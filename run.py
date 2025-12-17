@@ -1,13 +1,15 @@
 import os
 import sys
 
-# This line tells Python to look inside your nested folders
-sys.path.append(os.path.join(os.path.dirname(__file__), 'app', 'app', 'app'))
+# This tells Python to treat the deep nested folder as the starting point
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(BASE_DIR, 'app', 'app', 'app'))
 
 try:
+    # This tries to import it after we added the path
     from app import create_app
 except ImportError:
-    # Fallback for different directory resolutions
+    # Fallback import
     from app.app.app.app import create_app
 
 app = create_app()
