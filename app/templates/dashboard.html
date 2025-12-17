@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-1 space-y-6">
+        <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 text-center">
+            <h3 class="text-slate-400 text-xs font-black uppercase mb-4 tracking-widest">Overall Health Score</h3>
+            <div class="text-7xl font-black text-indigo-600">{{ audit.overall_score if audit else '0' }}%</div>
+        </div>
+        <a href="/audit/new" class="block w-full text-center bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700">Trigger New Manual Audit</a>
+    </div>
+
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="px-6 py-4 text-xs font-black text-slate-400 uppercase">Category</th>
+                    <th class="px-6 py-4 text-xs font-black text-slate-400 uppercase">Metric</th>
+                    <th class="px-6 py-4 text-xs font-black text-slate-400 uppercase text-right">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if audit and audit.metrics_json %}
+                    {% for category, data in audit.metrics_json.items() %}
+                    <tr class="border-b border-slate-50">
+                        <td class="px-6 py-4 font-bold text-indigo-600">{{ category|capitalize }}</td>
+                        <td class="px-6 py-4 text-slate-600">{{ data.name }}</td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="px-3 py-1 rounded-full text-xs font-black {{ 'bg-green-100 text-green-700' if data.pass else 'bg-red-100 text-red-700' }}">
+                                {{ 'PASS' if data.pass else 'FAIL' }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="3" class="px-6 py-20 text-center text-slate-400">No audit data available. Run your first scan.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
