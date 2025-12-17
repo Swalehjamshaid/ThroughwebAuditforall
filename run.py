@@ -1,21 +1,22 @@
 import os
 import sys
 
-# 1. Get the absolute path to the deepest folder where app.py lives
-# This points to /app/app/app/ inside your container
+# 1. Identify the absolute path to the deepest folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEEP_CODE_DIR = os.path.join(BASE_DIR, 'app', 'app', 'app')
+# This points exactly to where your app.py lives
+CODE_LOC = os.path.join(BASE_DIR, 'app', 'app', 'app')
 
-# 2. Add this path to the very top of Python's search list
-sys.path.insert(0, DEEP_CODE_DIR)
+# 2. Add it to the front of the path
+sys.path.insert(0, CODE_LOC)
 
 try:
-    # Now that the path is set, Python can find 'app.py' directly
-    from app import create_app
-    app = create_app()
-except ImportError as e:
-    print(f"Path Injection failed: {e}")
-    # Final fallback attempt
+    # IMPORTANT: We import the FILE 'app.py' as a unique name 'myapp'
+    # to stop Python from looking at the 'app/' folder.
+    import app as myapp_module
+    app = myapp_module.create_app()
+except Exception as e:
+    print(f"Direct file import failed: {e}")
+    # Fallback only
     from app.app.app.app import create_app
     app = create_app()
 
