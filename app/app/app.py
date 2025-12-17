@@ -7,7 +7,7 @@ db = SQLAlchemy()
 def create_app():
     app = Flask(__name__)
 
-    # Database URL adjustment for Railway
+    # Fix the Railway DATABASE_URL prefix
     uri = os.getenv("DATABASE_URL")
     if uri and uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
@@ -17,16 +17,17 @@ def create_app():
 
     db.init_app(app)
 
+    # Root route to stop 404
     @app.route('/')
     def home():
-        return "<h1>Throughweb Audit App is Online</h1>"
+        return "<h1>Throughweb Audit Status: Online</h1>"
 
+    # Auto-create tables (Organization, User, AuditRun)
     with app.app_context():
         try:
-            # This triggers your models.py to create the Postgres tables
             from . import models
             db.create_all()
         except Exception as e:
-            print(f"Startup DB log: {e}")
+            print(f"DB Sync Log: {e}")
 
     return app
