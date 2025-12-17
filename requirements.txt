@@ -1,0 +1,12 @@
+flask
+flask-sqlalchemy
+flask-bcrypt
+flask-login
+flask-mail
+psycopg2-binary
+celery
+redis
+httpx
+beautifulsoup4
+weasyprint
+pytz
