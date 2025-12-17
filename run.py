@@ -1,21 +1,21 @@
 import os
 import sys
 
-# 1. Clear the path confusion
+# Get the absolute path to the deepest folder where app.py actually lives
+# This tells Python to look directly at your code first
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Point exactly to the folder containing your app.py
-PROJECT_ROOT = os.path.join(BASE_DIR, 'app', 'app', 'app')
-sys.path.insert(0, PROJECT_ROOT)
+DEEP_CODE_DIR = os.path.join(BASE_DIR, 'app', 'app', 'app')
+sys.path.insert(0, DEEP_CODE_DIR)
 
 try:
-    # We import from 'app.py' directly now that its folder is in the path
+    # Now that we've added the path, we can import 'app.py' directly
     import app as app_module
-    create_app = app_module.create_app
-except (ImportError, AttributeError) as e:
-    print(f"Direct import failed, trying absolute path... Error: {e}")
+    flask_app = app_module.create_app()
+except Exception as e:
+    print(f"Import failed: {e}")
+    # Final safety fallback
     from app.app.app.app import create_app
-
-flask_app = create_app()
+    flask_app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
