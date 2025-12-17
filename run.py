@@ -1,21 +1,23 @@
 import os
 import sys
 
-# Get the absolute path to the folder containing this file (run.py)
-basedir = os.path.abspath(os.path.dirname(__file__))
+# 1. Path Diagnosis: Find the absolute path to the deepest folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# This points exactly to where your app.py and models.py are
+DEEP_PATH = os.path.join(BASE_DIR, 'app', 'app', 'app')
 
-# Add the deep nested path to the Python path
-# This allows 'from app import create_app' to work
-sys.path.append(os.path.join(basedir, 'app', 'app', 'app'))
+# 2. Inject this path into Python's search list
+sys.path.insert(0, DEEP_PATH)
 
 try:
-    # Try to import from the added path
+    # Now Python can see 'app.py' inside the deep folder directly
     from app import create_app
-except ImportError:
-    # Backup import if the above fails
+    app = create_app()
+except ImportError as e:
+    print(f"Path Error: {e}")
+    # Fallback for Gunicorn context
     from app.app.app.app import create_app
-
-app = create_app()
+    app = create_app()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
