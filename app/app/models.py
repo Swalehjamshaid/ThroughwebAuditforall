@@ -1,10 +1,10 @@
-# app/app/app/models.py
+# app/models.py
 
 import uuid
 from datetime import datetime
 from flask_login import UserMixin
 
-# DO NOT import db here — it will be available via the app context
+# No need to import db here — it's available via app context
 
 class Organization(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
