@@ -1,15 +1,18 @@
 import os
 import sys
 
-# This tells Python to treat the deep nested folder as the starting point
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(BASE_DIR, 'app', 'app', 'app'))
+# Get the absolute path to the folder containing this file (run.py)
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Add the deep nested path to the Python path
+# This allows 'from app import create_app' to work
+sys.path.append(os.path.join(basedir, 'app', 'app', 'app'))
 
 try:
-    # This tries to import it after we added the path
+    # Try to import from the added path
     from app import create_app
 except ImportError:
-    # Fallback import
+    # Backup import if the above fails
     from app.app.app.app import create_app
 
 app = create_app()
