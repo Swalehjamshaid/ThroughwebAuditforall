@@ -1,21 +1,19 @@
 import os
 import sys
 
-# 1. Path Diagnosis: Find the absolute path to the deepest folder
+# 1. Force Python to look in the deepest 'app' folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# This points exactly to where your app.py and models.py are
 DEEP_PATH = os.path.join(BASE_DIR, 'app', 'app', 'app')
-
-# 2. Inject this path into Python's search list
 sys.path.insert(0, DEEP_PATH)
 
+# 2. Import and create the app
 try:
-    # Now Python can see 'app.py' inside the deep folder directly
+    # After shifting the path, 'app' now refers to the file 'app.py' inside the deep folder
     from app import create_app
     app = create_app()
-except ImportError as e:
-    print(f"Path Error: {e}")
-    # Fallback for Gunicorn context
+except Exception as e:
+    print(f"CRITICAL: Path error. Details: {e}")
+    # Final backup attempt
     from app.app.app.app import create_app
     app = create_app()
 
