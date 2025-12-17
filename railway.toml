@@ -1,11 +1,2 @@
-[build]
-builder = "dockerfile"
-
 [deploy]
-startCommand = "python run.py"
-
-[services.worker]
-startCommand = "celery -A app.app.worker.celery_app worker --loglevel=info"
-
-[services.scheduler]
-startCommand = "celery -A app.app.worker.celery_app beat --loglevel=info"
+startCommand = "gunicorn run:app"
