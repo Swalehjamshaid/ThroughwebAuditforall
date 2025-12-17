@@ -1,33 +1,32 @@
-import os
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+# app/app/app/models.py
 
-db = SQLAlchemy()
+import uuid
+from datetime import datetime
+from flask_login import UserMixin
 
-def create_app():
-    app = Flask(__name__)
+# DO NOT import db here — it will be available via the app context
 
-    # Database Configuration (Fixed for Railway)
-    uri = os.getenv("DATABASE_URL")
-    if uri and uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
-    
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri or "sqlite:///local.db"
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+class Organization(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = db.Column(db.String(100))
+    report_frequency = db.Column(db.String(20), default='weekly')
+    report_time = db.Column(db.String(5), default='09:00')
+    timezone = db.Column(db.String(50), default='UTC')
+    users = db.relationship('User', backref='org', lazy=True)
 
-    db.init_app(app)
+class User(db.Model, UserMixin):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = db.Column(db.String(100), unique=True)
+    username = db.Column(db.String(80))
+    password_hash = db.Column(db.String(200))
+    role = db.Column(db.String(20), default='customer')
+    is_confirmed = db.Column(db.Boolean, default=False)
+    organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
 
-    # Prevent 404
-    @app.route('/')
-    def index():
-        return "<h1>Throughweb Audit System Online</h1>"
-
-    # Create Tables automatically
-    with app.app_context():
-        try:
-            from . import models
-            db.create_all()
-        except Exception as e:
-            print(f"DB Sync log: {e}")
-
-    return app
+class AuditRun(db.Model):
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    website_url = db.Column(db.String(255))
+    overall_score = db.Column(db.Integer, default=0)
+    metrics_json = db.Column(db.JSON)
+    organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
