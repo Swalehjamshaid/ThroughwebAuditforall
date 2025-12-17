@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from flask_login import UserMixin
-from .app import db  # This links to the 'db' initialized in your app.py
+from .app import db  # Ensure this relative import points to app.py
 
 class Organization(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -9,7 +9,6 @@ class Organization(db.Model):
     report_frequency = db.Column(db.String(20), default='weekly')
     report_time = db.Column(db.String(5), default='09:00') 
     timezone = db.Column(db.String(50), default='UTC')
-    # Relationship to User
     users = db.relationship('User', backref='org', lazy=True)
 
 class User(db.Model, UserMixin):
