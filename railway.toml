@@ -1,2 +1,6 @@
+[build]
+builder = "dockerfile" # Or nixpacks if you don't have a Dockerfile
+
 [deploy]
 startCommand = "gunicorn run:app"
+restartPolicyType = "on_failure"
