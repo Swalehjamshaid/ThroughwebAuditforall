@@ -1,24 +1,21 @@
 import os
 import sys
 
-# 1. Standardize pathing
+# 1. Standardize the root path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# 2. Add EVERY possible nested folder to sys.path
-# This forces Python to find your code no matter how many 'app' folders exist
-path_to_logic = os.path.join(BASE_DIR, 'app', 'app', 'app', 'app')
-if os.path.exists(path_to_logic):
-    sys.path.insert(0, path_to_logic)
+# 2. Add both levels of 'app' folders to the path
+# This ensures Python finds 'app' and 'app.app' regardless of nesting
+sys.path.append(os.path.join(BASE_DIR, 'app'))
+sys.path.append(os.path.join(BASE_DIR, 'app', 'app'))
 
-# 3. Import create_app using the internal name
 try:
-    # This tries to load from the deepest folder directly
-    import __init__ as core
-    create_app = core.create_app
-except (ImportError, AttributeError):
-    # Fallback to standard import if nesting changes
-    from app.app.app.app import create_app
+    # Try importing from the consolidated package
+    from app import create_app
+except ImportError:
+    # Fallback if your GitHub folder structure is still deeply nested
+    from app.app import create_app
 
 app = create_app()
 
