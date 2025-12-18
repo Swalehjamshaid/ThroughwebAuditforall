@@ -1,5 +1,10 @@
 
 [deploy]
-startCommand = "gunicorn --bind 0.0.0.0:${PORT:-8080} run:app"
-healthcheckPath = "/"
+# Start Gunicorn and bind to the port provided by Railway
+startCommand = "gunicorn --bind 0.0.0.0:$PORT run:app"
+
+# Healthcheck path that always returns 200 OK
+healthcheckPath = "/health"
+
+# Optional: restart policy
 restartPolicyType = "always"
