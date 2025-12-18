@@ -1,36 +1,26 @@
-from flask import Blueprint, request, redirect, url_for, render_template, flash
-from . import db, bcrypt, mail
-from .models import User, Organization
 
-auth = Blueprint('auth', __name__)
+# app/app/auth.py
+from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask_login import login_user, logout_user, login_required
+from .. import db, bcrypt
+from .models import User  # models lives in the same nested package
 
-@auth.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        try:
-            # Create Organization
-            org = Organization(name=request.form.get('org_name'))
-            db.session.add(org)
-            db.session.flush()
+auth = Blueprint("auth", __name__, url_prefix="/auth")
 
-            # Create User
-            hashed_pw = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-            user = User(
-                email=request.form.get('email'),
-                username=request.form.get('username'),
-                password_hash=hashed_pw,
-                organization_id=org.id
-            )
-            db.session.add(user)
-            db.session.commit()
-
-            flash("Success! Please log in.", "success")
-            return redirect(url_for('auth.login'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f"Error: {str(e)}", "danger")
-    return render_template('register.html')
-
-@auth.route('/login')
+@auth.route("/login", methods=["GET", "POST"])
 def login():
-    return render_template('login.html')
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        user = User.query.filter_by(email=email).first()
+        if user and bcrypt.check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for("core.dashboard"))
+        flash("Invalid credentials", "danger")
+    return render_template("login.html")
+
+@auth.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("auth.login"))
