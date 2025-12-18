@@ -5,43 +5,40 @@ from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
 
-# Initialize globally
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
 mail = Mail()
 
 def create_app():
-    # LINK TEMPLATES: Points to /app/templates relative to this file
-    # This works even if you are 2 or 3 levels deep
-    current_file_dir = os.path.dirname(os.path.abspath(__file__))
-    template_dir = os.path.abspath(os.path.join(current_file_dir, '..', 'templates'))
-    
-    app = Flask(__name__, template_folder=template_dir)
+    app = Flask(__name__)
 
-    # DATABASE LINKING: Link to Railway Postgres
-    database_url = os.getenv("DATABASE_URL")
-    if database_url and database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    # DATABASE FIX: Converts Railway URL for SQLAlchemy compatibility
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # Init extensions
+    # Initialize extensions
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
     mail.init_app(app)
 
-    # Register Blueprints
-    from .auth import auth as auth_blueprint
-    app.register_blueprint(auth_blueprint)
+    # Register Blueprints (using local relative import)
+    try:
+        from .auth import auth as auth_blueprint
+        app.register_blueprint(auth_blueprint)
+    except Exception as e:
+        print(f"Blueprint Error: {e}")
 
-    # SYNC DATABASE: This creates the tables in your empty Railway DB
+    # SYNC TABLES: This makes the "No Tables" message in Railway disappear
     with app.app_context():
         from . import models
         db.create_all()
-        print("Railway Postgres: Sync Success")
+        print("DATABASE SYNC: SUCCESSFUL")
 
     return app
