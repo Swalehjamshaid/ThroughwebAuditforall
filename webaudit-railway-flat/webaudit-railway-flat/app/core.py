@@ -1,4 +1,5 @@
 
+# app/app/core.py
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from .models import db, Website, Audit
@@ -6,11 +7,16 @@ from .tasks import run_lighthouse_audit
 
 core = Blueprint("core", __name__)
 
-@core.route('/')
-def index():
-    return render_template('index.html')
+# --- Healthcheck endpoint (Railway will call this) ---
+@core.route("/health")
+def health():
+    return "OK", 200
 
-@core.route('/dashboard')
+@core.route("/")
+def index():
+    return render_template("index.html")
+
+@core.route("/dashboard")
 @login_required
 def dashboard():
     websites = Website.query.filter_by(user_id=current_user.id).all()
@@ -26,12 +32,12 @@ def dashboard():
                 "seo": a.score_seo,
                 "bp": a.score_best_practices
             })
-    return render_template('dashboard.html', latest=latest, websites=websites)
+    return render_template("dashboard.html", latest=latest, websites=websites)
 
-@core.post('/api/audit')
+@core.post("/api/audit")
 @login_required
 def start_audit():
-    url = request.json.get('url')
+    url = request.json.get("url")
     w = Website.query.filter_by(user_id=current_user.id, url=url).first()
     if not w:
         w = Website(url=url, owner=current_user)
