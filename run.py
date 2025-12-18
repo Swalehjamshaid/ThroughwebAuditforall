@@ -1,15 +1,17 @@
 import os
 import sys
 
-# 1. Standardize the root path
+# 1. Standardize paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# 2. Add both levels of 'app' folders to the path
-# This ensures that 'from app import create_app' works regardless of nesting
-sys.path.append(os.path.join(BASE_DIR, 'app'))
-sys.path.append(os.path.join(BASE_DIR, 'app', 'app'))
+# 2. Add the nested folders to sys.path
+# This allows 'import auth' to work even if it's 3 levels deep
+app_path = os.path.join(BASE_DIR, 'app', 'app')
+if os.path.exists(app_path):
+    sys.path.insert(0, app_path)
 
+# 3. Import create_app
 try:
     from app.app import create_app
 except ImportError:
