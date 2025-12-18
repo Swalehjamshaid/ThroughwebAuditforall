@@ -1,7 +1,7 @@
 import os
 import sys
 
-# Ensure the app folder is recognized as a package for imports
+# Add the current directory to sys.path to ensure 'app' is found
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app import create_app
