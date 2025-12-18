@@ -1,5 +1,4 @@
 
-# app/app/core.py
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from .models import db, Website, Audit
@@ -7,14 +6,15 @@ from .tasks import run_lighthouse_audit
 
 core = Blueprint("core", __name__)
 
-# --- Healthcheck endpoint (Railway will call this) ---
+# --- Healthcheck endpoint ---
 @core.route("/health")
 def health():
     return "OK", 200
 
 @core.route("/")
 def index():
-    return render_template("index.html")
+    # A simple homepage; you can swap back to templates later
+    return "WebAudit is running", 200
 
 @core.route("/dashboard")
 @login_required
