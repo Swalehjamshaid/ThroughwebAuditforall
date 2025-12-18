@@ -5,7 +5,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
 
-# Initialize extensions
+# Initialize Extensions
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
@@ -14,18 +14,27 @@ mail = Mail()
 def create_app():
     app = Flask(__name__)
 
-    # 1. DATABASE FIX FOR RAILWAY
-    # Railway provides 'postgres://', but SQLAlchemy 2.0 requires 'postgresql://'
-    uri = os.getenv("DATABASE_URL")
-    if uri and uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+    # --- DATABASE CONFIGURATION ---
+    # Railway often provides 'postgres://', but SQLAlchemy 2.0 requires 'postgresql://'
+    # We fix this automatically here.
+    database_url = os.getenv("DATABASE_URL")
     
-    # If no DATABASE_URL is found, it defaults to a local sqlite file for safety
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri or "sqlite:///local.db"
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
+    # Using your linked Railway variable or a fallback for local testing
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-secret-key-123")
+    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
 
-    # 2. Initialize App with Extensions
+    # --- MAIL CONFIGURATION ---
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.getenv("MAIL_USERNAME")
+    app.config['MAIL_PASSWORD'] = os.getenv("MAIL_PASSWORD")
+
+    # Initialize App with Extensions
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -39,6 +48,7 @@ def create_app():
         return User.query.get(user_id)
 
     # --- ROUTES ---
+
     @app.route('/')
     @app.route('/login', methods=['GET', 'POST'])
     def login():
@@ -55,17 +65,30 @@ def create_app():
     def register():
         if request.method == 'POST':
             from .models import User, Organization
-            hashed_pwd = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-            new_org = Organization(name=request.form.get('org_name'))
-            db.session.add(new_org)
-            db.session.flush()
-            new_user = User(
-                username=request.form.get('username'), email=request.form.get('email'),
-                password_hash=hashed_pwd, organization_id=new_org.id
-            )
-            db.session.add(new_user)
-            db.session.commit()
-            return redirect(url_for('login'))
+            try:
+                # Hash password securely
+                hashed_pwd = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
+                
+                # Create Organization
+                new_org = Organization(name=request.form.get('org_name'))
+                db.session.add(new_org)
+                db.session.flush() # Generate Org ID
+
+                # Create User
+                new_user = User(
+                    username=request.form.get('username'),
+                    email=request.form.get('email'),
+                    password_hash=hashed_pwd,
+                    organization_id=new_org.id
+                )
+                db.session.add(new_user)
+                db.session.commit()
+                flash('Account created! Please login.')
+                return redirect(url_for('login'))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Registration Error: {str(e)}')
+                return redirect(url_for('register'))
         return render_template('register.html')
 
     @app.route('/dashboard')
@@ -84,7 +107,7 @@ def create_app():
         org.report_time = request.form.get('report_time')
         org.timezone = request.form.get('timezone')
         db.session.commit()
-        flash('Settings updated!')
+        flash('Preferences updated!')
         return redirect(url_for('dashboard'))
 
     @app.route('/logout')
@@ -92,14 +115,13 @@ def create_app():
         logout_user()
         return redirect(url_for('login'))
 
-    # 3. SAFE DATABASE INITIALIZATION
+    # --- AUTOMATIC DATABASE SYNC ---
     with app.app_context():
         try:
             from . import models
             db.create_all()
-            print("Postgres Connection: SUCCESS")
+            print("Postgres: Connection and table sync successful.")
         except Exception as e:
-            print(f"Postgres Connection: FAILED. Error: {e}")
-            # This allows the app to finish booting even if the DB is slow to respond
+            print(f"Postgres: Sync failed. Error: {e}")
 
     return app
