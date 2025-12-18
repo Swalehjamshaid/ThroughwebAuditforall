@@ -15,11 +15,3 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(200), nullable=False)
     is_confirmed = db.Column(db.Boolean, default=False)
     organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
-
-class AuditRun(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    website_url = db.Column(db.String(255))
-    overall_score = db.Column(db.Integer, default=0)
-    metrics_json = db.Column(db.JSON)
-    organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
