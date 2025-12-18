@@ -1,29 +1,37 @@
 import os
 import sys
 
-# 1. Get the absolute path of the root directory
+# 1. Get the absolute path of the project root
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# 2. Path to the FIRST 'app' folder
-first_app_level = os.path.join(BASE_DIR, 'app')
-sys.path.insert(0, first_app_level)
+# 2. Add all potential nested app directories to sys.path
+# This ensures that 'from app import create_app' works no matter what
+potential_paths = [
+    os.path.join(BASE_DIR, 'app'),
+    os.path.join(BASE_DIR, 'app', 'app'),
+    os.path.join(BASE_DIR, 'app', 'app', 'app')
+]
 
-# 3. Path to the SECOND 'app' folder (where __init__.py and models.py live)
-second_app_level = os.path.join(first_app_level, 'app')
-sys.path.insert(0, second_app_level)
+for path in potential_paths:
+    if os.path.exists(path):
+        sys.path.insert(0, path)
 
-# Now, we try to import create_app. 
-# Depending on your specific Git upload, one of these WILL work.
+# 3. Flexible Import Logic
 try:
+    # Try direct import first
     from app import create_app
 except ImportError:
     try:
+        # Try nested import
         from app.app import create_app
     except ImportError:
-        # Emergency fallback for nested structures
-        import app
-        create_app = app.create_app
+        # Final fallback: manually find the function
+        import importlib
+        spec = importlib.util.spec_from_file_location("app_pkg", os.path.join(BASE_DIR, "app/app/__init__.py"))
+        app_pkg = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(app_pkg)
+        create_app = app_pkg.create_app
 
 app = create_app()
 
