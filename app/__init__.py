@@ -5,6 +5,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_bcrypt import Bcrypt
 from flask_mail import Mail
 
+# Initialize extensions
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
@@ -13,22 +14,18 @@ mail = Mail()
 def create_app():
     app = Flask(__name__)
 
-    # 1. Database & Security Config
+    # 1. DATABASE FIX FOR RAILWAY
+    # Railway provides 'postgres://', but SQLAlchemy 2.0 requires 'postgresql://'
     uri = os.getenv("DATABASE_URL")
     if uri and uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
     
+    # If no DATABASE_URL is found, it defaults to a local sqlite file for safety
     app.config['SQLALCHEMY_DATABASE_URI'] = uri or "sqlite:///local.db"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secure-key-here")
-    
-    # Mail Config (Referenced from Railway Variables)
-    app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-    app.config['MAIL_PORT'] = 587
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
-    app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "dev-secret-key-123")
 
+    # 2. Initialize App with Extensions
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -42,14 +39,12 @@ def create_app():
         return User.query.get(user_id)
 
     # --- ROUTES ---
-
     @app.route('/')
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if request.method == 'POST':
             from .models import User
             user = User.query.filter_by(email=request.form.get('email')).first()
-            # Verify hashed password
             if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
                 login_user(user)
                 return redirect(url_for('dashboard'))
@@ -60,22 +55,16 @@ def create_app():
     def register():
         if request.method == 'POST':
             from .models import User, Organization
-            # Hash the password before storing
             hashed_pwd = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-            
             new_org = Organization(name=request.form.get('org_name'))
             db.session.add(new_org)
             db.session.flush()
-
             new_user = User(
-                username=request.form.get('username'),
-                email=request.form.get('email'),
-                password_hash=hashed_pwd,
-                organization_id=new_org.id
+                username=request.form.get('username'), email=request.form.get('email'),
+                password_hash=hashed_pwd, organization_id=new_org.id
             )
             db.session.add(new_user)
             db.session.commit()
-            flash('Registration successful! Please login.')
             return redirect(url_for('login'))
         return render_template('register.html')
 
@@ -95,7 +84,7 @@ def create_app():
         org.report_time = request.form.get('report_time')
         org.timezone = request.form.get('timezone')
         db.session.commit()
-        flash('Reporting preferences updated!')
+        flash('Settings updated!')
         return redirect(url_for('dashboard'))
 
     @app.route('/logout')
@@ -103,7 +92,14 @@ def create_app():
         logout_user()
         return redirect(url_for('login'))
 
+    # 3. SAFE DATABASE INITIALIZATION
     with app.app_context():
-        db.create_all()
+        try:
+            from . import models
+            db.create_all()
+            print("Postgres Connection: SUCCESS")
+        except Exception as e:
+            print(f"Postgres Connection: FAILED. Error: {e}")
+            # This allows the app to finish booting even if the DB is slow to respond
 
     return app
