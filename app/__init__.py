@@ -13,19 +13,17 @@ def create_app():
     app = Flask(__name__)
 
     # --- DATABASE LINKING ---
-    # This pulls the DATABASE_URL you just set in the Railway variables
-    uri = os.getenv("DATABASE_URL")
+    # Railway provides 'postgres://', but SQLAlchemy 2.0 requires 'postgresql://'
+    database_url = os.getenv("DATABASE_URL")
     
-    # Safety check: SQLAlchemy requires 'postgresql://' (which your vars have)
-    # But we keep this fix just in case Railway's internal string changes
-    if uri and uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
 
-    # Initialize extensions
+    # Initialize extensions with the app
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -33,24 +31,23 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        # We use absolute imports to fix the ModuleNotFoundError
         from app.models import User
         return User.query.get(user_id)
 
-    # --- REGISTRATION ROUTE ---
+    # --- REGISTRATION LOGIC ---
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
             from app.models import User, Organization
             try:
+                # Use bcrypt to hash the password securely
                 hashed_pwd = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
                 
-                # Create the Organization
+                # Create Organization and User
                 new_org = Organization(name=request.form.get('org_name'))
                 db.session.add(new_org)
                 db.session.flush()
 
-                # Create the User
                 new_user = User(
                     username=request.form.get('username'),
                     email=request.form.get('email'),
@@ -59,21 +56,39 @@ def create_app():
                 )
                 db.session.add(new_user)
                 db.session.commit()
-                flash('Registration successful!')
+                flash('Registration successful! Please login.')
                 return redirect(url_for('login'))
             except Exception as e:
                 db.session.rollback()
-                print(f"DEBUG: Registration failed: {e}")
-                flash("Error connecting to database.")
+                flash(f"Error: {str(e)}")
         return render_template('register.html')
 
-    # --- DATABASE SYNC ---
+    # --- OTHER ROUTES ---
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        if request.method == 'POST':
+            from app.models import User
+            user = User.query.filter_by(email=request.form.get('email')).first()
+            if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
+                login_user(user)
+                return redirect(url_for('dashboard'))
+            flash('Invalid email or password.')
+        return render_template('login.html')
+
+    @app.route('/dashboard')
+    @login_required
+    def dashboard():
+        from app.models import AuditRun
+        audit = AuditRun.query.filter_by(organization_id=current_user.organization_id).order_by(AuditRun.created_at.desc()).first()
+        return render_template('dashboard.html', audit=audit)
+
+    # --- THE "FILL TABLE" TRIGGER ---
     with app.app_context():
         try:
             from app import models
-            db.create_all()
-            print("Postgres: Database tables synchronized successfully.")
+            db.create_all()  # This creates the tables in your Railway Postgres service
+            print("Postgres Sync: SUCCESS")
         except Exception as e:
-            print(f"Postgres Error: Could not connect or create tables: {e}")
+            print(f"Postgres Sync: FAILED - {e}")
 
     return app
