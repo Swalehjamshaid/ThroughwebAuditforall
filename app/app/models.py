@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from flask_login import UserMixin
-from . import db 
+from . import db  # Import from same package (app.app)
 
 class Organization(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
