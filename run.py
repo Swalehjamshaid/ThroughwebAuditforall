@@ -1,29 +1,31 @@
 import os
 import sys
+import importlib.util
 
-# 1. Get the absolute path of the root directory
+# 1. Root path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, BASE_DIR)
 
-# 2. Add ALL levels of 'app' to the path to ensure Python finds the logic
-# This handles: Root -> app -> app -> app
-level1 = os.path.join(BASE_DIR, 'app')
-level2 = os.path.join(level1, 'app')
-level3 = os.path.join(level2, 'app')
+def get_create_app():
+    # This manually searches for the deepest __init__.py containing your app
+    for root, dirs, files in os.walk(BASE_DIR):
+        if "__init__.py" in files:
+            full_path = os.path.join(root, "__init__.py")
+            with open(full_path, 'r', errors='ignore') as f:
+                content = f.read()
+                if 'def create_app' in content:
+                    # Found it! Add this folder to Python's memory
+                    sys.path.insert(0, root)
+                    spec = importlib.util.spec_from_file_location("app_core", full_path)
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    return module.create_app()
+    return None
 
-for path in [level1, level2, level3]:
-    if os.path.exists(path):
-        sys.path.insert(0, path)
-
-# 3. Import the app factory
-try:
-    # We look for the folder that contains __init__.py with create_app
-    from app.app import create_app
-except ImportError:
-    from app import create_app
-
-app = create_app()
+app = get_create_app()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    if app:
+        port = int(os.environ.get("PORT", 8080))
+        app.run(host="0.0.0.0", port=port)
+    else:
+        print("CRITICAL ERROR: Could not find create_app function in any folder.")
