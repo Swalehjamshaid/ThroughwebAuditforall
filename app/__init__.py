@@ -15,6 +15,7 @@ def create_app():
     app = Flask(__name__)
 
     # --- DATABASE CONFIG ---
+    # Fixes the Railway 'postgres://' string for SQLAlchemy 2.0
     database_url = os.getenv("DATABASE_URL")
     if database_url and database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
@@ -23,7 +24,7 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
 
-    # Initialize extensions
+    # Initialize extensions with the app
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -33,9 +34,8 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        # Use absolute import
-        import models
-        return models.User.query.get(user_id)
+        from app.models import User
+        return User.query.get(user_id)
 
     # --- ROUTES ---
 
@@ -43,8 +43,8 @@ def create_app():
     @app.route('/login', methods=['GET', 'POST'])
     def login():
         if request.method == 'POST':
-            import models
-            user = models.User.query.filter_by(email=request.form.get('email')).first()
+            from app.models import User
+            user = User.query.filter_by(email=request.form.get('email')).first()
             if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
                 login_user(user)
                 return redirect(url_for('dashboard'))
@@ -54,14 +54,14 @@ def create_app():
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
-            import models
+            from app.models import User, Organization
             try:
                 hashed_pwd = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
-                new_org = models.Organization(name=request.form.get('org_name'))
+                new_org = Organization(name=request.form.get('org_name'))
                 db.session.add(new_org)
                 db.session.flush()
 
-                new_user = models.User(
+                new_user = User(
                     username=request.form.get('username'),
                     email=request.form.get('email'),
                     password_hash=hashed_pwd,
@@ -69,7 +69,7 @@ def create_app():
                 )
                 db.session.add(new_user)
                 db.session.commit()
-                flash('Registration successful!')
+                flash('Registration successful! Please login.')
                 return redirect(url_for('login'))
             except Exception as e:
                 db.session.rollback()
@@ -79,16 +79,33 @@ def create_app():
     @app.route('/dashboard')
     @login_required
     def dashboard():
-        import models
-        audit = models.AuditRun.query.filter_by(organization_id=current_user.organization_id).order_by(models.AuditRun.created_at.desc()).first()
+        from app.models import AuditRun
+        audit = AuditRun.query.filter_by(organization_id=current_user.organization_id).order_by(AuditRun.created_at.desc()).first()
         return render_template('dashboard.html', audit=audit)
+
+    @app.route('/settings/update', methods=['POST'])
+    @login_required
+    def update_settings():
+        from app.models import Organization
+        org = Organization.query.get(current_user.organization_id)
+        org.report_frequency = request.form.get('frequency')
+        org.report_time = request.form.get('report_time')
+        org.timezone = request.form.get('timezone')
+        db.session.commit()
+        flash('Settings updated!')
+        return redirect(url_for('dashboard'))
+
+    @app.route('/logout')
+    def logout():
+        logout_user()
+        return redirect(url_for('login'))
 
     # --- DATABASE SYNC ---
     with app.app_context():
         try:
-            import models
+            from app import models
             db.create_all()
-            print("Postgres: Sync Successful")
+            print("Postgres: Connection and table sync successful.")
         except Exception as e:
             print(f"Postgres Sync Error: {e}")
 
