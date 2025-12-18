@@ -1,47 +1,58 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager
 from flask_bcrypt import Bcrypt
+from flask_mail import Mail
 
+# Initialize extensions globally
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()
+mail = Mail()
 
 def create_app():
-    # Templates are located one level up from this file
+    # LINK TEMPLATES: Points back one level to ThroughwebAuditforall/app/templates
     template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
     app = Flask(__name__, template_folder=template_dir)
 
-    # Database Configuration
-    database_url = os.getenv("DATABASE_URL")
-    if database_url and database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    # DATABASE LINKING
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    # Initialize extensions
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
-    login_manager.login_view = 'login'
+    mail.init_app(app)
+
+    login_manager.login_view = 'auth.login'
 
     @login_manager.user_loader
     def load_user(user_id):
-        import models
-        return models.User.query.get(user_id)
+        from .models import User
+        return User.query.get(user_id)
 
-    # Routes (Login/Register/Dashboard)
-    # ... (Keep your existing route logic here)
+    # REGISTER BLUEPRINTS (Auth, Audit, etc.)
+    from .auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint)
 
-    # AUTOMATIC TABLE FILL
+    # MAIN ROUTES
+    @app.route('/dashboard')
+    def dashboard():
+        from .models import AuditRun
+        from flask_login import current_user, login_required
+        return render_template('dashboard.html')
+
+    # TRIGGER TABLE CREATION (Fills the Postgres DB on Railway)
     with app.app_context():
-        try:
-            import models
-            db.create_all()
-            print("Postgres Sync: Success - Tables Created")
-        except Exception as e:
-            print(f"Postgres Sync: Error - {e}")
+        from . import models
+        db.create_all()
+        print("Postgres Sync: Success - Tables Created")
 
     return app
