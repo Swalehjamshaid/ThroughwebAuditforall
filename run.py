@@ -1,31 +1,22 @@
 import os
 import sys
-import importlib.util
 
-# 1. Root path
+# 1. Standardize the root path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, BASE_DIR)
 
-def get_create_app():
-    # This manually searches for the deepest __init__.py containing your app
-    for root, dirs, files in os.walk(BASE_DIR):
-        if "__init__.py" in files:
-            full_path = os.path.join(root, "__init__.py")
-            with open(full_path, 'r', errors='ignore') as f:
-                content = f.read()
-                if 'def create_app' in content:
-                    # Found it! Add this folder to Python's memory
-                    sys.path.insert(0, root)
-                    spec = importlib.util.spec_from_file_location("app_core", full_path)
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    return module.create_app()
-    return None
+# 2. Add both levels of 'app' folders to the path
+# This ensures that 'from app import create_app' works regardless of nesting
+sys.path.append(os.path.join(BASE_DIR, 'app'))
+sys.path.append(os.path.join(BASE_DIR, 'app', 'app'))
 
-app = get_create_app()
+try:
+    from app.app import create_app
+except ImportError:
+    from app import create_app
+
+app = create_app()
 
 if __name__ == "__main__":
-    if app:
-        port = int(os.environ.get("PORT", 8080))
-        app.run(host="0.0.0.0", port=port)
-    else:
-        print("CRITICAL ERROR: Could not find create_app function in any folder.")
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
