@@ -1,3 +1,5 @@
+
+# app/__init__.py
 import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -12,15 +14,15 @@ login_manager = LoginManager()
 mail = Mail()
 
 def create_app():
-    # Set template folder relative to this file
+    # Templates live under top-level app/templates
     template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
     app = Flask(__name__, template_folder=template_dir)
 
-    # Database Configuration (Auto-fix for Railway)
+    # Database Configuration (Railway postgres:// -> postgresql:// fix)
     uri = os.getenv("DATABASE_URL")
     if uri and uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql://", 1)
-    
+
     app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -35,19 +37,21 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        from .models import User
+        # models.py is under nested package app/app/models.py
+        from .app.models import User
         return User.query.get(user_id)
 
-    # Register Blueprints
-    from .auth import auth as auth_blueprint
-    from .core import core as core_blueprint
+    # Register Blueprints — NOTE the nested package path ".app.auth" & ".app.core"
+    from .app.auth import auth as auth_blueprint
+    from .app.core import core as core_blueprint
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(core_blueprint)
 
     # Sync Database on boot
     with app.app_context():
-        from . import models
+        # Import models from nested package
+        from .app import models
         db.create_all()
         print("--- DATABASE STATUS: CONNECTED & SYNCED ---")
 
-    return app
+   
