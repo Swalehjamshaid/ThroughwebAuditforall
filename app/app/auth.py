@@ -1,5 +1,4 @@
 from flask import Blueprint, request, redirect, url_for, render_template, flash
-from flask_login import login_user, logout_user, login_required
 from . import db, mail, bcrypt
 from .models import User, Organization
 from flask_mail import Message
@@ -10,12 +9,12 @@ auth = Blueprint('auth', __name__)
 def register():
     if request.method == 'POST':
         try:
-            # Create Organization first
+            # Create Organization
             org = Organization(name=request.form.get('org_name'))
             db.session.add(org)
             db.session.flush()
             
-            # Create User with hashed password
+            # Create User
             hashed_pw = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
             user = User(
                 email=request.form.get('email'), 
@@ -26,31 +25,18 @@ def register():
             db.session.add(user)
             db.session.commit()
 
-            # Email Verification Workflow
+            # Send verification link
             msg = Message("Verify Your Account", recipients=[user.email])
             msg.body = f"Click here to verify: {url_for('auth.verify', user_id=user.id, _external=True)}"
             mail.send(msg)
             
-            flash("Success! Check your email to verify your account.")
+            flash("Success! Check your email to verify.")
             return redirect(url_for('auth.login'))
         except Exception as e:
             db.session.rollback()
-            flash(f"Error during registration: {str(e)}")
+            flash(f"Error: {str(e)}")
             
     return render_template('register.html')
-
-@auth.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(email=request.form.get('email')).first()
-        if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
-            if not user.is_confirmed:
-                flash("Please verify your email first.")
-                return redirect(url_for('auth.login'))
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash("Invalid email or password.")
-    return render_template('login.html')
 
 @auth.route('/verify/<user_id>')
 def verify(user_id):
@@ -58,5 +44,4 @@ def verify(user_id):
     if user:
         user.is_confirmed = True
         db.session.commit()
-        flash("Email verified! You can now login.")
     return redirect(url_for('auth.login'))
