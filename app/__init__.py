@@ -10,19 +10,18 @@ bcrypt = Bcrypt()
 login_manager = LoginManager()
 
 def create_app():
-    # Pointing to the template folder inside the nested structure
+    # We explicitly tell Flask where the templates are relative to this nested file
     template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
     app = Flask(__name__, template_folder=template_dir)
 
-    # --- DATABASE INTEGRATION ---
-    database_url = os.getenv("DATABASE_URL")
-    # Fix for SQLAlchemy 2.0
-    if database_url and database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    # --- DATABASE CONFIG ---
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secret-key-123")
+    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
 
     db.init_app(app)
     bcrypt.init_app(app)
@@ -31,10 +30,23 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        import models # Direct import due to sys.path fix in run.py
+        import models  # Direct import thanks to run.py path fix
         return models.User.query.get(user_id)
 
-    # --- REGISTRATION FUNCTION ---
+    # --- ROUTES ---
+
+    @app.route('/')
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        if request.method == 'POST':
+            import models
+            user = models.User.query.filter_by(email=request.form.get('email')).first()
+            if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
+                login_user(user)
+                return redirect(url_for('dashboard'))
+            flash('Login Failed. Check your email and password.')
+        return render_template('login.html')
+
     @app.route('/register', methods=['GET', 'POST'])
     def register():
         if request.method == 'POST':
@@ -53,24 +65,11 @@ def create_app():
                 )
                 db.session.add(new_user)
                 db.session.commit()
-                flash('Registration successful!')
                 return redirect(url_for('login'))
             except Exception as e:
                 db.session.rollback()
-                flash(f"Database Error: {str(e)}")
+                flash(f"Error: {str(e)}")
         return render_template('register.html')
-
-    # --- LOGIN FUNCTION ---
-    @app.route('/login', methods=['GET', 'POST'])
-    def login():
-        if request.method == 'POST':
-            import models
-            user = models.User.query.filter_by(email=request.form.get('email')).first()
-            if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
-                login_user(user)
-                return redirect(url_for('dashboard'))
-            flash('Invalid email or password.')
-        return render_template('login.html')
 
     @app.route('/dashboard')
     @login_required
@@ -79,12 +78,17 @@ def create_app():
         audit = models.AuditRun.query.filter_by(organization_id=current_user.organization_id).order_by(models.AuditRun.created_at.desc()).first()
         return render_template('dashboard.html', audit=audit)
 
-    # --- AUTO-CREATE TABLES ---
+    @app.route('/logout')
+    def logout():
+        logout_user()
+        return redirect(url_for('login'))
+
+    # --- AUTOMATIC TABLE FILL ---
     with app.app_context():
         try:
             import models
             db.create_all()
-            print("Postgres: Tables Synchronized Successfully")
+            print("Postgres: Tables Created/Verified Successfully")
         except Exception as e:
             print(f"Postgres Error: {e}")
 
