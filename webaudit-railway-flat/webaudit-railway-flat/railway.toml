@@ -1,10 +1,9 @@
 
-# railway.toml (place this in the same folder as Dockerfile)
 [deploy]
-# Use sh -c so $PORT expands even if Railway runner doesn't shell-expand.
+# Use sh -c so $PORT expands even if the runner doesn't shell-expand.
 startCommand = "sh -c \"gunicorn --workers 2 --bind 0.0.0.0:$PORT run:app\""
 
 # Call the guaranteed healthy endpoint
-healthhealthcheckPath = "/health"
+healthcheckPath = "/health"
 
-# Keep restarting on failure
+restartPolicyType = "always"
