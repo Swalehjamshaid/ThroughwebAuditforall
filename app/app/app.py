@@ -1,32 +1,33 @@
-# app/app/app/models.py
+import os
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 
-import uuid
-from datetime import datetime
-from flask_login import UserMixin
+db = SQLAlchemy()
 
-# DO NOT import db here — it will be available via the app context
+def create_app():
+    # This reaches out of /app/app to /app/templates
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    template_dir = os.path.abspath(os.path.join(current_dir, '..', 'templates'))
+    
+    app = Flask(__name__, template_folder=template_dir)
 
-class Organization(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(100))
-    report_frequency = db.Column(db.String(20), default='weekly')
-    report_time = db.Column(db.String(5), default='09:00')
-    timezone = db.Column(db.String(50), default='UTC')
-    users = db.relationship('User', backref='org', lazy=True)
+    # Database Configuration
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = db.Column(db.String(100), unique=True)
-    username = db.Column(db.String(80))
-    password_hash = db.Column(db.String(200))
-    role = db.Column(db.String(20), default='customer')
-    is_confirmed = db.Column(db.Boolean, default=False)
-    organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
+    db.init_app(app)
 
-class AuditRun(db.Model):
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    website_url = db.Column(db.String(255))
-    overall_score = db.Column(db.Integer, default=0)
-    metrics_json = db.Column(db.JSON)
-    organization_id = db.Column(db.String(36), db.ForeignKey('organization.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Using local relative imports for blueprints
+    from .auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint)
+
+    with app.app_context():
+        from . import models
+        db.create_all()
+        print("Postgres Linked and Tables Created!")
+
+    return app
