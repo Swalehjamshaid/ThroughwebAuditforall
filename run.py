@@ -1,20 +1,29 @@
 import os
 import sys
 
-# 1. Get the absolute path of the root directory
+# Get the absolute path of the root directory
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# 2. Add the nested folders to the Python path
-# Matches your structure: ThroughwebAuditforall/app/app/
-first_level = os.path.join(BASE_DIR, 'app')
-second_level = os.path.join(first_level, 'app')
+# Force Python to look into the nested 'app/app' folder
+nested_logic_path = os.path.join(BASE_DIR, 'app', 'app')
+if os.path.exists(nested_logic_path):
+    sys.path.insert(0, nested_logic_path)
 
-sys.path.insert(0, first_level)
-sys.path.insert(0, second_level)
-
-# 3. Import create_app from the deepest nested package
-from app.app import create_app
+# Try flexible imports to catch the create_app function
+try:
+    from app.app import create_app
+except ImportError:
+    try:
+        from app import create_app
+    except ImportError:
+        # Final fallback: manual discovery
+        import importlib.util
+        init_path = os.path.join(nested_logic_path, "__init__.py")
+        spec = importlib.util.spec_from_file_location("app", init_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        create_app = module.create_app
 
 app = create_app()
 
