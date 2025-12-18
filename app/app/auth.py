@@ -38,8 +38,13 @@ def register():
             
     return render_template('register.html')
 
+@auth.route('/login')
+def login():
+    return render_template('login.html')
+
 @auth.route('/verify/<user_id>')
 def verify(user_id):
+    from .models import User
     user = User.query.get(user_id)
     if user:
         user.is_confirmed = True
