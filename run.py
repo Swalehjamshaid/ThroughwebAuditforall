@@ -1,16 +1,15 @@
 import os
 import sys
 
-# 1. Get the absolute path of the directory containing run.py
+# Get the absolute path of the root directory
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, BASE_DIR)
 
-# 2. Add the nested folder to the path so Python can find 'models' and 'create_app'
-# Based on your structure: ThroughwebAuditforall/app/app/
+# Fix: Define the variable and use it consistently
 nested_app_path = os.path.join(BASE_DIR, 'app', 'app')
-sys.path.insert(0, nested_path)
+sys.path.insert(0, nested_app_path)
 
-# 3. Import from the correct package path
+# Import the application factory
 from app.app import create_app
 
 app = create_app()
