@@ -10,19 +10,22 @@ bcrypt = Bcrypt()
 login_manager = LoginManager()
 
 def create_app():
-    # We explicitly tell Flask where the templates are relative to this nested file
+    # Fix: Tell Flask where templates are (since this file is nested)
     template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
     app = Flask(__name__, template_folder=template_dir)
 
     # --- DATABASE CONFIG ---
-    uri = os.getenv("DATABASE_URL")
-    if uri and uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+    database_url = os.getenv("DATABASE_URL")
     
-    app.config['SQLALCHEMY_DATABASE_URI'] = uri
+    # Railway provides 'postgres://', but SQLAlchemy 2.0 requires 'postgresql://'
+    if database_url and database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "789456123321654987")
+    app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "your-secure-key-123")
 
+    # Initialize extensions with the app
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
@@ -30,22 +33,10 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        import models  # Direct import thanks to run.py path fix
+        import models  # Absolute import from the same folder
         return models.User.query.get(user_id)
 
     # --- ROUTES ---
-
-    @app.route('/')
-    @app.route('/login', methods=['GET', 'POST'])
-    def login():
-        if request.method == 'POST':
-            import models
-            user = models.User.query.filter_by(email=request.form.get('email')).first()
-            if user and bcrypt.check_password_hash(user.password_hash, request.form.get('password')):
-                login_user(user)
-                return redirect(url_for('dashboard'))
-            flash('Login Failed. Check your email and password.')
-        return render_template('login.html')
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
@@ -71,23 +62,11 @@ def create_app():
                 flash(f"Error: {str(e)}")
         return render_template('register.html')
 
-    @app.route('/dashboard')
-    @login_required
-    def dashboard():
-        import models
-        audit = models.AuditRun.query.filter_by(organization_id=current_user.organization_id).order_by(models.AuditRun.created_at.desc()).first()
-        return render_template('dashboard.html', audit=audit)
-
-    @app.route('/logout')
-    def logout():
-        logout_user()
-        return redirect(url_for('login'))
-
     # --- AUTOMATIC TABLE FILL ---
     with app.app_context():
         try:
             import models
-            db.create_all()
+            db.create_all()  # This builds the tables in your Railway database
             print("Postgres: Tables Created/Verified Successfully")
         except Exception as e:
             print(f"Postgres Error: {e}")
