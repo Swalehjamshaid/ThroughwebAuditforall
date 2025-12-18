@@ -15,7 +15,7 @@ def register():
             db.session.add(org)
             db.session.flush()
             
-            # Create User
+            # Create User with hashed password
             hashed_pw = bcrypt.generate_password_hash(request.form.get('password')).decode('utf-8')
             user = User(
                 email=request.form.get('email'), 
@@ -26,7 +26,7 @@ def register():
             db.session.add(user)
             db.session.commit()
 
-            # Send verification link
+            # Email Verification Workflow
             msg = Message("Verify Your Account", recipients=[user.email])
             msg.body = f"Click here to verify: {url_for('auth.verify', user_id=user.id, _external=True)}"
             mail.send(msg)
@@ -35,18 +35,9 @@ def register():
             return redirect(url_for('auth.login'))
         except Exception as e:
             db.session.rollback()
-            flash(f"Error: {str(e)}")
+            flash(f"Error during registration: {str(e)}")
             
     return render_template('register.html')
-
-@auth.route('/verify/<user_id>')
-def verify(user_id):
-    user = User.query.get(user_id)
-    if user:
-        user.is_confirmed = True
-        db.session.commit()
-        flash("Email verified! You can now login.")
-    return redirect(url_for('auth.login'))
 
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
@@ -60,3 +51,12 @@ def login():
             return redirect(url_for('dashboard'))
         flash("Invalid email or password.")
     return render_template('login.html')
+
+@auth.route('/verify/<user_id>')
+def verify(user_id):
+    user = User.query.get(user_id)
+    if user:
+        user.is_confirmed = True
+        db.session.commit()
+        flash("Email verified! You can now login.")
+    return redirect(url_for('auth.login'))
