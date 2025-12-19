@@ -3,88 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Audit AI | Advanced SEO Scanner</title>
+    <title>Throughweb Audit AI | Professional Website Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
-        /* Smooth progress bar transition */
-        #progressFill { transition: width 0.4s ease-out; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #progressFill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
-<body class="bg-slate-900 text-white p-4 md:p-10 font-sans">
-    <div class="max-w-4xl mx-auto bg-slate-800 p-6 md:p-8 rounded-xl shadow-2xl border border-slate-700">
-        <div class="flex items-center gap-3 mb-6">
-            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-900/50">T</div>
-            <h1 class="text-2xl md:text-3xl font-bold text-blue-400">Throughweb Audit AI</h1>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+    <div class="max-w-5xl mx-auto px-4 py-12">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
+                Throughweb Audit AI
+            </h1>
+            <p class="text-slate-400">Comprehensive 45+ Point Website Health Check</p>
         </div>
 
-        <div class="flex flex-col md:flex-row gap-4 mb-4">
-            <input type="text" id="url" placeholder="Enter URL (e.g., google.com)" 
-                   class="flex-1 p-3 rounded bg-slate-700 border border-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none text-white transition-all">
-            <button onclick="runAudit()" id="btn" 
-                    class="bg-blue-600 px-8 py-3 rounded font-bold hover:bg-blue-500 transition-all active:scale-95 disabled:opacity-50">
-                Analyze Website
-            </button>
-        </div>
-
-        <div id="progressContainer" class="hidden mb-8">
-            <div class="flex justify-between mb-2 text-xs text-slate-400">
-                <span id="statusText">Scanning 45+ security & SEO metrics...</span>
-                <span id="progressPercent">0%</span>
-            </div>
-            <div class="w-full bg-slate-700 rounded-full h-2.5 overflow-hidden">
-                <div id="progressFill" class="bg-blue-500 h-2.5 w-0 shadow-[0_0_10px_#3b82f6]"></div>
+        <div class="max-w-3xl mx-auto mb-12">
+            <div class="flex flex-col md:flex-row gap-3 bg-slate-800 p-2 rounded-2xl shadow-2xl border border-slate-700">
+                <input type="text" id="url" placeholder="Enter website (e.g., google.com)" 
+                       class="flex-1 bg-transparent px-4 py-3 outline-none text-lg border-none focus:ring-0">
+                <button onclick="runAudit()" id="btn" 
+                        class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50">
+                    Analyze Site
+                </button>
             </div>
         </div>
 
-        <div id="errorBox" class="hidden mb-6 p-4 bg-red-900/30 border border-red-500/50 text-red-200 rounded-lg text-sm"></div>
+        <div id="progressSection" class="hidden max-w-2xl mx-auto mb-12">
+            <div class="flex justify-between text-sm mb-2 text-slate-400 font-medium">
+                <span id="statusText">Initializing AI scanner...</span>
+                <span id="percentText">0%</span>
+            </div>
+            <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                <div id="progressFill" class="h-full w-0 bg-gradient-to-r from-blue-500 to-emerald-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+            </div>
+        </div>
+
+        <div id="errorBox" class="hidden max-w-2xl mx-auto mb-8 p-4 bg-red-900/20 border border-red-500/50 text-red-300 rounded-xl text-center"></div>
 
         <div id="results" class="hidden fade-in">
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="bg-slate-700/50 p-6 rounded-lg text-center border border-slate-600">
-                    <p class="text-xs text-slate-400 uppercase tracking-widest mb-1">Grade</p>
-                    <p id="grade" class="text-5xl font-black text-green-400"></p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center shadow-xl">
+                    <h3 class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Overall Grade</h3>
+                    <div id="grade" class="text-7xl font-black text-emerald-400 drop-shadow-sm"></div>
                 </div>
-                <div class="bg-slate-700/50 p-6 rounded-lg text-center border border-slate-600">
-                    <p class="text-xs text-slate-400 uppercase tracking-widest mb-1">Health Score</p>
-                    <p id="score" class="text-5xl font-black text-blue-400"></p>
+                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center shadow-xl">
+                    <h3 class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Health Score</h3>
+                    <div id="score" class="text-7xl font-black text-blue-400 drop-shadow-sm"></div>
                 </div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block text-center bg-blue-600/10 border border-blue-600/30 text-blue-400 py-3 rounded-lg mb-8 hover:bg-blue-600 hover:text-white transition-all font-semibold">
-                📥 Download Detailed PDF Report
+            <a id="dl" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-4 mb-10 bg-slate-800 border border-slate-700 rounded-2xl hover:bg-slate-700 transition-colors font-bold text-blue-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                Download Detailed Report (PDF)
             </a>
-            
-            <h3 class="text-xl font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2">Technical Audit Metrics</h3>
-            <div id="metricsTable" class="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]"></div>
+
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl">
+                <h3 class="text-xl font-bold mb-6 text-slate-300 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
+                    Detailed Technical Audit
+                </h3>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    </div>
+            </div>
         </div>
     </div>
 
     <script>
-        let progressInterval;
-
-        function updateProgress(start) {
+        let progInt;
+        
+        function updateUI(step) {
             const fill = document.getElementById('progressFill');
-            const percentText = document.getElementById('progressPercent');
-            const statusText = document.getElementById('statusText');
-            let width = 0;
+            const pText = document.getElementById('percentText');
+            const sText = document.getElementById('statusText');
+            let w = 0;
 
-            progressInterval = setInterval(() => {
-                if (width >= 95) {
-                    clearInterval(progressInterval);
-                    statusText.innerText = "Finalizing report...";
-                } else {
-                    width += Math.random() * 5;
-                    if(width > 95) width = 95;
-                    fill.style.width = width + '%';
-                    percentText.innerText = Math.floor(width) + '%';
-                    
-                    if(width > 30) statusText.innerText = "Checking Security SSL...";
-                    if(width > 60) statusText.innerText = "Analyzing 45+ Meta Tags...";
+            const stages = ["Scraping HTML content...", "Analyzing SEO tags...", "Checking Security headers...", "Validating Social metadata...", "Finalizing audit..."];
+
+            progInt = setInterval(() => {
+                if (w < 92) {
+                    w += Math.random() * 4;
+                    fill.style.width = w + '%';
+                    pText.innerText = Math.floor(w) + '%';
+                    sText.innerText = stages[Math.floor(w/20)] || stages[4];
                 }
-            }, 600);
+            }, 700);
         }
 
         async function runAudit() {
@@ -92,64 +97,61 @@
             const btn = document.getElementById('btn');
             const results = document.getElementById('results');
             const errorBox = document.getElementById('errorBox');
-            const progressContainer = document.getElementById('progressContainer');
-            const metricsTable = document.getElementById('metricsTable');
-
-            let url = urlInput.value.trim();
-            if(!url) return;
-
-            // Reset UI
-            btn.disabled = true;
-            btn.innerText = "Running...";
-            errorBox.classList.add('hidden');
-            results.classList.add('hidden');
-            progressContainer.classList.remove('hidden');
-            document.getElementById('progressFill').style.width = '0%';
+            const progSec = document.getElementById('progressSection');
             
-            updateProgress();
+            const target = urlInput.value.trim();
+            if(!target) return;
+
+            // UI State Reset
+            btn.disabled = true;
+            btn.innerText = "Analyzing...";
+            results.classList.add('hidden');
+            errorBox.classList.add('hidden');
+            progSec.classList.remove('hidden');
+            
+            updateUI();
 
             try {
-                const res = await fetch('/audit', {
+                const response = await fetch('/audit', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: url})
+                    body: JSON.stringify({url: target})
                 });
 
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.detail || "Connection Timeout");
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Server failed to respond.");
 
-                // Audit Success
-                clearInterval(progressInterval);
+                // On Success
+                clearInterval(progInt);
                 document.getElementById('progressFill').style.width = '100%';
-                document.getElementById('progressPercent').innerText = '100%';
+                document.getElementById('percentText').innerText = '100%';
 
                 setTimeout(() => {
-                    document.getElementById('grade').innerText = result.data.grade;
-                    document.getElementById('score').innerText = result.data.score;
-                    document.getElementById('dl').href = `/download/${result.id}`;
+                    progSec.classList.add('hidden');
+                    document.getElementById('grade').innerText = data.data.grade;
+                    document.getElementById('score').innerText = data.data.score + "%";
+                    document.getElementById('dl').href = `/download/${data.id}`;
                     
-                    let html = "";
-                    for (const [k, v] of Object.entries(result.data.metrics)) {
-                        html += `
-                            <div class="bg-slate-700/30 p-3 rounded flex justify-between border border-slate-700/50">
-                                <span class="text-slate-400 font-medium uppercase tracking-tight">${k}</span>
-                                <span class="font-bold text-blue-200">${v}</span>
+                    let gridHtml = "";
+                    for (const [key, val] of Object.entries(data.data.metrics)) {
+                        gridHtml += `
+                            <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                                <span class="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">${key}</span>
+                                <span class="text-blue-300 font-semibold text-xs">${val}</span>
                             </div>`;
                     }
-                    metricsTable.innerHTML = html;
-                    
-                    progressContainer.classList.add('hidden');
+                    document.getElementById('metricsGrid').innerHTML = gridHtml;
                     results.classList.remove('hidden');
-                }, 500);
+                }, 600);
 
             } catch (err) {
-                clearInterval(progressInterval);
-                progressContainer.classList.add('hidden');
-                errorBox.innerText = `Error: ${err.message}`;
+                clearInterval(progInt);
+                progSec.classList.add('hidden');
+                errorBox.innerText = `Audit Error: ${err.message}`;
                 errorBox.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
-                btn.innerText = "Analyze Website";
+                btn.innerText = "Analyze Site";
             }
         }
     </script>
