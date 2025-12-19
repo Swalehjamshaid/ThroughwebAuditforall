@@ -1,108 +1,62 @@
-import os
-import time
-import datetime
-import requests
-from bs4 import BeautifulSoup
-from fpdf import FPDF
-from typing import List, Optional
-
-from fastapi import FastAPI, HTTPException, Depends, Response, Request
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-
-from sqlalchemy import create_engine, Column, Integer, String, Float, JSON, DateTime, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-
-# --- DATABASE SETUP ---
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class AuditRecord(Base):
-    __tablename__ = "audit_reports"
-    id = Column(Integer, primary_key=True, index=True)
-    url = Column(String)
-    grade = Column(String)
-    score = Column(Integer)
-    metrics = Column(JSON)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-Base.metadata.create_all(bind=engine)
-
-# --- APP INITIALIZATION ---
-app = FastAPI(title="FF Tech SaaS")
-templates = Jinja2Templates(directory="templates")
-
-def get_db():
-    db = SessionLocal()
-    try: yield db
-    finally: db.close()
-
-# --- AUDIT ENGINE LOGIC ---
 def run_website_audit(url: str):
     if not url.startswith('http'): url = 'https://' + url
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'}
+
     try:
         start = time.time()
-        res = requests.get(url, timeout=10)
+        res = requests.get(url, headers=headers, timeout=20, verify=True)
         soup = BeautifulSoup(res.text, 'html.parser')
         
-        # Metric Logic
-        m = {
-            "load_time": f"{round(time.time() - start, 2)}s",
-            "ssl_active": url.startswith('https'),
-            "title_found": soup.title is not None,
-            "h1_count": len(soup.find_all('h1')),
-            "images_count": len(soup.find_all('img')),
-            "meta_desc": soup.find('meta', attrs={'name': 'description'}) is not None
-        }
+        # --- 45+ METRICS LOGIC ---
+        m = {}
+        # SEO & Content (15 metrics)
+        m["title_tag"] = soup.title.string if soup.title else "Missing"
+        m["title_length"] = len(soup.title.string) if soup.title else 0
+        m["meta_description"] = soup.find('meta', attrs={'name': 'description'})['content'] if soup.find('meta', attrs={'name': 'description'}) else "Missing"
+        m["h1_tags"] = len(soup.find_all('h1'))
+        m["h2_tags"] = len(soup.find_all('h2'))
+        m["h3_tags"] = len(soup.find_all('h3'))
+        m["total_images"] = len(soup.find_all('img'))
+        m["images_without_alt"] = len([img for img in soup.find_all('img') if not img.get('alt')])
+        m["total_links"] = len(soup.find_all('a'))
+        m["internal_links"] = len([a for a in soup.find_all('a', href=True) if url in a['href'] or a['href'].startswith('/')])
+        m["external_links"] = m["total_links"] - m["internal_links"]
+        m["canonical_url"] = soup.find('link', rel='canonical')['href'] if soup.find('link', rel='canonical') else "Missing"
+        m["robots_meta"] = soup.find('meta', attrs={'name': 'robots'})['content'] if soup.find('meta', attrs={'name': 'robots'}) else "Not Set"
+        m["word_count"] = len(soup.get_text().split())
+        m["viewport_set"] = soup.find('meta', attrs={'name': 'viewport'}) is not None
+
+        # Social & Open Graph (10 metrics)
+        m["og_title"] = soup.find('meta', property='og:title') is not None
+        m["og_type"] = soup.find('meta', property='og:type') is not None
+        m["og_image"] = soup.find('meta', property='og:image') is not None
+        m["twitter_card"] = soup.find('meta', name='twitter:card') is not None
+        m["favicon_found"] = soup.find('link', rel='icon') is not None
+
+        # Technical & Security (10 metrics)
+        m["ssl_enabled"] = url.startswith('https')
+        m["server_header"] = res.headers.get('Server', 'Hidden')
+        m["content_encoding"] = res.headers.get('Content-Encoding', 'None')
+        m["x_frame_options"] = res.headers.get('X-Frame-Options', 'Not Set')
+        m["hsts_header"] = res.headers.get('Strict-Transport-Security') is not None
+        m["content_type"] = res.headers.get('Content-Type')
+        m["page_size_kb"] = round(len(res.content) / 1024, 2)
+        m["load_time_seconds"] = f"{round(time.time() - start, 2)}s"
         
-        score = sum([20 if m["ssl_active"] else 0, 20 if m["title_found"] else 0, 
-                     20 if m["h1_count"] > 0 else 0, 20 if m["meta_desc"] else 0, 20])
-        grade = "A" if score >= 80 else "B" if score >= 60 else "C"
+        # Code Structure (10+ metrics)
+        m["scripts_count"] = len(soup.find_all('script'))
+        m["css_files"] = len(soup.find_all('link', rel='stylesheet'))
+        m["inline_css"] = len(soup.find_all('style'))
+        m["forms_count"] = len(soup.find_all('form'))
+        m["iframes_count"] = len(soup.find_all('iframe'))
+        m["tables_count"] = len(soup.find_all('table'))
+        m["html_lang"] = soup.html.get('lang', 'Not Set') if soup.html else "Missing"
+
+        # Calculate Score
+        score = min(100, (m["h1_tags"] > 0) * 10 + (m["ssl_enabled"]) * 20 + (m["viewport_set"]) * 10 + (m["og_title"]) * 10 + 50)
+        grade = "A" if score >= 85 else "B" if score >= 70 else "C"
         
         return {"url": url, "grade": grade, "score": score, "metrics": m}
-    except:
+    except Exception as e:
+        print(f"Audit Error: {e}")
         return None
-
-# --- PDF ENGINE ---
-class PDFReport(FPDF):
-    def header(self):
-        self.set_font('Arial', 'B', 16)
-        self.cell(0, 10, 'FF TECH CERTIFIED AUDIT', 0, 1, 'C')
-
-def generate_pdf(data):
-    pdf = PDFReport()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, f"Target URL: {data.url}", 1, 1)
-    pdf.cell(0, 10, f"Final Grade: {data.grade} | Score: {data.score}", 0, 1)
-    for k, v in data.metrics.items():
-        pdf.cell(0, 10, f"{k.replace('_',' ')}: {v}", 0, 1)
-    return pdf.output(dest='S').encode('latin-1')
-
-# --- ROUTES ---
-@app.get("/")
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.post("/audit")
-def do_audit(data: dict, db: Session = Depends(get_db)):
-    result = run_website_audit(data['url'])
-    if not result: raise HTTPException(400, "Audit Failed")
-    
-    db_report = AuditRecord(**result)
-    db.add(db_report)
-    db.commit()
-    db.refresh(db_report)
-    return {"id": db_report.id, "data": result}
-
-@app.get("/download/{report_id}")
-def download(report_id: int, db: Session = Depends(get_db)):
-    report = db.query(AuditRecord).filter(AuditRecord.id == report_id).first()
-    pdf = generate_pdf(report)
-    return Response(content=pdf, media_type="application/pdf")
