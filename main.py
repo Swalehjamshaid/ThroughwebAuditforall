@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
-# --- DATABASE SETUP ---
+# --- DATABASE ---
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -39,59 +39,36 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# --- 45+ METRICS ENGINE ---
+# --- AUDIT ENGINE ---
 def run_website_audit(url: str):
     if not url.startswith('http'): url = 'https://' + url
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+    h = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0'}
 
     try:
-        start_time = time.time()
-        res = requests.get(url, headers=headers, timeout=25, verify=True)
+        start = time.time()
+        res = requests.get(url, headers=h, timeout=20, verify=True)
         soup = BeautifulSoup(res.text, 'html.parser')
-        
         m = {}
-        # SEO & CONTENT
+        
+        # SEO Checks
         m["Title Tag"] = soup.title.string.strip() if soup.title else "Missing"
-        m["Title Length"] = len(m["Title Tag"])
         m["H1 Count"] = len(soup.find_all('h1'))
         m["H2 Count"] = len(soup.find_all('h2'))
-        m["H3 Count"] = len(soup.find_all('h3'))
-        m["H4 Count"] = len(soup.find_all('h4'))
-        m["Meta Description"] = "Present" if soup.find('meta', attrs={'name': 'description'}) else "Missing"
+        m["Meta Desc"] = "Yes" if soup.find('meta', attrs={'name': 'description'}) else "No"
         m["Total Images"] = len(soup.find_all('img'))
-        m["Images Missing Alt"] = len([i for i in soup.find_all('img') if not i.get('alt')])
-        m["Total Links"] = len(soup.find_all('a'))
-        m["External Links"] = len([a for a in soup.find_all('a', href=True) if not a['href'].startswith(url) and not a['href'].startswith('/')])
-        m["Canonical Tag"] = "Found" if soup.find('link', rel='canonical') else "Missing"
-        m["Word Count"] = len(soup.get_text().split())
-        m["Language"] = soup.html.get('lang', 'Not Specified') if soup.html else "Missing"
-        m["Viewport Meta"] = "Configured" if soup.find('meta', name='viewport') else "Missing"
-        m["Charset Meta"] = "Found" if soup.find('meta', charset=True) else "Missing"
-        m["Favicon"] = "Found" if soup.find('link', rel='icon') else "Missing"
-        m["Robots Meta"] = "Found" if soup.find('meta', name='robots') else "Missing"
-        m["Base URL Set"] = "Yes" if soup.find('base') else "No"
-        m["Bold Tags Count"] = len(soup.find_all(['b', 'strong']))
-
-        # TECHNICAL & SECURITY
-        m["SSL Active"] = "Yes" if url.startswith('https') else "No"
-        m["Server Software"] = res.headers.get('Server', 'Hidden')
-        m["Full Load Time"] = f"{round(time.time() - start_time, 2)}s"
-        m["Page Size"] = f"{round(len(res.content) / 1024, 2)} KB"
-        m["HSTS Header"] = "Enabled" if 'Strict-Transport-Security' in res.headers else "Disabled"
-        m["X-Frame-Options"] = res.headers.get('X-Frame-Options', 'Not Set')
-        m["Scripts Count"] = len(soup.find_all('script'))
-        m["External CSS"] = len(soup.find_all('link', rel='stylesheet'))
-        m["Inline Styles"] = len(soup.find_all('style'))
-        m["Forms Found"] = len(soup.find_all('form'))
-        m["iFrames Found"] = len(soup.find_all('iframe'))
-        m["Tables Found"] = len(soup.find_all('table'))
-
-        # SOCIAL & STRUCTURE (FIXED LINE 100 AREA)
-        m["OG Title"] = "Present" if soup.find('meta', property='og:title') else "Missing"
-        m["OG Image"] = "Present" if soup.find('meta', property='og:image') else "Missing"
-        m["Twitter Card"] = "Present" if soup.find('meta', name='twitter:card') else "Missing"
-        m["Schema Data"] = "Found" if soup.find('script', type='application/ld+json') else "Missing"
-        m["Copyright Info"] = "Found" if "©" in soup.get_text() else "Not Found"
-        m["SVG Graphics"] = len(soup.find_all('svg'))
-        m["Input Fields"] = len(soup.find_all('input'))
-        m["Comments in Code"] = "Found" if "
+        m["Links"] = len(soup.find_all('a'))
+        m["Viewport"] = "Yes" if soup.find('meta', name='viewport') else "No"
+        
+        # Technical Checks
+        m["SSL"] = "Yes" if url.startswith('https') else "No"
+        m["Page Size"] = f"{round(len(res.content)/1024, 2)} KB"
+        m["Load Time"] = f"{round(time.time()-start, 2)}s"
+        m["Scripts"] = len(soup.find_all('script'))
+        m["Forms"] = len(soup.find_all('form'))
+        
+        # Social
+        m["OG Title"] = "Yes" if soup.find('meta', property='og:title') else "No"
+        m["Twitter Card"] = "Yes" if soup.find('meta', name='twitter:card') else "No"
+        
+        # THE FIX FOR LINE 97/100
+        has_comments = "
