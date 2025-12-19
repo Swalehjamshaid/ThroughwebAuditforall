@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FF TECH | Auditor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <nav class="p-6 bg-white shadow-sm flex justify-between">
+        <h1 class="text-2xl font-bold text-blue-600">FF TECH</h1>
+    </nav>
+    
+    <div class="max-w-4xl mx-auto py-20 text-center">
+        <h2 class="text-4xl font-black mb-6">Professional Website Audit</h2>
+        <div class="flex gap-2 shadow-lg rounded-2xl p-2 bg-white">
+            <input id="url" type="text" placeholder="Enter Website URL..." class="flex-1 p-4 outline-none">
+            <button onclick="audit()" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold">Analyze Now</button>
+        </div>
+
+        <div id="resultBox" class="hidden mt-10 p-8 bg-white rounded-3xl border text-left">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-gray-400">Website Grade</p>
+                    <h3 id="resGrade" class="text-6xl font-black text-blue-600">--</h3>
+                </div>
+                <button id="dlBtn" class="bg-gray-100 p-4 rounded-xl font-bold">Download PDF Certificate</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function audit() {
+            const url = document.getElementById('url').value;
+            const res = await fetch('/audit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url: url})
+            });
+            const json = await response.json();
+            document.getElementById('resGrade').innerText = json.data.grade;
+            document.getElementById('resultBox').classList.remove('hidden');
+            document.getElementById('dlBtn').onclick = () => window.location.href = `/download/${json.id}`;
+        }
+    </script>
+</body>
+</html>
