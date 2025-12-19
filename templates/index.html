@@ -6,46 +6,46 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #020617; }
-        .red-alert { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 4px solid #ef4444; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); }
+        .red-alert-card { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 5px solid #ef4444; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
     </style>
 </head>
-<body class="text-slate-100 p-8">
+<body class="bg-[#020617] text-slate-100 p-6 md:p-12">
     <div class="max-w-6xl mx-auto">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
-            <h1 class="text-4xl font-black italic text-blue-500">THROUGHWEB <span class="text-white uppercase font-normal">Audit AI</span></h1>
-            <div class="flex gap-2 w-full md:w-auto">
-                <input type="text" id="url" placeholder="Enter Website..." class="bg-slate-900 border border-slate-700 px-6 py-3 rounded-xl flex-1 md:w-80 outline-none">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition-all">ANALYZE</button>
+        <header class="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
+            <h1 class="text-5xl font-black italic tracking-tighter text-blue-500">THROUGHWEB <span class="text-white">AI</span></h1>
+            <div class="flex glass p-2 rounded-2xl w-full md:w-auto">
+                <input type="text" id="url" placeholder="Paste domain here..." class="bg-transparent px-4 py-2 outline-none w-full md:w-80 text-sm">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-500 transition-all">Start Audit</button>
             </div>
-        </div>
+        </header>
 
-        <div id="results" class="hidden space-y-10">
+        <div id="results" class="hidden space-y-12">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass p-12 rounded-[40px] text-center border border-slate-800">
-                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Global Grade</span>
+                <div class="glass p-12 rounded-[40px] text-center flex flex-col justify-center">
+                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Enterprise Grade</span>
                     <div id="grade" class="text-[140px] font-black text-emerald-400 leading-none my-4"></div>
-                    <div id="score" class="text-2xl font-bold text-blue-400"></div>
+                    <div id="score" class="text-2xl font-bold text-blue-500"></div>
                 </div>
-                <div class="lg:col-span-2 glass p-10 rounded-[40px] border border-slate-800 flex items-center justify-center">
+                <div class="lg:col-span-2 glass p-10 rounded-[40px] flex items-center justify-center">
                     <canvas id="spiderChart"></canvas>
                 </div>
             </div>
 
             <div class="space-y-4">
-                <h3 class="text-red-500 font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                    <span class="h-2 w-2 bg-red-500 rounded-full animate-ping"></span> Key Weak Points Found
+                <h3 class="text-red-500 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
+                    <span class="h-2 w-2 bg-red-500 rounded-full animate-ping"></span> Critical Failure Analysis
                 </h3>
                 <div id="weakList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
 
-            <div class="glass p-10 rounded-[40px] border border-slate-800">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-8">Full Technical Intelligence (45+ Metrics)</h3>
-                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm"></div>
+            <div class="glass p-10 rounded-[40px]">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-10">45+ Technical Performance Indicators</h3>
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-blue-600 rounded-2xl font-black text-white uppercase tracking-widest">Download ISO Compliance PDF</a>
+            <a id="dl" href="#" target="_blank" class="block w-full py-6 bg-blue-600 text-center rounded-2xl font-black text-white uppercase tracking-[0.3em] hover:bg-blue-500 transition-all shadow-2xl shadow-blue-500/20">Download Compliance Certificate</a>
         </div>
     </div>
 
@@ -53,13 +53,15 @@
         let chart;
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
-            document.getElementById('btn').disabled = true;
+            const btn = document.getElementById('btn');
+            btn.innerText = 'SCANNIG...'; btn.disabled = true;
+
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
             
             if(res.ok) {
                 render(data);
-                document.getElementById('btn').disabled = false;
+                btn.innerText = 'Start Audit'; btn.disabled = false;
             }
         }
 
@@ -67,23 +69,28 @@
             const d = data.data;
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('grade').innerText = d.grade;
-            document.getElementById('score').innerText = `TOTAL SCORE: ${d.score}/100`;
+            document.getElementById('score').innerText = `ISO RATING: ${d.score}/100`;
             document.getElementById('dl').href = `/download/${data.id}`;
 
+            // WEAK POINTS
             document.getElementById('weakList').innerHTML = d.weak_points.map(w => `
-                <div class="red-alert p-5 rounded-2xl flex items-center gap-4">
-                    <span class="font-black text-red-500 text-2xl">!</span>
-                    <span class="text-red-100 font-bold text-xs uppercase">${w}</span>
-                </div>`).join('') || "<div class='text-emerald-400'>No critical weaknesses detected.</div>";
+                <div class="red-alert-card p-6 rounded-2xl flex items-center gap-5">
+                    <span class="font-black text-red-500 text-3xl italic">!</span>
+                    <span class="text-red-100 font-bold text-xs uppercase tracking-tighter">${w}</span>
+                </div>
+            `).join('') || "<div class='text-emerald-400 font-bold'>Security & SEO Optimized. No failures.</div>";
 
+            // METRICS
             let grid = "";
             for(let [k,v] of Object.entries(d.metrics)) {
-                grid += `<div class="bg-slate-950/50 p-4 rounded-xl border border-white/5">
-                            <div class="text-[9px] text-slate-600 font-bold uppercase mb-1">${k}</div>
-                            <div class="text-blue-300 font-bold truncate">${v}</div>
-                         </div>`;
+                grid += `
+                    <div class="p-5 bg-slate-900/50 rounded-2xl border border-white/5">
+                        <div class="text-[9px] text-slate-600 font-black uppercase mb-1">${k}</div>
+                        <div class="text-blue-300 font-bold text-xs truncate">${v}</div>
+                    </div>`;
             }
             document.getElementById('metricsGrid').innerHTML = grid;
+
             updateChart(d.cat_scores);
         }
 
@@ -93,10 +100,10 @@
                 type: 'radar',
                 data: {
                     labels: Object.keys(s),
-                    datasets: [{ data: Object.values(s), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', borderWidth: 3 }]
+                    datasets: [{ data: Object.values(s), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', borderWidth: 4 }]
                 },
                 options: { 
-                    scales: { r: { grid: { color: '#334155' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { weight: 'bold' } } } },
+                    scales: { r: { grid: { color: '#1e293b' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { size: 12, weight: 'bold' } } } },
                     plugins: { legend: { display: false } }
                 }
             });
