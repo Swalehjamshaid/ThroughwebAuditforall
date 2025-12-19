@@ -1,61 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech SaaS - Website Audit</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-6 text-center text-blue-600">Website Auditor</h1>
-        <div class="space-y-4">
-            <input type="text" id="urlInput" placeholder="example.com" 
-                   class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button onclick="runAudit()" id="auditBtn"
-                    class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">
-                Run Audit
-            </button>
-        </div>
-        <div id="results" class="mt-6 hidden">
-            <div class="p-4 bg-gray-50 rounded border border-gray-200">
-                <p class="font-semibold text-lg">Grade: <span id="grade" class="text-blue-600"></span></p>
-                <p class="text-gray-600">Score: <span id="score"></span>/100</p>
-                <a id="downloadBtn" href="#" class="mt-4 block text-center text-sm text-blue-500 underline">Download PDF Report</a>
-            </div>
-        </div>
-    </div>
+// Inside your runAudit() function, replace the result handling section:
+const result = await response.json();
 
-    <script>
-        async function runAudit() {
-            const url = document.getElementById('urlInput').value;
-            const btn = document.getElementById('auditBtn');
-            const resultsDiv = document.getElementById('results');
-            
-            if(!url) return alert("Please enter a URL");
-            
-            btn.innerText = "Auditing...";
-            btn.disabled = true;
+document.getElementById('grade').innerText = result.data.grade;
+document.getElementById('score').innerText = result.data.score;
+document.getElementById('downloadBtn').href = `/download/${result.id}`;
 
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url: url })
-                });
-                const result = await response.json();
-                
-                document.getElementById('grade').innerText = result.data.grade;
-                document.getElementById('score').innerText = result.data.score;
-                document.getElementById('downloadBtn').href = `/download/${result.id}`;
-                resultsDiv.classList.remove('hidden');
-            } catch (error) {
-                alert("Audit failed. Make sure the URL is valid.");
-            } finally {
-                btn.innerText = "Run Audit";
-                btn.disabled = false;
-            }
-        }
-    </script>
-</body>
-</html>
+// Build the Metrics Table
+let metricsHtml = '<table class="w-full text-left border-collapse mt-4 text-sm">';
+metricsHtml += '<thead><tr class="border-b"><th>Metric</th><th>Value</th></tr></thead><tbody>';
+
+for (const [key, value] of Object.entries(result.data.metrics)) {
+    metricsHtml += `<tr class="border-b">
+        <td class="py-1 font-medium text-gray-700">${key.replace(/_/g, ' ').toUpperCase()}</td>
+        <td class="py-1 text-gray-600">${value}</td>
+    </tr>`;
+}
+metricsHtml += '</tbody></table>';
+
+document.getElementById('metricsDisplay').innerHTML = metricsHtml; // Ensure you have a div with this ID
+resultsDiv.classList.remove('hidden');
