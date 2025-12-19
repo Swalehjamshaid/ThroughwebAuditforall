@@ -8,50 +8,89 @@
     <div class="max-w-4xl mx-auto bg-slate-800 p-8 rounded-xl shadow-2xl">
         <h1 class="text-3xl font-bold mb-6 text-blue-400">Throughweb Audit AI</h1>
         <div class="flex gap-4 mb-8">
-            <input type="text" id="url" placeholder="Enter URL (e.g. google.com)" class="flex-1 p-3 rounded bg-slate-700 border-none focus:ring-2 focus:ring-blue-500 text-white">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 px-6 py-3 rounded font-bold hover:bg-blue-500 transition">Analyze</button>
+            <input type="text" id="url" placeholder="Enter URL (e.g. google.com)" 
+                   class="flex-1 p-3 rounded bg-slate-700 border-none focus:ring-2 focus:ring-blue-500 text-white">
+            <button onclick="runAudit()" id="btn" 
+                    class="bg-blue-600 px-6 py-3 rounded font-bold hover:bg-blue-500 transition disabled:opacity-50">
+                Analyze
+            </button>
         </div>
+
+        <div id="errorBox" class="hidden bg-red-900/50 border border-red-500 text-red-200 p-4 rounded mb-6"></div>
 
         <div id="results" class="hidden">
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="bg-slate-700 p-4 rounded text-center"><p class="text-sm text-slate-400">GRADE</p><p id="grade" class="text-4xl font-bold text-green-400"></p></div>
-                <div class="bg-slate-700 p-4 rounded text-center"><p class="text-sm text-slate-400">SCORE</p><p id="score" class="text-4xl font-bold text-blue-400"></p></div>
+                <div class="bg-slate-700 p-4 rounded text-center">
+                    <p class="text-sm text-slate-400">GRADE</p>
+                    <p id="grade" class="text-4xl font-bold text-green-400"></p>
+                </div>
+                <div class="bg-slate-700 p-4 rounded text-center">
+                    <p class="text-sm text-slate-400">SCORE</p>
+                    <p id="score" class="text-4xl font-bold text-blue-400"></p>
+                </div>
             </div>
-            <a id="dl" class="block text-center bg-slate-600 py-2 rounded mb-6 hover:bg-slate-500">Download PDF Report</a>
+            <a id="dl" href="#" target="_blank" class="block text-center bg-slate-600 py-2 rounded mb-6 hover:bg-slate-500">
+                Download PDF Report
+            </a>
             
-            <h3 class="text-xl font-bold mb-4">Detailed Metrics (45+)</h3>
+            <h3 class="text-xl font-bold mb-4 border-b border-slate-700 pb-2">Detailed Metrics (45+)</h3>
             <div id="metricsTable" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
         </div>
     </div>
 
     <script>
         async function runAudit() {
-            const url = document.getElementById('url').value;
+            const urlInput = document.getElementById('url');
             const btn = document.getElementById('btn');
+            const results = document.getElementById('results');
+            const errorBox = document.getElementById('errorBox');
+            const metricsTable = document.getElementById('metricsTable');
+
+            let url = urlInput.value.trim();
             if(!url) return;
-            
+
+            // UI Reset
             btn.innerText = "Analyzing...";
-            const res = await fetch('/audit', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({url: url})
-            });
-            const result = await res.json();
-            
-            document.getElementById('grade').innerText = result.data.grade;
-            document.getElementById('score').innerText = result.data.score;
-            document.getElementById('dl').href = `/download/${result.id}`;
-            
-            let html = "";
-            for (const [k, v] of Object.entries(result.data.metrics)) {
-                html += `<div class="bg-slate-700 p-2 rounded flex justify-between">
-                            <span class="text-slate-400 uppercase">${k.replace(/_/g, ' ')}</span>
-                            <span class="font-bold">${v}</span>
-                         </div>`;
+            btn.disabled = true;
+            errorBox.classList.add('hidden');
+            results.classList.add('hidden');
+
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url: url})
+                });
+
+                const result = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(result.detail || "Audit failed. The site may be blocking us.");
+                }
+
+                // Populate UI
+                document.getElementById('grade').innerText = result.data.grade;
+                document.getElementById('score').innerText = result.data.score;
+                document.getElementById('dl').href = `/download/${result.id}`;
+                
+                let html = "";
+                for (const [k, v] of Object.entries(result.data.metrics)) {
+                    html += `
+                        <div class="bg-slate-700/50 p-2 rounded flex justify-between border border-slate-700">
+                            <span class="text-slate-400 uppercase font-medium">${k}</span>
+                            <span class="font-bold text-blue-300">${v}</span>
+                        </div>`;
+                }
+                metricsTable.innerHTML = html;
+                results.classList.remove('hidden');
+
+            } catch (err) {
+                errorBox.innerText = err.message;
+                errorBox.classList.remove('hidden');
+            } finally {
+                btn.innerText = "Analyze";
+                btn.disabled = false;
             }
-            document.getElementById('metricsTable').innerHTML = html;
-            document.getElementById('results').classList.remove('hidden');
-            btn.innerText = "Analyze";
         }
     </script>
 </body>
