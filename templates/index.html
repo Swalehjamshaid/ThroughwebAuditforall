@@ -2,118 +2,142 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Audit AI | Advanced Web Intelligence</title>
+    <title>Throughweb Enterprise AI Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: radial-gradient(circle at top right, #1e293b, #0f172a); }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        #progressFill { transition: width 0.4s ease; }
+        body { background: #0b1120; font-family: 'Inter', sans-serif; }
+        .enterprise-card { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        .stat-bar { height: 4px; border-radius: 2px; background: #1e293b; overflow: hidden; }
+        .stat-fill { height: 100%; transition: width 1s ease-out; }
     </style>
 </head>
-<body class="text-slate-100 min-h-screen pb-20">
-    <div class="max-w-6xl mx-auto px-4 py-12">
-        <header class="text-center mb-16">
-            <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-4 italic">THROUGHWEB AI</h1>
-            <p class="text-slate-400 tracking-widest uppercase text-sm">Next-Gen Website Intelligence & Compliance Engine</p>
-        </header>
-
-        <div class="max-w-3xl mx-auto mb-20">
-            <div class="glass p-2 rounded-2xl flex flex-col md:flex-row gap-2">
-                <input type="text" id="url" placeholder="Paste URL here..." class="bg-transparent flex-1 px-6 py-4 outline-none text-xl">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-black transition-all transform active:scale-95 shadow-xl shadow-blue-500/20">ANALYZE</button>
+<body class="text-slate-200 py-10 px-4">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
+            <div>
+                <h1 class="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">THROUGHWEB ENTERPRISE</h1>
+                <p class="text-slate-500 uppercase tracking-widest text-xs mt-2">Global Compliance & Performance Standards v4.0</p>
+            </div>
+            <div class="flex gap-2">
+                <input type="text" id="url" placeholder="Enter target URL..." class="bg-slate-900 border border-slate-700 px-6 py-3 rounded-xl w-64 md:w-96 outline-none focus:border-blue-500 transition-all">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all">ANALYZE</button>
             </div>
         </div>
 
-        <div id="progressSection" class="hidden max-w-2xl mx-auto mb-16">
-            <div class="flex justify-between text-xs font-bold text-blue-400 mb-2 tracking-tighter uppercase"><span id="statusText">...</span><span id="percentText">0%</span></div>
-            <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div id="progressFill" class="h-full w-0 bg-blue-400 shadow-[0_0_15px_#60a5fa]"></div></div>
-        </div>
+        <div id="results" class="hidden space-y-6">
+            
+            <div id="catScores" class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                </div>
 
-        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass p-10 rounded-3xl text-center">
-                    <span class="text-slate-500 text-xs font-bold uppercase">Domain Rank</span>
-                    <div id="grade" class="text-9xl font-black text-emerald-400 leading-none my-4"></div>
+                <div class="enterprise-card p-10 rounded-3xl text-center flex flex-col justify-center shadow-2xl">
+                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Global Health Grade</span>
+                    <div id="grade" class="text-[120px] font-black text-white leading-none my-4"></div>
                     <div id="score" class="text-2xl font-bold text-blue-400"></div>
                 </div>
-                <div class="lg:col-span-2 glass p-8 rounded-3xl min-h-[300px] flex items-center justify-center">
-                    <canvas id="radarChart"></canvas>
+
+                <div class="lg:col-span-2 enterprise-card p-8 rounded-3xl flex items-center justify-center min-h-[400px]">
+                    <canvas id="spiderChart"></canvas>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl">
-                    <h4 class="text-red-400 font-bold uppercase text-xs mb-4 italic">Critical Findings</h4>
-                    <ul id="weakList" class="space-y-3 text-sm text-red-100"></ul>
+                <div class="bg-red-500/5 border border-red-500/10 p-8 rounded-3xl">
+                    <h3 class="text-red-400 font-bold uppercase text-xs mb-6 tracking-widest flex items-center gap-2">
+                        <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span> Critical Risks
+                    </h3>
+                    <ul id="weakList" class="space-y-4 text-sm text-red-200/80 italic"></ul>
                 </div>
-                <div class="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-3xl">
-                    <h4 class="text-emerald-400 font-bold uppercase text-xs mb-4 italic">Action Plan</h4>
-                    <ul id="sugList" class="space-y-3 text-sm text-emerald-100"></ul>
+                <div class="bg-emerald-500/5 border border-emerald-500/10 p-8 rounded-3xl">
+                    <h3 class="text-emerald-400 font-bold uppercase text-xs mb-6 tracking-widest">Enterprise Action Plan</h3>
+                    <ul id="sugList" class="space-y-4 text-sm text-emerald-200/80"></ul>
                 </div>
             </div>
 
-            <div class="glass p-8 rounded-3xl">
-                <h4 class="text-slate-400 font-bold text-xs uppercase mb-6">Technical Metadata Grid</h4>
-                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-            </div>
+            <a id="dl" href="#" target="_blank" class="block w-full text-center py-5 bg-white text-slate-950 font-black rounded-2xl hover:bg-blue-400 transition-colors uppercase tracking-[0.2em]">Generate ISO Compliance Report (PDF)</a>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-white text-slate-900 font-black rounded-2xl hover:bg-blue-400 transition-colors uppercase tracking-widest">Download Official PDF Report</a>
+            <div class="enterprise-card p-8 rounded-3xl">
+                <h3 class="text-xs font-bold text-slate-500 uppercase mb-8 tracking-widest">Full Technical Specification</h3>
+                <div id="metricsGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        let myChart;
+        let chart;
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
-            document.getElementById('btn').disabled = true;
-            document.getElementById('results').classList.add('hidden');
-            document.getElementById('progressSection').classList.remove('hidden');
-            
-            // Progress logic
-            let w = 0;
-            const int = setInterval(() => {
-                if(w < 90) { 
-                    w += 2; 
-                    document.getElementById('progressFill').style.width = w + '%';
-                    document.getElementById('percentText').innerText = w + '%';
-                }
-            }, 300);
+            const btn = document.getElementById('btn');
+            btn.innerText = 'AUDITING...'; btn.disabled = true;
 
-            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-            const data = await res.json();
-            clearInterval(int);
-
-            if(res.ok) {
-                document.getElementById('grade').innerText = data.data.grade;
-                document.getElementById('score').innerText = data.data.score + '% Health Score';
-                document.getElementById('dl').href = `/download/${data.id}`;
+            try {
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+                const data = await res.json();
                 
-                document.getElementById('weakList').innerHTML = data.data.weak_points.map(w => `<li>• ${w}</li>`).join('');
-                document.getElementById('sugList').innerHTML = data.data.suggestions.map(s => `<li>• ${s}</li>`).join('');
-                
-                let grid = "";
-                for(let [k,v] of Object.entries(data.data.metrics)) {
-                    grid += `<div class="bg-slate-900/40 p-3 rounded-lg border border-white/5"><div class="text-[10px] text-slate-500 font-bold uppercase">${k}</div><div class="text-blue-300 font-bold text-xs truncate">${v}</div></div>`;
+                if(res.ok) {
+                    renderDashboard(data);
                 }
-                document.getElementById('metricsGrid').innerHTML = grid;
-                
-                initChart(data.data.score);
-                document.getElementById('progressSection').classList.add('hidden');
-                document.getElementById('results').classList.remove('hidden');
-            }
-            document.getElementById('btn').disabled = false;
+            } catch(e) { alert("Analysis failed"); }
+            btn.innerText = 'ANALYZE'; btn.disabled = false;
         }
 
-        function initChart(s) {
-            if(myChart) myChart.destroy();
-            myChart = new Chart(document.getElementById('radarChart'), {
+        function renderDashboard(data) {
+            const d = data.data;
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('grade').innerText = d.grade;
+            document.getElementById('score').innerText = `SCORE: ${d.score}/100`;
+            document.getElementById('dl').href = `/download/${data.id}`;
+
+            // Render Category Scoreboard
+            let catHtml = "";
+            for(let [cat, score] of Object.entries(d.cat_scores)) {
+                catHtml += `
+                    <div class="enterprise-card p-4 rounded-2xl">
+                        <div class="text-[10px] text-slate-500 font-bold uppercase mb-1">${cat}</div>
+                        <div class="text-xl font-bold">${score}</div>
+                        <div class="stat-bar mt-2"><div class="stat-fill bg-blue-500" style="width:${score}%"></div></div>
+                    </div>`;
+            }
+            document.getElementById('catScores').innerHTML = catHtml;
+
+            // Render Metrics Grid
+            let gridHtml = "";
+            for(let [k, v] of Object.entries(d.metrics)) {
+                gridHtml += `
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-white/5">
+                        <div class="text-[9px] text-slate-500 font-black uppercase mb-1">${k}</div>
+                        <div class="text-blue-300 font-bold text-xs truncate">${v}</div>
+                    </div>`;
+            }
+            document.getElementById('metricsGrid').innerHTML = gridHtml;
+
+            document.getElementById('weakList').innerHTML = d.weak_points.map(w => `<li>• ${w}</li>`).join('');
+            document.getElementById('sugList').innerHTML = d.suggestions.map(s => `<li>• ${s}</li>`).join('');
+
+            updateChart(d.cat_scores);
+        }
+
+        function updateChart(scores) {
+            if(chart) chart.destroy();
+            const ctx = document.getElementById('spiderChart').getContext('2d');
+            chart = new Chart(ctx, {
                 type: 'radar',
                 data: {
-                    labels: ['SEO', 'Security', 'Speed', 'Content', 'Social'],
-                    datasets: [{ data: [s, s-10, s+5, s-5, s], backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: '#34d399', borderWidth: 2 }]
+                    labels: Object.keys(scores),
+                    datasets: [{
+                        label: 'Standard Compliance',
+                        data: Object.values(scores),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff'
+                    }]
                 },
-                options: { scales: { r: { grid: { color: '#334155' }, ticks: { display: false } } }, plugins: { legend: { display: false } } }
+                options: {
+                    scales: { r: { grid: { color: '#334155' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { weight: 'bold' } } } },
+                    plugins: { legend: { display: false } }
+                }
             });
         }
     </script>
