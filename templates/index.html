@@ -2,65 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Enterprise AI Audit</title>
+    <title>Throughweb Audit AI | Global Standards</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: #0b1120; font-family: 'Inter', sans-serif; }
-        .enterprise-card { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
-        .stat-bar { height: 4px; border-radius: 2px; background: #1e293b; overflow: hidden; }
-        .stat-fill { height: 100%; transition: width 1s ease-out; }
+        body { background: #020617; }
+        .alert-card { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 5px solid #ef4444; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
-<body class="text-slate-200 py-10 px-4">
+<body class="text-slate-100 p-6 md:p-12">
     <div class="max-w-6xl mx-auto">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
-            <div>
-                <h1 class="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-300">THROUGHWEB ENTERPRISE</h1>
-                <p class="text-slate-500 uppercase tracking-widest text-xs mt-2">Global Compliance & Performance Standards v4.0</p>
-            </div>
-            <div class="flex gap-2">
-                <input type="text" id="url" placeholder="Enter target URL..." class="bg-slate-900 border border-slate-700 px-6 py-3 rounded-xl w-64 md:w-96 outline-none focus:border-blue-500 transition-all">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all">ANALYZE</button>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
+            <h1 class="text-4xl font-black italic tracking-tighter text-blue-500">THROUGHWEB <span class="text-white">AI</span></h1>
+            <div class="flex bg-slate-900 p-2 rounded-2xl border border-slate-800 w-full md:w-auto">
+                <input type="text" id="url" placeholder="Enter Target Domain..." class="bg-transparent px-4 py-2 outline-none w-full md:w-72 text-sm">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-6 py-2 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-500 transition-all">Audit</button>
             </div>
         </div>
 
-        <div id="results" class="hidden space-y-6">
-            
-            <div id="catScores" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-                </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="enterprise-card p-10 rounded-3xl text-center flex flex-col justify-center shadow-2xl">
-                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Global Health Grade</span>
+        <div id="results" class="hidden space-y-10">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div class="bg-slate-900 p-10 rounded-[40px] border border-slate-800 text-center flex flex-col justify-center">
+                    <span class="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Global Grade</span>
                     <div id="grade" class="text-[120px] font-black text-white leading-none my-4"></div>
-                    <div id="score" class="text-2xl font-bold text-blue-400"></div>
+                    <div id="score" class="text-xl font-bold text-blue-500"></div>
                 </div>
-
-                <div class="lg:col-span-2 enterprise-card p-8 rounded-3xl flex items-center justify-center min-h-[400px]">
-                    <canvas id="spiderChart"></canvas>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-red-500/5 border border-red-500/10 p-8 rounded-3xl">
-                    <h3 class="text-red-400 font-bold uppercase text-xs mb-6 tracking-widest flex items-center gap-2">
-                        <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span> Critical Risks
-                    </h3>
-                    <ul id="weakList" class="space-y-4 text-sm text-red-200/80 italic"></ul>
-                </div>
-                <div class="bg-emerald-500/5 border border-emerald-500/10 p-8 rounded-3xl">
-                    <h3 class="text-emerald-400 font-bold uppercase text-xs mb-6 tracking-widest">Enterprise Action Plan</h3>
-                    <ul id="sugList" class="space-y-4 text-sm text-emerald-200/80"></ul>
+                <div class="lg:col-span-3 bg-slate-900 p-8 rounded-[40px] border border-slate-800">
+                    <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-6">Compliance Visualization (Core Web Vitals)</h3>
+                    <div class="h-64"><canvas id="spiderChart"></canvas></div>
                 </div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-5 bg-white text-slate-950 font-black rounded-2xl hover:bg-blue-400 transition-colors uppercase tracking-[0.2em]">Generate ISO Compliance Report (PDF)</a>
-
-            <div class="enterprise-card p-8 rounded-3xl">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-8 tracking-widest">Full Technical Specification</h3>
-                <div id="metricsGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            <div id="weakZone" class="space-y-4">
+                <h3 class="text-red-500 font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                    <span class="h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
+                    Critical Vulnerabilities & Weak Points
+                </h3>
+                <div id="weakList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
+
+            <div class="bg-slate-900/40 p-10 rounded-[40px] border border-slate-800">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-8">Technical Intelligence Feed</h3>
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+            </div>
+
+            <a id="dl" href="#" target="_blank" class="block w-full py-6 bg-blue-600 text-center rounded-2xl font-black text-white uppercase tracking-[0.3em] hover:bg-blue-500 transition-all">Download ISO Compliance PDF</a>
         </div>
     </div>
 
@@ -68,74 +55,55 @@
         let chart;
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
-            const btn = document.getElementById('btn');
-            btn.innerText = 'AUDITING...'; btn.disabled = true;
-
-            try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                const data = await res.json();
-                
-                if(res.ok) {
-                    renderDashboard(data);
-                }
-            } catch(e) { alert("Analysis failed"); }
-            btn.innerText = 'ANALYZE'; btn.disabled = false;
+            document.getElementById('btn').disabled = true;
+            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+            const data = await res.json();
+            
+            if(res.ok) {
+                render(data);
+                document.getElementById('btn').disabled = false;
+            }
         }
 
-        function renderDashboard(data) {
+        function render(data) {
             const d = data.data;
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('grade').innerText = d.grade;
-            document.getElementById('score').innerText = `SCORE: ${d.score}/100`;
+            document.getElementById('score').innerText = `ISO SCORE: ${d.score}/100`;
             document.getElementById('dl').href = `/download/${data.id}`;
 
-            // Render Category Scoreboard
-            let catHtml = "";
-            for(let [cat, score] of Object.entries(d.cat_scores)) {
-                catHtml += `
-                    <div class="enterprise-card p-4 rounded-2xl">
-                        <div class="text-[10px] text-slate-500 font-bold uppercase mb-1">${cat}</div>
-                        <div class="text-xl font-bold">${score}</div>
-                        <div class="stat-bar mt-2"><div class="stat-fill bg-blue-500" style="width:${score}%"></div></div>
+            // RED ZONE LOGIC
+            document.getElementById('weakList').innerHTML = d.weak_points.map(w => `
+                <div class="alert-card p-5 rounded-2xl flex items-center gap-4">
+                    <span class="text-2xl text-red-500 italic font-black">!</span>
+                    <span class="text-red-100 text-xs font-bold uppercase tracking-tighter">${w}</span>
+                </div>
+            `).join('') || "<div class='text-emerald-400 font-bold'>System fully optimized. No critical failures.</div>";
+
+            // METRIC GRID
+            let grid = "";
+            for(let [k,v] of Object.entries(d.metrics)) {
+                grid += `
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800">
+                        <div class="text-[9px] text-slate-600 font-black uppercase mb-1">${k}</div>
+                        <div class="text-blue-400 font-bold text-xs truncate">${v}</div>
                     </div>`;
             }
-            document.getElementById('catScores').innerHTML = catHtml;
-
-            // Render Metrics Grid
-            let gridHtml = "";
-            for(let [k, v] of Object.entries(d.metrics)) {
-                gridHtml += `
-                    <div class="bg-slate-900/40 p-4 rounded-xl border border-white/5">
-                        <div class="text-[9px] text-slate-500 font-black uppercase mb-1">${k}</div>
-                        <div class="text-blue-300 font-bold text-xs truncate">${v}</div>
-                    </div>`;
-            }
-            document.getElementById('metricsGrid').innerHTML = gridHtml;
-
-            document.getElementById('weakList').innerHTML = d.weak_points.map(w => `<li>• ${w}</li>`).join('');
-            document.getElementById('sugList').innerHTML = d.suggestions.map(s => `<li>• ${s}</li>`).join('');
+            document.getElementById('metricsGrid').innerHTML = grid;
 
             updateChart(d.cat_scores);
         }
 
-        function updateChart(scores) {
+        function updateChart(s) {
             if(chart) chart.destroy();
-            const ctx = document.getElementById('spiderChart').getContext('2d');
-            chart = new Chart(ctx, {
+            chart = new Chart(document.getElementById('spiderChart'), {
                 type: 'radar',
                 data: {
-                    labels: Object.keys(scores),
-                    datasets: [{
-                        label: 'Standard Compliance',
-                        data: Object.values(scores),
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: '#3b82f6',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#fff'
-                    }]
+                    labels: Object.keys(s),
+                    datasets: [{ data: Object.values(s), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', borderWidth: 3 }]
                 },
-                options: {
-                    scales: { r: { grid: { color: '#334155' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { weight: 'bold' } } } },
+                options: { 
+                    scales: { r: { grid: { color: '#1e293b' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { size: 12, weight: 'bold' } } } },
                     plugins: { legend: { display: false } }
                 }
             });
