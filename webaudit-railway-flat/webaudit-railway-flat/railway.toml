@@ -1,9 +1,0 @@
-
-[deploy]
-# Use sh -c so $PORT expands even if the runner doesn't shell-expand.
-startCommand = "sh -c \"gunicorn --workers 2 --bind 0.0.0.0:$PORT run:app\""
-
-# Call the guaranteed healthy endpoint
-healthcheckPath = "/health"
-
-restartPolicyType = "always"

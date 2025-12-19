@@ -1,4 +1,0 @@
-
-web: gunicorn --bind 0.0.0.0:${PORT:-8080} run:app
-worker: celery -A app.tasks.celery worker --loglevel=info
-beat: celery -A app.tasks.celery beat --loglevel=info
