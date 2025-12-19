@@ -39,15 +39,13 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# --- ROBUST 45+ METRICS ENGINE ---
+# --- 45+ METRICS ENGINE ---
 def run_website_audit(url: str):
     if not url.startswith('http'): url = 'https://' + url
-    # High-quality User-Agent to prevent getting stuck/blocked
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
 
     try:
         start_time = time.time()
-        # Increased timeout to 25 seconds for heavy sites like haier.com.pk
         res = requests.get(url, headers=headers, timeout=25, verify=True)
         soup = BeautifulSoup(res.text, 'html.parser')
         
@@ -72,7 +70,7 @@ def run_website_audit(url: str):
         m["Favicon"] = "Found" if soup.find('link', rel='icon') else "Missing"
         m["Robots Meta"] = "Found" if soup.find('meta', name='robots') else "Missing"
         m["Base URL Set"] = "Yes" if soup.find('base') else "No"
-        m["Bold Tags (b/strong)"] = len(soup.find_all(['b', 'strong']))
+        m["Bold Tags Count"] = len(soup.find_all(['b', 'strong']))
 
         # TECHNICAL & SECURITY (15 METRICS)
         m["SSL Active"] = "Yes" if url.startswith('https') else "No"
@@ -82,10 +80,10 @@ def run_website_audit(url: str):
         m["HSTS Header"] = "Enabled" if 'Strict-Transport-Security' in res.headers else "Disabled"
         m["X-Frame-Options"] = res.headers.get('X-Frame-Options', 'Not Set')
         m["X-Content-Type"] = res.headers.get('X-Content-Type-Options', 'Not Set')
-        m["Compression (Gzip)"] = res.headers.get('Content-Encoding', 'None')
+        m["Compression"] = res.headers.get('Content-Encoding', 'None')
         m["Scripts Count"] = len(soup.find_all('script'))
         m["External CSS"] = len(soup.find_all('link', rel='stylesheet'))
-        m["Inline CSS Blocks"] = len(soup.find_all('style'))
+        m["Inline Styles"] = len(soup.find_all('style'))
         m["Forms Found"] = len(soup.find_all('form'))
         m["iFrames Found"] = len(soup.find_all('iframe'))
         m["Tables Found"] = len(soup.find_all('table'))
@@ -98,5 +96,5 @@ def run_website_audit(url: str):
         m["Twitter Card"] = "Present" if soup.find('meta', name='twitter:card') else "Missing"
         m["Schema JSON-LD"] = "Found" if soup.find('script', type='application/ld+json') else "Missing"
         m["Copyright Info"] = "Found" if "©" in soup.get_text() else "Not Found"
-        m["Social Links"] = len([a for a in soup.find_all('a', href=True) if 'facebook' in a['href'] or 'twitter' in a['href']])
-        m["Comments in Code"] = "Yes" if soup.find(string=lambda text: isinstance(text, str) and text.strip().startswith('
+        m["Social Links"] = len([a for a in soup.find_all('a', href=True) if any(x in a['href'] for x in ['facebook', 'twitter', 'linkedin'])])
+        m["Comments in Code"] = "Yes" if soup.find(string=lambda text: isinstance(text, str) and "
