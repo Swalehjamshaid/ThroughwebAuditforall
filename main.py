@@ -50,7 +50,7 @@ def run_website_audit(url: str):
         soup = BeautifulSoup(res.text, 'html.parser')
         
         m = {}
-        # SEO & CONTENT (20 METRICS)
+        # SEO & CONTENT
         m["Title Tag"] = soup.title.string.strip() if soup.title else "Missing"
         m["Title Length"] = len(m["Title Tag"])
         m["H1 Count"] = len(soup.find_all('h1'))
@@ -72,29 +72,28 @@ def run_website_audit(url: str):
         m["Base URL Set"] = "Yes" if soup.find('base') else "No"
         m["Bold Tags Count"] = len(soup.find_all(['b', 'strong']))
 
-        # TECHNICAL & SECURITY (15 METRICS)
+        # TECHNICAL & SECURITY
         m["SSL Active"] = "Yes" if url.startswith('https') else "No"
         m["Server Software"] = res.headers.get('Server', 'Hidden')
         m["Full Load Time"] = f"{round(time.time() - start_time, 2)}s"
         m["Page Size"] = f"{round(len(res.content) / 1024, 2)} KB"
         m["HSTS Header"] = "Enabled" if 'Strict-Transport-Security' in res.headers else "Disabled"
         m["X-Frame-Options"] = res.headers.get('X-Frame-Options', 'Not Set')
-        m["X-Content-Type"] = res.headers.get('X-Content-Type-Options', 'Not Set')
-        m["Compression"] = res.headers.get('Content-Encoding', 'None')
         m["Scripts Count"] = len(soup.find_all('script'))
         m["External CSS"] = len(soup.find_all('link', rel='stylesheet'))
         m["Inline Styles"] = len(soup.find_all('style'))
         m["Forms Found"] = len(soup.find_all('form'))
         m["iFrames Found"] = len(soup.find_all('iframe'))
         m["Tables Found"] = len(soup.find_all('table'))
-        m["Video Elements"] = len(soup.find_all('video'))
 
-        # SOCIAL & STRUCTURE (10 METRICS)
+        # SOCIAL & STRUCTURE
         m["OG Title"] = "Present" if soup.find('meta', property='og:title') else "Missing"
-        m["OG Description"] = "Present" if soup.find('meta', property='og:description') else "Missing"
         m["OG Image"] = "Present" if soup.find('meta', property='og:image') else "Missing"
         m["Twitter Card"] = "Present" if soup.find('meta', name='twitter:card') else "Missing"
         m["Schema JSON-LD"] = "Found" if soup.find('script', type='application/ld+json') else "Missing"
         m["Copyright Info"] = "Found" if "©" in soup.get_text() else "Not Found"
-        m["Social Links"] = len([a for a in soup.find_all('a', href=True) if any(x in a['href'] for x in ['facebook', 'twitter', 'linkedin'])])
-        m["Comments in Code"] = "Yes" if soup.find(string=lambda text: isinstance(text, str) and "
+        m["SVG Graphics"] = len(soup.find_all('svg'))
+        m["Input Fields"] = len(soup.find_all('input'))
+        
+        # FIXED LINE 100 AREA
+        m["Comments in Code"] = "Found" if "
