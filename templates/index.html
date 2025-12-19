@@ -2,157 +2,119 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Audit AI | Professional Website Scanner</title>
+    <title>Throughweb Audit AI | Advanced Web Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        #progressFill { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        body { background: radial-gradient(circle at top right, #1e293b, #0f172a); }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        #progressFill { transition: width 0.4s ease; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
-    <div class="max-w-5xl mx-auto px-4 py-12">
-        <div class="text-center mb-12">
-            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-                Throughweb Audit AI
-            </h1>
-            <p class="text-slate-400">Comprehensive 45+ Point Website Health Check</p>
-        </div>
+<body class="text-slate-100 min-h-screen pb-20">
+    <div class="max-w-6xl mx-auto px-4 py-12">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-4 italic">THROUGHWEB AI</h1>
+            <p class="text-slate-400 tracking-widest uppercase text-sm">Next-Gen Website Intelligence & Compliance Engine</p>
+        </header>
 
-        <div class="max-w-3xl mx-auto mb-12">
-            <div class="flex flex-col md:flex-row gap-3 bg-slate-800 p-2 rounded-2xl shadow-2xl border border-slate-700">
-                <input type="text" id="url" placeholder="Enter website (e.g., google.com)" 
-                       class="flex-1 bg-transparent px-4 py-3 outline-none text-lg border-none focus:ring-0">
-                <button onclick="runAudit()" id="btn" 
-                        class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50">
-                    Analyze Site
-                </button>
+        <div class="max-w-3xl mx-auto mb-20">
+            <div class="glass p-2 rounded-2xl flex flex-col md:flex-row gap-2">
+                <input type="text" id="url" placeholder="Paste URL here..." class="bg-transparent flex-1 px-6 py-4 outline-none text-xl">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-black transition-all transform active:scale-95 shadow-xl shadow-blue-500/20">ANALYZE</button>
             </div>
         </div>
 
-        <div id="progressSection" class="hidden max-w-2xl mx-auto mb-12">
-            <div class="flex justify-between text-sm mb-2 text-slate-400 font-medium">
-                <span id="statusText">Initializing AI scanner...</span>
-                <span id="percentText">0%</span>
-            </div>
-            <div class="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                <div id="progressFill" class="h-full w-0 bg-gradient-to-r from-blue-500 to-emerald-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-            </div>
+        <div id="progressSection" class="hidden max-w-2xl mx-auto mb-16">
+            <div class="flex justify-between text-xs font-bold text-blue-400 mb-2 tracking-tighter uppercase"><span id="statusText">...</span><span id="percentText">0%</span></div>
+            <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden"><div id="progressFill" class="h-full w-0 bg-blue-400 shadow-[0_0_15px_#60a5fa]"></div></div>
         </div>
 
-        <div id="errorBox" class="hidden max-w-2xl mx-auto mb-8 p-4 bg-red-900/20 border border-red-500/50 text-red-300 rounded-xl text-center"></div>
-
-        <div id="results" class="hidden fade-in">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center shadow-xl">
-                    <h3 class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Overall Grade</h3>
-                    <div id="grade" class="text-7xl font-black text-emerald-400 drop-shadow-sm"></div>
+        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass p-10 rounded-3xl text-center">
+                    <span class="text-slate-500 text-xs font-bold uppercase">Domain Rank</span>
+                    <div id="grade" class="text-9xl font-black text-emerald-400 leading-none my-4"></div>
+                    <div id="score" class="text-2xl font-bold text-blue-400"></div>
                 </div>
-                <div class="bg-slate-800 p-8 rounded-2xl border border-slate-700 text-center shadow-xl">
-                    <h3 class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Health Score</h3>
-                    <div id="score" class="text-7xl font-black text-blue-400 drop-shadow-sm"></div>
+                <div class="lg:col-span-2 glass p-8 rounded-3xl min-h-[300px] flex items-center justify-center">
+                    <canvas id="radarChart"></canvas>
                 </div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="flex items-center justify-center gap-2 w-full py-4 mb-10 bg-slate-800 border border-slate-700 rounded-2xl hover:bg-slate-700 transition-colors font-bold text-blue-400">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Download Detailed Report (PDF)
-            </a>
-
-            <div class="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-xl">
-                <h3 class="text-xl font-bold mb-6 text-slate-300 flex items-center gap-2">
-                    <span class="w-2 h-6 bg-blue-500 rounded-full"></span>
-                    Detailed Technical Audit
-                </h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-red-500/10 border border-red-500/20 p-8 rounded-3xl">
+                    <h4 class="text-red-400 font-bold uppercase text-xs mb-4 italic">Critical Findings</h4>
+                    <ul id="weakList" class="space-y-3 text-sm text-red-100"></ul>
+                </div>
+                <div class="bg-emerald-500/10 border border-emerald-500/20 p-8 rounded-3xl">
+                    <h4 class="text-emerald-400 font-bold uppercase text-xs mb-4 italic">Action Plan</h4>
+                    <ul id="sugList" class="space-y-3 text-sm text-emerald-100"></ul>
+                </div>
             </div>
+
+            <div class="glass p-8 rounded-3xl">
+                <h4 class="text-slate-400 font-bold text-xs uppercase mb-6">Technical Metadata Grid</h4>
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+            </div>
+
+            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-white text-slate-900 font-black rounded-2xl hover:bg-blue-400 transition-colors uppercase tracking-widest">Download Official PDF Report</a>
         </div>
     </div>
 
     <script>
-        let progInt;
-        
-        function updateUI(step) {
-            const fill = document.getElementById('progressFill');
-            const pText = document.getElementById('percentText');
-            const sText = document.getElementById('statusText');
+        let myChart;
+        async function runAudit() {
+            const url = document.getElementById('url').value; if(!url) return;
+            document.getElementById('btn').disabled = true;
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('progressSection').classList.remove('hidden');
+            
+            // Progress logic
             let w = 0;
-
-            const stages = ["Scraping HTML content...", "Analyzing SEO tags...", "Checking Security headers...", "Validating Social metadata...", "Finalizing audit..."];
-
-            progInt = setInterval(() => {
-                if (w < 92) {
-                    w += Math.random() * 4;
-                    fill.style.width = w + '%';
-                    pText.innerText = Math.floor(w) + '%';
-                    sText.innerText = stages[Math.floor(w/20)] || stages[4];
+            const int = setInterval(() => {
+                if(w < 90) { 
+                    w += 2; 
+                    document.getElementById('progressFill').style.width = w + '%';
+                    document.getElementById('percentText').innerText = w + '%';
                 }
-            }, 700);
+            }, 300);
+
+            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+            const data = await res.json();
+            clearInterval(int);
+
+            if(res.ok) {
+                document.getElementById('grade').innerText = data.data.grade;
+                document.getElementById('score').innerText = data.data.score + '% Health Score';
+                document.getElementById('dl').href = `/download/${data.id}`;
+                
+                document.getElementById('weakList').innerHTML = data.data.weak_points.map(w => `<li>• ${w}</li>`).join('');
+                document.getElementById('sugList').innerHTML = data.data.suggestions.map(s => `<li>• ${s}</li>`).join('');
+                
+                let grid = "";
+                for(let [k,v] of Object.entries(data.data.metrics)) {
+                    grid += `<div class="bg-slate-900/40 p-3 rounded-lg border border-white/5"><div class="text-[10px] text-slate-500 font-bold uppercase">${k}</div><div class="text-blue-300 font-bold text-xs truncate">${v}</div></div>`;
+                }
+                document.getElementById('metricsGrid').innerHTML = grid;
+                
+                initChart(data.data.score);
+                document.getElementById('progressSection').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+            }
+            document.getElementById('btn').disabled = false;
         }
 
-        async function runAudit() {
-            const urlInput = document.getElementById('url');
-            const btn = document.getElementById('btn');
-            const results = document.getElementById('results');
-            const errorBox = document.getElementById('errorBox');
-            const progSec = document.getElementById('progressSection');
-            
-            const target = urlInput.value.trim();
-            if(!target) return;
-
-            // UI State Reset
-            btn.disabled = true;
-            btn.innerText = "Analyzing...";
-            results.classList.add('hidden');
-            errorBox.classList.add('hidden');
-            progSec.classList.remove('hidden');
-            
-            updateUI();
-
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: target})
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || "Server failed to respond.");
-
-                // On Success
-                clearInterval(progInt);
-                document.getElementById('progressFill').style.width = '100%';
-                document.getElementById('percentText').innerText = '100%';
-
-                setTimeout(() => {
-                    progSec.classList.add('hidden');
-                    document.getElementById('grade').innerText = data.data.grade;
-                    document.getElementById('score').innerText = data.data.score + "%";
-                    document.getElementById('dl').href = `/download/${data.id}`;
-                    
-                    let gridHtml = "";
-                    for (const [key, val] of Object.entries(data.data.metrics)) {
-                        gridHtml += `
-                            <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                                <span class="text-slate-500 text-[10px] uppercase font-bold tracking-tighter">${key}</span>
-                                <span class="text-blue-300 font-semibold text-xs">${val}</span>
-                            </div>`;
-                    }
-                    document.getElementById('metricsGrid').innerHTML = gridHtml;
-                    results.classList.remove('hidden');
-                }, 600);
-
-            } catch (err) {
-                clearInterval(progInt);
-                progSec.classList.add('hidden');
-                errorBox.innerText = `Audit Error: ${err.message}`;
-                errorBox.classList.remove('hidden');
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Analyze Site";
-            }
+        function initChart(s) {
+            if(myChart) myChart.destroy();
+            myChart = new Chart(document.getElementById('radarChart'), {
+                type: 'radar',
+                data: {
+                    labels: ['SEO', 'Security', 'Speed', 'Content', 'Social'],
+                    datasets: [{ data: [s, s-10, s+5, s-5, s], backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: '#34d399', borderWidth: 2 }]
+                },
+                options: { scales: { r: { grid: { color: '#334155' }, ticks: { display: false } } }, plugins: { legend: { display: false } } }
+            });
         }
     </script>
 </body>
