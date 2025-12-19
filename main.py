@@ -86,14 +86,12 @@ def run_website_audit(url: str):
         m["iFrames Found"] = len(soup.find_all('iframe'))
         m["Tables Found"] = len(soup.find_all('table'))
 
-        # SOCIAL & STRUCTURE
+        # SOCIAL & STRUCTURE (FIXED LINE 100 AREA)
         m["OG Title"] = "Present" if soup.find('meta', property='og:title') else "Missing"
         m["OG Image"] = "Present" if soup.find('meta', property='og:image') else "Missing"
         m["Twitter Card"] = "Present" if soup.find('meta', name='twitter:card') else "Missing"
-        m["Schema JSON-LD"] = "Found" if soup.find('script', type='application/ld+json') else "Missing"
+        m["Schema Data"] = "Found" if soup.find('script', type='application/ld+json') else "Missing"
         m["Copyright Info"] = "Found" if "©" in soup.get_text() else "Not Found"
         m["SVG Graphics"] = len(soup.find_all('svg'))
         m["Input Fields"] = len(soup.find_all('input'))
-        
-        # FIXED LINE 100 AREA
         m["Comments in Code"] = "Found" if "
