@@ -1,0 +1,9 @@
+
+[build]
+# Use Railpack builder (recommended by Railway). If you still run Nixpacks, switch to RAILPACK.
+builder = "RAILPACK"
+
+[deploy]
+startCommand = "python -m uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT}"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
