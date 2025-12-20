@@ -1,79 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Swaleh Web Audit | Elite Engine</title>
+    <meta charset="UTF-8"><title>Swaleh Web Audit | Elite Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%); font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .custom-scroll::-webkit-scrollbar { width: 5px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
+        body { background: #05070a; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .gradient-text { background: linear-gradient(to right, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
-<body class="text-slate-200 p-4 md:p-10">
-    <div class="max-w-6xl mx-auto">
+<body class="text-slate-300 p-4 md:p-12">
+    <div class="max-w-7xl mx-auto">
         <header class="text-center mb-16">
-            <h1 class="text-6xl font-black text-white tracking-tighter mb-4">
-                SWALEH <span class="text-blue-500">AUDIT</span>
-            </h1>
-            <p class="text-slate-400 text-lg uppercase tracking-widest">Elite 57-Point Technical Intelligence</p>
+            <h1 class="text-6xl font-black mb-4">SWALEH <span class="gradient-text">AUDIT</span></h1>
+            <p class="text-slate-500 uppercase tracking-widest text-sm">Global 57-Point Technical Intelligence Engine</p>
         </header>
 
-        <div class="glass p-3 rounded-3xl flex flex-col md:flex-row gap-4 mb-12 shadow-2xl">
-            <input type="text" id="url" placeholder="Enter Website URL..." class="flex-1 bg-transparent p-4 text-xl outline-none text-white placeholder:text-slate-600">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all transform active:scale-95">
-                GENERATE AUDIT
-            </button>
+        <div class="glass p-4 rounded-3xl flex flex-col md:flex-row gap-4 mb-16 shadow-2xl">
+            <input type="text" id="url" placeholder="Enter URL (e.g. https://google.com)" class="flex-1 bg-transparent p-4 text-xl outline-none text-white placeholder:text-slate-700">
+            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 text-white px-12 py-4 rounded-2xl font-bold text-lg transition-all">ANALYZE SITE</button>
         </div>
 
-        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="glass p-10 rounded-[2rem] text-center">
-                    <span class="text-slate-500 text-xs uppercase font-bold tracking-widest">Elite Grade</span>
-                    <div id="grade" class="text-8xl font-black text-blue-500 mt-4"></div>
+        <div id="results" class="hidden space-y-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="glass p-8 rounded-[2rem] text-center border-b-4 border-blue-500">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Elite Grade</span>
+                    <div id="grade" class="text-7xl font-black text-white mt-2"></div>
                 </div>
-                <div class="glass p-10 rounded-[2rem] flex flex-col items-center justify-center">
-                    <div class="w-32 h-32 relative">
-                        <canvas id="scoreChart"></canvas>
-                        <div id="scoreVal" class="absolute inset-0 flex items-center justify-center text-2xl font-bold"></div>
-                    </div>
-                    <p class="text-slate-500 text-xs mt-4 uppercase">Overall Efficiency</p>
+                <div class="glass p-8 rounded-[2rem] flex flex-col items-center justify-center">
+                    <canvas id="scoreChart" width="100" height="100"></canvas>
+                    <div id="scoreVal" class="text-2xl font-bold mt-2"></div>
                 </div>
-                <div class="glass p-10 rounded-[2rem] flex flex-col justify-center gap-4">
-                    <p class="text-slate-400 text-sm text-center">200-word Strategic Report Generated.</p>
-                    <a id="dl" href="#" class="bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-bold text-center block shadow-lg shadow-emerald-900/20">
-                        DOWNLOAD FULL PDF
-                    </a>
+                <div class="md:col-span-2 glass rounded-[2rem] overflow-hidden relative group">
+                    <div class="absolute inset-0 bg-blue-600/10 z-10 pointer-events-none"></div>
+                    <iframe id="preview" src="" class="w-full h-full min-h-[150px] border-none scale-90"></iframe>
+                    <div class="absolute bottom-4 left-4 z-20 bg-black/50 px-3 py-1 rounded-full text-[10px] font-bold">LIVE PREVIEW GENERATED</div>
                 </div>
             </div>
 
-            <div class="glass rounded-[2rem] overflow-hidden">
-                <div class="p-6 bg-white/5 border-b border-white/10 flex justify-between">
-                    <h3 class="font-bold text-xl text-blue-400 tracking-tight">Comprehensive Technical Scorecard</h3>
-                    <span class="text-slate-500 text-sm">Showing 57 Performance Vectors</span>
+            <div class="flex justify-center">
+                <a id="dl" href="#" class="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-5 rounded-2xl font-black tracking-widest shadow-xl shadow-emerald-900/20">DOWNLOAD WORLD-CLASS PDF REPORT</a>
+            </div>
+
+            <div class="glass rounded-[3rem] overflow-hidden">
+                <div class="p-8 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold">Comprehensive Technical Scorecard</h2>
+                    <span class="text-blue-400 font-mono text-sm">57 METRICS IDENTIFIED</span>
                 </div>
-                <div class="max-h-[600px] overflow-y-auto custom-scroll p-4">
-                    <div id="m-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        </div>
-                </div>
+                <div class="p-8 max-h-[700px] overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-4" id="m-grid"></div>
             </div>
         </div>
     </div>
 
-    <div id="loader" class="hidden fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
-        <div class="text-center">
-            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-            <p class="text-blue-500 font-mono text-sm uppercase tracking-widest">Probing 57 Global Metrics...</p>
-        </div>
+    <div id="loader" class="hidden fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center">
+        <div class="w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <p class="text-blue-500 font-mono tracking-widest text-sm uppercase">Mapping 57 Global Metrics...</p>
     </div>
 
     <script>
         let chart;
         async function runAudit() {
             const url = document.getElementById('url').value;
-            if(!url) return alert("URL Required");
+            if(!url.startsWith('http')) return alert("Please enter a full URL starting with http:// or https://");
             
             document.getElementById('loader').classList.remove('hidden');
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
@@ -83,33 +72,28 @@
             document.getElementById('grade').innerText = data.summary.grade;
             document.getElementById('scoreVal').innerText = data.summary.score + "%";
             document.getElementById('dl').href = `/download/${data.id}`;
+            document.getElementById('preview').src = url;
 
             const grid = document.getElementById('m-grid');
             grid.innerHTML = "";
-            Object.entries(data.summary.metrics).forEach(([id, info]) => {
+            Object.values(data.summary.metrics).forEach(m => {
                 grid.innerHTML += `
-                    <div class="p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-blue-500/50 transition-all">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">${info.category}</span>
-                            <span class="text-xs font-mono ${info.status==='PASS'?'text-emerald-500':'text-rose-500'}">${info.status}</span>
+                    <div class="p-6 rounded-3xl bg-white/5 border border-white/5 hover:border-blue-500/30 transition-all">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">${m.category}</span>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded ${m.status==='PASS'?'bg-emerald-500/10 text-emerald-400':'bg-rose-500/10 text-rose-400'}">${m.status}</span>
                         </div>
-                        <h4 class="text-sm font-bold text-slate-200 mb-2">${info.name}</h4>
-                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="h-full bg-blue-500" style="width: ${info.score}%"></div>
-                        </div>
-                    </div>
-                `;
+                        <h4 class="text-sm font-semibold text-slate-200 mb-4">${m.name}</h4>
+                        <div class="w-full bg-slate-800 h-1 rounded-full"><div class="h-full bg-blue-500" style="width:${m.score}%"></div></div>
+                    </div>`;
             });
 
-            updateChart(data.summary.score);
+            const ctx = document.getElementById('scoreChart');
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [data.summary.score, 100-data.summary.score], backgroundColor: ['#2563eb','#1e293b'], borderWidth: 0 }] }, options: { cutout: '80%' } });
+
             document.getElementById('loader').classList.add('hidden');
             window.scrollTo({ top: document.getElementById('results').offsetTop - 50, behavior: 'smooth' });
-        }
-
-        function updateChart(s) {
-            const ctx = document.getElementById('scoreChart').getContext('2d');
-            if(chart) chart.destroy();
-            chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [s, 100-s], backgroundColor: ['#3b82f6','#1e293b'], borderWidth: 0 }] }, options: { cutout: '85%', plugins: { legend: false, tooltip: false } } });
         }
     </script>
 </body>
