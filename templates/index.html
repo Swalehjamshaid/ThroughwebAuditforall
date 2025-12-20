@@ -2,37 +2,52 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Elite | Strict Master Audit</title>
+    <title>Throughweb Elite | Owner Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .weakness-alert { border-left: 6px solid #ef4444; background: linear-gradient(90deg, #450a0a 0%, #020617 100%); animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-        .metric-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.05); }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .fail-red { background: linear-gradient(135deg, #450a0a 0%, #020617 100%); border: 1px solid #ef4444; color: #f87171; }
+        .pass-green { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .fail-text { color: #ef4444; font-weight: 900; }
     </style>
 </head>
-<body class="bg-[#020617] text-slate-100 p-8">
+<body class="bg-[#020617] text-slate-100 p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-16 p-8 bg-slate-900/50 rounded-[40px] border border-slate-800">
-            <h1 class="text-3xl font-black italic text-blue-500">THROUGHWEB <span class="text-white font-normal uppercase tracking-widest">STRICT SCAN</span></h1>
-            <div class="flex gap-2">
-                <input type="text" id="url" placeholder="Enter Domain..." class="bg-slate-950 border border-slate-800 px-6 py-3 rounded-xl w-80 outline-none">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-blue-500 transition-all">Deep Audit</button>
+        <header class="flex flex-col lg:flex-row justify-between items-center mb-12 p-10 glass rounded-[50px] gap-8">
+            <h1 class="text-3xl font-black italic text-blue-500">THROUGHWEB <span class="text-white uppercase font-normal tracking-[0.3em]">Owner AI</span></h1>
+            <div class="flex gap-2 w-full lg:w-auto">
+                <input type="text" id="url" placeholder="Enter target domain..." class="bg-slate-950 border border-slate-800 px-8 py-4 rounded-2xl flex-1 outline-none focus:border-blue-500">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Execute Master Audit</button>
             </div>
         </header>
 
         <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-slate-900 p-12 rounded-[50px] text-center border-4 border-slate-800">
-                    <span class="text-slate-500 text-xs font-black uppercase tracking-[0.4em]">Audit Health Grade</span>
-                    <div id="grade" class="text-[140px] font-black text-white leading-none my-4"></div>
-                    <div id="score" class="text-2xl font-bold text-blue-500"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="glass p-12 rounded-[60px] flex items-center justify-between border-2 border-slate-800">
+                    <div>
+                        <span class="text-slate-500 text-xs font-black uppercase tracking-widest">Website Health</span>
+                        <div id="grade" class="text-[120px] font-black leading-none my-2 text-white"></div>
+                    </div>
+                    <div class="text-right">
+                        <div id="score" class="text-5xl font-black text-blue-500 mb-2"></div>
+                        <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Compliance Score</p>
+                    </div>
                 </div>
-                <div class="space-y-4" id="weakList"></div>
+                <div class="fail-red p-12 rounded-[60px] flex flex-col justify-center">
+                    <span class="text-red-500 font-black text-xs uppercase mb-4 tracking-widest animate-pulse">Critical Revenue Risk</span>
+                    <div id="revLoss" class="text-7xl font-black mb-4"></div>
+                    <p id="revText" class="text-slate-300 text-lg leading-relaxed italic font-medium"></p>
+                </div>
             </div>
 
-            <div class="bg-slate-900/50 p-10 rounded-[50px] border border-slate-800">
-                <h3 class="text-[10px] font-black text-slate-500 uppercase mb-10 text-center tracking-[0.5em]">Master Intelligence feed: 59-Point checklist</h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+            <div id="brokenBox" class="hidden p-8 rounded-[40px] bg-red-950/20 border border-red-900/50">
+                <h3 class="text-red-500 font-black text-xs uppercase mb-4 tracking-widest">Broken Infrastructure Map (Dead Links)</h3>
+                <div id="brokenList" class="text-xs font-mono text-red-300 space-y-1"></div>
+            </div>
+
+            <div class="glass p-12 rounded-[60px]">
+                <h3 class="text-[10px] font-black text-slate-600 uppercase mb-12 text-center tracking-[0.6em]">59-Point Strategic Master Feed</h3>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
         </div>
     </div>
@@ -41,7 +56,7 @@
         async function runAudit() {
             document.getElementById('results').classList.add('hidden');
             const url = document.getElementById('url').value; if(!url) return;
-            const btn = document.getElementById('btn'); btn.innerText = 'STRICT SCANNING...'; btn.disabled = true;
+            const btn = document.getElementById('btn'); btn.innerText = 'CRAWLING...'; btn.disabled = true;
 
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
@@ -50,28 +65,30 @@
                 const d = data.data;
                 document.getElementById('results').classList.remove('hidden');
                 document.getElementById('grade').innerText = d.grade;
-                document.getElementById('score').innerText = `COMPLIANCE SCORE: ${d.score}/100`;
+                document.getElementById('score').innerText = d.score;
+                document.getElementById('revLoss').innerText = `-${d.financial_impact.loss} Sales`;
+                document.getElementById('revText').innerText = d.financial_impact.text;
 
-                document.getElementById('weakList').innerHTML = d.weak_points.map((w, i) => `
-                    <div class="weakness-alert p-6 rounded-3xl">
-                        <div class="text-red-500 font-black text-xs uppercase mb-1 tracking-widest">Issue: ${w}</div>
-                        <div class="text-slate-100 text-sm italic">"${d.suggestions[i]}"</div>
-                    </div>`).join('') || "<div class='text-emerald-400 font-bold p-10 bg-slate-900 rounded-[50px]'>All Critical Security & Performance Standards Met.</div>";
+                // Broken Links
+                if(d.broken_links.length > 0) {
+                    document.getElementById('brokenBox').classList.remove('hidden');
+                    document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>→ ${l}</div>`).join('');
+                }
 
+                // Metric Grid
                 let grid = "";
                 for(let [k,v] of Object.entries(d.metrics)) {
+                    const isFail = v.status === "FAIL";
                     grid += `
-                        <div class="p-5 metric-card rounded-2xl">
-                            <div class="text-[9px] text-slate-600 font-black uppercase mb-1 truncate">${k}</div>
-                            <div class="text-blue-300 font-bold text-sm mb-2">${v.val}</div>
-                            <div class="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-600" style="width: ${(v.pts/v.max)*100}%"></div>
-                            </div>
+                        <div class="p-8 rounded-[35px] ${isFail ? 'fail-red' : 'glass'}">
+                            <div class="text-[9px] ${isFail ? 'text-red-400' : 'text-slate-500'} font-black uppercase mb-1">${k}</div>
+                            <div class="text-2xl font-black ${isFail ? 'text-white' : 'text-blue-400'} mb-4">${v.val}</div>
+                            <div class="text-[11px] ${isFail ? 'text-red-200' : 'text-slate-400'} italic font-medium leading-relaxed">"${v.tip}"</div>
                         </div>`;
                 }
                 document.getElementById('metricsGrid').innerHTML = grid;
+                btn.innerText = 'Execute Master Audit'; btn.disabled = false;
             }
-            btn.innerText = 'Deep Audit'; btn.disabled = false;
         }
     </script>
 </body>
