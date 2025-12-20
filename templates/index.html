@@ -2,53 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Elite | Owner Intelligence</title>
+    <title>Throughweb Elite | Revenue Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .fail-red { background: linear-gradient(135deg, #450a0a 0%, #020617 100%); border: 1px solid #ef4444; color: #f87171; }
-        .pass-green { background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); }
-        .fail-text { color: #ef4444; font-weight: 900; }
+        .risk-glow { background: linear-gradient(135deg, #450a0a 0%, #020617 100%); border: 1px solid #ef4444; }
+        .gain-glow { background: linear-gradient(135deg, #064e3b 0%, #020617 100%); border: 1px solid #10b981; }
     </style>
 </head>
 <body class="bg-[#020617] text-slate-100 p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
         <header class="flex flex-col lg:flex-row justify-between items-center mb-12 p-10 glass rounded-[50px] gap-8">
-            <h1 class="text-3xl font-black italic text-blue-500">THROUGHWEB <span class="text-white uppercase font-normal tracking-[0.3em]">Owner AI</span></h1>
-            <div class="flex gap-2 w-full lg:w-auto">
-                <input type="text" id="url" placeholder="Enter target domain..." class="bg-slate-950 border border-slate-800 px-8 py-4 rounded-2xl flex-1 outline-none focus:border-blue-500">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-2xl font-black uppercase tracking-widest transition-all">Execute Master Audit</button>
+            <h1 class="text-3xl font-black italic text-blue-500 uppercase tracking-tighter">Throughweb <span class="text-white font-light">Elite Strategy</span></h1>
+            <div class="flex gap-2">
+                <input type="text" id="url" placeholder="Enter Domain..." class="bg-slate-950 border border-slate-800 px-6 py-4 rounded-3xl w-80 outline-none">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-4 rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-blue-500">Analyze</button>
             </div>
         </header>
 
         <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="glass p-12 rounded-[60px] flex items-center justify-between border-2 border-slate-800">
-                    <div>
-                        <span class="text-slate-500 text-xs font-black uppercase tracking-widest">Website Health</span>
-                        <div id="grade" class="text-[120px] font-black leading-none my-2 text-white"></div>
-                    </div>
-                    <div class="text-right">
-                        <div id="score" class="text-5xl font-black text-blue-500 mb-2"></div>
-                        <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Compliance Score</p>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="risk-glow p-8 rounded-[40px] flex flex-col justify-center">
+                    <span class="text-red-500 font-black text-[10px] uppercase mb-1">Financial Leakage</span>
+                    <div id="revLoss" class="text-5xl font-black text-red-500 mb-2"></div>
+                    <p class="text-slate-400 text-[9px] italic">Revenue lost to friction.</p>
                 </div>
-                <div class="fail-red p-12 rounded-[60px] flex flex-col justify-center">
-                    <span class="text-red-500 font-black text-xs uppercase mb-4 tracking-widest animate-pulse">Critical Revenue Risk</span>
-                    <div id="revLoss" class="text-7xl font-black mb-4"></div>
-                    <p id="revText" class="text-slate-300 text-lg leading-relaxed italic font-medium"></p>
+                <div class="gain-glow p-8 rounded-[40px] flex flex-col justify-center">
+                    <span class="text-emerald-500 font-black text-[10px] uppercase mb-1">Traffic Gain</span>
+                    <div id="trafficGain" class="text-5xl font-black text-emerald-500 mb-2"></div>
+                    <p class="text-slate-300 text-[9px] italic">Projected search growth.</p>
+                </div>
+                <div class="glass p-8 rounded-[40px] border-blue-900/30">
+                    <span class="text-blue-500 font-black text-[10px] uppercase mb-1">Recovery Growth</span>
+                    <div id="revRecovery" class="text-5xl font-black text-white mb-2"></div>
+                    <p class="text-slate-400 text-[9px] italic">Conversion ROI potential.</p>
+                </div>
+                <div class="glass p-8 rounded-[40px] text-center border-white/5">
+                    <span class="text-slate-500 text-[10px] font-black uppercase mb-1">Health Grade</span>
+                    <div id="grade" class="text-7xl font-black text-white leading-none"></div>
                 </div>
             </div>
 
             <div id="brokenBox" class="hidden p-8 rounded-[40px] bg-red-950/20 border border-red-900/50">
-                <h3 class="text-red-500 font-black text-xs uppercase mb-4 tracking-widest">Broken Infrastructure Map (Dead Links)</h3>
-                <div id="brokenList" class="text-xs font-mono text-red-300 space-y-1"></div>
+                <h3 class="text-red-500 font-black text-xs uppercase mb-4 tracking-widest">Infrastructure Dead Link Map</h3>
+                <div id="brokenList" class="text-[10px] font-mono text-red-300 space-y-1"></div>
             </div>
 
-            <div class="glass p-12 rounded-[60px]">
-                <h3 class="text-[10px] font-black text-slate-600 uppercase mb-12 text-center tracking-[0.6em]">59-Point Strategic Master Feed</h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            <div class="glass p-10 rounded-[50px]">
+                <h3 class="text-[10px] font-black text-slate-600 uppercase mb-8 text-center tracking-[0.5em]">59-Point Master Technical Checklist</h3>
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
             </div>
+
+            <a id="dl" href="#" target="_blank" class="block w-full py-8 glass rounded-[40px] text-center font-black uppercase tracking-widest text-blue-400 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-900/30">
+                Download Executive Strategy PDF
+            </a>
         </div>
     </div>
 
@@ -56,39 +63,33 @@
         async function runAudit() {
             document.getElementById('results').classList.add('hidden');
             const url = document.getElementById('url').value; if(!url) return;
-            const btn = document.getElementById('btn'); btn.innerText = 'CRAWLING...'; btn.disabled = true;
+            const btn = document.getElementById('btn'); btn.innerText = 'SCANNING...'; btn.disabled = true;
 
-            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-            const data = await res.json();
-            
-            if(res.ok) {
-                const d = data.data;
-                document.getElementById('results').classList.remove('hidden');
-                document.getElementById('grade').innerText = d.grade;
-                document.getElementById('score').innerText = d.score;
-                document.getElementById('revLoss').innerText = `-${d.financial_impact.loss} Sales`;
-                document.getElementById('revText').innerText = d.financial_impact.text;
+            try {
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+                const data = await res.json();
+                if(res.ok) {
+                    const d = data.data;
+                    document.getElementById('results').classList.remove('hidden');
+                    document.getElementById('revLoss').innerText = d.financial_data.leak;
+                    document.getElementById('trafficGain').innerText = d.financial_data.traffic_gain;
+                    document.getElementById('revRecovery').innerText = d.financial_data.recovery;
+                    document.getElementById('grade').innerText = d.grade;
+                    document.getElementById('dl').href = `/download/${data.id}`;
 
-                // Broken Links
-                if(d.broken_links.length > 0) {
-                    document.getElementById('brokenBox').classList.remove('hidden');
-                    document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>→ ${l}</div>`).join('');
+                    if(d.broken_links.length > 0) {
+                        document.getElementById('brokenBox').classList.remove('hidden');
+                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>→ ${l}</div>`).join('');
+                    }
+
+                    let grid = "";
+                    for(let [k,v] of Object.entries(d.metrics)) {
+                        grid += `<div class="p-4 glass rounded-2xl border-white/5"><div class="text-[8px] text-slate-600 font-black uppercase truncate mb-1">${k}</div><div class="font-bold text-[10px] ${v.status == 'FAIL' ? 'text-red-500' : 'text-blue-400'}">${v.val}</div></div>`;
+                    }
+                    document.getElementById('metricsGrid').innerHTML = grid;
                 }
-
-                // Metric Grid
-                let grid = "";
-                for(let [k,v] of Object.entries(d.metrics)) {
-                    const isFail = v.status === "FAIL";
-                    grid += `
-                        <div class="p-8 rounded-[35px] ${isFail ? 'fail-red' : 'glass'}">
-                            <div class="text-[9px] ${isFail ? 'text-red-400' : 'text-slate-500'} font-black uppercase mb-1">${k}</div>
-                            <div class="text-2xl font-black ${isFail ? 'text-white' : 'text-blue-400'} mb-4">${v.val}</div>
-                            <div class="text-[11px] ${isFail ? 'text-red-200' : 'text-slate-400'} italic font-medium leading-relaxed">"${v.tip}"</div>
-                        </div>`;
-                }
-                document.getElementById('metricsGrid').innerHTML = grid;
-                btn.innerText = 'Execute Master Audit'; btn.disabled = false;
-            }
+            } catch (e) { alert("Analysis timed out. Target server may be blocking our crawler."); }
+            finally { btn.innerText = 'Analyze'; btn.disabled = false; }
         }
     </script>
 </body>
