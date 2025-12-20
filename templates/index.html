@@ -1,64 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Swaleh Web Audit Elite</title>
+    <meta charset="UTF-8"><title>Swaleh Web Audit Elite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        .metric-card:hover { border-color: #3b82f6; transform: translateY(-2px); transition: all 0.3s; }
+        .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .metric-card { transition: all 0.3s ease; }
+        .metric-card:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); }
     </style>
 </head>
-<body class="p-4 md:p-10">
+<body class="p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
-        <div class="text-center mb-12">
-            <h1 class="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">SWALEH WEB AUDIT</h1>
-            <p class="text-slate-400 mt-4 tracking-widest uppercase">Elite 57-Point Technical Intelligence</p>
+        <div class="text-center mb-16">
+            <h1 class="text-7xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">SWALEH AUDIT</h1>
+            <p class="text-slate-500 mt-4 tracking-[0.3em] uppercase text-sm">Elite 57-Point Performance Intelligence</p>
         </div>
 
-        <div class="glass p-6 rounded-3xl flex flex-col md:flex-row gap-4 mb-10 shadow-2xl">
-            <input type="text" id="url" placeholder="Enter URL..." class="flex-1 bg-transparent border-none text-2xl outline-none p-2">
-            <button onclick="startAudit()" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-bold text-xl transition-all">RUN DEEP SCAN</button>
+        <div class="glass p-4 rounded-3xl flex flex-col md:flex-row gap-4 mb-16 shadow-2xl">
+            <input type="text" id="url" placeholder="Enter URL (https://...)" class="flex-1 bg-transparent border-none text-2xl p-4 outline-none">
+            <button onclick="startAudit()" id="audit-btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-5 rounded-2xl font-bold text-xl transition-all">ANALYZE NOW</button>
         </div>
 
         <div id="results" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                <div class="glass p-10 rounded-[2.5rem] text-center">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+                <div class="glass p-10 rounded-[3rem] text-center border-b-4 border-blue-500">
                     <p class="text-slate-500 uppercase text-xs font-bold tracking-widest">Global Grade</p>
-                    <div id="grade" class="text-8xl font-black text-blue-500 mt-2"></div>
+                    <div id="grade" class="text-8xl font-black text-white mt-2"></div>
                 </div>
-                <div class="glass p-10 rounded-[2.5rem] text-center">
-                    <p class="text-slate-500 uppercase text-xs font-bold tracking-widest">Efficiency Score</p>
-                    <div id="score" class="text-8xl font-black text-emerald-500 mt-2"></div>
+                <div class="glass p-10 rounded-[3rem] text-center border-b-4 border-cyan-500">
+                    <p class="text-slate-500 uppercase text-xs font-bold tracking-widest">Overall Score</p>
+                    <div id="score" class="text-8xl font-black text-white mt-2"></div>
                 </div>
-                <div class="glass p-10 rounded-[2.5rem] flex flex-col justify-center">
-                    <button class="bg-white text-black py-4 rounded-2xl font-bold hover:bg-slate-200 mb-4">DOWNLOAD FULL PDF</button>
-                    <p class="text-xs text-slate-400 text-center uppercase tracking-tighter italic">Includes 200-word Strategic Improvement Plan</p>
+                <div class="glass p-10 rounded-[3rem] flex flex-col justify-center gap-4">
+                    <button id="pdf-btn" onclick="downloadPDF()" class="bg-white text-black py-5 rounded-2xl font-black hover:bg-slate-200 transition-all uppercase tracking-widest">Download PDF Report</button>
+                    <p class="text-[10px] text-center text-slate-500 italic">PDF includes 200-word executive summary & weak area analysis</p>
                 </div>
             </div>
 
-            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
-                <span class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-sm">57</span>
-                Technical Data Points Elaborated
-            </h2>
-            <div id="metric-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                </div>
+            <div id="metric-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
     </div>
 
     <script>
+        let currentReportId = null;
+
         async function startAudit() {
             const url = document.getElementById('url').value;
-            const btn = document.querySelector('button');
-            btn.innerText = "Scanning 57 Metrics...";
+            if(!url) return alert("Enter URL");
             
+            const btn = document.getElementById('audit-btn');
+            btn.innerText = "Scanning 57 Metrics...";
+            btn.disabled = true;
+
             const response = await fetch('/audit', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({url})
             });
             const data = await response.json();
+            currentReportId = data.id;
 
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('grade').innerText = data.summary.grade;
@@ -66,22 +67,28 @@
 
             const grid = document.getElementById('metric-grid');
             grid.innerHTML = "";
-            
             Object.values(data.summary.metrics).forEach(m => {
                 grid.innerHTML += `
-                    <div class="glass p-5 rounded-2xl metric-card">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-[10px] text-blue-400 font-bold uppercase tracking-widest">${m.cat}</span>
-                            <span class="text-[10px] px-2 py-1 rounded bg-slate-800 ${m.status==='PASS'?'text-emerald-400':'text-rose-400'} font-bold">${m.status}</span>
+                    <div class="glass p-6 rounded-2xl metric-card border border-white/5">
+                        <div class="flex justify-between mb-4">
+                            <span class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">${m.cat}</span>
+                            <span class="text-[10px] px-2 py-1 rounded ${m.status==='PASS'?'bg-emerald-500/20 text-emerald-400':'bg-rose-500/20 text-rose-400'} font-bold">${m.status}</span>
                         </div>
                         <h3 class="text-sm font-bold text-slate-200">${m.name}</h3>
-                        <div class="w-full bg-slate-800 h-1.5 mt-4 rounded-full overflow-hidden">
+                        <div class="w-full bg-slate-800 h-1 mt-4 rounded-full overflow-hidden">
                             <div class="h-full bg-blue-500" style="width: ${m.score}%"></div>
                         </div>
                     </div>
                 `;
             });
-            btn.innerText = "RUN DEEP SCAN";
+            btn.innerText = "ANALYZE NOW";
+            btn.disabled = false;
+        }
+
+        function downloadPDF() {
+            if(currentReportId) {
+                window.location.href = `/download/${currentReportId}`;
+            }
         }
     </script>
 </body>
