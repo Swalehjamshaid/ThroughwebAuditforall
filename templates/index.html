@@ -2,38 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Comprehensive Audit AI</title>
+    <title>Throughweb 59-Point Master Audit AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .weak-alert { border-left: 6px solid #ef4444; background: linear-gradient(90deg, #450a0a 0%, #020617 100%); }
+        .weak-alert { border-left: 6px solid #ef4444; background: linear-gradient(90deg, #450a0a 0%, #020617 100%); animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
     </style>
 </head>
 <body class="bg-[#020617] text-slate-100 p-8">
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-7xl mx-auto">
         <header class="flex justify-between items-center mb-16 p-8 bg-slate-900/50 rounded-3xl border border-slate-800">
-            <h1 class="text-3xl font-black text-blue-500">THROUGHWEB <span class="text-white">AUDIT AI</span></h1>
+            <h1 class="text-3xl font-black text-blue-500">THROUGHWEB <span class="text-white">59-POINT AUDIT</span></h1>
             <div class="flex gap-2">
-                <input type="text" id="url" placeholder="Enter Website..." class="bg-slate-950 border border-slate-800 px-6 py-3 rounded-xl w-80 outline-none">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-500">Analyze</button>
+                <input type="text" id="url" placeholder="Enter Domain..." class="bg-slate-950 border border-slate-800 px-6 py-3 rounded-xl w-80 outline-none">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-blue-500">Analyze</button>
             </div>
         </header>
 
         <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="bg-slate-900 p-12 rounded-[40px] text-center border border-slate-800">
-                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Global Health Grade</span>
-                    <div id="grade" class="text-[120px] font-black text-emerald-400 my-4"></div>
+                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest tracking-[0.2em]">Global Health Grade</span>
+                    <div id="grade" class="text-[140px] font-black text-emerald-400 leading-none my-4"></div>
                     <div id="score" class="text-2xl font-bold text-blue-500"></div>
                 </div>
-                <div class="space-y-4" id="weakList"></div>
+                <div class="lg:col-span-2 space-y-4" id="weakList"></div>
             </div>
 
             <div class="bg-slate-900/50 p-10 rounded-[40px] border border-slate-800">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-8 text-center tracking-widest">Master Metric Intelligence (50+ Checks)</h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                <h3 class="text-xs font-bold text-slate-500 uppercase mb-10 text-center tracking-[0.4em]">Comprehensive Audit Intelligence (59 Metrics)</h3>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-blue-600 rounded-2xl font-black text-white uppercase tracking-widest">Download Full Audit PDF Report</a>
+            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-blue-600 rounded-2xl font-black text-white uppercase tracking-widest">Download Full 59-Point Master Report</a>
         </div>
     </div>
 
@@ -41,7 +42,7 @@
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
             const btn = document.getElementById('btn');
-            btn.innerText = 'AUDITING...'; btn.disabled = true;
+            btn.innerText = 'PROCESSING...'; btn.disabled = true;
 
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
@@ -53,27 +54,21 @@
                 document.getElementById('score').innerText = `TOTAL COMPLIANCE: ${d.score}/100`;
                 document.getElementById('dl').href = `/download/${data.id}`;
 
-                // Render Weak Points (RED ZONE)
+                // Render Weakness (RED ZONE)
                 document.getElementById('weakList').innerHTML = d.weak_points.map((w, i) => `
                     <div class="weak-alert p-6 rounded-2xl">
-                        <div class="text-red-500 font-bold text-[10px] uppercase mb-1">Critical Failure: ${w}</div>
+                        <div class="text-red-500 font-black text-xs uppercase mb-1">Critical Failure: ${w}</div>
                         <div class="text-slate-300 text-sm italic">"${d.suggestions[i]}"</div>
-                    </div>`).join('') || "<div class='text-emerald-400 font-bold'>No critical weaknesses found. ISO standard met.</div>";
+                    </div>`).join('') || "<div class='text-emerald-400 font-bold p-6 bg-slate-900 rounded-2xl'>All critical standards passed.</div>";
 
-                // Render Metric Grid
+                // Render All 59 Metrics
                 let grid = "";
                 for(let [k,v] of Object.entries(d.metrics)) {
-                    const pct = (v.pts / v.max) * 100;
                     grid += `
-                        <div class="p-5 bg-slate-950 rounded-2xl border border-slate-800">
-                            <div class="text-[9px] text-slate-600 font-black uppercase mb-1 tracking-tighter">${k}</div>
-                            <div class="text-blue-300 font-bold text-lg mb-3">${v.val}</div>
-                            <div class="flex justify-between text-[10px] text-slate-500 font-bold mb-1">
-                                <span>Score</span><span>${v.pts}/${v.max}</span>
-                            </div>
-                            <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-600" style="width: ${pct}%"></div>
-                            </div>
+                        <div class="p-4 bg-slate-950 rounded-xl border border-slate-800">
+                            <div class="text-[8px] text-slate-600 font-black uppercase mb-1 truncate">${k}</div>
+                            <div class="text-blue-300 font-bold text-xs">${v.val}</div>
+                            <div class="text-[9px] text-slate-500 mt-2 font-bold">${v.pts}/${v.max} pts</div>
                         </div>`;
                 }
                 document.getElementById('metricsGrid').innerHTML = grid;
