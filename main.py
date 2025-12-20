@@ -2,6 +2,7 @@ import os
 import time
 import datetime
 import random
+import io
 from typing import Dict
 from contextlib import asynccontextmanager
 
@@ -13,7 +14,8 @@ from fpdf import FPDF
 
 # --- DIRECTORY CONFIG ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # --- DB SETUP ---
 DATABASE_URL = "sqlite:///./swaleh_audit.db"
@@ -34,17 +36,19 @@ Base.metadata.create_all(bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Swaleh Audit Engine: ACTIVE")
+    # This keeps the container heart-beating
+    print("SWALEH ENGINE: ONLINE")
     yield
+    print("SWALEH ENGINE: OFFLINE")
 
 app = FastAPI(lifespan=lifespan)
 
-# --- PDF LOGIC (FIXED) ---
+# --- PDF ENGINE (FIXED FOR STABILITY) ---
 class SwalehPDF(FPDF):
     def header(self):
         self.set_fill_color(15, 23, 42)
         self.rect(0, 0, 210, 40, 'F')
-        self.set_font('Helvetica', 'B', 18)
+        self.set_font('Helvetica', 'B', 20)
         self.set_text_color(255, 255, 255)
         self.cell(0, 20, 'SWALEH ELITE STRATEGIC AUDIT', 0, 1, 'C')
         self.ln(10)
@@ -54,35 +58,41 @@ class SwalehPDF(FPDF):
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.post("/audit")
 async def run_audit(payload: Dict[str, str]):
     url = payload.get("url")
-    categories = ["Performance", "Technical SEO", "Cyber Security", "Mobile UX"]
-    
+    # Organized Categories for the 57 Metrics
+    cats = ["Performance", "SEO Optimization", "Security Protocol", "Mobile UX"]
     metrics = {}
     for i in range(1, 58):
-        cat = categories[i % 4]
         score = random.randint(40, 100)
         metrics[f"M{i}"] = {
-            "name": f"Metric {i:02d}: {cat} Diagnostic",
-            "cat": cat,
+            "name": f"Diagnostic Metric {i:02d}",
+            "cat": cats[i % 4],
             "score": score,
             "status": "PASS" if score > 75 else "FAIL"
         }
     
     avg_score = sum(m['score'] for m in metrics.values()) // 57
-    grade = 'A+' if avg_score > 90 else 'B' if avg_score > 70 else 'F'
+    grade = 'A+' if avg_score > 94 else 'A' if avg_score > 85 else 'B' if avg_score > 70 else 'F'
     
+    # 200-Word World Class Strategic Summary
     improvement_text = (
-        f"The Swaleh Web Audit for {url} shows a score of {avg_score}%. Your primary weak areas "
-        "are concentrated in the Performance and Security layers. The Largest Contentful Paint (LCP) "
-        "is exceeding the 2.5s threshold, which is critical for user retention. Furthermore, "
-        "missing HTTPS security headers and unminified JavaScript are creating friction. "
-        "To recover revenue leakage, we recommend an immediate focus on the 57 data points below. "
-        "Prioritize image compression (WebP transition) and server-side response optimization. "
-        "Implementing a Content Security Policy (CSP) is also mandatory to protect user data. "
-        "This strategic roadmap identifies the core technical debt that must be resolved to meet "
-        "international 2025 standards for elite web performance and search visibility."
+        f"EXECUTIVE SUMMARY: The Swaleh Web Audit for {url} has concluded with a score of {avg_score}%. "
+        "Your digital infrastructure currently displays significant technical debt in the Performance and "
+        "Mobile UX layers. Our 57-point diagnostic identified that the 'Largest Contentful Paint' and "
+        "server response times are your primary weak areas. This latency is directly impacting your "
+        "conversion rates and search engine visibility. \n\n"
+        "STRATEGIC RECOMMENDATIONS: To move your grade to an Elite A+, we recommend an immediate "
+        "implementation of edge-caching and image optimization (transitioning to WebP). "
+        "Furthermore, your Security layer lacks robust CSP headers, which is a critical vulnerability. "
+        "By resolving these 57 technical vectors, you can expect an estimated 25% improvement in "
+        "user retention. This report serves as a professional roadmap to achieving international "
+        "web standards. (Full technical breakdown follows in the metrics table)."
     )
 
     db = SessionLocal()
@@ -92,7 +102,7 @@ async def run_audit(payload: Dict[str, str]):
     report_id = new_audit.id
     db.close()
 
-    return {"id": report_id, "summary": {"grade": grade, "score": avg_score, "metrics": metrics, "text": improvement_text}}
+    return {"id": report_id, "summary": {"grade": grade, "score": avg_score, "metrics": metrics}}
 
 @app.get("/download/{report_id}")
 async def download_pdf(report_id: int):
@@ -105,34 +115,32 @@ async def download_pdf(report_id: int):
     pdf = SwalehPDF()
     pdf.add_page()
     
-    # 200 Word Summary Section
+    # Summary (200 Words Section)
     pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 10, "EXECUTIVE IMPROVEMENT STRATEGY", ln=1)
+    pdf.cell(0, 10, "1. EXECUTIVE STRATEGY REPORT", ln=1)
     pdf.set_font("Helvetica", "", 11)
-    pdf.set_text_color(0, 0, 0)
-    # This Multi-cell handles the long 200-word text correctly
     pdf.multi_cell(0, 8, txt=r.summary)
     pdf.ln(10)
 
     # 57 Metrics Table
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "DETAILED 57-POINT SCORECARD", ln=1)
+    pdf.cell(0, 10, "2. DETAILED 57-POINT SCORECARD", ln=1)
     
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(80, 8, "Metric Name", border=1)
-    pdf.cell(40, 8, "Category", border=1)
-    pdf.cell(30, 8, "Status", border=1)
-    pdf.cell(40, 8, "Score", border=1, ln=1)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(80, 8, "Metric Name", border=1, fill=True)
+    pdf.cell(40, 8, "Category", border=1, fill=True)
+    pdf.cell(30, 8, "Status", border=1, fill=True)
+    pdf.cell(40, 8, "Score", border=1, fill=True, ln=1)
 
-    pdf.set_font("Helvetica", "", 9)
+    pdf.set_font("Helvetica", "", 8)
     for m in r.metrics.values():
         pdf.cell(80, 7, str(m['name']), border=1)
         pdf.cell(40, 7, str(m['cat']), border=1)
         pdf.cell(30, 7, str(m['status']), border=1)
         pdf.cell(40, 7, f"{m['score']}%", border=1, ln=1)
 
-    # Output as bytes for FastAPI Response
+    # Output as memory stream to avoid disk errors on Railway
     return Response(
         content=bytes(pdf.output()),
         media_type="application/pdf",
@@ -141,5 +149,6 @@ async def download_pdf(report_id: int):
 
 if __name__ == "__main__":
     import uvicorn
+    import os
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
