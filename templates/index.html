@@ -3,111 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite — World's Best Website Audit</title>
+    <title>Swaleh Web Audit | Elite Performance Insights</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { background: #0a0e17; color: #e2e8f0; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
-        .metric-card { transition: transform 0.3s; }
-        .metric-card:hover { transform: translateY(-4px); }
-        .scroll-container { max-height: 80vh; overflow-y: auto; }
-        .scroll-container::-webkit-scrollbar { width: 6px; }
-        .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
-        .glow-red { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
-        .glow-green { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
-<body class="p-6 md:p-12">
-    <div class="max-w-7xl mx-auto">
-        <header class="glass rounded-3xl p-10 mb-12 text-center">
-            <h1 class="text-5xl font-black text-white mb-4">Throughweb Elite</h1>
-            <p class="text-xl text-blue-300 mb-8">57 Real Metrics Audit</p>
-            <div class="flex gap-4 justify-center">
-                <input type="text" id="url" placeholder="Enter domain (e.g., example.com)" class="glass px-8 py-4 rounded-full w-80">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-full font-bold uppercase">
-                    Start Audit
-                </button>
-            </div>
+<body class="text-slate-200 min-h-screen">
+
+    <div class="container mx-auto px-6 py-12">
+        <header class="text-center mb-16">
+            <h1 class="text-5xl font-extrabold tracking-tight text-white mb-4">
+                SWALEH <span class="text-blue-500">WEB AUDIT</span>
+            </h1>
+            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
+                Uncover hidden performance bottlenecks with our industry-leading 57-point diagnostic engine. 
+                Optimized for 2025 international web standards.
+            </p>
         </header>
 
-        <div id="results" class="space-y-12">
-            <!-- Executive Summary -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="glass glow-red p-8 rounded-[40px] text-center">
-                    <span class="text-red-400 font-bold text-xs uppercase mb-2">Revenue Leakage</span>
-                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2">-0%</div>
+        <div class="max-w-3xl mx-auto mb-12">
+            <div class="flex flex-col md:flex-row gap-4 glass-card p-2 rounded-2xl shadow-2xl">
+                <input type="text" id="urlInput" placeholder="https://example.com" 
+                    class="flex-1 bg-transparent px-6 py-4 text-white outline-none placeholder:text-slate-500 text-lg">
+                <button onclick="startAudit()" id="auditBtn" 
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                    <i data-lucide="search" class="w-5 h-5"></i> START AUDIT
+                </button>
+            </div>
+        </div>
+
+        <div id="dashboard" class="hidden space-y-8">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card p-8 rounded-3xl text-center">
+                    <h3 class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Performance Grade</h3>
+                    <div id="gradeValue" class="text-7xl font-black text-blue-500">A+</div>
                 </div>
-                <div class="glass glow-green p-8 rounded-[40px] text-center">
-                    <span class="text-green-400 font-bold text-xs uppercase mb-2">Recovery Gain</span>
-                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2">+0%</div>
+                
+                <div class="glass-card p-8 rounded-3xl flex flex-col items-center justify-center">
+                    <div class="relative w-32 h-32">
+                        <canvas id="scoreChart"></canvas>
+                        <div id="scoreText" class="absolute inset-0 flex items-center justify-center text-2xl font-bold">0%</div>
+                    </div>
                 </div>
-                <div class="glass p-8 rounded-[40px] text-center">
-                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">Mobile LCP</span>
-                    <div id="mobileLcp" class="text-4xl font-black text-white mb-2">N/A</div>
-                </div>
-                <div class="glass p-8 rounded-[40px] text-center">
-                    <span class="text-slate-400 font-bold text-xs uppercase mb-2">Grade</span>
-                    <div id="grade" class="text-7xl font-black text-white mb-2">—</div>
-                    <div id="score" class="text-3xl text-slate-300">—</div>
+
+                <div class="glass-card p-8 rounded-3xl flex flex-col items-center justify-center gap-4">
+                    <p class="text-slate-400 text-sm text-center">Your comprehensive 200+ word strategy report is ready.</p>
+                    <a id="downloadBtn" href="#" class="bg-emerald-600 hover:bg-emerald-500 text-white w-full py-4 rounded-xl font-bold text-center flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-5 h-5"></i> DOWNLOAD PDF
+                    </a>
                 </div>
             </div>
 
-            <!-- All 57 Metrics Grid -->
-            <div class="glass p-12 rounded-[50px]">
-                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics Analysis</h2>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container">
-                    <!-- Filled by JavaScript -->
+            <div class="glass-card rounded-3xl overflow-hidden">
+                <div class="p-6 border-b border-white/10 flex justify-between items-center">
+                    <h2 class="text-xl font-bold flex items-center gap-2">
+                        <i data-lucide="list-checks" class="text-blue-500"></i> Technical Scorecard
+                    </h2>
+                    <span class="text-slate-400 text-sm">57 Critical Points Analyzed</span>
+                </div>
+                <div class="max-h-[500px] overflow-y-auto custom-scroll">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase sticky top-0">
+                            <tr>
+                                <th class="p-4">Diagnostic Metric</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricsBody">
+                            </tbody>
+                    </table>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <a id="dl" href="#" class="block w-full md:w-1/2 mx-auto text-center py-6 glass rounded-[30px] font-bold uppercase tracking-widest text-blue-300 hover:bg-blue-600 hover:text-white transition-all">
-                Download Full PDF Report
-            </a>
+    <div id="loader" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-blue-400 font-mono tracking-widest uppercase">Initializing 57-Point Engine...</p>
         </div>
     </div>
 
     <script>
-        async function runAudit() {
-            const url = document.getElementById('url').value.trim();
-            if (!url) return alert('Enter a domain');
-            const btn = document.getElementById('btn');
-            btn.innerText = 'Auditing...';
+        // Initialize Icons
+        lucide.createIcons();
+        let chart = null;
+
+        async function startAudit() {
+            const url = document.getElementById('urlInput').value;
+            if(!url) return alert("Please enter a valid URL.");
+
+            const loader = document.getElementById('loader');
+            const dashboard = document.getElementById('dashboard');
+            const btn = document.getElementById('auditBtn');
+
+            loader.classList.remove('hidden');
             btn.disabled = true;
 
             try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                const data = await res.json();
-                if (res.ok) {
-                    const d = data.data;
-                    document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
-                    document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                    document.getElementById('mobileLcp').innerText = d.metrics['Mobile - Largest Contentful Paint (LCP)']?.val || 'N/A';
-                    document.getElementById('grade').innerText = d.grade;
-                    document.getElementById('score').innerText = `${d.score}%`;
-                    document.getElementById('dl').href = `/download/${data.id}`;
+                const response = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
 
-                    let grid = "";
-                    Object.entries(d.metrics).sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, v]) => {
-                        let color = v.status == 'PASS' ? 'text-green-400' : v.status == 'WARN' ? 'text-yellow-400' : 'text-red-400';
-                        grid += `<div class="glass rounded-2xl p-6">
-                            <div class="text-xs text-slate-400 uppercase mb-2">${k}</div>
-                            <div class="font-bold text-lg ${color}">${v.val}</div>
-                            <div class="text-sm text-slate-500 mt-2">${v.status} (${v.score}%)</div>
-                            <p class="text-xs text-slate-400 mt-4">Explanation: ${v.explanation || 'N/A'}</p>
-                            <p class="text-xs text-slate-300 mt-2">Recommendation: ${v.recommendation || 'N/A'}</p>
-                        </div>`;
-                    });
-                    document.getElementById('metricsGrid').innerHTML = grid;
-                } else {
-                    alert('Audit failed');
-                }
-            } catch {
-                alert('Error');
+                const data = await response.json();
+                
+                // Update UI Components
+                document.getElementById('gradeValue').innerText = data.summary.grade;
+                document.getElementById('scoreText').innerText = data.summary.score + "%";
+                document.getElementById('downloadBtn').href = `/download/${data.id}`;
+                
+                // Inject Metrics
+                const body = document.getElementById('metricsBody');
+                body.innerHTML = "";
+                Object.entries(data.summary.metrics).forEach(([name, info]) => {
+                    const row = `
+                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                            <td class="p-4 font-medium text-slate-300 text-sm">${name}</td>
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase ${info.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}">
+                                    ${info.status}
+                                </span>
+                            </td>
+                            <td class="p-4 text-right font-mono text-slate-400 text-sm">${info.score}%</td>
+                        </tr>
+                    `;
+                    body.innerHTML += row;
+                });
+
+                updateChart(data.summary.score);
+                dashboard.classList.remove('hidden');
+                window.scrollTo({ top: dashboard.offsetTop - 50, behavior: 'smooth' });
+
+            } catch (err) {
+                alert("Audit failed. Please ensure the backend is running.");
             } finally {
-                btn.innerText = 'Start Audit';
+                loader.classList.add('hidden');
                 btn.disabled = false;
             }
+        }
+
+        function updateChart(score) {
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [score, 100 - score],
+                        backgroundColor: ['#2563eb', '#1e293b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    cutout: '85%',
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                }
+            });
         }
     </script>
 </body>
