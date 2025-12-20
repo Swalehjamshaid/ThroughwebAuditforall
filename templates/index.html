@@ -2,35 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Enterprise Audit</title>
+    <title>Throughweb Audit AI | Professional Enterprise Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .score-pill { background: #1e293b; border: 1px solid #334155; }
-        .red-alert { border-left: 4px solid #ef4444; background: linear-gradient(90deg, #450a0a 0%, #020617 100%); }
+        .red-alert { border-left: 5px solid #ef4444; background: rgba(239, 68, 68, 0.05); }
+        .score-bar { height: 6px; border-radius: 3px; background: #e2e8f0; overflow: hidden; }
     </style>
 </head>
-<body class="bg-[#020617] text-slate-100 p-8">
-    <div class="max-w-6xl mx-auto">
-        <div class="flex flex-col md:flex-row gap-4 mb-16 p-6 bg-slate-900 rounded-3xl border border-slate-800">
-            <input type="text" id="url" placeholder="Enter Domain..." class="bg-transparent flex-1 px-4 py-2 outline-none text-xl">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-3 rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-500/20">Analyze Site</button>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+    <div class="max-w-5xl mx-auto px-4 py-12">
+        <header class="text-center mb-16">
+            <h1 class="text-4xl font-extrabold text-blue-700 mb-2">Throughweb Audit AI</h1>
+            <p class="text-slate-500">World-Standard 45+ Point Comprehensive Website Health Check</p>
+        </header>
+
+        <div class="bg-white p-2 rounded-2xl shadow-xl flex flex-col md:flex-row gap-2 mb-12 border border-slate-200">
+            <input type="text" id="url" placeholder="Enter Website (e.g., haier.com.pk)" class="flex-1 px-6 py-4 outline-none text-lg">
+            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-xl font-bold transition-all">Start Audit</button>
         </div>
 
-        <div id="results" class="hidden space-y-10">
+        <div id="results" class="hidden space-y-8 animate-fade-in">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-slate-900 p-12 rounded-[40px] text-center border-2 border-slate-800">
-                    <div id="grade" class="text-[120px] font-black text-emerald-400 leading-none"></div>
-                    <div id="score" class="text-3xl font-bold text-blue-500 mt-4"></div>
+                <div class="bg-white p-10 rounded-3xl shadow-sm border border-slate-100 text-center">
+                    <span class="text-slate-400 text-xs font-bold uppercase tracking-widest">Global Health Grade</span>
+                    <div id="grade" class="text-9xl font-black text-blue-600 my-4"></div>
+                    <div id="score" class="text-2xl font-bold text-slate-700"></div>
                 </div>
-                <div class="space-y-4" id="weakContainer"></div>
+                <div id="weakContainer" class="space-y-4"></div>
             </div>
 
-            <div class="bg-slate-900/50 p-10 rounded-[40px] border border-slate-800">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-8 tracking-widest text-center">50+ Scored Intelligence Metrics</h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <h3 class="font-bold text-lg mb-8 border-b pb-4">Technical Scored Metrics</h3>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"></div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-blue-600 rounded-2xl font-black text-white uppercase tracking-[0.3em]">Download ISO Compliance PDF</a>
+            <a id="dl" href="#" target="_blank" class="block w-full text-center py-5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-black transition-all">Download Comprehensive PDF Report</a>
         </div>
     </div>
 
@@ -38,7 +44,7 @@
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
             const btn = document.getElementById('btn');
-            btn.innerText = 'PROCESSING...'; btn.disabled = true;
+            btn.innerText = 'Analyzing...'; btn.disabled = true;
 
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
@@ -46,43 +52,33 @@
             if(res.ok) {
                 document.getElementById('results').classList.remove('hidden');
                 document.getElementById('grade').innerText = data.data.grade;
-                document.getElementById('score').innerText = `TOTAL: ${data.data.score}/100`;
+                document.getElementById('score').innerText = `Total Score: ${data.data.score}/100`;
                 document.getElementById('dl').href = `/download/${data.id}`;
 
-                // RED ZONE
+                // Render Weak Points
                 document.getElementById('weakContainer').innerHTML = data.data.weak_points.map((w, i) => `
                     <div class="red-alert p-6 rounded-2xl">
-                        <div class="text-red-500 text-[10px] font-black uppercase mb-1">Issue: ${w}</div>
-                        <div class="text-red-100 text-sm italic font-medium">"${data.data.suggestions[i]}"</div>
-                    </div>
-                `).join('') || "<div class='text-emerald-400 font-bold'>No critical vulnerabilities detected.</div>";
+                        <div class="text-red-600 font-bold text-xs uppercase mb-1">Issue: ${w}</div>
+                        <div class="text-slate-600 text-sm font-medium">Suggestion: ${data.data.suggestions[i]}</div>
+                    </div>`).join('') || "<div class='p-6 bg-green-50 rounded-2xl text-green-700 font-bold'>No critical weaknesses found. Excellent!</div>";
 
-                // DETAILED GRID WITH SCORES
+                // Render Metrics Grid
                 let grid = "";
                 for(let [k,v] of Object.entries(data.data.metrics)) {
                     const pct = (v.pts / v.max) * 100;
-                    const color = pct > 80 ? 'bg-emerald-500' : pct > 40 ? 'bg-yellow-500' : 'bg-red-500';
-                    
                     grid += `
-                        <div class="p-5 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col justify-between">
-                            <div>
-                                <div class="text-[9px] text-slate-500 font-black uppercase mb-1">${k}</div>
-                                <div class="text-blue-300 font-bold text-lg mb-3">${v.val}</div>
+                        <div>
+                            <div class="flex justify-between text-xs font-bold mb-2">
+                                <span class="text-slate-500 uppercase">${k}</span>
+                                <span>${v.pts}/${v.max} pts</span>
                             </div>
-                            <div>
-                                <div class="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
-                                    <span>Compliance</span>
-                                    <span>${v.pts}/${v.max} pts</span>
-                                </div>
-                                <div class="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                                    <div class="h-full ${color}" style="width: ${pct}%"></div>
-                                </div>
-                            </div>
+                            <div class="text-sm font-bold mb-2">${v.val}</div>
+                            <div class="score-bar"><div class="h-full bg-blue-600" style="width:${pct}%"></div></div>
                         </div>`;
                 }
                 document.getElementById('metricsGrid').innerHTML = grid;
             }
-            btn.innerText = 'Analyze Site'; btn.disabled = false;
+            btn.innerText = 'Start Audit'; btn.disabled = false;
         }
     </script>
 </body>
