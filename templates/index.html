@@ -1,70 +1,148 @@
-<script>
-    async function runAudit() {
-        const results = document.getElementById('results');
-        results.classList.add('hidden');
-        const url = document.getElementById('url').value.trim();
-        if (!url) return alert('Please enter a domain');
+<!-- templates/index.html - Final Beautiful & Professional Version -->
 
-        const btn = document.getElementById('btn');
-        btn.innerText = 'Auditing...';
-        btn.disabled = true;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Throughweb Elite | 57 Metrics Web Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(to bottom, #0f172a, #1e293b); color: #e2e8f0; font-family: 'Inter', sans-serif; min-height: 100vh; }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .glow-red { box-shadow: 0 0 40px rgba(239,68,68,0.4); }
+        .glow-green { box-shadow: 0 0 40px rgba(16,185,129,0.4); }
+        .metric-card { transition: all 0.4s ease; }
+        .metric-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .scroll-container { max-height: 70vh; overflow-y: auto; }
+        .scroll-container::-webkit-scrollbar { width: 8px; }
+        .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
+    </style>
+</head>
+<body class="px-4 py-12">
+    <div class="max-w-7xl mx-auto">
+        <header class="glass rounded-3xl p-12 mb-20 text-center shadow-2xl">
+            <h1 class="text-5xl md:text-7xl font-black text-white mb-6">Throughweb Elite</h1>
+            <p class="text-2xl text-blue-300 mb-10">Comprehensive Audit with 57 Real Metrics</p>
+            <div class="flex flex-col md:flex-row gap-6 justify-center items-center">
+                <input type="text" id="url" placeholder="Enter website (e.g. example.com)" class="glass px-8 py-5 rounded-full w-full md:w-96 text-lg focus:outline-none focus:border-blue-400">
+                <button onclick="runAudit()" id="btn" class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-12 py-5 rounded-full font-bold text-xl uppercase tracking-wider shadow-2xl transition-all">
+                    Start Audit
+                </button>
+            </div>
+        </header>
 
-        try {
-            const res = await fetch('/audit', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({url})
-            });
+        <div id="results" class="hidden space-y-16">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="glass glow-red rounded-3xl p-10 text-center metric-card">
+                    <p class="text-red-400 text-sm uppercase tracking-widest mb-4">Revenue Leakage</p>
+                    <div id="revLoss" class="text-6xl font-black text-red-400 mb-4">-0%</div>
+                    <p class="text-slate-400 text-xs">From performance & compliance issues</p>
+                </div>
+                <div class="glass glow-green rounded-3xl p-10 text-center metric-card">
+                    <p class="text-green-400 text-sm uppercase tracking-widest mb-4">Recovery Potential</p>
+                    <div id="revGain" class="text-6xl font-black text-green-400 mb-4">+0%</div>
+                    <p class="text-slate-400 text-xs">With recommended fixes</p>
+                </div>
+                <div class="glass rounded-3xl p-10 text-center metric-card">
+                    <p class="text-blue-400 text-sm uppercase tracking-widest mb-4">Largest Contentful Paint</p>
+                    <div id="lcpVal" class="text-5xl font-black text-white mb-4">N/A</div>
+                    <p class="text-slate-400 text-xs">Core Web Vital</p>
+                </div>
+                <div class="glass rounded-3xl p-10 text-center metric-card">
+                    <p class="text-slate-400 text-sm uppercase tracking-widest mb-6">Overall Grade</p>
+                    <div id="grade" class="text-8xl font-black text-white mb-2">—</div>
+                    <div id="score" class="text-4xl text-slate-300">—</div>
+                </div>
+            </div>
 
-            const data = await res.json();
+            <div id="brokenBox" class="hidden glass rounded-3xl p-10 border border-red-600/30 glow-red metric-card">
+                <h3 class="text-red-400 font-bold uppercase mb-6">Broken Links Detected</h3>
+                <div id="brokenList" class="text-sm space-y-2 text-red-300"></div>
+            </div>
 
-            if (res.ok) {
-                const d = data.data;
-                results.classList.remove('hidden');
+            <div class="glass rounded-3xl p-12">
+                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12 text-lg font-bold">Full 57 Metrics Analysis</h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 scroll-container"></div>
+            </div>
 
-                // Populate top cards
-                document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
-                document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)']?.val || 'N/A';
-                document.getElementById('grade').innerText = d.grade;
-                document.getElementById('score').innerText = `${d.score}%`;
-                document.getElementById('dl').href = `/download/${data.id}`;
+            <div class="text-center">
+                <a id="dl" href="#" class="inline-block px-16 py-6 glass rounded-full font-bold text-2xl uppercase tracking-widest text-blue-300 hover:text-white hover:bg-blue-600/30 transition-all border-2 border-blue-900/50 metric-card">
+                    Download Full PDF Report
+                </a>
+            </div>
+        </div>
+    </div>
 
-                // Broken links
-                const brokenBox = document.getElementById('brokenBox');
-                if (d.broken_links && d.broken_links.length > 0) {
-                    brokenBox.classList.remove('hidden');
-                    document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>• ${l}</div>`).join('');
-                } else {
-                    brokenBox.classList.add('hidden');
-                }
+    <script>
+        async function runAudit() {
+            const results = document.getElementById('results');
+            results.classList.add('hidden');
+            
+            const url = document.getElementById('url').value.trim();
+            if (!url) return alert('Please enter a website URL');
 
-                // All 57 metrics
-                let grid = "";
-                Object.entries(d.metrics).forEach(([key, val]) => {
-                    const color = val.status === 'PASS' ? 'text-green-400' : val.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
-                    grid += `
-                        <div class="glass rounded-2xl p-6 metric-card">
-                            <div class="text-xs text-slate-400 uppercase tracking-wide mb-2">${key}</div>
-                            <div class="text-xl font-bold ${color} mb-1">${val.val}</div>
-                            <div class="text-sm text-slate-500 mb-2">${val.status} (${val.score}%)</div>
-                            <p class="text-xs text-slate-400 mb-2">Explanation: ${val.explanation || 'N/A'}</p>
-                            <p class="text-xs text-slate-300">Recommendation: ${val.recommendation || 'N/A'}</p>
-                        </div>`;
+            const btn = document.getElementById('btn');
+            btn.innerText = 'AUDITING...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
                 });
-                document.getElementById('metricsGrid').innerHTML = grid;
 
-            } else {
-                // Better error from backend
-                alert(data.detail || 'Audit failed – site may be down or blocking automated scans.');
+                const data = await res.json();
+
+                if (res.ok) {
+                    const d = data.data;
+                    results.classList.remove('hidden');
+
+                    document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
+                    document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
+                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)']?.val || 'N/A';
+                    document.getElementById('grade').innerText = d.grade;
+                    document.getElementById('score').innerText = `${d.score}%`;
+                    document.getElementById('dl').href = `/download/${data.id}`;
+
+                    const brokenBox = document.getElementById('brokenBox');
+                    if (d.broken_links.length > 0) {
+                        brokenBox.classList.remove('hidden');
+                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>• <a href="${l}" class="underline" target="_blank">${l}</a></div>`).join('');
+                    } else {
+                        brokenBox.classList.add('hidden');
+                    }
+
+                    let grid = "";
+                    Object.entries(d.metrics).sort((a,b) => a[0].localeCompare(b[0])).forEach(([key, val]) => {
+                        const color = val.status === 'PASS' ? 'text-green-400' : val.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
+                        grid += `
+                            <div class="glass rounded-2xl p-6 metric-card border border-white/5">
+                                <div class="text-sm text-slate-400 uppercase mb-3">${key}</div>
+                                <div class="text-2xl font-bold ${color} mb-2">${val.val}</div>
+                                <div class="text-sm text-slate-500 mb-4">${val.status} (${val.score}%)</div>
+                                <p class="text-xs text-slate-300 leading-relaxed">Explanation: ${val.explanation || 'N/A'}</p>
+                                <p class="text-xs text-slate-400 mt-3 leading-relaxed">Recommendation: ${val.recommendation || 'N/A'}</p>
+                            </div>`;
+                    });
+                    document.getElementById('metricsGrid').innerHTML = grid;
+
+                } else {
+                    alert(data.detail || 'Audit failed. Site may be down or blocking scans.');
+                }
+            } catch (err) {
+                alert('Unable to connect to audit engine.\n\nCommon causes:\n• Site blocks automated tools (like haier.com.pk)\n• Network/server issue\n\nTry example.com to see full results.');
+            } finally {
+                btn.innerText = 'Start Audit';
+                btn.disabled = false;
             }
-        } catch (err) {
-            // Network or server error – friendly message
-            alert('Connection error or server issue. Please try again in a few moments.\n\nNote: Some sites (like BBC, Amazon) block automated audits.');
-            console.error(err);
-        } finally {
-            btn.innerText = 'Start Comprehensive Audit';
-            btn.disabled = false;
         }
-    }
-</script>
+
+        document.getElementById('url').addEventListener('keypress', e => {
+            if (e.key === 'Enter') runAudit();
+        });
+    </script>
+</body>
+</html>
