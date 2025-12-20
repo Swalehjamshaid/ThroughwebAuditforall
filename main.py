@@ -1,202 +1,167 @@
-<!DOCTYPE html>
-<html lang="en" dir="ltr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite | World-Class Web Audit AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-        .red-leak { background: linear-gradient(135deg, #450a0a 0%, #1e1b4b 100%); border: 1px solid #ef4444; }
-        .gain-green { background: linear-gradient(135deg, #064e3b 0%, #1e1b4b 100%); border: 1px solid #10b981; }
-        .card-glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); }
-        .warn-text { color: #fbbf24; }
-        .pass-text { color: #10b981; }
-        .fail-text { color: #ef4444; }
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        input:focus, button:focus { outline: 2px solid #3b82f6; outline-offset: 2px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.6s ease-out; }
-    </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-</head>
-<body class="bg-[#020617] text-slate-100 p-4 md:p-8 lg:p-12 min-h-screen antialiased">
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <header class="flex flex-col lg:flex-row justify-between items-center mb-12 md:mb-16 p-8 md:p-10 glass rounded-3xl md:rounded-[50px] gap-6 md:gap-8 shadow-2xl">
-            <h1 class="text-3xl md:text-4xl lg:text-5xl font-black italic text-blue-400 uppercase tracking-tighter">
-                Throughweb <span class="text-white font-light">World-Class Audit</span>
-            </h1>
-            <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                <label for="url" class="sr-only">Enter website URL</label>
-                <input 
-                    type="text" 
-                    id="url" 
-                    placeholder="Enter domain (e.g., example.com or https://example.com)" 
-                    class="bg-slate-950/80 border border-slate-700 px-6 py-4 rounded-3xl w-full sm:w-96 outline-none text-sm focus:border-blue-500 transition-all" 
-                    aria-required="true">
-                <button 
-                    onclick="runAudit()" 
-                    id="btn" 
-                    class="bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900 px-8 py-4 rounded-3xl font-bold uppercase tracking-widest transition-all text-sm md:text-base shadow-lg">
-                    Launch World-Class Scan
-                </button>
-            </div>
-        </header>
+import os
+import time
+import datetime
+import requests
+import urllib3
+import re
+import random
+from bs4 import BeautifulSoup
+from fpdf import FPDF
+from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from urllib.parse import quote_plus
 
-        <!-- Results Section -->
-        <div id="results" class="hidden space-y-12 animate-fade-in">
-            <!-- Top KPI Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="red-leak p-8 md:p-10 rounded-3xl md:rounded-[50px] flex flex-col justify-center text-center shadow-xl" role="region" aria-labelledby="leak-label">
-                    <span id="leak-label" class="text-red-400 font-black text-xs uppercase mb-3 tracking-widest">Estimated Revenue Leakage</span>
-                    <div id="revLoss" class="text-5xl md:text-6xl font-black text-red-400 mb-2">-</div>
-                    <p class="text-slate-400 text-xs italic">From performance & compliance issues</p>
-                </div>
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-                <div class="gain-green p-8 md:p-10 rounded-3xl md:rounded-[50px] flex flex-col justify-center text-center shadow-xl" role="region" aria-labelledby="gain-label">
-                    <span id="gain-label" class="text-emerald-400 font-black text-xs uppercase mb-3 tracking-widest">Potential Revenue Recovery</span>
-                    <div id="revGain" class="text-5xl md:text-6xl font-black text-emerald-400 mb-2">+</div>
-                    <p class="text-slate-300 text-xs italic">Through targeted optimizations</p>
-                </div>
+DB_URL = os.getenv('DATABASE_URL', 'sqlite:///./audits.db')
+engine = create_engine(DB_URL, connect_args={'check_same_thread': False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-                <div class="card-glass p-8 md:p-10 rounded-3xl md:rounded-[50px] flex flex-col justify-center text-center shadow-xl border-blue-500/20" role="region" aria-labelledby="lcp-label">
-                    <span id="lcp-label" class="text-blue-400 font-black text-xs uppercase mb-3 tracking-widest">Largest Contentful Paint</span>
-                    <div id="lcpVal" class="text-4xl md:text-5xl font-black text-white mb-2">--</div>
-                    <p class="text-slate-400 text-xs italic">Core Web Vital – Major Ranking Factor</p>
-                </div>
+class AuditRecord(Base):
+    __tablename__ = 'reports'
+    id = Column(Integer, primary_key=True)
+    url = Column(String)
+    grade = Column(String)
+    score = Column(Integer)
+    metrics = Column(JSON)
+    broken_links = Column(JSON)
+    financial_data = Column(JSON)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-                <div class="card-glass p-8 md:p-10 rounded-3xl md:rounded-[50px] text-center shadow-xl border-white/10" role="region" aria-labelledby="health-label">
-                    <span id="health-label" class="text-slate-400 text-xs font-black uppercase mb-4 tracking-widest">Overall Health Score</span>
-                    <div id="grade" class="text-7xl md:text-8xl font-black text-white leading-none">--</div>
-                    <div id="score" class="text-3xl md:text-4xl font-light text-slate-300 mt-2">--</div>
-                </div>
-            </div>
+Base.metadata.create_all(bind=engine)
 
-            <!-- Broken Links Alert -->
-            <div id="brokenBox" class="hidden p-8 md:p-10 rounded-3xl md:rounded-[50px] bg-red-950/30 border border-red-800/50 shadow-xl" role="alert">
-                <h3 class="text-red-400 font-black text-sm uppercase mb-6 tracking-widest flex items-center gap-3">
-                    <span class="w-3 h-3 bg-red-500 rounded-full animate-ping" aria-hidden="true"></span>
-                    Critical Broken Links Detected
-                </h3>
-                <ul id="brokenList" class="text-xs font-mono text-red-300 space-y-2 max-h-64 overflow-y-auto list-disc pl-6"></ul>
-            </div>
+app = FastAPI(title="Throughweb Elite Audit")
+templates = Jinja2Templates(directory="templates")
 
-            <!-- Metrics Grid -->
-            <section class="glass p-10 md:p-14 rounded-3xl md:rounded-[60px] shadow-2xl" role="region" aria-labelledby="metrics-title">
-                <h2 id="metrics-title" class="text-xs md:text-sm font-black text-slate-500 uppercase mb-10 md:mb-14 text-center tracking-[0.6em]">
-                    Comprehensive Diagnostic Metrics
-                </h2>
-                <div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5"></div>
-            </section>
+class ElitePDF(FPDF):
+    def header(self):
+        self.set_fill_color(15, 23, 42)
+        self.rect(0, 0, 210, 50, 'F')
+        self.set_font('Helvetica', 'B', 24)
+        self.set_text_color(255, 255, 255)
+        self.cell(0, 30, 'ELITE WEBSITE AUDIT REPORT', 0, 1, 'C')
 
-            <!-- Download Report -->
-            <a 
-                id="dl" 
-                href="#" 
-                download 
-                class="block w-full py-6 md:py-8 glass rounded-3xl md:rounded-[40px] text-center font-black uppercase tracking-widest text-blue-300 hover:bg-blue-600/30 hover:text-white transition-all border-2 border-blue-900/40 shadow-xl text-sm md:text-base" 
-                role="button" 
-                aria-label="Download full PDF report">
-                Download Executive PDF Report
-            </a>
-        </div>
-    </div>
+@app.get("/")
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-    <script>
-        async function runAudit() {
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.classList.add('hidden');
+def run_live_audit(url: str):
+    if not re.match(r'^https?://', url, re.I):
+        url = 'https://' + url
 
-            const urlInput = document.getElementById('url').value.trim();
-            if (!urlInput) {
-                alert('Please enter a website URL');
-                return;
-            }
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    }
 
-            const btn = document.getElementById('btn');
-            btn.innerText = 'SCANNING WEBSITE...';
-            btn.disabled = true;
-            btn.setAttribute('aria-busy', 'true');
+    metrics = {}
+    broken_links = []
 
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: urlInput })
-                });
+    try:
+        time.sleep(random.uniform(1.5, 3.5))
+        start = time.time()
+        res = requests.get(url, headers=headers, timeout=30, verify=False, allow_redirects=True)
+        load_time = round(time.time() - start, 2)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        final_url = res.url
+        ssl = final_url.startswith('https')
 
-                const result = await response.json();
+        # PSI attempt
+        psi_success = False
+        try:
+            time.sleep(random.uniform(1, 2))
+            psi_res = requests.get(f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={quote_plus(final_url)}&strategy=desktop", timeout=15)
+            if psi_res.ok:
+                data = psi_res.json()
+                if 'lighthouseResult' in data:
+                    psi_success = True
+                    lh = data['lighthouseResult']['audits']
+                    metrics['Largest Contentful Paint (LCP)'] = {"val": lh['largest-contentful-paint']['displayValue'], "score": 100 if lh['largest-contentful-paint']['score'] >= 0.9 else 60, "status": "PASS" if lh['largest-contentful-paint']['score'] >= 0.9 else "WARN"}
+        except:
+            pass
 
-                if (response.ok) {
-                    const d = result.data;
+        if not psi_success:
+            est_lcp = round(load_time + 1.3, 2)
+            metrics['Largest Contentful Paint (LCP)'] = {"val": f"{est_lcp}s (Est.)", "score": 100 if est_lcp < 2.5 else 70 if est_lcp < 4 else 40, "status": "PASS" if est_lcp < 2.5 else "WARN", "note": "Estimated from load time"}
 
-                    resultsDiv.classList.remove('hidden');
+        # Core custom checks
+        title_len = len(soup.title.string.strip()) if soup.title and soup.title.string else 0
+        metrics['Page Title'] = {"val": f"{title_len} chars", "score": 100 if 50 <= title_len <= 60 else 70 if title_len > 0 else 20, "status": "PASS" if 50 <= title_len <= 60 else "WARN"}
 
-                    // Financial Impact
-                    document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
-                    document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
+        viewport = bool(soup.find('meta', attrs={'name': 'viewport'}))
+        metrics['Mobile Friendly'] = {"val": "Yes" if viewport else "No", "score": 100 if viewport else 30, "status": "PASS" if viewport else "FAIL"}
 
-                    // LCP
-                    const lcpMetric = d.metrics['Largest Contentful Paint (LCP)'] || { val: 'N/A' };
-                    document.getElementById('lcpVal').innerText = lcpMetric.val;
+        metrics['HTTPS'] = {"val": "Secure" if ssl else "Insecure", "score": 100 if ssl else 0, "status": "PASS" if ssl else "FAIL"}
 
-                    // Grade & Score
-                    document.getElementById('grade').innerText = d.grade;
-                    document.getElementById('score').innerText = `${d.score}%`;
+        # Broken links sample
+        for a in soup.find_all('a', href=True)[:12]:
+            if a['href'].startswith('/'):
+                try:
+                    full = requests.compat.urljoin(final_url, a['href'])
+                    h = requests.head(full, headers=headers, timeout=6)
+                    if h.status_code >= 400:
+                        broken_links.append(full)
+                except:
+                    pass
 
-                    // Download Link
-                    document.getElementById('dl').href = `/download/${result.id}`;
+        metrics['Broken Links'] = {"val": str(len(broken_links)), "score": 100 if len(broken_links) == 0 else 50 if len(broken_links) < 3 else 20, "status": "PASS" if len(broken_links) == 0 else "FAIL"}
 
-                    // Broken Links
-                    const brokenBox = document.getElementById('brokenBox');
-                    const brokenList = document.getElementById('brokenList');
-                    if (d.broken_links && d.broken_links.length > 0) {
-                        brokenBox.classList.remove('hidden');
-                        brokenList.innerHTML = d.broken_links
-                            .map(link => `<li><a href="${link}" class="underline hover:text-red-400" target="_blank">${link}</a></li>`)
-                            .join('');
-                    } else {
-                        brokenBox.classList.add('hidden');
-                    }
+        # Scoring
+        scores = [v['score'] for v in metrics.values() if isinstance(v.get('score'), (int, float))]
+        avg_score = round(sum(scores) / len(scores)) if scores else 60
 
-                    // Metrics Grid – Clean & Color-Coded
-                    let gridHTML = "";
-                    Object.entries(d.metrics).forEach(([key, value]) => {
-                        let colorClass = 'text-blue-300';
-                        if (value.status === 'FAIL') colorClass = 'fail-text';
-                        else if (value.status === 'WARN') colorClass = 'warn-text';
-                        else if (value.status === 'PASS') colorClass = 'pass-text';
+        # Financial (realistic caps)
+        leak = round(min((100 - avg_score) * 0.25 + len(broken_links) * 2, 40), 1)
+        gain = round(leak * 1.4, 1)
 
-                        const note = value.note ? `<span class="block text-[8px] text-slate-500 mt-1">${value.note}</span>` : '';
+        grade = 'A+' if avg_score >= 95 else 'A' if avg_score >= 85 else 'B' if avg_score >= 70 else 'C' if avg_score >= 50 else 'D'
 
-                        gridHTML += `
-                            <div class="p-5 card-glass rounded-2xl text-center shadow-md border border-white/5">
-                                <div class="text-[10px] text-slate-400 font-bold uppercase truncate mb-2">${key}</div>
-                                <div class="font-black text-base ${colorClass}">${value.val}</div>
-                                <div class="text-[9px] text-slate-500 mt-2">${value.status || ''}</div>
-                                ${note}
-                            </div>`;
-                    });
-                    document.getElementById('metricsGrid').innerHTML = gridHTML;
-
-                } else {
-                    alert(result.detail || 'Audit failed. The site may be temporarily unavailable or blocking scans.');
-                }
-            } catch (err) {
-                alert('Connection error. Please try again later.');
-                console.error(err);
-            } finally {
-                btn.innerText = 'Launch World-Class Scan';
-                btn.disabled = false;
-                btn.removeAttribute('aria-busy');
-            }
+        return {
+            'url': final_url,
+            'grade': grade,
+            'score': avg_score,
+            'metrics': metrics,
+            'broken_links': broken_links,
+            'financial_data': {'estimated_revenue_leak': f"{leak}%", 'potential_recovery_gain': f"{gain}%"}
         }
 
-        // Allow Enter key to trigger scan
-        document.getElementById('url').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') runAudit();
-        });
-    </script>
-</body>
-</html>
+    except Exception as e:
+        return {
+            'url': url,
+            'grade': 'Partial',
+            'score': 40,
+            'metrics': {'Status': {"val": "Limited access – partial scan", "status": "WARN"}},
+            'broken_links': [],
+            'financial_data': {'estimated_revenue_leak': 'N/A', 'potential_recovery_gain': 'N/A'}
+        }
+
+@app.post('/audit')
+async def audit(data: dict):
+    url = data.get('url')
+    if not url: raise HTTPException(400, "URL required")
+    result = run_live_audit(url)
+    db = SessionLocal()
+    record = AuditRecord(**result)
+    db.add(record); db.commit(); db.refresh(record); db.close()
+    return {'id': record.id, 'data': result}
+
+@app.get('/download/{id}')
+async def download(id: int):
+    db = SessionLocal()
+    r = db.query(AuditRecord).get(id)
+    db.close()
+    if not r: raise HTTPException(404)
+    pdf = ElitePDF()
+    pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 16)
+    pdf.cell(0, 10, f"Audit: {r.url} | Grade: {r.grade} ({r.score}%)", ln=1)
+    # Add more content...
+    return Response(pdf.output(dest='S').encode('latin-1'), media_type='application/pdf')
