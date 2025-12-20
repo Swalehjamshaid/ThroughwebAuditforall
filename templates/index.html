@@ -3,60 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite — The World's Most Advanced Website Audit Tool</title>
-    <meta name="description" content="Free professional website audit with 57 real metrics including Core Web Vitals (Mobile & Desktop), SEO, Performance, Accessibility, Security & Revenue Impact. Instant PDF report.">
+    <title>Throughweb Elite — World's Best Website Audit Tool</title>
+    <meta name="description" content="Free instant audit with 57 real metrics including Mobile & Desktop Core Web Vitals, SEO, Performance, Accessibility, Security & Revenue Impact.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/js/all.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        :root {
-            --bg: #0a0e17;
-            --card-bg: rgba(20, 28, 45, 0.7);
-            --glass: rgba(30, 41, 65, 0.6);
-            --primary: #3b82f6;
-            --red: #ef4444;
-            --green: #10b981;
-            --yellow: #fbbf24;
-            --text: #e2e8f0;
-            --text-muted: #94a3b8;
-        }
         body {
-            background: var(--bg);
-            color: var(--text);
+            background: linear-gradient(to bottom, #0a0e17, #111827);
+            color: #e2e8f0;
             font-family: 'Inter', sans-serif;
             min-height: 100vh;
         }
         .glass {
-            background: var(--glass);
+            background: rgba(20, 30, 50, 0.75);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(59, 130, 246, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
         }
-        .hero-gradient {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        .hero-glass {
+            background: rgba(15, 25, 45, 0.8);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
         }
         .metric-card {
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            transition: all 0.4s ease;
         }
         .metric-card:hover {
-            transform: translateY(-12px) scale(1.02);
+            transform: translateY(-10px);
             box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
         }
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, transparent, rgba(59, 130, 246, 0.05));
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-        .metric-card:hover::before { opacity: 1; }
-        .glow-red { box-shadow: 0 0 50px rgba(239, 68, 68, 0.3); }
-        .glow-green { box-shadow: 0 0 50px rgba(16, 185, 129, 0.3); }
+        .glow-red { box-shadow: 0 0 60px rgba(239, 68, 68, 0.3); }
+        .glow-green { box-shadow: 0 0 60px rgba(16, 185, 129, 0.3); }
+        .glow-blue { box-shadow: 0 0 60px rgba(59, 130, 246, 0.3); }
         .scroll-container {
-            max-height: 80vh;
+            max-height: 75vh;
             overflow-y: auto;
             scrollbar-width: thin;
         }
@@ -64,7 +46,7 @@
             width: 8px;
         }
         .scroll-container::-webkit-scrollbar-thumb {
-            background: rgba(59, 130, 246, 0.4);
+            background: rgba(59, 130, 246, 0.5);
             border-radius: 4px;
         }
         .pulse-btn {
@@ -72,99 +54,97 @@
         }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
     </style>
 </head>
 <body class="antialiased">
     <div class="min-h-screen">
-        <!-- Hero Section -->
-        <header class="hero-gradient py-20 px-6">
-            <div class="max-w-7xl mx-auto text-center">
+        <!-- Hero -->
+        <header class="hero-glass py-24 px-8 text-center">
+            <div class="max-w-5xl mx-auto">
                 <h1 class="text-5xl md:text-7xl font-black text-white mb-6 leading-tight">
                     Throughweb <span class="text-blue-400">Elite</span>
                 </h1>
-                <p class="text-2xl md:text-3xl text-blue-200 mb-12 font-light">
-                    The World's Most Advanced Free Website Audit Tool
+                <p class="text-xl md:text-3xl text-blue-200 mb-8 font-light">
+                    The World's Most Advanced Free Website Audit
                 </p>
                 <p class="text-lg md:text-xl text-blue-300 mb-16 max-w-4xl mx-auto">
-                    Instant analysis of 57 real metrics including Mobile & Desktop Core Web Vitals, SEO, Performance, Accessibility, Security & Revenue Impact
+                    Instant analysis of <strong>57 real metrics</strong> including Mobile & Desktop Core Web Vitals, SEO, Performance, Accessibility, Security & Revenue Impact
                 </p>
 
                 <div class="flex flex-col md:flex-row gap-6 justify-center items-center max-w-3xl mx-auto">
-                    <div class="w-full md:w-auto flex-1">
-                        <input 
-                            type="text" 
-                            id="url" 
-                            placeholder="Enter your website (e.g. example.com)" 
-                            class="w-full glass px-8 py-6 rounded-2xl text-lg focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all"
-                            aria-label="Website URL">
-                    </div>
+                    <input 
+                        type="text" 
+                        id="url" 
+                        placeholder="Enter your website (e.g. example.com or https://yoursite.com)" 
+                        class="w-full glass px-10 py-6 rounded-full text-lg focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all"
+                        aria-label="Website URL to audit">
                     <button 
                         onclick="runAudit()" 
                         id="btn" 
-                        class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-12 py-6 rounded-2xl font-bold text-xl uppercase tracking-wider shadow-2xl pulse-btn transition-all">
+                        class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 px-16 py-6 rounded-full font-bold text-xl uppercase tracking-wider shadow-2xl pulse-btn transition-all">
                         Start Free Audit
                     </button>
                 </div>
             </div>
         </header>
 
-        <!-- Results Section -->
+        <!-- Results -->
         <main id="results" class="hidden max-w-7xl mx-auto px-6 py-16 space-y-20">
-            <!-- Key Summary Cards -->
-            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div class="glass glow-red rounded-3xl p-10 text-center metric-card">
+            <!-- Summary Cards -->
+            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+                <div class="glass glow-red rounded-3xl p-12 text-center metric-card">
                     <p class="text-red-400 text-sm uppercase tracking-widest mb-6 font-semibold">Estimated Revenue Leakage</p>
                     <div id="revLoss" class="text-6xl font-black text-red-400 mb-4">-0%</div>
-                    <p class="text-slate-400 text-sm">From performance & compliance issues</p>
+                    <p class="text-slate-400 text-sm italic">From performance & compliance issues</p>
                 </div>
 
-                <div class="glass glow-green rounded-3xl p-10 text-center metric-card">
+                <div class="glass glow-green rounded-3xl p-12 text-center metric-card">
                     <p class="text-green-400 text-sm uppercase tracking-widest mb-6 font-semibold">Potential Recovery Gain</p>
                     <div id="revGain" class="text-6xl font-black text-green-400 mb-4">+0%</div>
-                    <p class="text-slate-400 text-sm">Through targeted optimizations</p>
+                    <p class="text-slate-400 text-sm italic">Through targeted optimizations</p>
                 </div>
 
-                <div class="glass rounded-3xl p-10 text-center metric-card border-blue-400/30">
+                <div class="glass glow-blue rounded-3xl p-12 text-center metric-card">
                     <p class="text-blue-400 text-sm uppercase tracking-widest mb-6 font-semibold">Mobile LCP (Core Web Vital)</p>
                     <div id="mobileLcp" class="text-5xl font-black text-white mb-4">N/A</div>
-                    <p class="text-slate-400 text-sm">Critical for mobile ranking</p>
+                    <p class="text-slate-400 text-sm italic">Most important mobile ranking factor</p>
                 </div>
 
-                <div class="glass rounded-3xl p-10 text-center metric-card">
+                <div class="glass rounded-3xl p-12 text-center metric-card">
                     <p class="text-slate-300 text-sm uppercase tracking-widest mb-8 font-semibold">Overall Website Grade</p>
                     <div id="grade" class="text-8xl font-black text-white mb-4">—</div>
                     <div id="score" class="text-4xl font-light text-blue-300">—</div>
                 </div>
             </section>
 
-            <!-- Broken Links Alert -->
-            <section id="brokenBox" class="hidden glass rounded-3xl p-10 border border-red-600/40 glow-red metric-card">
-                <h3 class="text-red-400 font-bold text-lg uppercase mb-8 flex items-center gap-4">
+            <!-- Broken Links -->
+            <section id="brokenBox" class="hidden glass rounded-3xl p-12 border border-red-600/40 glow-red metric-card">
+                <h3 class="text-red-400 font-bold text-xl uppercase mb-8 flex items-center gap-4">
                     <i class="fas fa-exclamation-triangle text-2xl"></i>
                     Critical Broken Links Detected
                 </h3>
-                <div id="brokenList" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"></div>
+                <div id="brokenList" class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm"></div>
             </section>
 
-            <!-- Full Metrics Grid -->
-            <section class="glass rounded-3xl p-12">
-                <h2 class="text-center text-2xl font-bold text-white mb-12">
+            <!-- All 57 Metrics Grid -->
+            <section class="glass rounded-3xl p-16">
+                <h2 class="text-center text-3xl font-bold text-white mb-16">
                     Full 57-Metric Professional Analysis
                 </h2>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 scroll-container"></div>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10 scroll-container"></div>
             </section>
 
-            <!-- Download Report -->
+            <!-- Download PDF -->
             <section class="text-center">
                 <a 
                     id="dl" 
                     href="#" 
-                    class="inline-block px-20 py-8 glass rounded-3xl font-bold text-2xl uppercase tracking-widest text-blue-300 hover:text-white hover:bg-blue-600/30 transition-all border-4 border-blue-900/50 metric-card pulse-btn">
-                    <i class="fas fa-file-download mr-4"></i>
-                    Download Executive PDF Report
+                    class="inline-block px-24 py-8 glass rounded-full font-bold text-3xl uppercase tracking-widest text-blue-300 hover:text-white hover:bg-blue-600/30 transition-all border-4 border-blue-900/50 metric-card pulse-btn">
+                    <i class="fas fa-file-download mr-6"></i>
+                    Download Comprehensive PDF Report
                 </a>
             </section>
         </main>
@@ -200,7 +180,7 @@
 
                     results.classList.remove('hidden');
 
-                    // Summary Cards
+                    // Summary
                     document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
                     document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
                     document.getElementById('mobileLcp').innerText = d.metrics['Mobile - Largest Contentful Paint (LCP)']?.val || 'N/A';
@@ -214,22 +194,22 @@
                     if (d.broken_links && d.broken_links.length > 0) {
                         brokenBox.classList.remove('hidden');
                         brokenList.innerHTML = d.broken_links.map(link => `
-                            <div class="bg-red-900/30 rounded-xl p-4 text-left">
-                                <i class="fas fa-link text-red-400 mr-2"></i>
-                                <a href="${link}" target="_blank" class="text-red-300 underline hover:text-red-200 break-all">${link}</a>
+                            <div class="bg-red-900/30 rounded-xl p-5 text-left">
+                                <i class="fas fa-link text-red-400 mr-3"></i>
+                                <a href="${link}" target="_blank" class="text-red-300 underline hover:text-red-100 break-all">${link}</a>
                             </div>
                         `).join('');
                     } else {
                         brokenBox.classList.add('hidden');
                     }
 
-                    // Full Metrics Grid
+                    // ALL 57 METRICS GRID - ALWAYS FULLY VISIBLE
                     let gridHTML = "";
                     Object.entries(d.metrics)
                         .sort((a, b) => a[0].localeCompare(b[0]))
                         .forEach(([key, val]) => {
                             let colorClass = 'text-blue-300';
-                            let borderClass = '';
+                            let borderClass = 'border-blue-400/20';
                             if (val.status === 'PASS') {
                                 colorClass = 'text-green-400';
                                 borderClass = 'border-green-500/30';
@@ -241,18 +221,24 @@
                                 borderClass = 'border-red-500/30';
                             }
 
-                            if (key.includes('Mobile')) {
-                                borderClass += ' bg-blue-900/30 border-blue-400/50';
+                            if (key.toLowerCase().includes('mobile')) {
+                                borderClass += ' bg-blue-900/40';
                             }
 
                             gridHTML += `
                                 <div class="glass rounded-3xl p-8 metric-card ${borderClass}">
                                     <div class="text-sm text-slate-400 uppercase tracking-wide mb-4 font-semibold">${key}</div>
-                                    <div class="text-3xl font-black ${colorClass} mb-3">${val.val}</div>
-                                    <div class="text-lg font-bold text-slate-300 mb-4">${val.status} • ${val.score}%</div>
-                                    <div class="text-sm leading-relaxed space-y-3">
-                                        <p class="text-slate-300"><span class="font-semibold text-slate-200">Explanation:</span> ${val.explanation || 'N/A'}</p>
-                                        <p class="text-slate-400"><span class="font-semibold text-slate-200">Recommendation:</span> ${val.recommendation || 'N/A'}</p>
+                                    <div class="text-3xl font-black ${colorClass} mb-4">${val.val}</div>
+                                    <div class="text-lg font-bold text-slate-300 mb-6">${val.status} • ${val.score}%</div>
+                                    <div class="text-sm space-y-3">
+                                        <p class="text-slate-300">
+                                            <span class="font-semibold">Explanation:</span> 
+                                            ${val.explanation || 'No explanation available'}
+                                        </p>
+                                        <p class="text-slate-400">
+                                            <span class="font-semibold">Recommendation:</span> 
+                                            ${val.recommendation || 'No recommendation available'}
+                                        </p>
                                     </div>
                                 </div>`;
                         });
@@ -263,7 +249,7 @@
                     alert(data.detail || 'Audit failed. The site may be temporarily unavailable or blocking automated analysis.');
                 }
             } catch (err) {
-                alert('Connection error. Please try again in a moment.\n\nNote: Some sites block automated audits for security.');
+                alert('Unable to complete audit.\n\nCommon causes:\n• The site blocks automated tools\n• Temporary network issue\n\nTry example.com to see full results.');
                 console.error(err);
             } finally {
                 btn.innerText = 'Start Free Audit';
