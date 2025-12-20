@@ -2,126 +2,158 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Mouammahd Swaleh | MS Tech Company</title>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swaleh Web Audit | Elite Performance Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: "Segoe UI", Arial, sans-serif;
-            background: #f4f6f9;
-            margin: 0;
-        }
-        header {
-            background: linear-gradient(90deg, #0f2027, #203a43, #2c5364);
-            color: white;
-            padding: 35px;
-            text-align: center;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 34px;
-        }
-        header p {
-            margin-top: 8px;
-            opacity: 0.9;
-        }
-        .score-box {
-            background: white;
-            width: 320px;
-            margin: 35px auto;
-            padding: 25px;
-            text-align: center;
-            border-radius: 14px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-        }
-        .score {
-            font-size: 50px;
-            color: #2c5364;
-            font-weight: bold;
-        }
-        .container {
-            width: 94%;
-            margin: auto;
-        }
-        table {
-            width: 100%;
-            background: white;
-            border-collapse: collapse;
-            margin-bottom: 60px;
-            border-radius: 14px;
-            overflow: hidden;
-        }
-        th {
-            background: #2c5364;
-            color: white;
-            padding: 15px;
-            text-align: left;
-        }
-        td {
-            padding: 13px;
-            border-bottom: 1px solid #e1e1e1;
-        }
-        tr:hover {
-            background: #f2f5f7;
-        }
-        .good { color: #2e7d32; font-weight: bold; }
-        .avg { color: #ef6c00; font-weight: bold; }
-        .poor { color: #c62828; font-weight: bold; }
-
-        footer {
-            background: #203a43;
-            color: white;
-            text-align: center;
-            padding: 20px;
-            font-size: 14px;
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #05070a; overflow-x: hidden; }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .glow-blue { box-shadow: 0 0 50px -12px rgba(59, 130, 246, 0.5); }
+        .gradient-text { background: linear-gradient(to right, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        @keyframes pulse-border { 0% { border-color: rgba(59,130,246,0.3); } 50% { border-color: rgba(59,130,246,1); } 100% { border-color: rgba(59,130,246,0.3); } }
+        .analyzing { animation: pulse-border 2s infinite; }
     </style>
 </head>
+<body class="text-slate-200">
 
-<body>
+    <div class="relative overflow-hidden pt-16 pb-8">
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full"></div>
+        
+        <div class="container mx-auto px-6 relative z-10 text-center">
+            <h1 class="text-6xl md:text-7xl font-extrabold tracking-tighter mb-4">
+                SWALEH <span class="gradient-text">WEB AUDIT</span>
+            </h1>
+            <p class="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-10">
+                The world's most advanced 57-point diagnostic engine for modern digital assets. 
+                Enter your URL to generate a world-class strategic report.
+            </p>
 
-<header>
-    <h1>{{ app_name }}</h1>
-    <p>Professional Website Audit Platform • {{ company_name }}</p>
-</header>
+            <div class="max-w-3xl mx-auto glass p-2 rounded-2xl flex flex-col md:flex-row gap-2 glow-blue mb-12">
+                <input type="text" id="url" placeholder="https://your-luxury-brand.com" 
+                       class="flex-1 bg-transparent px-6 py-4 text-white outline-none text-lg placeholder:text-slate-600">
+                <button onclick="runAudit()" id="btn" 
+                        class="bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 rounded-xl font-bold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-600/20">
+                    ANALYZE NOW
+                </button>
+            </div>
+        </div>
+    </div>
 
-<div class="score-box">
-    <div><strong>Total Metrics Audited</strong></div>
-    <div class="score">{{ total_metrics }}</div>
-    <hr>
-    <div><strong>Overall Website Health</strong></div>
-    <div class="score">{{ overall_score }}%</div>
-</div>
+    <div id="results" class="hidden container mx-auto px-6 pb-20">
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <div class="glass p-8 rounded-3xl text-center border-t-4 border-t-blue-500">
+                <div class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Elite Rating</div>
+                <div id="grade" class="text-6xl font-black text-white italic">A+</div>
+            </div>
+            <div class="glass p-8 rounded-3xl text-center">
+                <div class="text-slate-500 uppercase tracking-widest text-xs font-bold mb-2">Performance Score</div>
+                <div id="score" class="text-6xl font-black text-blue-400">98%</div>
+            </div>
+            <div class="md:col-span-2 glass p-8 rounded-3xl flex flex-col justify-center items-center">
+                <p class="text-slate-400 text-sm mb-4">Your 200+ word executive summary is ready.</p>
+                <a id="dl-link" href="#" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-center py-4 rounded-2xl font-extrabold tracking-wide transition-all shadow-xl shadow-emerald-900/20">
+                    DOWNLOAD PDF STRATEGY REPORT
+                </a>
+            </div>
+        </div>
 
-<div class="container">
-    <table>
-        <tr>
-            <th>#</th>
-            <th>Audit Metric</th>
-            <th>Score (%)</th>
-            <th>Status</th>
-        </tr>
-        {% for metric, score in results.items() %}
-        <tr>
-            <td>{{ loop.index }}</td>
-            <td>{{ metric }}</td>
-            <td>{{ score }}</td>
-            <td>
-                {% if score >= 85 %}
-                    <span class="good">Excellent</span>
-                {% elif score >= 70 %}
-                    <span class="avg">Needs Improvement</span>
-                {% else %}
-                    <span class="poor">Critical</span>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-</div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+            <div class="glass p-8 rounded-3xl">
+                <h3 class="text-xl font-bold mb-6">Efficiency Snapshot</h3>
+                <canvas id="auditChart" height="200"></canvas>
+            </div>
+            <div class="glass p-8 rounded-3xl">
+                <h3 class="text-xl font-bold mb-4">57-Point Scorecard</h3>
+                <div class="max-h-[350px] overflow-y-auto pr-2 custom-scroll" id="metric-list">
+                    </div>
+            </div>
+        </div>
+    </div>
 
-<footer>
-    © {{ company_name }} | Mouammahd Swaleh – World-Class Website Audit System
-</footer>
+    <div id="loader" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center">
+        <div class="text-center">
+            <div class="w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <h2 class="text-2xl font-bold text-white mb-2">Engaging Swaleh Diagnostic Engine...</h2>
+            <p class="text-slate-500 font-mono">Running Metrics 01-57</p>
+        </div>
+    </div>
 
+    <script>
+        let auditChart = null;
+
+        async function runAudit() {
+            const url = document.getElementById('url').value;
+            if(!url) return alert("Please enter a valid URL");
+            
+            document.getElementById('loader').classList.remove('hidden');
+            
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                
+                const data = await res.json();
+                
+                // Update UI
+                document.getElementById('grade').innerText = data.grade;
+                document.getElementById('score').innerText = data.score + "%";
+                document.getElementById('dl-link').href = `/download/${data.id}`;
+                
+                // Render List
+                const list = document.getElementById('metric-list');
+                list.innerHTML = "";
+                Object.entries(data.metrics).forEach(([name, info]) => {
+                    list.innerHTML += `
+                        <div class="flex items-center justify-between p-4 mb-2 bg-white/5 rounded-xl border border-white/5">
+                            <span class="text-sm font-semibold">${name}</span>
+                            <div class="flex items-center gap-4">
+                                <span class="text-xs ${info.status === 'PASS' ? 'text-emerald-400' : 'text-rose-400'} font-bold">${info.status}</span>
+                                <span class="text-slate-500 text-xs">${info.score}%</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                renderChart(data.score);
+
+                document.getElementById('results').classList.remove('hidden');
+                window.scrollTo({ top: document.getElementById('results').offsetTop - 50, behavior: 'smooth' });
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        function renderChart(score) {
+            const ctx = document.getElementById('auditChart').getContext('2d');
+            if(auditChart) auditChart.destroy();
+            auditChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Optimized', 'Remaining'],
+                    datasets: [{
+                        data: [score, 100 - score],
+                        backgroundColor: ['#2563eb', '#1e293b'],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    cutout: '80%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    </script>
+
+    <style>
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    </style>
 </body>
 </html>
