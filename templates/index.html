@@ -1,116 +1,116 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Swaleh Web Audit | Elite Engine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%); font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .custom-scroll::-webkit-scrollbar { width: 5px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
-    </style>
+<meta charset="UTF-8">
+<title>Swaleh Web Audit Elite</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
+.glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+</style>
 </head>
-<body class="text-slate-200 p-4 md:p-10">
-    <div class="max-w-6xl mx-auto">
-        <header class="text-center mb-16">
-            <h1 class="text-6xl font-black text-white tracking-tighter mb-4">SWALEH <span class="text-blue-500">AUDIT</span></h1>
-            <p class="text-slate-400 text-lg uppercase tracking-widest font-bold">Elite 57-Point Technical Intelligence</p>
-        </header>
+<body class="p-6 md:p-10">
+<div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12 text-5xl font-black text-blue-500">SWALEH WEB AUDIT</div>
 
-        <div class="glass p-3 rounded-3xl flex flex-col md:flex-row gap-4 mb-12 shadow-2xl">
-            <input type="text" id="url" placeholder="Enter Website URL (https://...)" class="flex-1 bg-transparent p-4 text-xl outline-none text-white">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all transform active:scale-95">ANALYZE NOW</button>
-        </div>
-
-        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="glass p-10 rounded-[2.5rem] text-center border-b-4 border-blue-500">
-                    <span class="text-slate-500 text-xs uppercase font-bold tracking-widest">Global Grade</span>
-                    <div id="grade" class="text-8xl font-black text-white mt-4"></div>
-                </div>
-                <div class="glass p-10 rounded-[2.5rem] flex flex-col items-center justify-center">
-                    <div class="w-32 h-32 relative">
-                        <canvas id="scoreChart"></canvas>
-                        <div id="scoreVal" class="absolute inset-0 flex items-center justify-center text-2xl font-bold"></div>
-                    </div>
-                </div>
-                <div class="glass p-10 rounded-[2.5rem] flex flex-col justify-center">
-                    <button onclick="downloadPDF()" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold text-center block shadow-lg shadow-blue-900/20">DOWNLOAD PDF REPORT</button>
-                </div>
-            </div>
-
-            <div class="glass rounded-[2rem] overflow-hidden">
-                <div class="p-8 bg-white/5 border-b border-white/10 flex justify-between">
-                    <h3 class="font-bold text-xl text-blue-400 tracking-tight text-white">Full 57-Point Diagnostic Breakdown</h3>
-                    <span class="text-slate-500 text-sm uppercase font-bold">Comprehensive Analysis</span>
-                </div>
-                <div class="max-h-[600px] overflow-y-auto custom-scroll p-8">
-                    <div id="m-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-                </div>
-            </div>
-        </div>
+    <div class="glass p-6 rounded-3xl flex gap-4 mb-10 shadow-2xl">
+        <input type="text" id="url" placeholder="Enter URL..." class="flex-1 bg-transparent border-none text-2xl outline-none">
+        <button onclick="startAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">RUN DEEP SCAN</button>
     </div>
 
-    <div id="loader" class="hidden fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
-        <div class="text-center">
-            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-            <p class="text-blue-500 font-mono text-sm uppercase tracking-widest">Probing Global Performance Vectors...</p>
+    <div id="results" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <div class="glass p-10 rounded-[2rem] text-center">
+                <p class="text-slate-500 text-xs font-bold">GRADE</p>
+                <div id="grade" class="text-7xl font-black text-blue-500 mt-2"></div>
+            </div>
+            <div class="glass p-10 rounded-[2rem] text-center">
+                <p class="text-slate-500 text-xs font-bold">SCORE</p>
+                <div id="score" class="text-7xl font-black text-emerald-500 mt-2"></div>
+            </div>
+            <div class="glass p-10 rounded-[2rem] flex flex-col justify-center">
+                <button onclick="downloadPDF()" class="bg-white text-black py-4 rounded-xl font-bold">DOWNLOAD PDF</button>
+            </div>
+        </div>
+
+        <div id="metric-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10"></div>
+
+        <div class="glass p-6 rounded-xl mb-10">
+            <h3 class="text-xl font-bold mb-4">Category Scores</h3>
+            <canvas id="categoryChart"></canvas>
         </div>
     </div>
+</div>
 
-    <script>
-        let chart;
-        let currentReportId = null;
+<script>
+let lastAuditData = {};
 
-        async function runAudit() {
-            const url = document.getElementById('url').value;
-            if(!url) return alert("URL Required");
-            
-            document.getElementById('loader').classList.remove('hidden');
-            try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                const data = await res.json();
-                currentReportId = data.id;
+async function startAudit() {
+    const url = document.getElementById('url').value;
+    const res = await fetch('/audit', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({url})
+    });
+    const data = await res.json();
+    lastAuditData = data.summary;
+    document.getElementById('results').classList.remove('hidden');
+    document.getElementById('grade').innerText = data.summary.grade;
+    document.getElementById('score').innerText = data.summary.score + "%";
 
-                document.getElementById('results').classList.remove('hidden');
-                document.getElementById('grade').innerText = data.summary.grade;
-                document.getElementById('scoreVal').innerText = data.summary.score + "%";
+    const grid = document.getElementById('metric-grid');
+    grid.innerHTML = "";
+    Object.values(data.summary.metrics).forEach(m => {
+        grid.innerHTML += `
+            <div class="glass p-4 rounded-xl">
+                <div class="flex justify-between text-[10px] mb-2">
+                    <span class="text-blue-400 font-bold uppercase">${m.cat}</span>
+                    <span class="${m.status==='PASS'?'text-emerald-400':'text-rose-400'} font-bold">${m.status}</span>
+                </div>
+                <h3 class="text-xs font-bold">${m.name}</h3>
+            </div>`;
+    });
 
-                const grid = document.getElementById('m-grid');
-                grid.innerHTML = "";
-                Object.entries(data.summary.metrics).forEach(([id, info]) => {
-                    grid.innerHTML += `
-                        <div class="p-6 rounded-3xl bg-white/5 border border-white/5 hover:border-blue-500/50 transition-all group">
-                            <div class="flex justify-between items-start mb-4">
-                                <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">${info.category}</span>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${info.status==='PASS'?'bg-emerald-500/10 text-emerald-500':'bg-rose-500/10 text-rose-400'}">${info.status}</span>
-                            </div>
-                            <h4 class="text-sm font-bold text-slate-200 mb-4">${info.name}</h4>
-                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500" style="width: ${info.score}%"></div>
-                            </div>
-                        </div>`;
-                });
+    const ctx = document.getElementById('categoryChart').getContext('2d');
+    if(window.categoryChart) window.categoryChart.destroy();
+    window.categoryChart = new Chart(ctx, {
+        type:'bar',
+        data:{
+            labels:Object.keys(data.summary.category_scores),
+            datasets:[{
+                label:'Average Score',
+                data:Object.values(data.summary.category_scores),
+                backgroundColor:['#28a745','#ffc107','#dc3545','#17a2b8']
+            }]
+        },
+        options:{scales:{y:{beginAtZero:true,max:100}}}
+    });
+}
 
-                const ctx = document.getElementById('scoreChart').getContext('2d');
-                if(chart) chart.destroy();
-                chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [data.summary.score, 100-data.summary.score], backgroundColor: ['#3b82f6','#1e293b'], borderWidth: 0 }] }, options: { cutout: '85%', plugins: { legend: false } } });
-                
-                document.getElementById('loader').classList.add('hidden');
-                window.scrollTo({ top: document.getElementById('results').offsetTop - 50, behavior: 'smooth' });
-            } catch(e) {
-                alert("Critical engine failure. Check backend logs.");
-                document.getElementById('loader').classList.add('hidden');
-            }
-        }
-
-        function downloadPDF() {
-            if(currentReportId) {
-                window.location.href = `/download/${currentReportId}`;
-            }
-        }
-    </script>
+async function downloadPDF() {
+    if (!lastAuditData) return alert("Run an audit first!");
+    const res = await fetch('/download_pdf', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+            url: document.getElementById('url').value,
+            grade: lastAuditData.grade,
+            score: lastAuditData.score,
+            metrics: lastAuditData.metrics,
+            text: lastAuditData.text,
+            category_scores: lastAuditData.category_scores
+        })
+    });
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Swaleh_Web_Audit_Report.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+</script>
 </body>
 </html>
