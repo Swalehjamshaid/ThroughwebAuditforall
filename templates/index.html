@@ -3,282 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite — The World's Most Beautiful Website Audit Tool</title>
-    <meta name="description" content="Free professional website audit with 57 real metrics, Core Web Vitals, SEO, performance, accessibility, security & revenue impact analysis.">
+    <title>Elysium — The World's Most Beautiful Landing Page 2025</title>
+    <meta name="description" content="A breathtaking modern landing page with glassmorphism, gradients, glow effects, and smooth animations. The pinnacle of 2025 web design.">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
             color: #e2e8f0;
             font-family: 'Inter', sans-serif;
-            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .hero-bg {
+            background: url('https://images.unsplash.com/photo-1502082553048-f009c50876b2?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80') center/cover no-repeat;
+            position: relative;
+        }
+        .hero-overlay {
+            background: linear-gradient(to bottom, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.7));
         }
         .glass {
-            background: rgba(15, 23, 42, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-        }
-        .hero-glass {
-            background: linear-gradient(135deg, rgba(30, 41, 65, 0.8), rgba(15, 23, 42, 0.6));
+            background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
             border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
         }
-        .metric-card {
-            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            position: relative;
-            overflow: hidden;
+        .card {
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .metric-card:hover {
-            transform: translateY(-15px) scale(1.03);
-            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7);
+        .card:hover {
+            transform: translateY(-20px) scale(1.05);
+            box-shadow: 0 40px 80px rgba(59, 130, 246, 0.3);
         }
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(135deg, transparent, rgba(59, 130, 246, 0.1));
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
-        .metric-card:hover::before { opacity: 1; }
-        .glow-red { box-shadow: 0 0 60px rgba(239, 68, 68, 0.4); }
-        .glow-green { box-shadow: 0 0 60px rgba(16, 185, 129, 0.4); }
-        .glow-blue { box-shadow: 0 0 60px rgba(59, 130, 246, 0.4); }
-        .scroll-container {
-            max-height: 80vh;
-            overflow-y: auto;
-            scrollbar-width: thin;
-        }
-        .scroll-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        .scroll-container::-webkit-scrollbar-thumb {
-            background: linear-gradient(to bottom, #3b82f6, #1e40af);
-            border-radius: 4px;
-        }
-        .pulse-btn {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        .glow {
+            box-shadow: 0 0 80px rgba(59, 130, 246, 0.4);
         }
         .title-gradient {
-            background: linear-gradient(to right, #60a5fa, #a78bfa, #f472b6);
+            background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6, #34d399);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+        .btn-pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(96, 165, 250, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+        }
+        .floating {
+            animation: float 6s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0px); }
+        }
     </style>
 </head>
 <body class="antialiased">
-    <div class="min-h-screen">
-        <!-- Hero Section -->
-        <header class="hero-glass py-32 px-8 text-center">
-            <div class="max-w-6xl mx-auto">
-                <h1 class="text-6xl md:text-8xl font-black mb-8 leading-tight">
-                    Throughweb <span class="title-gradient">Elite</span>
-                </h1>
-                <p class="text-2xl md:text-4xl text-blue-200 mb-10 font-light">
-                    The World's Most Beautiful & Advanced Website Audit
-                </p>
-                <p class="text-lg md:text-2xl text-blue-300 mb-20 max-w-4xl mx-auto">
-                    Instant professional analysis of <strong>57 real metrics</strong> including Mobile & Desktop Core Web Vitals, SEO, Performance, Accessibility, Security & Revenue Impact
-                </p>
+    <!-- Hero Section -->
+    <section class="hero-bg min-h-screen flex items-center justify-center relative">
+        <div class="hero-overlay absolute inset-0"></div>
+        <div class="relative z-10 text-center px-8 max-w-6xl mx-auto">
+            <h1 class="text-6xl md:text-8xl font-black mb-8 leading-tight">
+                <span class="title-gradient">Elysium</span><br>
+                <span class="text-white">The Future of Web</span>
+            </h1>
+            <p class="text-2xl md:text-4xl text-blue-200 mb-12 font-light max-w-4xl mx-auto">
+                Experience the pinnacle of 2025 design — glassmorphism, vibrant gradients, ethereal glows, and seamless animations.
+            </p>
+            <div class="flex flex-col md:flex-row gap-8 justify-center items-center">
+                <button class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-purple-600 hover:to-pink-600 px-16 py-8 rounded-full font-bold text-2xl uppercase tracking-wider shadow-2xl btn-pulse transition-all">
+                    Explore Now
+                </button>
+                <button class="glass px-16 py-8 rounded-full font-bold text-xl uppercase tracking-wider hover:bg-white/10 transition-all">
+                    Learn More
+                </button>
+            </div>
+        </div>
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 animate-bounce">
+            <i class="fas fa-chevron-down text-4xl text-blue-400"></i>
+        </div>
+    </section>
 
-                <div class="flex flex-col md:flex-row gap-8 justify-center items-center max-w-4xl mx-auto">
-                    <input 
-                        type="text" 
-                        id="url" 
-                        placeholder="Enter your website (e.g. example.com)" 
-                        class="w-full glass px-12 py-7 rounded-full text-xl focus:outline-none focus:ring-4 focus:ring-blue-500/50 transition-all shadow-2xl"
-                        aria-label="Website URL">
-                    <button 
-                        onclick="runAudit()" 
-                        id="btn" 
-                        class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 px-20 py-7 rounded-full font-bold text-2xl uppercase tracking-wider shadow-2xl pulse-btn transition-all">
-                        Start Free Audit
-                    </button>
+    <!-- Features Section -->
+    <section class="py-32 px-8">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-5xl md:text-7xl font-black text-center mb-20">
+                <span class="title-gradient">Revolutionary Features</span>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div class="glass rounded-3xl p-12 text-center card glow floating">
+                    <i class="fas fa-bolt text-6xl text-yellow-400 mb-8"></i>
+                    <h3 class="text-3xl font-bold mb-6">Lightning Fast</h3>
+                    <p class="text-lg leading-relaxed">Optimized for speed with cutting-edge performance techniques and modern frameworks.</p>
+                </div>
+                <div class="glass rounded-3xl p-12 text-center card glow floating" style="animation-delay: 0.2s;">
+                    <i class="fas fa-shield-alt text-6xl text-green-400 mb-8"></i>
+                    <h3 class="text-3xl font-bold mb-6">Secure by Design</h3>
+                    <p class="text-lg leading-relaxed">Built with security best practices, encryption, and protection against modern threats.</p>
+                </div>
+                <div class="glass rounded-3xl p-12 text-center card glow floating" style="animation-delay: 0.4s;">
+                    <i class="fas fa-mobile-alt text-6xl text-blue-400 mb-8"></i>
+                    <h3 class="text-3xl font-bold mb-6">Perfectly Responsive</h3>
+                    <p class="text-lg leading-relaxed">Flawless experience on every device — mobile, tablet, desktop, and beyond.</p>
                 </div>
             </div>
-        </header>
+        </div>
+    </section>
 
-        <!-- Results Section -->
-        <main id="results" class="hidden max-w-7xl mx-auto px-8 py-20 space-y-24">
-            <!-- Executive Summary -->
-            <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-                <div class="glass glow-red rounded-3xl p-14 text-center metric-card">
-                    <p class="text-red-400 text-lg uppercase tracking-widest mb-8 font-semibold">Estimated Revenue Leakage</p>
-                    <div id="revLoss" class="text-7xl font-black text-red-400 mb-6">-0%</div>
-                    <p class="text-slate-400 text-sm italic">From performance & compliance issues</p>
-                </div>
+    <!-- CTA Section -->
+    <section class="py-32 px-8 text-center">
+        <div class="glass rounded-3xl p-20 max-w-5xl mx-auto">
+            <h2 class="text-5xl md:text-7xl font-black mb-12">
+                Ready to <span class="title-gradient">Elevate</span> Your Web Presence?
+            </h2>
+            <button class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-pink-600 hover:to-orange-600 px-24 py-10 rounded-full font-bold text-3xl uppercase tracking-widest shadow-2xl btn-pulse transition-all">
+                Get Started Today
+            </button>
+        </div>
+    </section>
 
-                <div class="glass glow-green rounded-3xl p-14 text-center metric-card">
-                    <p class="text-green-400 text-lg uppercase tracking-widest mb-8 font-semibold">Potential Recovery Gain</p>
-                    <div id="revGain" class="text-7xl font-black text-green-400 mb-6">+0%</div>
-                    <p class="text-slate-400 text-sm italic">Through targeted optimizations</p>
-                </div>
-
-                <div class="glass glow-blue rounded-3xl p-14 text-center metric-card">
-                    <p class="text-blue-400 text-lg uppercase tracking-widest mb-8 font-semibold">Mobile LCP (Core Vital)</p>
-                    <div id="mobileLcp" class="text-6xl font-black text-white mb-6">N/A</div>
-                    <p class="text-slate-400 text-sm italic">Most important mobile ranking factor</p>
-                </div>
-
-                <div class="glass rounded-3xl p-14 text-center metric-card">
-                    <p class="text-slate-300 text-lg uppercase tracking-widest mb-10 font-semibold">Overall Website Grade</p>
-                    <div id="grade" class="text-9xl font-black text-white mb-6">—</div>
-                    <div id="score" class="text-5xl font-light text-blue-300">—</div>
-                </div>
-            </section>
-
-            <!-- Broken Links Alert -->
-            <section id="brokenBox" class="hidden glass rounded-3xl p-16 border border-red-600/40 glow-red metric-card">
-                <h3 class="text-red-400 font-bold text-2xl uppercase mb-12 flex items-center justify-center gap-6">
-                    <i class="fas fa-exclamation-triangle text-3xl"></i>
-                    Critical Broken Links Detected
-                </h3>
-                <div id="brokenList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-base"></div>
-            </section>
-
-            <!-- All 57 Metrics -->
-            <section class="glass rounded-3xl p-20">
-                <h2 class="text-center text-4xl font-bold text-white mb-20">
-                    Complete 57-Metric Professional Analysis
-                </h2>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12 scroll-container"></div>
-            </section>
-
-            <!-- Download Report -->
-            <section class="text-center">
-                <a 
-                    id="dl" 
-                    href="#" 
-                    class="inline-block px-32 py-10 glass rounded-full font-bold text-3xl uppercase tracking-widest text-blue-300 hover:text-white hover:bg-gradient-to-r hover:from-blue-600/30 hover:to-purple-600/30 transition-all border-4 border-blue-900/50 metric-card pulse-btn">
-                    <i class="fas fa-file-download mr-8 text-4xl"></i>
-                    Download Executive PDF Report
-                </a>
-            </section>
-        </main>
-    </div>
-
-    <script>
-        async function runAudit() {
-            const results = document.getElementById('results');
-            results.classList.add('hidden');
-
-            const urlInput = document.getElementById('url').value.trim();
-            if (!urlInput) {
-                alert('Please enter a valid website URL');
-                return;
-            }
-
-            const btn = document.getElementById('btn');
-            btn.innerText = 'AUDITING...';
-            btn.disabled = true;
-            btn.classList.remove('pulse-btn');
-
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: urlInput })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    const d = data.data;
-
-                    results.classList.remove('hidden');
-
-                    // Executive Summary
-                    document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
-                    document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                    document.getElementById('mobileLcp').innerText = d.metrics['Mobile - Largest Contentful Paint (LCP)']?.val || 'N/A';
-                    document.getElementById('grade').innerText = d.grade;
-                    document.getElementById('score').innerText = `${d.score}%`;
-                    document.getElementById('dl').href = `/download/${data.id}`;
-
-                    // Broken Links
-                    const brokenBox = document.getElementById('brokenBox');
-                    const brokenList = document.getElementById('brokenList');
-                    if (d.broken_links && d.broken_links.length > 0) {
-                        brokenBox.classList.remove('hidden');
-                        brokenList.innerHTML = d.broken_links.map(link => `
-                            <div class="bg-red-900/30 rounded-2xl p-6 text-left">
-                                <i class="fas fa-link text-red-400 mr-4 text-xl"></i>
-                                <a href="${link}" target="_blank" class="text-red-300 underline hover:text-red-100 break-all text-lg">${link}</a>
-                            </div>
-                        `).join('');
-                    } else {
-                        brokenBox.classList.add('hidden');
-                    }
-
-                    // All 57 Metrics
-                    let gridHTML = "";
-                    Object.entries(d.metrics)
-                        .sort((a, b) => a[0].localeCompare(b[0]))
-                        .forEach(([key, val]) => {
-                            let colorClass = 'text-blue-300';
-                            let borderClass = 'border-blue-400/20';
-                            if (val.status === 'PASS') {
-                                colorClass = 'text-green-400';
-                                borderClass = 'border-green-500/30';
-                            } else if (val.status === 'WARN') {
-                                colorClass = 'text-yellow-400';
-                                borderClass = 'border-yellow-500/30';
-                            } else if (val.status === 'FAIL') {
-                                colorClass = 'text-red-400';
-                                borderClass = 'border-red-500/30';
-                            }
-
-                            if (key.toLowerCase().includes('mobile')) {
-                                borderClass += ' bg-gradient-to-br from-blue-900/30 to-purple-900/20';
-                            }
-
-                            gridHTML += `
-                                <div class="glass rounded-3xl p-10 metric-card ${borderClass}">
-                                    <div class="text-base text-slate-400 uppercase tracking-wide mb-6 font-semibold">${key}</div>
-                                    <div class="text-4xl font-black ${colorClass} mb-6">${val.val}</div>
-                                    <div class="text-xl font-bold text-slate-300 mb-8">${val.status} • ${val.score}%</div>
-                                    <div class="text-base space-y-5">
-                                        <p class="text-slate-300 leading-relaxed">
-                                            <span class="font-bold text-white">Explanation:</span> 
-                                            ${val.explanation || 'No explanation available'}
-                                        </p>
-                                        <p class="text-slate-400 leading-relaxed">
-                                            <span class="font-bold text-white">Recommendation:</span> 
-                                            ${val.recommendation || 'No recommendation available'}
-                                        </p>
-                                    </div>
-                                </div>`;
-                        });
-
-                    document.getElementById('metricsGrid').innerHTML = gridHTML;
-
-                } else {
-                    alert(data.detail || 'Audit failed. The site may be temporarily unavailable or blocking automated analysis.');
-                }
-            } catch (err) {
-                alert('Unable to complete audit.\n\nCommon causes:\n• The site blocks automated tools\n• Temporary network issue\n\nTry example.com to see full results.');
-                console.error(err);
-            } finally {
-                btn.innerText = 'Start Free Audit';
-                btn.disabled = false;
-                btn.classList.add('pulse-btn');
-            }
-        }
-
-        // Enter key support
-        document.getElementById('url').addEventListener('keypress', e => {
-            if (e.key === 'Enter') runAudit();
-        });
-    </script>
+    <!-- Footer -->
+    <footer class="py-16 px-8 text-center">
+        <p class="text-lg">© 2025 Elysium. The world's most beautiful web experience.</p>
+    </footer>
 </body>
 </html>
