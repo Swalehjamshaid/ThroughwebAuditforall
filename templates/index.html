@@ -7,20 +7,23 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        body { background: #0a0e17; color: #e2e8f0; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
         .metric-card { transition: transform 0.3s; }
         .metric-card:hover { transform: translateY(-4px); }
         .scroll-container { max-height: 80vh; overflow-y: auto; }
         .scroll-container::-webkit-scrollbar { width: 6px; }
         .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
+        .glow-red { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
+        .glow-green { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
+        .mobile-highlight { border: 2px solid #3b82f6; background: rgba(59,130,246,0.1); }
     </style>
 </head>
 <body class="p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
         <header class="glass rounded-3xl p-10 mb-12 text-center">
             <h1 class="text-5xl font-black text-white mb-4">Throughweb Elite</h1>
-            <p class="text-xl text-blue-300 mb-8">57 Real Metrics Audit • Instant Report</p>
+            <p class="text-xl text-blue-300 mb-8">57 Real Metrics Audit</p>
             <div class="flex gap-4 justify-center">
                 <input type="text" id="url" placeholder="Enter domain (e.g., example.com)" class="glass px-8 py-4 rounded-full w-80">
                 <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-full font-bold uppercase">
@@ -31,32 +34,27 @@
 
         <div id="results" class="hidden space-y-12">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="glass p-8 rounded-[40px] text-center">
+                <div class="glass glow-red p-8 rounded-[40px] text-center">
                     <span class="text-red-400 font-bold text-xs uppercase mb-2">Revenue Leakage</span>
-                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2"></div>
+                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2">0%</div>
                 </div>
-                <div class="glass p-8 rounded-[40px] text-center">
+                <div class="glass glow-green p-8 rounded-[40px] text-center">
                     <span class="text-green-400 font-bold text-xs uppercase mb-2">Recovery Gain</span>
-                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2"></div>
+                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2">0%</div>
                 </div>
-                <div class="glass p-8 rounded-[40px] text-center">
-                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">LCP</span>
-                    <div id="lcpVal" class="text-4xl font-black text-white mb-2"></div>
+                <div class="glass p-8 rounded-[40px] text-center mobile-highlight">
+                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">Mobile LCP (Core Vital)</span>
+                    <div id="mobileLcp" class="text-4xl font-black text-white mb-2">N/A</div>
                 </div>
                 <div class="glass p-8 rounded-[40px] text-center">
                     <span class="text-slate-400 font-bold text-xs uppercase mb-2">Grade</span>
-                    <div id="grade" class="text-7xl font-black text-white"></div>
-                    <div id="score" class="text-3xl text-slate-300"></div>
+                    <div id="grade" class="text-7xl font-black text-white mb-2">—</div>
+                    <div id="score" class="text-3xl text-slate-300">—</div>
                 </div>
             </div>
 
-            <div id="brokenBox" class="hidden glass p-10 rounded-[40px] border-red-600/30">
-                <h3 class="text-red-400 font-bold text-xs uppercase mb-6">Broken Links</h3>
-                <div id="brokenList" class="text-sm text-red-300 space-y-2"></div>
-            </div>
-
             <div class="glass p-12 rounded-[50px]">
-                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics</h2>
+                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics Analysis</h2>
                 <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container"></div>
             </div>
 
@@ -84,20 +82,16 @@
                     results.classList.remove('hidden');
                     document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
                     document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)']?.val || 'N/A';
+                    document.getElementById('mobileLcp').innerText = d.metrics['Mobile - Largest Contentful Paint (LCP)']?.val || 'N/A';
                     document.getElementById('grade').innerText = d.grade;
                     document.getElementById('score').innerText = `${d.score}%`;
                     document.getElementById('dl').href = `/download/${data.id}`;
 
-                    if (d.broken_links.length > 0) {
-                        document.getElementById('brokenBox').classList.remove('hidden');
-                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `→ ${l}`).join('<br>');
-                    }
-
                     let grid = "";
                     Object.entries(d.metrics).sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, v]) => {
                         let color = v.status == 'PASS' ? 'text-green-400' : v.status == 'WARN' ? 'text-yellow-400' : 'text-red-400';
-                        grid += `<div class="glass rounded-2xl p-6">
+                        let highlight = k.includes('Mobile') ? 'mobile-highlight' : '';
+                        grid += `<div class="glass rounded-2xl p-6 metric-card ${highlight}">
                             <div class="text-xs text-slate-400 uppercase mb-2">${k}</div>
                             <div class="font-bold text-lg ${color}">${v.val}</div>
                             <div class="text-sm text-slate-500 mt-2">${v.status} (${v.score}%)</div>
