@@ -1,234 +1,120 @@
-import os
-import time
-import datetime
-import requests
-import urllib3
-import re
-import random
-from bs4 import BeautifulSoup
-from fpdf import FPDF
-from fastapi import FastAPI, HTTPException, Response, Request
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from urllib.parse import quote_plus
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Throughweb Elite | Comprehensive Web Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+        .metric-card { transition: all 0.3s; }
+        .metric-card:hover { transform: translateY(-4px); }
+        .scroll-container { max-height: 80vh; overflow-y: auto; }
+        .scroll-container::-webkit-scrollbar { width: 6px; }
+        .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-[#020617] text-slate-100 p-6 md:p-12">
+    <div class="max-w-7xl mx-auto">
+        <header class="glass rounded-3xl p-10 mb-12 text-center">
+            <h1 class="text-5xl font-black text-white mb-4">Throughweb Elite</h1>
+            <p class="text-xl text-blue-300 mb-8">Comprehensive Audit with 57 Metrics</p>
+            <div class="flex gap-4 justify-center">
+                <input type="text" id="url" placeholder="Enter domain (e.g., example.com)" class="glass px-8 py-4 rounded-full w-80">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-full font-bold uppercase">
+                    Start Audit
+                </button>
+            </div>
+        </header>
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        <div id="results" class="hidden space-y-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-red-400 font-bold text-xs uppercase mb-2">Revenue Leakage</span>
+                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2"></div>
+                </div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-green-400 font-bold text-xs uppercase mb-2">Recovery Gain</span>
+                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2"></div>
+                </div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">LCP</span>
+                    <div id="lcpVal" class="text-4xl font-black text-white mb-2"></div>
+                </div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-slate-400 font-bold text-xs uppercase mb-2">Grade</span>
+                    <div id="grade" class="text-7xl font-black text-white"></div>
+                    <div id="score" class="text-3xl text-slate-300"></div>
+                </div>
+            </div>
 
-# --- DATABASE SETUP ---
-DB_URL = os.getenv('DATABASE_URL', 'sqlite:///./live_audits.db')
-engine = create_engine(DB_URL, connect_args={'check_same_thread': False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+            <div id="brokenBox" class="hidden glass p-10 rounded-[40px] border-red-600/30">
+                <h3 class="text-red-400 font-bold text-xs uppercase mb-6">Broken Links</h3>
+                <div id="brokenList" class="text-sm text-red-300 space-y-2"></div>
+            </div>
 
-class AuditRecord(Base):
-    __tablename__ = 'strategic_reports'
-    id = Column(Integer, primary_key=True)
-    url = Column(String)
-    grade = Column(String)
-    score = Column(Integer)
-    metrics = Column(JSON)
-    broken_links = Column(JSON)
-    financial_data = Column(JSON)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+            <div class="glass p-12 rounded-[50px]">
+                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics with Details</h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container"></div>
+            </div>
 
-Base.metadata.create_all(bind=engine)
+            <a id="dl" href="#" class="block w-full md:w-1/2 mx-auto text-center py-6 glass rounded-[30px] font-bold uppercase tracking-widest text-blue-300 hover:bg-blue-600 hover:text-white transition-all">
+                Download Full PDF Report
+            </a>
+        </div>
+    </div>
 
-app = FastAPI()
-templates = Jinja2Templates(directory='templates')
+    <script>
+        async function runAudit() {
+            const results = document.getElementById('results');
+            results.classList.add('hidden');
+            const url = document.getElementById('url').value.trim();
+            if (!url) return alert('Enter a domain');
+            const btn = document.getElementById('btn');
+            btn.innerText = 'Auditing...';
+            btn.disabled = true;
 
-# --- PROFESSIONAL PDF GENERATOR ---
-class MasterStrategyPDF(FPDF):
-    def header(self):
-        self.set_fill_color(15, 23, 42)
-        self.rect(0, 0, 210, 50, 'F')
-        self.set_font('Arial', 'B', 22)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 30, 'COMPREHENSIVE WEBSITE AUDIT REPORT', 0, 1, 'C')
-        self.ln(10)
+            try {
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+                const data = await res.json();
+                if (res.ok) {
+                    const d = data.data;
+                    results.classList.remove('hidden');
+                    document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
+                    document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
+                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)'].val;
+                    document.getElementById('grade').innerText = d.grade;
+                    document.getElementById('score').innerText = `${d.score}%`;
+                    document.getElementById('dl').href = `/download/${data.id}`;
+                    document.getElementById('dl').download = 'audit_report.pdf';  // Force download
 
-    def add_section(self, title):
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, title, ln=1)
-
-    def add_metric(self, name, data):
-        self.set_font('Arial', 'B', 12)
-        self.multi_cell(0, 6, f"{name}: {data['val']} | Status: {data['status']} | Score: {data['score']}")
-        self.set_font('Arial', '', 10)
-        self.multi_cell(0, 6, f"Explanation: {data.get('explanation', 'N/A')}")
-        self.multi_cell(0, 6, f"Recommendation: {data.get('recommendation', 'N/A')}")
-        self.ln(5)
-
-@app.get("/")
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-# --- AUDIT ENGINE WITH MOBILE & DESKTOP CORE WEB VITALS ---
-def run_live_audit(url: str):
-    if not re.match(r'^(http|https)://', url):
-        url = 'https://' + url
-
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive'
-    }
-
-    metrics = {}
-    broken_links = []
-
-    try:
-        time.sleep(random.uniform(1.5, 3.5))
-        start_time = time.time()
-        res = requests.get(url, headers=headers, timeout=30, verify=False, allow_redirects=True)
-        load_time = round(time.time() - start_time, 2)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        final_url = res.url
-        ssl = final_url.startswith('https')
-
-        # --- MOBILE CORE WEB VITALS FROM PSI ---
-        mobile_cwv = {}
-        desktop_cwv = {}
-        try:
-            # Mobile strategy
-            mobile_psi_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={quote_plus(final_url)}&strategy=mobile"
-            mobile_res = requests.get(mobile_psi_url, timeout=20)
-            if mobile_res.ok:
-                mobile_data = mobile_res.json()
-                if 'lighthouseResult' in mobile_data:
-                    audits = mobile_data['lighthouseResult']['audits']
-                    mobile_cwv = {
-                        'LCP': audits['largest-contentful-paint']['displayValue'],
-                        'CLS': audits['cumulative-layout-shift']['displayValue'],
-                        'INP': audits.get('interaction-to-next-paint', {}).get('displayValue', 'N/A'),
-                        'TBT': audits['total-blocking-time']['displayValue'],
-                        'FCP': audits['first-contentful-paint']['displayValue'],
-                        'TTFB': audits.get('server-response-time', {}).get('displayValue', 'N/A'),
+                    if (d.broken_links.length > 0) {
+                        document.getElementById('brokenBox').classList.remove('hidden');
+                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `→ ${l}`).join('<br>');
                     }
 
-            # Desktop strategy
-            desktop_psi_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={quote_plus(final_url)}&strategy=desktop"
-            desktop_res = requests.get(desktop_psi_url, timeout=20)
-            if desktop_res.ok:
-                desktop_data = desktop_res.json()
-                if 'lighthouseResult' in desktop_data:
-                    audits = desktop_data['lighthouseResult']['audits']
-                    desktop_cwv = {
-                        'LCP': audits['largest-contentful-paint']['displayValue'],
-                        'CLS': audits['cumulative-layout-shift']['displayValue'],
-                        'INP': audits.get('interaction-to-next-paint', {}).get('displayValue', 'N/A'),
-                        'TBT': audits['total-blocking-time']['displayValue'],
-                        'FCP': audits['first-contentful-paint']['displayValue'],
-                        'TTFB': audits.get('server-response-time', {}).get('displayValue', 'N/A'),
+                    let grid = "";
+                    for (let [k, v] of Object.entries(d.metrics)) {
+                        let color = v.status == 'PASS' ? 'text-green-400' : v.status == 'WARN' ? 'text-yellow-400' : 'text-red-400';
+                        grid += `<div class="glass rounded-2xl p-6">
+                            <div class="text-xs text-slate-400 uppercase mb-2">${k}</div>
+                            <div class="font-bold text-lg ${color}">${v.val}</div>
+                            <div class="text-sm text-slate-500 mt-2">${v.status} (${v.score}%)</div>
+                            <p class="text-xs text-slate-400 mt-4">Explanation: ${v.explanation || 'N/A'}</p>
+                            <p class="text-xs text-slate-300 mt-2">Recommendation: ${v.recommendation || 'N/A'}</p>
+                        </div>`;
                     }
-        except Exception as e:
-            print(f"PSI error: {e}")
-
-        # Add Mobile Core Web Vitals
-        metrics['Mobile - Largest Contentful Paint (LCP)'] = {
-            "val": mobile_cwv.get('LCP', f"{load_time + 1.5:.2f}s (Est.)"),
-            "score": 100 if 'good' in mobile_cwv.get('LCP', '').lower() else 60 if mobile_cwv else 50,
-            "status": "PASS" if 'good' in mobile_cwv.get('LCP', '').lower() else "WARN" if mobile_cwv else "WARN",
-            "explanation": "Mobile LCP is critical as 70%+ traffic is mobile. Good <2.5s.",
-            "recommendation": "Optimize images, fonts, and critical CSS for mobile."
+                    document.getElementById('metricsGrid').innerHTML = grid;
+                } else {
+                    alert('Audit failed. Site may be down or blocking requests.');
+                }
+            } catch {
+                alert('Connection error. Try again.');
+            } finally {
+                btn.innerText = 'Start Comprehensive Audit';
+                btn.disabled = false;
+            }
         }
-
-        metrics['Mobile - Cumulative Layout Shift (CLS)'] = {
-            "val": mobile_cwv.get('CLS', "0.15 (Est.)"),
-            "score": 100 if mobile_cwv and float(mobile_cwv['CLS']) < 0.1 else 60,
-            "status": "PASS" if mobile_cwv and float(mobile_cwv['CLS']) < 0.1 else "WARN",
-            "explanation": "Mobile users are more affected by layout shifts.",
-            "recommendation": "Reserve space for ads/images on mobile."
-        }
-
-        metrics['Mobile - Interaction to Next Paint (INP)'] = {
-            "val": mobile_cwv.get('INP', "250ms (Est.)"),
-            "score": 100 if mobile_cwv.get('INP', 'N/A') != 'N/A' and 'good' in mobile_cwv.get('INP', '').lower() else 60,
-            "status": "PASS" if mobile_cwv.get('INP', 'N/A') != 'N/A' and 'good' in mobile_cwv.get('INP', '').lower() else "WARN",
-            "explanation": "Responsiveness on mobile touch devices. Good <200ms.",
-            "recommendation": "Reduce JS, use efficient event listeners."
-        }
-
-        metrics['Mobile - Total Blocking Time (TBT)'] = {
-            "val": mobile_cwv.get('TBT', "400ms (Est.)"),
-            "score": 100 if mobile_cwv and 'good' in mobile_cwv.get('TBT', '').lower() else 60,
-            "status": "PASS" if mobile_cwv and 'good' in mobile_cwv.get('TBT', '').lower() else "WARN",
-            "explanation": "Mobile devices have slower CPUs.",
-            "recommendation": "Defer non-critical JS on mobile."
-        }
-
-        # Add Desktop for comparison (optional)
-        metrics['Desktop - LCP'] = {
-            "val": desktop_cwv.get('LCP', "N/A"),
-            "score": 90 if desktop_cwv else 50,
-            "status": "PASS" if desktop_cwv else "INFO",
-            "explanation": "Desktop reference for comparison.",
-            "recommendation": "Use for benchmarking."
-        }
-
-        # Other metrics (keep your existing ones)
-        # ...
-
-        # Scoring includes mobile heavily
-        scores = [v['score'] for v in metrics.values()]
-        avg_score = round(sum(scores) / len(scores)) if scores else 50
-
-        grade = 'A+' if avg_score >= 95 else 'A' if avg_score >= 85 else 'B' if avg_score >= 70 else 'C' if avg_score >= 50 else 'F'
-
-        return {
-            'url': final_url,
-            'grade': grade,
-            'score': avg_score,
-            'metrics': metrics,
-            'broken_links': broken_links,
-            'financial_data': {'estimated_revenue_leak': f"{round((100 - avg_score) * 0.3, 1)}%", 'potential_recovery_gain': f"{round((100 - avg_score) * 0.45, 1)}%"}
-        }
-
-    except Exception as e:
-        print(f"Audit error: {e}")
-        return {
-            'url': url,
-            'grade': 'Partial',
-            'score': 30,
-            'metrics': {'Scan Status': {"val": "Limited", "status": "WARN", "explanation": "Site blocked scan", "recommendation": "Try open sites like example.com"}},
-            'broken_links': [],
-            'financial_data': {'estimated_revenue_leak': 'N/A', 'potential_recovery_gain': 'N/A'}
-        }
-
-# Endpoints unchanged
-@app.post('/audit')
-async def do_audit(data: dict):
-    target_url = data.get('url')
-    if not target_url:
-        raise HTTPException(400, "URL required")
-    res = run_live_audit(target_url)
-    db = SessionLocal()
-    rep = AuditRecord(**res)
-    db.add(rep); db.commit(); db.refresh(rep); db.close()
-    return {'id': rep.id, 'data': res}
-
-@app.get('/download/{report_id}')
-def download(report_id: int):
-    db = SessionLocal()
-    r = db.query(AuditRecord).filter(AuditRecord.id == report_id).first()
-    db.close()
-    if not r:
-        raise HTTPException(404, "Report not found")
-
-    pdf = MasterStrategyPDF()
-    pdf.add_page()
-    pdf.add_section(f"Audit Report: {r.url}")
-    pdf.set_font('Arial', '', 12)
-    pdf.multi_cell(0, 8, f"Grade: {r.grade} | Score: {r.score}%")
-    pdf.multi_cell(0, 8, f"Revenue Impact: {r.financial_data['estimated_revenue_leak']} leakage")
-    pdf.ln(10)
-    pdf.add_section("Core Web Vitals (Mobile)")
-    for name, data in [item for item in r.metrics.items() if 'Mobile' in name]:
-        pdf.add_metric(name, data)
-    pdf.add_section("Other Key Metrics")
-    for name, data in [item for item in r.metrics.items() if 'Mobile' not in name]:
-        pdf.add_metric(name, data)
-    return Response(content=pdf.output(dest='S').encode('latin-1'), media_type='application/pdf')
+    </script>
+</body>
+</html>
