@@ -16,7 +16,6 @@
         .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
         .glow-red { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
         .glow-green { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
-        .mobile-highlight { border: 2px solid #3b82f6; background: rgba(59,130,246,0.1); }
     </style>
 </head>
 <body class="p-6 md:p-12">
@@ -33,6 +32,7 @@
         </header>
 
         <div id="results" class="hidden space-y-12">
+            <!-- Executive Summary at Top -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="glass glow-red p-8 rounded-[40px] text-center">
                     <span class="text-red-400 font-bold text-xs uppercase mb-2">Revenue Leakage</span>
@@ -42,8 +42,8 @@
                     <span class="text-green-400 font-bold text-xs uppercase mb-2">Recovery Gain</span>
                     <div id="revGain" class="text-5xl font-black text-green-400 mb-2">0%</div>
                 </div>
-                <div class="glass p-8 rounded-[40px] text-center mobile-highlight">
-                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">Mobile LCP (Core Vital)</span>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">Mobile LCP</span>
                     <div id="mobileLcp" class="text-4xl font-black text-white mb-2">N/A</div>
                 </div>
                 <div class="glass p-8 rounded-[40px] text-center">
@@ -53,6 +53,7 @@
                 </div>
             </div>
 
+            <!-- All 57 Metrics Grid - ALWAYS FULLY VISIBLE -->
             <div class="glass p-12 rounded-[50px]">
                 <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics Analysis</h2>
                 <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container"></div>
@@ -90,8 +91,7 @@
                     let grid = "";
                     Object.entries(d.metrics).sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, v]) => {
                         let color = v.status == 'PASS' ? 'text-green-400' : v.status == 'WARN' ? 'text-yellow-400' : 'text-red-400';
-                        let highlight = k.includes('Mobile') ? 'mobile-highlight' : '';
-                        grid += `<div class="glass rounded-2xl p-6 metric-card ${highlight}">
+                        grid += `<div class="glass rounded-2xl p-6">
                             <div class="text-xs text-slate-400 uppercase mb-2">${k}</div>
                             <div class="font-bold text-lg ${color}">${v.val}</div>
                             <div class="text-sm text-slate-500 mt-2">${v.status} (${v.score}%)</div>
