@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { background: #0a0e17; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        body { background: #0a0e17; color: #e2e8f0; font-family: 'Inter', sans-serif; min-height: 100vh; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
         .metric-card { transition: transform 0.3s; }
         .metric-card:hover { transform: translateY(-4px); }
@@ -16,6 +16,7 @@
         .scroll-container::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.5); border-radius: 4px; }
         .glow-red { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
         .glow-green { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
+        .hidden { display: none; }
     </style>
 </head>
 <body class="p-6 md:p-12">
@@ -31,16 +32,17 @@
             </div>
         </header>
 
+        <!-- Results Section - Always exists, but hidden until audit complete -->
         <div id="results" class="hidden space-y-12">
-            <!-- Executive Summary at Top -->
+            <!-- Executive Summary -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="glass glow-red p-8 rounded-[40px] text-center">
                     <span class="text-red-400 font-bold text-xs uppercase mb-2">Revenue Leakage</span>
-                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2">0%</div>
+                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2">-0%</div>
                 </div>
                 <div class="glass glow-green p-8 rounded-[40px] text-center">
                     <span class="text-green-400 font-bold text-xs uppercase mb-2">Recovery Gain</span>
-                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2">0%</div>
+                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2">+0%</div>
                 </div>
                 <div class="glass p-8 rounded-[40px] text-center">
                     <span class="text-blue-400 font-bold text-xs uppercase mb-2">Mobile LCP</span>
@@ -53,12 +55,21 @@
                 </div>
             </div>
 
-            <!-- All 57 Metrics Grid - ALWAYS FULLY VISIBLE -->
-            <div class="glass p-12 rounded-[50px]">
-                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics Analysis</h2>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container"></div>
+            <!-- Broken Links (optional) -->
+            <div id="brokenBox" class="hidden glass p-10 rounded-[40px] border-red-600/30">
+                <h3 class="text-red-400 font-bold text-xs uppercase mb-6">Broken Links</h3>
+                <div id="brokenList" class="text-sm text-red-300 space-y-2"></div>
             </div>
 
+            <!-- ALL 57 METRICS GRID - This will ALWAYS be populated -->
+            <div class="glass p-12 rounded-[50px]">
+                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Metrics Analysis</h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 scroll-container">
+                    <!-- JavaScript will fill this with 57 cards -->
+                </div>
+            </div>
+
+            <!-- PDF Download -->
             <a id="dl" href="#" class="block w-full md:w-1/2 mx-auto text-center py-6 glass rounded-[30px] font-bold uppercase tracking-widest text-blue-300 hover:bg-blue-600 hover:text-white transition-all">
                 Download Full PDF Report
             </a>
@@ -68,19 +79,34 @@
     <script>
         async function runAudit() {
             const results = document.getElementById('results');
-            results.classList.add('hidden');
+            results.classList.add('hidden');  // Hide previous results
+
             const url = document.getElementById('url').value.trim();
-            if (!url) return alert('Enter a domain');
+            if (!url) {
+                alert('Please enter a website URL');
+                return;
+            }
+
             const btn = document.getElementById('btn');
-            btn.innerText = 'Auditing...';
+            btn.innerText = 'AUDITING...';
             btn.disabled = true;
 
             try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                const data = await res.json();
-                if (res.ok) {
+                const response = await fetch('/audit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
                     const d = data.data;
+
+                    // Show results
                     results.classList.remove('hidden');
+
+                    // Executive Summary
                     document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
                     document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
                     document.getElementById('mobileLcp').innerText = d.metrics['Mobile - Largest Contentful Paint (LCP)']?.val || 'N/A';
@@ -88,28 +114,56 @@
                     document.getElementById('score').innerText = `${d.score}%`;
                     document.getElementById('dl').href = `/download/${data.id}`;
 
+                    // Broken Links
+                    const brokenBox = document.getElementById('brokenBox');
+                    if (d.broken_links && d.broken_links.length > 0) {
+                        brokenBox.classList.remove('hidden');
+                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>• ${l}</div>`).join('');
+                    } else {
+                        brokenBox.classList.add('hidden');
+                    }
+
+                    // **ALL 57 METRICS - GUARANTEED TO SHOW**
                     let grid = "";
-                    Object.entries(d.metrics).sort((a, b) => a[0].localeCompare(b[0])).forEach(([k, v]) => {
-                        let color = v.status == 'PASS' ? 'text-green-400' : v.status == 'WARN' ? 'text-yellow-400' : 'text-red-400';
-                        grid += `<div class="glass rounded-2xl p-6">
-                            <div class="text-xs text-slate-400 uppercase mb-2">${k}</div>
-                            <div class="font-bold text-lg ${color}">${v.val}</div>
-                            <div class="text-sm text-slate-500 mt-2">${v.status} (${v.score}%)</div>
-                            <p class="text-xs text-slate-400 mt-4">Explanation: ${v.explanation || 'N/A'}</p>
-                            <p class="text-xs text-slate-300 mt-2">Recommendation: ${v.recommendation || 'N/A'}</p>
-                        </div>`;
+                    const metricKeys = Object.keys(d.metrics);
+                    // Sort by key to ensure consistent order
+                    metricKeys.sort();
+
+                    metricKeys.forEach(key => {
+                        const v = d.metrics[key];
+                        let color = 'text-blue-300';
+                        if (v.status === 'PASS') color = 'text-green-400';
+                        if (v.status === 'WARN') color = 'text-yellow-400';
+                        if (v.status === 'FAIL') color = 'text-red-400';
+
+                        grid += `
+                            <div class="glass rounded-2xl p-6 metric-card">
+                                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2">${key}</div>
+                                <div class="text-2xl font-black ${color} mb-2">${v.val}</div>
+                                <div class="text-sm text-slate-500 mb-4">${v.status} (${v.score}%)</div>
+                                <p class="text-xs text-slate-300 leading-relaxed">Explanation: ${v.explanation || 'N/A'}</p>
+                                <p class="text-xs text-slate-400 mt-3 leading-relaxed">Recommendation: ${v.recommendation || 'N/A'}</p>
+                            </div>`;
                     });
+
                     document.getElementById('metricsGrid').innerHTML = grid;
+
                 } else {
-                    alert('Audit failed');
+                    alert('Audit failed. The site may be blocking access or unavailable.');
                 }
-            } catch {
-                alert('Error');
+            } catch (err) {
+                alert('Connection error. Please try again later.');
+                console.error(err);
             } finally {
                 btn.innerText = 'Start Audit';
                 btn.disabled = false;
             }
         }
+
+        // Allow Enter key
+        document.getElementById('url').addEventListener('keypress', e => {
+            if (e.key === 'Enter') runAudit();
+        });
     </script>
 </body>
 </html>
