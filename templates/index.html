@@ -3,65 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite | 57 Real Metrics Audit</title>
+    <title>Throughweb Elite | Comprehensive Web Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
-        .red-glow { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
-        .green-glow { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
-        .card { transition: all 0.4s; }
-        .card:hover { transform: translateY(-6px); }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .metric-card { transition: transform 0.3s; }
+        .metric-card:hover { transform: scale(1.05); }
+        .scroll-container { max-height: 80vh; overflow-y: auto; scrollbar-width: thin; }
+        .scroll-container::-webkit-scrollbar { width: 6px; }
+        .scroll-container::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.2); border-radius: 10px; }
     </style>
 </head>
-<body class="min-h-screen py-12 px-6">
+<body class="min-h-screen px-4 md:px-0">
     <div class="max-w-7xl mx-auto">
-        <header class="glass rounded-3xl p-12 mb-20 text-center">
-            <h1 class="text-5xl md:text-7xl font-black text-white mb-4">THROUGHWEB ELITE</h1>
-            <p class="text-2xl text-blue-300">57 Real-World Performance & SEO Metrics</p>
-            <div class="mt-12 flex flex-col md:flex-row gap-6 justify-center">
-                <input type="text" id="url" placeholder="Enter domain" class="glass px-8 py-5 rounded-full w-full md:w-96">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-5 rounded-full font-bold text-xl uppercase">
-                    Run Full Audit
+        <header class="glass rounded-3xl p-10 mb-16 text-center">
+            <h1 class="text-5xl font-black text-white mb-4">Throughweb Elite</h1>
+            <p class="text-xl text-blue-300 mb-8">Comprehensive Web Audit with 57 Key Metrics</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                <input type="text" id="url" placeholder="Enter domain (e.g., example.com)" class="glass px-8 py-4 rounded-full w-full md:w-96 focus:border-blue-400">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-4 rounded-full font-bold uppercase tracking-widest transition-all">
+                    Start Comprehensive Audit
                 </button>
             </div>
         </header>
 
-        <div id="results" class="hidden space-y-16">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div class="glass red-glow rounded-3xl p-10 text-center card">
-                    <p class="text-red-400 text-sm uppercase mb-4">Revenue Leakage</p>
-                    <div id="revLoss" class="text-6xl font-black text-red-400"></div>
+        <div id="results" class="hidden space-y-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-red-400 font-bold text-xs uppercase mb-2">Estimated Revenue Leakage</span>
+                    <div id="revLoss" class="text-5xl font-black text-red-400 mb-2"></div>
+                    <p class="text-slate-400 text-xs italic">From detected issues</p>
                 </div>
-                <div class="glass green-glow rounded-3xl p-10 text-center card">
-                    <p class="text-green-400 text-sm uppercase mb-4">Recovery Potential</p>
-                    <div id="revGain" class="text-6xl font-black text-green-400"></div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-green-400 font-bold text-xs uppercase mb-2">Potential Recovery Gain</span>
+                    <div id="revGain" class="text-5xl font-black text-green-400 mb-2"></div>
+                    <p class="text-slate-400 text-xs italic">With recommended fixes</p>
                 </div>
-                <div class="glass rounded-3xl p-10 text-center card">
-                    <p class="text-blue-400 text-sm uppercase mb-4">LCP</p>
-                    <div id="lcpVal" class="text-5xl font-black text-white"></div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-blue-400 font-bold text-xs uppercase mb-2">Largest Contentful Paint</span>
+                    <div id="lcpVal" class="text-4xl font-black text-white mb-2"></div>
+                    <p class="text-slate-400 text-xs italic">Core Web Vital</p>
                 </div>
-                <div class="glass rounded-3xl p-10 text-center card">
-                    <p class="text-slate-400 text-sm uppercase mb-6">Grade</p>
-                    <div id="grade" class="text-8xl font-black text-white"></div>
-                    <div id="score" class="text-4xl text-slate-300"></div>
+                <div class="glass p-8 rounded-[40px] text-center">
+                    <span class="text-slate-400 text-xs font-bold uppercase mb-2">Overall Grade</span>
+                    <div id="grade" class="text-7xl font-black text-white"></div>
+                    <div id="score" class="text-3xl font-light text-slate-300"></div>
                 </div>
             </div>
 
-            <div id="brokenBox" class="hidden glass rounded-3xl p-10 red-glow">
-                <h3 class="text-red-400 font-bold uppercase mb-6">Broken Links Found</h3>
+            <div id="brokenBox" class="hidden glass p-10 rounded-[40px] border-red-600/30">
+                <h3 class="text-red-400 font-bold text-xs uppercase mb-6">Broken Links Detected</h3>
                 <div id="brokenList" class="text-sm text-red-300 space-y-2"></div>
             </div>
 
-            <div class="glass rounded-3xl p-12">
-                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Real Metrics</h2>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-96 overflow-y-auto scrollbar-hide"></div>
+            <div class="glass p-12 rounded-[50px]">
+                <h2 class="text-center text-slate-400 uppercase tracking-widest text-sm mb-12 font-bold">Detailed Analysis of All 57 Metrics</h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 scroll-container"></div>
             </div>
 
-            <a id="dl" href="#" class="block text-center py-8 glass rounded-3xl font-bold text-2xl uppercase text-blue-300 hover:text-white">
-                Download Full Report (PDF)
+            <a id="dl" href="#" class="block w-full md:w-1/2 mx-auto text-center py-6 glass rounded-[30px] font-bold uppercase tracking-widest text-blue-300 hover:bg-blue-600 hover:text-white transition-all border-2 border-blue-900/30">
+                Download Comprehensive PDF Report
             </a>
         </div>
     </div>
@@ -71,9 +74,9 @@
             const results = document.getElementById('results');
             results.classList.add('hidden');
             const url = document.getElementById('url').value.trim();
-            if (!url) return;
+            if (!url) return alert('Enter a domain');
             const btn = document.getElementById('btn');
-            btn.innerText = 'Scanning...';
+            btn.innerText = 'Auditing...';
             btn.disabled = true;
 
             try {
@@ -84,7 +87,7 @@
                     results.classList.remove('hidden');
                     document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
                     document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)']?.val || 'N/A';
+                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)'].val;
                     document.getElementById('grade').innerText = d.grade;
                     document.getElementById('score').innerText = `${d.score}%`;
                     document.getElementById('dl').href = `/download/${data.id}`;
@@ -95,19 +98,25 @@
                     }
 
                     let grid = "";
-                    Object.entries(d.metrics).sort().forEach(([k, v]) => {
-                        const color = v.status === 'PASS' ? 'text-green-400' : v.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
+                    Object.entries(d.metrics).forEach(([key, val]) => {
+                        const color = val.status === 'PASS' ? 'text-green-400' : val.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
                         grid += `
-                            <div class="glass rounded-2xl p-6">
-                                <div class="text-sm text-slate-400 uppercase mb-2">${k}</div>
-                                <div class="text-2xl font-bold ${color} mb-1">${v.val}</div>
-                                <div class="text-sm text-slate-500">${v.status}</div>
+                            <div class="glass rounded-2xl p-6 metric-card">
+                                <div class="text-xs text-slate-400 uppercase tracking-wide mb-2">${key}</div>
+                                <div class="text-xl font-bold ${color} mb-1">${val.val}</div>
+                                <div class="text-sm text-slate-500 mb-2">${val.status} (${val.score}%)</div>
+                                <p class="text-xs text-slate-400 mb-2">Explanation: ${val.explanation || 'N/A'}</p>
+                                <p class="text-xs text-slate-300">Recommendation: ${val.recommendation || 'N/A'}</p>
                             </div>`;
                     });
                     document.getElementById('metricsGrid').innerHTML = grid;
+                } else {
+                    alert('Audit failed');
                 }
+            } catch {
+                alert('Error');
             } finally {
-                btn.innerText = 'Run Full Audit';
+                btn.innerText = 'Start Comprehensive Audit';
                 btn.disabled = false;
             }
         }
