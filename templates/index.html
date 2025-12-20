@@ -2,78 +2,123 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb 59-Point Master Audit AI</title>
+    <title>Throughweb Audit AI | Master 59 Metrics</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .weak-alert { border-left: 6px solid #ef4444; background: linear-gradient(90deg, #450a0a 0%, #020617 100%); animation: pulse-red 2s infinite; }
-        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        .red-alert-glow { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 5px solid #ef4444; animation: glow 2s infinite; }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 10px #ef444433; } 50% { box-shadow: 0 0 25px #ef444466; } }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
     </style>
 </head>
-<body class="bg-[#020617] text-slate-100 p-8">
-    <div class="max-w-7xl mx-auto">
-        <header class="flex justify-between items-center mb-16 p-8 bg-slate-900/50 rounded-3xl border border-slate-800">
-            <h1 class="text-3xl font-black text-blue-500">THROUGHWEB <span class="text-white">59-POINT AUDIT</span></h1>
-            <div class="flex gap-2">
-                <input type="text" id="url" placeholder="Enter Domain..." class="bg-slate-950 border border-slate-800 px-6 py-3 rounded-xl w-80 outline-none">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold uppercase tracking-widest hover:bg-blue-500">Analyze</button>
+<body class="bg-[#020617] text-slate-100 p-6">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-16 p-8 glass rounded-[40px]">
+            <h1 class="text-3xl font-black italic text-blue-500">THROUGHWEB <span class="text-white">AUDIT AI</span></h1>
+            <div class="flex gap-2 w-full md:w-auto">
+                <input type="text" id="url" placeholder="Paste website URL..." class="bg-slate-950 border border-slate-700 px-6 py-3 rounded-xl flex-1 outline-none focus:border-blue-500">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-500">Start Audit</button>
             </div>
         </header>
 
         <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="bg-slate-900 p-12 rounded-[40px] text-center border border-slate-800">
-                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest tracking-[0.2em]">Global Health Grade</span>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass p-12 rounded-[50px] text-center">
+                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Health Grade</span>
                     <div id="grade" class="text-[140px] font-black text-emerald-400 leading-none my-4"></div>
-                    <div id="score" class="text-2xl font-bold text-blue-500"></div>
+                    <div id="score" class="text-2xl font-bold text-blue-400"></div>
                 </div>
-                <div class="lg:col-span-2 space-y-4" id="weakList"></div>
+                <div class="lg:col-span-2 glass p-10 rounded-[50px] flex items-center justify-center">
+                    <canvas id="pillarChart"></canvas>
+                </div>
             </div>
 
-            <div class="bg-slate-900/50 p-10 rounded-[40px] border border-slate-800">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-10 text-center tracking-[0.4em]">Comprehensive Audit Intelligence (59 Metrics)</h3>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+            <div class="space-y-4">
+                <h3 class="text-red-500 font-black text-xs uppercase tracking-widest flex items-center gap-2">
+                    <span class="h-2 w-2 bg-red-500 rounded-full animate-ping"></span> Critical Failure Analysis
+                </h3>
+                <div id="weakList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full text-center py-6 bg-blue-600 rounded-2xl font-black text-white uppercase tracking-widest">Download Full 59-Point Master Report</a>
+            <div class="glass p-10 rounded-[40px]">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-10 text-center">Comprehensive Master Intelligence Feed</h3>
+                <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
+            </div>
         </div>
     </div>
 
     <script>
+        let myChart;
         async function runAudit() {
+            // FIX: Clear UI before new audit to prevent showing previous analysis
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('weakList').innerHTML = '';
+            document.getElementById('metricsGrid').innerHTML = '';
+            
             const url = document.getElementById('url').value; if(!url) return;
             const btn = document.getElementById('btn');
-            btn.innerText = 'PROCESSING...'; btn.disabled = true;
+            btn.innerText = 'SCANNIG...'; btn.disabled = true;
 
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
             
             if(res.ok) {
-                const d = data.data;
-                document.getElementById('results').classList.remove('hidden');
-                document.getElementById('grade').innerText = d.grade;
-                document.getElementById('score').innerText = `TOTAL COMPLIANCE: ${d.score}/100`;
-                document.getElementById('dl').href = `/download/${data.id}`;
-
-                // Render Weakness (RED ZONE)
-                document.getElementById('weakList').innerHTML = d.weak_points.map((w, i) => `
-                    <div class="weak-alert p-6 rounded-2xl">
-                        <div class="text-red-500 font-black text-xs uppercase mb-1">Critical Failure: ${w}</div>
-                        <div class="text-slate-300 text-sm italic">"${d.suggestions[i]}"</div>
-                    </div>`).join('') || "<div class='text-emerald-400 font-bold p-6 bg-slate-900 rounded-2xl'>All critical standards passed.</div>";
-
-                // Render All 59 Metrics
-                let grid = "";
-                for(let [k,v] of Object.entries(d.metrics)) {
-                    grid += `
-                        <div class="p-4 bg-slate-950 rounded-xl border border-slate-800">
-                            <div class="text-[8px] text-slate-600 font-black uppercase mb-1 truncate">${k}</div>
-                            <div class="text-blue-300 font-bold text-xs">${v.val}</div>
-                            <div class="text-[9px] text-slate-500 mt-2 font-bold">${v.pts}/${v.max} pts</div>
-                        </div>`;
-                }
-                document.getElementById('metricsGrid').innerHTML = grid;
+                render(data);
+                btn.innerText = 'Start Audit'; btn.disabled = false;
             }
-            btn.innerText = 'Analyze'; btn.disabled = false;
+        }
+
+        function render(data) {
+            const d = data.data;
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('grade').innerText = d.grade;
+            document.getElementById('score').innerText = `TOTAL COMPLIANCE: ${d.score}/100`;
+
+            // Render Weaknesses (RED ALERT)
+            document.getElementById('weakList').innerHTML = d.weak_points.map((w, i) => `
+                <div class="red-alert-glow p-6 rounded-2xl">
+                    <div class="text-red-500 font-bold text-[10px] uppercase mb-1">Issue: ${w}</div>
+                    <div class="text-slate-100 text-xs italic">"${d.suggestions[i]}"</div>
+                </div>
+            `).join('') || "<div class='text-emerald-400 font-bold'>No critical weaknesses found. ISO standard met.</div>";
+
+            // Render Grid
+            let grid = "";
+            for(let [k,v] of Object.entries(d.metrics)) {
+                grid += `
+                    <div class="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                        <div class="text-[9px] text-slate-600 font-bold uppercase mb-1">${k}</div>
+                        <div class="text-blue-400 font-bold text-xs truncate">${v.val}</div>
+                        <div class="text-[9px] text-slate-500 mt-2 font-bold">${v.pts}/${v.max} pts</div>
+                    </div>`;
+            }
+            document.getElementById('metricsGrid').innerHTML = grid;
+
+            // DRAW CHART
+            updateChart(d.pillar_scores);
+        }
+
+        function updateChart(s) {
+            if(myChart) myChart.destroy();
+            const ctx = document.getElementById('pillarChart');
+            myChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(s),
+                    datasets: [{
+                        label: 'Compliance Level',
+                        data: Object.values(s),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    scales: { r: { grid: { color: '#1e293b' }, angleLines: { color: '#1e293b' }, ticks: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
     </script>
 </body>
