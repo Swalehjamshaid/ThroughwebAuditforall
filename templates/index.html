@@ -3,37 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Throughweb Elite | Strict World-Class Web Audit</title>
+    <title>Throughweb Elite | 57 Real Metrics Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg: #0f172a;
-            --glass: rgba(15, 23, 42, 0.85);
-            --border: rgba(255,255,255,0.1);
-            --red: #ef4444;
-            --green: #10b981;
-            --blue: #3b82f6;
-        }
-        body { background: var(--bg); color: #e2e8f0; font-family: 'Inter', sans-serif; }
-        .glass { background: var(--glass); backdrop-filter: blur(16px); border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-        .red-glow { box-shadow: 0 0 30px rgba(239,68,68,0.3); }
-        .green-glow { box-shadow: 0 0 30px rgba(16,185,129,0.3); }
-        .card { transition: transform 0.4s ease, box-shadow 0.4s ease; }
-        .card:hover { transform: translateY(-8px); }
-        .header-gradient { background: linear-gradient(135deg, #1e293b, #0f172a); }
-        .text-glow { text-shadow: 0 0 20px rgba(59,130,246,0.5); }
+        body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+        .red-glow { box-shadow: 0 0 40px rgba(239,68,68,0.3); }
+        .green-glow { box-shadow: 0 0 40px rgba(16,185,129,0.3); }
+        .card { transition: all 0.4s; }
+        .card:hover { transform: translateY(-6px); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="min-h-screen py-12 px-6">
     <div class="max-w-7xl mx-auto">
-        <header class="glass rounded-3xl p-12 mb-20 header-gradient text-center">
-            <h1 class="text-5xl md:text-7xl font-black text-white text-glow mb-4">THROUGHWEB ELITE</h1>
-            <p class="text-xl md:text-2xl text-blue-300 font-light">Strict 2025 Web Performance Audit</p>
-            <div class="mt-12 flex flex-col md:flex-row gap-6 justify-center items-center">
-                <input type="text" id="url" placeholder="Enter your domain (e.g. example.com)" class="glass border border-white/20 px-8 py-5 rounded-full w-full md:w-96 text-lg focus:outline-none focus:border-blue-400">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-5 rounded-full font-bold text-xl uppercase tracking-wide transition-all shadow-2xl">
-                    Launch Strict Audit
+        <header class="glass rounded-3xl p-12 mb-20 text-center">
+            <h1 class="text-5xl md:text-7xl font-black text-white mb-4">THROUGHWEB ELITE</h1>
+            <p class="text-2xl text-blue-300">57 Real-World Performance & SEO Metrics</p>
+            <div class="mt-12 flex flex-col md:flex-row gap-6 justify-center">
+                <input type="text" id="url" placeholder="Enter domain" class="glass px-8 py-5 rounded-full w-full md:w-96">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-12 py-5 rounded-full font-bold text-xl uppercase">
+                    Run Full Audit
                 </button>
             </div>
         </header>
@@ -41,42 +32,36 @@
         <div id="results" class="hidden space-y-16">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div class="glass red-glow rounded-3xl p-10 text-center card">
-                    <p class="text-red-400 text-sm uppercase tracking-widest mb-4">Revenue Leakage Risk</p>
-                    <div id="revLoss" class="text-6xl font-black text-red-400 mb-4"></div>
-                    <p class="text-slate-400 text-sm">Due to performance & compliance gaps</p>
+                    <p class="text-red-400 text-sm uppercase mb-4">Revenue Leakage</p>
+                    <div id="revLoss" class="text-6xl font-black text-red-400"></div>
                 </div>
                 <div class="glass green-glow rounded-3xl p-10 text-center card">
-                    <p class="text-green-400 text-sm uppercase tracking-widest mb-4">Recovery Potential</p>
-                    <div id="revGain" class="text-6xl font-black text-green-400 mb-4"></div>
-                    <p class="text-slate-300 text-sm">With strict optimization</p>
-                </div>
-                <div class="glass rounded-3xl p-10 text-center card border-blue-400/30">
-                    <p class="text-blue-400 text-sm uppercase tracking-widest mb-4">Largest Contentful Paint</p>
-                    <div id="lcpVal" class="text-5xl font-black text-white mb-4">--</div>
-                    <p class="text-slate-400 text-sm">Core Web Vital (2025 Ranking Factor)</p>
+                    <p class="text-green-400 text-sm uppercase mb-4">Recovery Potential</p>
+                    <div id="revGain" class="text-6xl font-black text-green-400"></div>
                 </div>
                 <div class="glass rounded-3xl p-10 text-center card">
-                    <p class="text-slate-400 text-sm uppercase tracking-widest mb-6">Overall Grade</p>
-                    <div id="grade" class="text-8xl font-black text-white">--</div>
-                    <div id="score" class="text-4xl text-slate-300 mt-2">--</div>
+                    <p class="text-blue-400 text-sm uppercase mb-4">LCP</p>
+                    <div id="lcpVal" class="text-5xl font-black text-white"></div>
+                </div>
+                <div class="glass rounded-3xl p-10 text-center card">
+                    <p class="text-slate-400 text-sm uppercase mb-6">Grade</p>
+                    <div id="grade" class="text-8xl font-black text-white"></div>
+                    <div id="score" class="text-4xl text-slate-300"></div>
                 </div>
             </div>
 
-            <div id="brokenBox" class="hidden glass rounded-3xl p-10 border border-red-800/50 red-glow card">
-                <h3 class="text-red-400 font-bold uppercase tracking-widest mb-6 flex items-center gap-3">
-                    <span class="w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
-                    Critical Broken Links Found
-                </h3>
-                <div id="brokenList" class="text-sm text-red-300 font-mono space-y-2"></div>
+            <div id="brokenBox" class="hidden glass rounded-3xl p-10 red-glow">
+                <h3 class="text-red-400 font-bold uppercase mb-6">Broken Links Found</h3>
+                <div id="brokenList" class="text-sm text-red-300 space-y-2"></div>
             </div>
 
             <div class="glass rounded-3xl p-12">
-                <h2 class="text-center text-slate-400 uppercase tracking-[0.8em] text-sm mb-12 font-bold">Strict Diagnostic Metrics (2025 Standards)</h2>
-                <div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                <h2 class="text-center text-slate-400 uppercase tracking-widest mb-12">All 57 Real Metrics</h2>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-96 overflow-y-auto scrollbar-hide"></div>
             </div>
 
-            <a id="dl" href="#" class="block text-center py-8 glass rounded-3xl font-bold text-2xl uppercase tracking-widest text-blue-300 hover:text-white hover:bg-blue-600/20 transition-all border-2 border-blue-900/50 card">
-                Download Executive Report (PDF)
+            <a id="dl" href="#" class="block text-center py-8 glass rounded-3xl font-bold text-2xl uppercase text-blue-300 hover:text-white">
+                Download Full Report (PDF)
             </a>
         </div>
     </div>
@@ -86,56 +71,43 @@
             const results = document.getElementById('results');
             results.classList.add('hidden');
             const url = document.getElementById('url').value.trim();
-            if (!url) return alert('Please enter a domain');
+            if (!url) return;
             const btn = document.getElementById('btn');
-            btn.innerText = 'Running Strict Audit...';
+            btn.innerText = 'Scanning...';
             btn.disabled = true;
 
             try {
-                const res = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
-                });
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
                 const data = await res.json();
                 if (res.ok) {
                     const d = data.data;
                     results.classList.remove('hidden');
-
                     document.getElementById('revLoss').innerText = `-${d.financial_data.estimated_revenue_leak}`;
                     document.getElementById('revGain').innerText = `+${d.financial_data.potential_recovery_gain}`;
-                    document.getElementById('lcpVal').innerText = d.metrics['Largest Contentful Paint (LCP)']?.val || 'N/A';
+                    document.getElementById('lcpVal').innerText = d.metrics['04. Largest Contentful Paint (LCP)']?.val || 'N/A';
                     document.getElementById('grade').innerText = d.grade;
                     document.getElementById('score').innerText = `${d.score}%`;
                     document.getElementById('dl').href = `/download/${data.id}`;
 
-                    const brokenBox = document.getElementById('brokenBox');
                     if (d.broken_links.length > 0) {
-                        brokenBox.classList.remove('hidden');
-                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>• <a href="${l}" class="underline hover:text-red-200" target="_blank">${l}</a></div>`).join('');
-                    } else {
-                        brokenBox.classList.add('hidden');
+                        document.getElementById('brokenBox').classList.remove('hidden');
+                        document.getElementById('brokenList').innerHTML = d.broken_links.map(l => `<div>• ${l}</div>`).join('');
                     }
 
                     let grid = "";
-                    for (let [key, val] of Object.entries(d.metrics)) {
-                        let color = val.status === 'PASS' ? 'text-green-400' : val.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
+                    Object.entries(d.metrics).sort().forEach(([k, v]) => {
+                        const color = v.status === 'PASS' ? 'text-green-400' : v.status === 'WARN' ? 'text-yellow-400' : 'text-red-400';
                         grid += `
-                            <div class="glass rounded-2xl p-6 text-center border border-white/10 card">
-                                <div class="text-xs text-slate-400 uppercase tracking-wide mb-3">${key}</div>
-                                <div class="text-2xl font-black ${color} mb-2">${val.val}</div>
-                                <div class="text-xs text-slate-500">${val.status}</div>
-                                <p class="text-xs text-slate-400 mt-4 leading-relaxed">${val.explanation || ''}</p>
+                            <div class="glass rounded-2xl p-6">
+                                <div class="text-sm text-slate-400 uppercase mb-2">${k}</div>
+                                <div class="text-2xl font-bold ${color} mb-1">${v.val}</div>
+                                <div class="text-sm text-slate-500">${v.status}</div>
                             </div>`;
-                    }
+                    });
                     document.getElementById('metricsGrid').innerHTML = grid;
-                } else {
-                    alert('Audit failed – site may be down or blocking scans');
                 }
-            } catch {
-                alert('Connection error');
             } finally {
-                btn.innerText = 'Launch Strict Audit';
+                btn.innerText = 'Run Full Audit';
                 btn.disabled = false;
             }
         }
