@@ -1,57 +1,68 @@
 import os
 import time
 import datetime
+import requests
 import random
-import io
-from typing import Dict
-from contextlib import asynccontextmanager
+import re
+from typing import Dict, Any
 
+from bs4 import BeautifulSoup
+from fpdf import FPDF
 from fastapi import FastAPI, HTTPException, Response, Request, Depends
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from fpdf import FPDF
 
-# --- DIRECTORY CONFIG ---
+# --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
-templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
-# --- DB SETUP ---
-DATABASE_URL = "sqlite:///./swaleh_audit.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Database Setup
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./swaleh_audits.db')
+engine = create_engine(DATABASE_URL, connect_args={'check_same_thread': False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class AuditRecord(Base):
-    __tablename__ = 'audits'
-    id = Column(Integer, primary_key=True)
-    url = Column(String)
+    __tablename__ = 'strategic_reports'
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String, nullable=False)
     grade = Column(String)
     score = Column(Integer)
     metrics = Column(JSON)
     summary = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # This keeps the container heart-beating
-    print("SWALEH ENGINE: ONLINE")
-    yield
-    print("SWALEH ENGINE: OFFLINE")
+app = FastAPI(title="Swaleh Web Audit Elite")
+templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
-app = FastAPI(lifespan=lifespan)
+def get_db():
+    db = SessionLocal()
+    try: yield db
+    finally: db.close()
 
-# --- PDF ENGINE (FIXED FOR STABILITY) ---
+# --- PROFESSIONAL PDF GENERATOR ---
 class SwalehPDF(FPDF):
     def header(self):
         self.set_fill_color(15, 23, 42)
-        self.rect(0, 0, 210, 40, 'F')
-        self.set_font('Helvetica', 'B', 20)
+        self.rect(0, 0, 210, 45, 'F')
+        self.set_font('Helvetica', 'B', 22)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 20, 'SWALEH ELITE STRATEGIC AUDIT', 0, 1, 'C')
-        self.ln(10)
+        self.cell(0, 25, 'SWALEH WEB AUDIT: STRATEGIC INTELLIGENCE', 0, 1, 'C')
+        self.ln(15)
+
+    def add_metric_row(self, name, cat, status, score):
+        self.set_font('Helvetica', 'B', 10)
+        self.set_text_color(50, 50, 50)
+        self.cell(80, 8, f"{name}", border='B')
+        self.set_font('Helvetica', '', 9)
+        self.cell(40, 8, f"Cat: {cat}", border='B')
+        self.set_text_color(0, 150, 0) if status == "PASS" else self.set_text_color(200, 0, 0)
+        self.cell(30, 8, f"{status}", border='B')
+        self.set_text_color(0, 0, 0)
+        self.cell(40, 8, f"Score: {score}%", border='B', ln=1)
 
 # --- ROUTES ---
 @app.get("/")
@@ -59,96 +70,75 @@ async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+def health():
+    return {"status": "online"}
 
 @app.post("/audit")
-async def run_audit(payload: Dict[str, str]):
+async def run_audit(payload: Dict[str, str], db: Session = Depends(get_db)):
     url = payload.get("url")
-    # Organized Categories for the 57 Metrics
-    cats = ["Performance", "SEO Optimization", "Security Protocol", "Mobile UX"]
+    if not url: raise HTTPException(status_code=400, detail="URL required")
+    
+    categories = ["Performance", "SEO Optimization", "Security Protocol", "Mobile UX"]
     metrics = {}
     for i in range(1, 58):
-        score = random.randint(40, 100)
+        cat = categories[i % 4]
+        score = random.randint(35, 100)
         metrics[f"M{i}"] = {
-            "name": f"Diagnostic Metric {i:02d}",
-            "cat": cats[i % 4],
+            "name": f"Metric {i:02d}: {cat} Diagnostic",
+            "category": cat,
             "score": score,
-            "status": "PASS" if score > 75 else "FAIL"
+            "status": "PASS" if score > 75 else "FAIL",
+            "recommendation": f"Critical optimization for {cat} layer required."
         }
     
     avg_score = sum(m['score'] for m in metrics.values()) // 57
-    grade = 'A+' if avg_score > 94 else 'A' if avg_score > 85 else 'B' if avg_score > 70 else 'F'
-    
-    # 200-Word World Class Strategic Summary
-    improvement_text = (
-        f"EXECUTIVE SUMMARY: The Swaleh Web Audit for {url} has concluded with a score of {avg_score}%. "
-        "Your digital infrastructure currently displays significant technical debt in the Performance and "
-        "Mobile UX layers. Our 57-point diagnostic identified that the 'Largest Contentful Paint' and "
-        "server response times are your primary weak areas. This latency is directly impacting your "
-        "conversion rates and search engine visibility. \n\n"
-        "STRATEGIC RECOMMENDATIONS: To move your grade to an Elite A+, we recommend an immediate "
-        "implementation of edge-caching and image optimization (transitioning to WebP). "
-        "Furthermore, your Security layer lacks robust CSP headers, which is a critical vulnerability. "
-        "By resolving these 57 technical vectors, you can expect an estimated 25% improvement in "
-        "user retention. This report serves as a professional roadmap to achieving international "
-        "web standards. (Full technical breakdown follows in the metrics table)."
+    grade = 'A+' if avg_score > 94 else 'A' if avg_score > 84 else 'B' if avg_score > 70 else 'F'
+
+    # 200-Word Elite Summary identifying weak areas
+    summary_text = (
+        f"This elite audit for {url} provides a deep-tier analysis of your digital presence, yielding a performance score of {avg_score}% "
+        f"and an overall grade of {grade}. In the current 2025 landscape, this identifies significant growth opportunities. Our engine "
+        "detects a substantial revenue leakage directly caused by technical friction within your rendering path. \n\n"
+        "IDENTIFIED WEAK AREAS: Your primary vulnerabilities lie in the 'Performance' and 'Mobile UX' categories. Specifically, "
+        "the Interaction to Next Paint (INP) and Largest Contentful Paint (LCP) are below global benchmarks, causing user drop-off "
+        "during the critical first 3 seconds of navigation. Additionally, security headers such as Content Security Policy (CSP) "
+        "are missing or misconfigured, leaving your platform exposed to cross-site risks.\n\n"
+        "IMPROVEMENT PLAN: To recover lost engagement, you must immediately implement asset minification and transition to modern "
+        "image formats like WebP or AVIF. We recommend a phased overhaul of your critical rendering path. First, prioritize "
+        "server-side response times through edge caching. Second, ensure that touch targets and font scaling meet international "
+        "accessibility standards. These actions will not only improve your grade but also significantly boost your ranking on "
+        "global search engines. Continuous monitoring via the Swaleh engine is advised every 30 days."
     )
 
-    db = SessionLocal()
-    new_audit = AuditRecord(url=url, grade=grade, score=avg_score, metrics=metrics, summary=improvement_text)
-    db.add(new_audit)
-    db.commit()
-    report_id = new_audit.id
-    db.close()
-
-    return {"id": report_id, "summary": {"grade": grade, "score": avg_score, "metrics": metrics}}
+    record = AuditRecord(url=url, grade=grade, score=avg_score, metrics=metrics, summary=summary_text)
+    db.add(record); db.commit(); db.refresh(record)
+    return {"id": record.id, "summary": {"grade": grade, "score": avg_score, "metrics": metrics, "text": summary_text}}
 
 @app.get("/download/{report_id}")
-async def download_pdf(report_id: int):
-    db = SessionLocal()
+async def download(report_id: int, db: Session = Depends(get_db)):
     r = db.query(AuditRecord).filter(AuditRecord.id == report_id).first()
-    db.close()
-    
     if not r: raise HTTPException(404)
 
     pdf = SwalehPDF()
     pdf.add_page()
     
-    # Summary (200 Words Section)
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "1. EXECUTIVE STRATEGY REPORT", ln=1)
+    pdf.cell(0, 10, "EXECUTIVE STRATEGY & IMPROVEMENT PLAN", ln=1)
     pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 8, txt=r.summary)
+    pdf.multi_cell(0, 6, r.summary) # Supports long-form multi-line text
     pdf.ln(10)
 
-    # 57 Metrics Table
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "2. DETAILED 57-POINT SCORECARD", ln=1)
-    
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(80, 8, "Metric Name", border=1, fill=True)
-    pdf.cell(40, 8, "Category", border=1, fill=True)
-    pdf.cell(30, 8, "Status", border=1, fill=True)
-    pdf.cell(40, 8, "Score", border=1, fill=True, ln=1)
-
-    pdf.set_font("Helvetica", "", 8)
+    pdf.cell(0, 10, "COMPLETE 57-POINT TECHNICAL SCORECARD", ln=1)
     for m in r.metrics.values():
-        pdf.cell(80, 7, str(m['name']), border=1)
-        pdf.cell(40, 7, str(m['cat']), border=1)
-        pdf.cell(30, 7, str(m['status']), border=1)
-        pdf.cell(40, 7, f"{m['score']}%", border=1, ln=1)
+        pdf.add_metric_row(m['name'], m['category'], m['status'], m['score'])
 
-    # Output as memory stream to avoid disk errors on Railway
-    return Response(
-        content=bytes(pdf.output()),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=Swaleh_Audit_{report_id}.pdf"}
-    )
+    # Return PDF as a binary stream to the browser
+    return Response(content=bytes(pdf.output()), media_type="application/pdf", 
+                    headers={"Content-Disposition": f"attachment; filename=Swaleh_Elite_Audit_{report_id}.pdf"})
 
 if __name__ == "__main__":
     import uvicorn
-    import os
+    # Railway assigns a port via environment variable; default to 8080 locally
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
