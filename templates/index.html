@@ -2,50 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Throughweb Audit AI | Global Enterprise Standards</title>
+    <title>Throughweb Audit AI | Professional Enterprise Scanner</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .red-alert-card { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 5px solid #ef4444; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
-        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .weakness-alert { background: linear-gradient(90deg, #450a0a 0%, #020617 100%); border-left: 6px solid #ef4444; animation: redGlow 2s infinite; }
+        @keyframes redGlow { 0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); } 50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.5); } }
+        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
     </style>
 </head>
-<body class="bg-[#020617] text-slate-100 p-6 md:p-12">
+<body class="bg-[#020617] text-slate-100 p-6">
     <div class="max-w-6xl mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
-            <h1 class="text-5xl font-black italic tracking-tighter text-blue-500">THROUGHWEB <span class="text-white">AI</span></h1>
-            <div class="flex glass p-2 rounded-2xl w-full md:w-auto">
-                <input type="text" id="url" placeholder="Paste domain here..." class="bg-transparent px-4 py-2 outline-none w-full md:w-80 text-sm">
-                <button onclick="runAudit()" id="btn" class="bg-blue-600 px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-500 transition-all">Start Audit</button>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-16 p-8 glass-panel rounded-[40px] gap-6">
+            <h1 class="text-3xl font-black text-blue-500">THROUGHWEB <span class="text-white">AUDIT</span></h1>
+            <div class="flex gap-2 w-full md:w-auto">
+                <input type="text" id="url" placeholder="Enter Domain (e.g., google.com)" class="bg-slate-950 border border-slate-700 px-6 py-3 rounded-xl flex-1 outline-none">
+                <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-[0.2em] transition-all active:scale-95">Analyze</button>
             </div>
-        </header>
+        </div>
 
         <div id="results" class="hidden space-y-12">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass p-12 rounded-[40px] text-center flex flex-col justify-center">
-                    <span class="text-slate-500 text-xs font-bold uppercase tracking-widest">Enterprise Grade</span>
+                <div class="glass-panel p-12 rounded-[50px] text-center">
+                    <span class="text-slate-500 text-xs font-black uppercase tracking-widest">Enterprise Grade</span>
                     <div id="grade" class="text-[140px] font-black text-emerald-400 leading-none my-4"></div>
-                    <div id="score" class="text-2xl font-bold text-blue-500"></div>
+                    <div id="score" class="text-2xl font-bold text-blue-400"></div>
                 </div>
-                <div class="lg:col-span-2 glass p-10 rounded-[40px] flex items-center justify-center">
+                <div class="lg:col-span-2 glass-panel p-10 rounded-[50px]">
                     <canvas id="spiderChart"></canvas>
                 </div>
             </div>
 
-            <div class="space-y-4">
-                <h3 class="text-red-500 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2">
-                    <span class="h-2 w-2 bg-red-500 rounded-full animate-ping"></span> Critical Failure Analysis
+            <div class="space-y-6">
+                <h3 class="text-red-500 font-black text-xs uppercase tracking-[0.3em] flex items-center gap-3">
+                    <span class="h-3 w-3 bg-red-500 rounded-full animate-ping"></span> High-Priority Weakness Detection
                 </h3>
-                <div id="weakList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div id="weakList" class="grid grid-cols-1 gap-4">
+                    </div>
             </div>
 
-            <div class="glass p-10 rounded-[40px]">
-                <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-10">45+ Technical Performance Indicators</h3>
+            <div class="glass-panel p-10 rounded-[50px]">
+                <h3 class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-10 text-center">Comprehensive Technical Metadata</h3>
                 <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 gap-6"></div>
             </div>
 
-            <a id="dl" href="#" target="_blank" class="block w-full py-6 bg-blue-600 text-center rounded-2xl font-black text-white uppercase tracking-[0.3em] hover:bg-blue-500 transition-all shadow-2xl shadow-blue-500/20">Download Compliance Certificate</a>
+            <a id="dl" href="#" target="_blank" class="block w-full text-center py-7 bg-white text-slate-900 font-black rounded-3xl hover:bg-blue-400 transition-colors uppercase tracking-[0.4em]">Download Written Audit Report (PDF)</a>
         </div>
     </div>
 
@@ -54,14 +55,14 @@
         async function runAudit() {
             const url = document.getElementById('url').value; if(!url) return;
             const btn = document.getElementById('btn');
-            btn.innerText = 'SCANNIG...'; btn.disabled = true;
+            btn.innerText = 'AUDITING...'; btn.disabled = true;
 
             const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
             const data = await res.json();
             
             if(res.ok) {
                 render(data);
-                btn.innerText = 'Start Audit'; btn.disabled = false;
+                btn.innerText = 'Analyze'; btn.disabled = false;
             }
         }
 
@@ -69,25 +70,21 @@
             const d = data.data;
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('grade').innerText = d.grade;
-            document.getElementById('score').innerText = `ISO RATING: ${d.score}/100`;
+            document.getElementById('score').innerText = `SYSTEM SCORE: ${d.score}/100`;
             document.getElementById('dl').href = `/download/${data.id}`;
 
-            // WEAK POINTS
-            document.getElementById('weakList').innerHTML = d.weak_points.map(w => `
-                <div class="red-alert-card p-6 rounded-2xl flex items-center gap-5">
-                    <span class="font-black text-red-500 text-3xl italic">!</span>
-                    <span class="text-red-100 font-bold text-xs uppercase tracking-tighter">${w}</span>
+            // WEAKNESS RENDER
+            document.getElementById('weakList').innerHTML = d.weak_points.map((w, i) => `
+                <div class="weakness-alert p-8 rounded-[35px]">
+                    <div class="text-red-500 font-black text-[10px] uppercase mb-2 tracking-widest">Priority Issue: ${w}</div>
+                    <div class="text-slate-100 text-sm leading-relaxed font-medium">"${d.suggestions[i]}"</div>
                 </div>
-            `).join('') || "<div class='text-emerald-400 font-bold'>Security & SEO Optimized. No failures.</div>";
+            `).join('') || "<div class='text-emerald-400 font-bold p-8 glass-panel rounded-3xl'>Maximum Optimization Detected. No Critical Weaknesses Found.</div>";
 
-            // METRICS
+            // METRIC GRID
             let grid = "";
             for(let [k,v] of Object.entries(d.metrics)) {
-                grid += `
-                    <div class="p-5 bg-slate-900/50 rounded-2xl border border-white/5">
-                        <div class="text-[9px] text-slate-600 font-black uppercase mb-1">${k}</div>
-                        <div class="text-blue-300 font-bold text-xs truncate">${v}</div>
-                    </div>`;
+                grid += `<div class="bg-slate-950/50 p-5 rounded-2xl border border-white/5"><div class="text-[9px] text-slate-600 font-bold uppercase mb-1 tracking-tighter">${k}</div><div class="text-blue-300 font-black text-xs truncate">${v}</div></div>`;
             }
             document.getElementById('metricsGrid').innerHTML = grid;
 
@@ -100,7 +97,7 @@
                 type: 'radar',
                 data: {
                     labels: Object.keys(s),
-                    datasets: [{ data: Object.values(s), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', borderWidth: 4 }]
+                    datasets: [{ data: Object.values(s), backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: '#3b82f6', borderWidth: 3 }]
                 },
                 options: { 
                     scales: { r: { grid: { color: '#1e293b' }, ticks: { display: false }, pointLabels: { color: '#94a3b8', font: { size: 12, weight: 'bold' } } } },
