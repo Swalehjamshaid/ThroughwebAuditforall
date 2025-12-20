@@ -2,174 +2,114 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swaleh Web Audit | Elite Performance Insights</title>
+    <title>Swaleh Web Audit | Elite Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
-        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        body { background: radial-gradient(circle at top, #1e293b 0%, #0f172a 100%); font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
     </style>
 </head>
-<body class="text-slate-200 min-h-screen">
-
-    <div class="container mx-auto px-6 py-12">
+<body class="text-slate-200 p-4 md:p-10">
+    <div class="max-w-6xl mx-auto">
         <header class="text-center mb-16">
-            <h1 class="text-5xl font-extrabold tracking-tight text-white mb-4">
-                SWALEH <span class="text-blue-500">WEB AUDIT</span>
+            <h1 class="text-6xl font-black text-white tracking-tighter mb-4">
+                SWALEH <span class="text-blue-500">AUDIT</span>
             </h1>
-            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-                Uncover hidden performance bottlenecks with our industry-leading 57-point diagnostic engine. 
-                Optimized for 2025 international web standards.
-            </p>
+            <p class="text-slate-400 text-lg uppercase tracking-widest">Elite 57-Point Technical Intelligence</p>
         </header>
 
-        <div class="max-w-3xl mx-auto mb-12">
-            <div class="flex flex-col md:flex-row gap-4 glass-card p-2 rounded-2xl shadow-2xl">
-                <input type="text" id="urlInput" placeholder="https://example.com" 
-                    class="flex-1 bg-transparent px-6 py-4 text-white outline-none placeholder:text-slate-500 text-lg">
-                <button onclick="startAudit()" id="auditBtn" 
-                    class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-xl font-bold transition-all transform active:scale-95 flex items-center justify-center gap-2">
-                    <i data-lucide="search" class="w-5 h-5"></i> START AUDIT
-                </button>
-            </div>
+        <div class="glass p-3 rounded-3xl flex flex-col md:flex-row gap-4 mb-12 shadow-2xl">
+            <input type="text" id="url" placeholder="Enter Website URL..." class="flex-1 bg-transparent p-4 text-xl outline-none text-white placeholder:text-slate-600">
+            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all transform active:scale-95">
+                GENERATE AUDIT
+            </button>
         </div>
 
-        <div id="dashboard" class="hidden space-y-8">
-            
+        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="glass-card p-8 rounded-3xl text-center">
-                    <h3 class="text-slate-400 text-sm font-semibold uppercase tracking-wider mb-2">Performance Grade</h3>
-                    <div id="gradeValue" class="text-7xl font-black text-blue-500">A+</div>
+                <div class="glass p-10 rounded-[2rem] text-center">
+                    <span class="text-slate-500 text-xs uppercase font-bold tracking-widest">Elite Grade</span>
+                    <div id="grade" class="text-8xl font-black text-blue-500 mt-4"></div>
                 </div>
-                
-                <div class="glass-card p-8 rounded-3xl flex flex-col items-center justify-center">
-                    <div class="relative w-32 h-32">
+                <div class="glass p-10 rounded-[2rem] flex flex-col items-center justify-center">
+                    <div class="w-32 h-32 relative">
                         <canvas id="scoreChart"></canvas>
-                        <div id="scoreText" class="absolute inset-0 flex items-center justify-center text-2xl font-bold">0%</div>
+                        <div id="scoreVal" class="absolute inset-0 flex items-center justify-center text-2xl font-bold"></div>
                     </div>
+                    <p class="text-slate-500 text-xs mt-4 uppercase">Overall Efficiency</p>
                 </div>
-
-                <div class="glass-card p-8 rounded-3xl flex flex-col items-center justify-center gap-4">
-                    <p class="text-slate-400 text-sm text-center">Your comprehensive 200+ word strategy report is ready.</p>
-                    <a id="downloadBtn" href="#" class="bg-emerald-600 hover:bg-emerald-500 text-white w-full py-4 rounded-xl font-bold text-center flex items-center justify-center gap-2">
-                        <i data-lucide="download" class="w-5 h-5"></i> DOWNLOAD PDF
+                <div class="glass p-10 rounded-[2rem] flex flex-col justify-center gap-4">
+                    <p class="text-slate-400 text-sm text-center">200-word Strategic Report Generated.</p>
+                    <a id="dl" href="#" class="bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-bold text-center block shadow-lg shadow-emerald-900/20">
+                        DOWNLOAD FULL PDF
                     </a>
                 </div>
             </div>
 
-            <div class="glass-card rounded-3xl overflow-hidden">
-                <div class="p-6 border-b border-white/10 flex justify-between items-center">
-                    <h2 class="text-xl font-bold flex items-center gap-2">
-                        <i data-lucide="list-checks" class="text-blue-500"></i> Technical Scorecard
-                    </h2>
-                    <span class="text-slate-400 text-sm">57 Critical Points Analyzed</span>
+            <div class="glass rounded-[2rem] overflow-hidden">
+                <div class="p-6 bg-white/5 border-b border-white/10 flex justify-between">
+                    <h3 class="font-bold text-xl text-blue-400 tracking-tight">Comprehensive Technical Scorecard</h3>
+                    <span class="text-slate-500 text-sm">Showing 57 Performance Vectors</span>
                 </div>
-                <div class="max-h-[500px] overflow-y-auto custom-scroll">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-800/50 text-slate-400 text-xs uppercase sticky top-0">
-                            <tr>
-                                <th class="p-4">Diagnostic Metric</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4 text-right">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metricsBody">
-                            </tbody>
-                    </table>
+                <div class="max-h-[600px] overflow-y-auto custom-scroll p-4">
+                    <div id="m-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="loader" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center">
+    <div id="loader" class="hidden fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center">
         <div class="text-center">
-            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-blue-400 font-mono tracking-widest uppercase">Initializing 57-Point Engine...</p>
+            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <p class="text-blue-500 font-mono text-sm uppercase tracking-widest">Probing 57 Global Metrics...</p>
         </div>
     </div>
 
     <script>
-        // Initialize Icons
-        lucide.createIcons();
-        let chart = null;
+        let chart;
+        async function runAudit() {
+            const url = document.getElementById('url').value;
+            if(!url) return alert("URL Required");
+            
+            document.getElementById('loader').classList.remove('hidden');
+            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+            const data = await res.json();
 
-        async function startAudit() {
-            const url = document.getElementById('urlInput').value;
-            if(!url) return alert("Please enter a valid URL.");
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('grade').innerText = data.summary.grade;
+            document.getElementById('scoreVal').innerText = data.summary.score + "%";
+            document.getElementById('dl').href = `/download/${data.id}`;
 
-            const loader = document.getElementById('loader');
-            const dashboard = document.getElementById('dashboard');
-            const btn = document.getElementById('auditBtn');
+            const grid = document.getElementById('m-grid');
+            grid.innerHTML = "";
+            Object.entries(data.summary.metrics).forEach(([id, info]) => {
+                grid.innerHTML += `
+                    <div class="p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-blue-500/50 transition-all">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">${info.category}</span>
+                            <span class="text-xs font-mono ${info.status==='PASS'?'text-emerald-500':'text-rose-500'}">${info.status}</span>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-200 mb-2">${info.name}</h4>
+                        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-full bg-blue-500" style="width: ${info.score}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
 
-            loader.classList.remove('hidden');
-            btn.disabled = true;
-
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
-                });
-
-                const data = await response.json();
-                
-                // Update UI Components
-                document.getElementById('gradeValue').innerText = data.summary.grade;
-                document.getElementById('scoreText').innerText = data.summary.score + "%";
-                document.getElementById('downloadBtn').href = `/download/${data.id}`;
-                
-                // Inject Metrics
-                const body = document.getElementById('metricsBody');
-                body.innerHTML = "";
-                Object.entries(data.summary.metrics).forEach(([name, info]) => {
-                    const row = `
-                        <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <td class="p-4 font-medium text-slate-300 text-sm">${name}</td>
-                            <td class="p-4">
-                                <span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase ${info.status === 'PASS' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}">
-                                    ${info.status}
-                                </span>
-                            </td>
-                            <td class="p-4 text-right font-mono text-slate-400 text-sm">${info.score}%</td>
-                        </tr>
-                    `;
-                    body.innerHTML += row;
-                });
-
-                updateChart(data.summary.score);
-                dashboard.classList.remove('hidden');
-                window.scrollTo({ top: dashboard.offsetTop - 50, behavior: 'smooth' });
-
-            } catch (err) {
-                alert("Audit failed. Please ensure the backend is running.");
-            } finally {
-                loader.classList.add('hidden');
-                btn.disabled = false;
-            }
+            updateChart(data.summary.score);
+            document.getElementById('loader').classList.add('hidden');
+            window.scrollTo({ top: document.getElementById('results').offsetTop - 50, behavior: 'smooth' });
         }
 
-        function updateChart(score) {
+        function updateChart(s) {
             const ctx = document.getElementById('scoreChart').getContext('2d');
             if(chart) chart.destroy();
-            chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [score, 100 - score],
-                        backgroundColor: ['#2563eb', '#1e293b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    cutout: '85%',
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
-                }
-            });
+            chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [s, 100-s], backgroundColor: ['#3b82f6','#1e293b'], borderWidth: 0 }] }, options: { cutout: '85%', plugins: { legend: false, tooltip: false } } });
         }
     </script>
 </body>
