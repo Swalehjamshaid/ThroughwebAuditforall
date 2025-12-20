@@ -5,8 +5,8 @@ from fastapi.templating import Jinja2Templates
 import requests
 from bs4 import BeautifulSoup
 import time
-import pdfkit
 import io
+from weasyprint import HTML
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -129,6 +129,10 @@ async def download_report(url: str = Form(...)):
     metrics, weak_areas = audit_website(url)
     summary = generate_summary()
     category_chart = category_scores(metrics)
-    rendered = templates.get_template("dashboard.html").render(metrics=metrics, weak_areas=weak_areas, summary=summary, category_chart=category_chart, url=url, pdf=True)
-    pdf = pdfkit.from_string(rendered, False)
-    return FileResponse(io.BytesIO(pdf), media_type="application/pdf", filename="Swealeh.Tech_Website_Audit_Report.pdf")
+    rendered = templates.get_template("dashboard.html").render(
+        metrics=metrics, weak_areas=weak_areas, summary=summary,
+        category_chart=category_chart, url=url, pdf=True
+    )
+    pdf_file = HTML(string=rendered).write_pdf()
+    return FileResponse(io.BytesIO(pdf_file), media_type="application/pdf",
+                        filename="Swealeh.Tech_Website_Audit_Report.pdf")
