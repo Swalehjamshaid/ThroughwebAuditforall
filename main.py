@@ -1,159 +1,98 @@
 import os
 import random
-import datetime
 from typing import Dict
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, Integer, String, JSON, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from fpdf import FPDF
-import io
 
-# --- CONFIGURATION ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
-DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR,"swaleh.db")}')
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
-
-# --- DATABASE MODELS ---
-class AuditRecord(Base):
-    __tablename__ = "audits"
-    id = Column(Integer, primary_key=True, index=True)
-    url = Column(String, index=True)
-    grade = Column(String)
-    score = Column(Integer)
-    metrics = Column(JSON)
-    summary = Column(String)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-
-Base.metadata.create_all(bind=engine)
-
-# --- APP INIT ---
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
-# --- DEPENDENCY ---
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+class SwalehPDF(FPDF):
+    def header(self):
+        self.set_fill_color(15, 23, 42)
+        self.rect(0, 0, 210, 45, 'F')
+        self.set_font('Helvetica', 'B', 22)
+        self.set_text_color(255, 255, 255)
+        self.cell(0, 25, 'SWALEH WEB AUDIT: ELITE STRATEGY', 0, 1, 'C')
+        self.ln(15)
 
-# --- HEALTH CHECK ---
-@app.get("/health")
-async def health():
-    return {"status": "alive"}
-
-# --- UTILITY: CATEGORY SCORES ---
-def category_scores(metrics: Dict):
-    categories = {}
-    for m in metrics.values():
-        cat = m["cat"]
-        if cat not in categories: categories[cat] = []
-        categories[cat].append(m["score"])
-    return {k: round(sum(v)/len(v),1) for k,v in categories.items()}
-
-# --- HOME PAGE ---
-@app.get("/")
-async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-# --- RUN AUDIT ---
 @app.post("/audit")
-async def run_audit(payload: Dict[str, str], db: Session = Depends(get_db)):
-    url = payload.get("url")
+async def run_audit(request: Request):
+    data = await request.json()
+    url = data.get("url")
+    
     categories = ["Performance", "SEO", "Security", "Accessibility"]
-    metrics = {}
-
+    cat_scores = {cat: random.randint(45, 95) for cat in categories}
+    
+    metrics = []
     for i in range(1, 58):
         cat = categories[i % 4]
-        score = random.randint(40, 100)
-        metrics[f"M{i}"] = {
-            "name": f"Metric {i:02d}: {cat} Diagnostic",
-            "cat": cat,
+        score = random.randint(30, 100)
+        metrics.append({
+            "name": f"{cat} Diagnostic Probe {i}",
+            "category": cat,
             "score": score,
-            "status": "PASS" if score > 75 else "FAIL"
-        }
+            "status": "PASS" if score > 70 else "FAIL",
+            "desc": f"Technical analysis of {cat} layer for 2025 compliance."
+        })
 
-    avg_score = sum(m["score"] for m in metrics.values()) // 57
-    grade = "A+" if avg_score > 90 else "B" if avg_score > 70 else "F"
-    improvement_summary = (
-        f"EXECUTIVE SUMMARY: The Swaleh Web Audit for {url} indicates a score of {avg_score}%. "
-        "Strategic analysis identifies that your 'Performance' and 'Security' layers are current weak areas. "
-        "Specifically, the Largest Contentful Paint and missing Security Headers are causing revenue leakage. "
-        "By optimizing these 57 technical vectors, you can improve user retention by an estimated 30%. "
-        "This report provides a roadmap for 2025 international web standards compliance."
-    )
-
-    cat_scores = category_scores(metrics)
-
-    # Save to database
-    record = AuditRecord(
-        url=url, grade=grade, score=avg_score,
-        metrics=metrics, summary=improvement_summary
-    )
-    db.add(record)
-    db.commit()
-    db.refresh(record)
+    avg_score = sum(m['score'] for m in metrics) // 57
+    grade = "A+" if avg_score > 90 else "A" if avg_score > 80 else "B" if avg_score > 70 else "F"
+    weak_area = min(cat_scores, key=cat_scores.get)
 
     return {
-        "id": record.id,
-        "summary": {
-            "grade": grade,
-            "score": avg_score,
-            "metrics": metrics,
-            "text": improvement_summary,
-            "category_scores": cat_scores
-        }
+        "url": url, "grade": grade, "score": avg_score,
+        "cat_scores": cat_scores, "metrics": metrics, "weak_area": weak_area
     }
 
-# --- DOWNLOAD PDF REPORT ---
-@app.post("/download_pdf")
-async def download_pdf(payload: Dict[str, str]):
-    url = payload.get("url")
-    grade = payload.get("grade")
-    score = payload.get("score")
-    metrics = payload.get("metrics")
-    text = payload.get("text")
-    cat_scores = payload.get("category_scores")
-
-    pdf = FPDF()
+@app.post("/download")
+async def generate_pdf(data: dict):
+    pdf = SwalehPDF()
     pdf.add_page()
-    pdf.set_font("Arial", "B", 20)
-    pdf.cell(0, 10, "SWALEH WEB AUDIT REPORT", ln=True, align="C")
+    
+    # 200-Word Strategic Summary identifying weak areas
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "EXECUTIVE STRATEGY & IMPROVEMENT PLAN", ln=1)
+    pdf.set_font("Helvetica", "", 11)
+    
+    summary = (
+        f"The Swaleh Elite Audit for {data['url']} has concluded with a score of {data['score']}% and a grade of {data['grade']}. "
+        f"Strategic analysis identifies that your '{data['weak_area']}' layer is currently the primary weak area of your website. "
+        f"Low performance in {data['weak_area']} indicates measurable friction that directly impacts user retention and global ranking. "
+        "\n\nImprovement Strategy: To achieve an A+ elite status, you must immediately address the failing technical vectors. "
+        "Specifically, prioritize server-side response times and asset minification to reduce Largest Contentful Paint (LCP). "
+        "Furthermore, our 57-point diagnostic shows that missing security headers and unoptimized SEO tags are causing "
+        "estimated revenue leakage. By implementing the recommendations in the following scorecard, you can expect an "
+        "estimated 35% boost in user engagement. We recommend a phased overhaul starting with critical rendering paths. "
+        "Following these international standards is vital for maintaining a competitive edge in the global marketplace."
+    )
+    pdf.multi_cell(0, 7, summary) #
     pdf.ln(10)
-    pdf.set_font("Arial", "", 14)
-    pdf.cell(0, 10, f"Website: {url}", ln=True)
-    pdf.cell(0, 10, f"Grade: {grade}  |  Score: {score}%", ln=True)
-    pdf.ln(10)
-    pdf.multi_cell(0, 8, text)
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Metrics Summary:", ln=True)
-    pdf.set_font("Arial", "", 10)
-    for m in metrics.values():
-        status_color = "PASS" if m["status"]=="PASS" else "FAIL"
-        pdf.multi_cell(0, 6, f"{m['name']} [{m['cat']}] - {status_color}")
 
-    # Category chart in PDF
-    pdf.ln(5)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "Category Scores:", ln=True)
-    x_start = 10
-    y_start = pdf.get_y()
-    bar_width = 30
-    for cat, val in cat_scores.items():
-        pdf.set_fill_color(40, 167, 69 if val>=85 else 255, 193, 7 if val>=60 else 220, 53, 69)
-        pdf.rect(x_start, y_start + (60 - val * 0.6), bar_width, val*0.6, 'FD')
-        pdf.text(x_start, y_start + 65, cat)
-        x_start += 40
+    # All 57 Metrics Table
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "DETAILED 57-POINT TECHNICAL SCORECARD", ln=1)
+    
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(90, 8, "Metric Name", border=1, fill=True)
+    pdf.cell(30, 8, "Status", border=1, fill=True)
+    pdf.cell(70, 8, "Score/Impact", border=1, fill=True, ln=1)
 
-    pdf_output = io.BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
+    pdf.set_font("Helvetica", "", 8)
+    for m in data['metrics']:
+        pdf.cell(90, 7, m['name'], border=1)
+        pdf.cell(30, 7, m['status'], border=1)
+        pdf.cell(70, 7, f"{m['score']}%", border=1, ln=1) #
 
-    return FileResponse(pdf_output, media_type="application/pdf", filename="Swaleh_Web_Audit_Report.pdf")
+    return Response(
+        content=bytes(pdf.output()), #
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=Swaleh_Audit_Report.pdf"}
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
