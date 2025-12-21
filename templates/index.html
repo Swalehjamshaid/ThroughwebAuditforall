@@ -1,39 +1,267 @@
-<div id="results" class="hidden space-y-10">
-    <div class="flex flex-wrap gap-4 justify-center py-4 border-b border-slate-800">
-        <span class="text-[10px] text-slate-400 uppercase font-bold">Weighting Engine:</span>
-        <span class="px-2 py-1 bg-red-950/30 text-red-500 rounded text-[10px] border border-red-500/20">SECURITY (3.0x)</span>
-        <span class="px-2 py-1 bg-blue-950/30 text-blue-500 rounded text-[10px] border border-blue-500/20">PERFORMANCE (2.5x)</span>
-        <span class="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px]">ACCESSIBILITY (0.5x)</span>
-    </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH | Elite Strategic Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #3b82f6;
+            --brand-gradient-start: #2563eb;
+            --brand-gradient-end: #3b82f6;
+            --brand-dark: #020617;
+            --glass-bg: rgba(15, 23, 42, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glow: 0 0 30px rgba(59, 130, 246, 0.3);
+        }
+        body {
+            background: var(--brand-dark);
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-image: 
+                radial-gradient(circle at 20% 80%, #1e293b 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, #1e293b 0%, transparent 50%),
+                radial-gradient(circle at 50% -50%, #0f172a 0%, var(--brand-dark) 70%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            box-shadow: var(--glow);
+            transition: all 0.4s ease;
+        }
+        .glass-panel:hover {
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+            transform: translateY(-4px);
+        }
+        .ff-logo {
+            background: linear-gradient(135deg, var(--brand-gradient-start), var(--brand-gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.6));
+            font-weight: 800;
+        }
+        .score-ring {
+            width: 240px;
+            height: 240px;
+            background: conic-gradient(var(--brand-primary) calc(var(--percent) * 1%), #1e293b 0%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: var(--glow);
+            transition: all 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .score-ring::before {
+            content: "";
+            position: absolute;
+            inset: 16px;
+            background: var(--brand-dark);
+            border-radius: 50%;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+        }
+        .metric-card {
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: var(--glow);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6); }
+        }
+        .animate-glow { animation: pulse-glow 4s infinite; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float { animation: float 6s infinite ease-in-out; }
+    </style>
+</head>
+<body class="p-6 md:p-12">
+    <div class="max-w-7xl mx-auto space-y-16">
+        <!-- Header -->
+        <nav class="flex justify-between items-center">
+            <div class="flex items-center gap-5 animate-float">
+                <div class="bg-gradient-to-br from-blue-600 to-blue-700 text-white font-black px-5 py-3 rounded-2xl text-4xl shadow-2xl">FF</div>
+                <span class="text-4xl md:text-5xl font-extrabold tracking-tight ff-logo">Tech</span>
+            </div>
+            <div class="hidden md:block text-sm tracking-widest text-slate-500 font-medium uppercase">
+                Elite Intelligence Engine // v5.0 // 2025
+            </div>
+        </nav>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="glass-panel p-10 text-center flex flex-col items-center border-t-4 border-blue-500">
-            <h2 class="text-7xl font-black mb-2" id="bigScore">0</h2>
-            <p class="text-blue-400 uppercase tracking-widest font-bold text-xs">Weighted Grade</p>
-            <div class="mt-6 w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div id="scoreBar" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
+        <!-- Hero -->
+        <div class="text-center space-y-10">
+            <h1 class="text-5xl md:text-7xl lg:text-8xl font-extrabold leading-tight">
+                Eliminate <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-blue-400">Revenue Leakage</span><br>
+                <span class="text-4xl md:text-6xl">With Precision Intelligence</span>
+            </h1>
+            <div class="flex flex-col md:flex-row gap-5 max-w-5xl mx-auto glass-panel p-4">
+                <input id="urlInput" type="text" placeholder="Enter your website URL (e.g., yourstore.com)"
+                       class="flex-1 bg-transparent px-10 py-6 outline-none text-xl placeholder-slate-400 border border-slate-700 rounded-2xl focus:border-blue-500 transition">
+                <button onclick="runAudit()" class="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold px-12 py-6 rounded-2xl shadow-2xl shadow-blue-900/50 hover:shadow-blue-900/70 transition-all transform hover:scale-105">
+                    LAUNCH STRATEGIC AUDIT
+                </button>
             </div>
         </div>
-        
-        <div class="lg:col-span-2 glass-panel p-10 bg-gradient-to-br from-slate-900 to-blue-900/10">
-            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
-                Strategic Financial Forensic
-            </h3>
-            <p id="summary" class="text-slate-300 leading-relaxed text-lg mb-6"></p>
-            <div class="grid grid-cols-2 gap-8 border-t border-slate-800 pt-6">
-                <div>
-                    <span class="block text-xs text-slate-500 font-bold mb-1">REVENUE LEAKAGE RATE</span>
-                    <span id="leakageVal" class="text-3xl font-black text-red-500">0%</span>
+
+        <!-- Loader -->
+        <div id="loader" class="hidden">
+            <div class="flex flex-col items-center justify-center py-32">
+                <div class="w-24 h-24 border-6 border-blue-500 border-t-transparent rounded-full animate-spin mb-10 shadow-2xl"></div>
+                <p class="text-blue-400 font-mono text-xl animate-glow">EXECUTING DEEP FORENSIC SCAN... MAPPING 110+ WEIGHTED METRICS...</p>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden space-y-16">
+            <!-- Executive Summary Section -->
+            <div class="glass-panel p-12 rounded-3xl">
+                <h2 class="text-4xl md:text-5xl font-bold text-center mb-10">Executive Strategic Overview</h2>
+                <div class="text-lg md:text-xl leading-relaxed text-slate-300 whitespace-pre-line" id="summary"></div>
+            </div>
+
+            <!-- Score + Financial Impact -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div class="glass-panel p-12 flex flex-col items-center justify-center text-center animate-glow">
+                    <span class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-8">Weighted Asset Efficiency</span>
+                    <div id="ringContainer" class="score-ring" style="--percent: 0">
+                        <div class="relative z-10 text-center">
+                            <span id="bigScore" class="text-6xl md:text-7xl font-black block">0%</span>
+                            <span class="text-slate-400 text-lg" id="healthTag">Awaiting analysis...</span>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-xs text-slate-500 font-bold mb-1">ANNUAL POTENTIAL LOSS</span>
-                    <span id="lossVal" class="text-3xl font-black text-white">$0</span>
+
+                <div class="lg:col-span-2 glass-panel p-12">
+                    <div class="flex items-center gap-4 mb-8">
+                        <span class="w-5 h-5 bg-red-500 rounded-full animate-pulse"></span>
+                        <h3 class="text-red-400 font-bold uppercase text-lg tracking-widest">Critical Financial Impact Alert</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        <div>
+                            <p class="text-slate-400 uppercase font-semibold text-sm mb-2">Estimated Conversion Leakage</p>
+                            <p id="leakageVal" class="text-5xl font-black text-white">0%</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 uppercase font-semibold text-sm mb-2">Potential Annual Revenue Loss</p>
+                            <p id="lossVal" class="text-5xl font-black bg-gradient-to-r from-blue-400 to-blue-500 bg-clip-text text-transparent">$0</p>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Download + Metrics Grid -->
+            <div class="glass-panel p-10">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h4 class="text-3xl font-bold">Elite Forensic Scorecard</h4>
+                        <p class="text-slate-400 text-lg">110+ Weighted Metrics • Professional One-Page Export</p>
+                    </div>
+                    <button onclick="downloadPDF()" class="bg-white text-black hover:bg-gray-100 px-10 py-5 rounded-2xl font-bold text-lg flex items-center gap-4 shadow-2xl transition-all hover:scale-105">
+                        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3"/>
+                        </svg>
+                        EXPORT PREMIUM PDF
+                    </button>
+                </div>
+                <div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[80vh] overflow-y-auto pr-2"></div>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" id="metricsGrid">
-        </div>
-</div>
+    <script>
+        let reportData = null;
+
+        async function runAudit() {
+            const urlInput = document.getElementById('urlInput');
+            if (!urlInput.value.trim()) return alert("Please enter a valid URL");
+
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput.value.trim() })
+                });
+                reportData = await res.json();
+
+                // Populate results
+                document.getElementById('bigScore').innerText = reportData.avg_score + "%";
+                document.getElementById('healthTag').innerText = reportData.health_tag;
+                document.getElementById('ringContainer').style.setProperty('--percent', reportData.avg_score);
+                document.getElementById('summary').innerText = reportData.summary;
+                document.getElementById('leakageVal').innerText = reportData.financial_impact.leakage + "%";
+                document.getElementById('lossVal').innerText = reportData.financial_impact.annual_loss;
+
+                const grid = document.getElementById('metricsGrid');
+                grid.innerHTML = '';
+                reportData.metrics.forEach(m => {
+                    const colorClass = m.score > 75 ? 'text-green-400 border-green-500/40 bg-green-500/10' :
+                                      m.score > 45 ? 'text-orange-400 border-orange-500/40 bg-orange-500/10' :
+                                                     'text-red-400 border-red-500/40 bg-red-500/10';
+
+                    grid.innerHTML += `
+                        <div class="glass-panel p-8 metric-card border-l-6 ${colorClass} rounded-3xl">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${m.category}</span>
+                                <span class="text-2xl font-black ${colorClass.split(' ')[0]}">${m.score}%</span>
+                            </div>
+                            <h4 class="font-bold text-lg text-white mb-4 leading-tight">${m.name}</h4>
+                            <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden shadow-inner">
+                                <div class="h-full ${colorClass.split(' ')[2]} transition-all duration-1000" style="width: ${m.score}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+            } catch (e) {
+                alert("Audit failed. Please check server connection.");
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        async function downloadPDF() {
+            if (!reportData) return alert("Run an audit first");
+
+            const btn = event.currentTarget;
+            const original = btn.innerHTML;
+            btn.innerHTML = "GENERATING PREMIUM PDF...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reportData)
+                });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `FF_Tech_Elite_Audit_${reportData.url.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert("PDF generation failed");
+            }
+
+            btn.innerHTML = original;
+            btn.disabled = false;
+        }
+    </script>
+</body>
+</html>
