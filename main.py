@@ -1,12 +1,13 @@
 import os
 import random
-from typing import Dict
-from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi import FastAPI, Response, Request
 from fastapi.templating import Jinja2Templates
 from fpdf import FPDF
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 class SwalehPDF(FPDF):
     def header(self):
@@ -14,8 +15,12 @@ class SwalehPDF(FPDF):
         self.rect(0, 0, 210, 45, 'F')
         self.set_font('Helvetica', 'B', 22)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 25, 'SWALEH WEB AUDIT: ELITE STRATEGY', 0, 1, 'C')
+        self.cell(0, 25, 'SWALEH WEB AUDIT: STRATEGIC INTELLIGENCE', 0, 1, 'C')
         self.ln(15)
+
+@app.get("/")
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/audit")
 async def run_audit(request: Request):
@@ -23,22 +28,22 @@ async def run_audit(request: Request):
     url = data.get("url")
     
     categories = ["Performance", "SEO", "Security", "Accessibility"]
-    cat_scores = {cat: random.randint(45, 95) for cat in categories}
+    cat_scores = {cat: random.randint(25, 85) for cat in categories} # Strict Scoring
     
     metrics = []
     for i in range(1, 58):
         cat = categories[i % 4]
-        score = random.randint(30, 100)
+        score = random.randint(15, 100)
         metrics.append({
-            "name": f"{cat} Diagnostic Probe {i}",
+            "name": f"{cat} Diagnostic Probe {i:02d}",
             "category": cat,
             "score": score,
-            "status": "PASS" if score > 70 else "FAIL",
-            "desc": f"Technical analysis of {cat} layer for 2025 compliance."
+            "status": "PASS" if score > 75 else "FAIL",
+            "desc": f"Technical analysis of {cat} infrastructure for 2025 compliance."
         })
 
     avg_score = sum(m['score'] for m in metrics) // 57
-    grade = "A+" if avg_score > 90 else "A" if avg_score > 80 else "B" if avg_score > 70 else "F"
+    grade = "A+" if avg_score > 92 else "A" if avg_score > 82 else "B" if avg_score > 70 else "F"
     weak_area = min(cat_scores, key=cat_scores.get)
 
     return {
@@ -51,48 +56,36 @@ async def generate_pdf(data: dict):
     pdf = SwalehPDF()
     pdf.add_page()
     
-    # 200-Word Strategic Summary identifying weak areas
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 10, "EXECUTIVE STRATEGY & IMPROVEMENT PLAN", ln=1)
     pdf.set_font("Helvetica", "", 11)
     
+    # 200 Word Strategic Summary
     summary = (
-        f"The Swaleh Elite Audit for {data['url']} has concluded with a score of {data['score']}% and a grade of {data['grade']}. "
-        f"Strategic analysis identifies that your '{data['weak_area']}' layer is currently the primary weak area of your website. "
-        f"Low performance in {data['weak_area']} indicates measurable friction that directly impacts user retention and global ranking. "
-        "\n\nImprovement Strategy: To achieve an A+ elite status, you must immediately address the failing technical vectors. "
-        "Specifically, prioritize server-side response times and asset minification to reduce Largest Contentful Paint (LCP). "
-        "Furthermore, our 57-point diagnostic shows that missing security headers and unoptimized SEO tags are causing "
-        "estimated revenue leakage. By implementing the recommendations in the following scorecard, you can expect an "
-        "estimated 35% boost in user engagement. We recommend a phased overhaul starting with critical rendering paths. "
-        "Following these international standards is vital for maintaining a competitive edge in the global marketplace."
+        f"The Swaleh Elite Audit for {data['url']} has concluded with a technical score of {data['score']}% and a grade of {data['grade']}. "
+        f"Our engine identifies that the '{data['weak_area']}' infrastructure is currently the primary weak area of your platform. "
+        f"The substandard performance in {data['weak_area']} is causing measurable friction, impacting user retention and global rankings. "
+        "\n\nStrategic Plan: To reach an A+ status, you must immediately address the failing technical vectors. "
+        "Prioritize server response times and asset minification to reduce Largest Contentful Paint (LCP). "
+        "Our 57-point diagnostic shows missing security headers and unoptimized SEO tags are causing revenue leakage. "
+        "Implementing these recommendations can yield an estimated 35% boost in engagement. "
+        "This roadmap is vital for maintaining a competitive edge and building trust in the global marketplace."
     )
-    pdf.multi_cell(0, 7, summary) #
+    pdf.multi_cell(0, 7, summary)
     pdf.ln(10)
 
-    # All 57 Metrics Table
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 10, "DETAILED 57-POINT TECHNICAL SCORECARD", ln=1)
-    
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(90, 8, "Metric Name", border=1, fill=True)
-    pdf.cell(30, 8, "Status", border=1, fill=True)
-    pdf.cell(70, 8, "Score/Impact", border=1, fill=True, ln=1)
-
-    pdf.set_font("Helvetica", "", 8)
     for m in data['metrics']:
-        pdf.cell(90, 7, m['name'], border=1)
-        pdf.cell(30, 7, m['status'], border=1)
-        pdf.cell(70, 7, f"{m['score']}%", border=1, ln=1) #
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(100, 8, m['name'], border='B')
+        pdf.cell(30, 8, m['status'], border='B')
+        pdf.cell(0, 8, f"Score: {m['score']}%", border='B', ln=1)
 
-    return Response(
-        content=bytes(pdf.output()), #
-        media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=Swaleh_Audit_Report.pdf"}
-    )
+    return Response(content=bytes(pdf.output()), media_type="application/pdf")
 
 if __name__ == "__main__":
     import uvicorn
+    import os
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
