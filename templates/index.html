@@ -3,108 +3,139 @@
 <head>
     <meta charset="UTF-8"><title>Swaleh Web Audit Elite</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: #020617; font-family: 'Inter', sans-serif; color: white; }
-        .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .weak-box { border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.1); box-shadow: 0 0 20px rgba(239,68,68,0.2); }
+        .glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .weak-highlight { border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
+        .terminal-text { font-family: 'Courier New', Courier, monospace; }
     </style>
 </head>
 <body class="p-6 md:p-12">
     <div class="max-w-6xl mx-auto">
         <header class="text-center mb-12">
-            <h1 class="text-6xl font-black text-blue-500 mb-2">SWALEH AUDIT</h1>
-            <p class="text-slate-500 uppercase tracking-widest text-sm font-bold">Elite 60+ Point Intelligence Engine</p>
+            <h1 class="text-7xl font-black text-blue-500 mb-2 tracking-tighter">SWALEH AUDIT</h1>
+            <p class="text-slate-500 uppercase tracking-[0.3em] text-xs font-bold">Elite 60-Point Intelligence Engine</p>
         </header>
 
-        <div class="glass p-4 rounded-3xl flex flex-col md:flex-row gap-4 mb-16 shadow-2xl">
-            <input type="text" id="url" placeholder="Enter Website URL (https://...)" class="flex-1 bg-transparent px-6 py-4 outline-none text-xl">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-bold transition-all transform active:scale-95">ANALYZE NOW</button>
+        <div class="glass p-4 rounded-3xl flex gap-4 mb-12">
+            <input type="text" id="url" placeholder="https://..." class="flex-1 bg-transparent px-6 py-4 text-xl outline-none">
+            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-bold transition-all">ANALYZE NOW</button>
         </div>
 
-        <div id="loading" class="hidden glass p-10 rounded-[3rem] text-center mb-16">
-            <p id="status" class="text-blue-400 font-mono text-sm uppercase mb-4 tracking-widest">Initializing 60+ Probes...</p>
-            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden"><div id="progress" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div></div>
+        <div id="loading-zone" class="hidden glass p-8 rounded-[2.5rem] mb-12 overflow-hidden">
+            <div id="terminal" class="terminal-text text-blue-400 text-[12px] h-32 overflow-y-auto mb-6 custom-scroll"></div>
+            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+            </div>
         </div>
 
-        <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="glass p-10 rounded-[3rem] text-center border-b-4 border-blue-500">
-                    <p class="text-xs font-bold text-slate-500 uppercase">Grade</p>
+        <div id="results" class="hidden space-y-10">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass p-10 rounded-[2.5rem] text-center border-b-4 border-blue-500">
+                    <p class="text-xs font-bold text-slate-500 uppercase">Global Grade</p>
                     <div id="grade" class="text-8xl font-black mt-2"></div>
                 </div>
-                <div class="glass p-10 rounded-[3rem] text-center">
-                    <p class="text-xs font-bold text-slate-500 uppercase">Score</p>
-                    <div id="score" class="text-8xl font-black text-emerald-500 mt-2"></div>
+                <div class="glass p-10 rounded-[2.5rem] flex flex-col items-center justify-center text-center">
+                    <div class="w-32 h-32 relative">
+                        <canvas id="scoreChart"></canvas>
+                        <div id="scoreVal" class="absolute inset-0 flex items-center justify-center text-3xl font-black text-emerald-400"></div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-500 uppercase mt-4">Efficiency Score</p>
                 </div>
-                <div class="glass p-10 rounded-[3rem] flex flex-col justify-center">
-                    <button onclick="downloadReport()" class="bg-white text-black py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-slate-200">Download Strategic PDF</button>
+                <div class="glass p-10 rounded-[2.5rem] flex flex-col justify-center gap-4">
+                    <button onclick="downloadPDF()" class="bg-white text-black py-4 rounded-xl font-black uppercase tracking-widest">Download PDF</button>
                 </div>
             </div>
 
-            <div id="cat-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
-
-            <div class="bg-blue-600/10 border border-blue-500/20 p-10 rounded-[3rem]">
-                <h3 class="text-2xl font-bold text-blue-400 mb-6 tracking-tighter">Executive Improvement Strategy</h3>
-                <div id="summary" class="text-slate-300 leading-relaxed text-lg"></div>
+            <div class="glass rounded-[2rem] p-8">
+                <h3 class="text-xl font-bold mb-6 text-white uppercase">Category scores</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="cat-grid"></div>
             </div>
 
-            <h3 class="text-xl font-bold uppercase text-slate-400 tracking-widest">60+ Technical Data Points Elaborated</h3>
-            <div id="m-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-2"></div>
+            <div class="glass p-10 rounded-[2.5rem] border border-blue-500/20">
+                <h2 class="text-xl font-bold text-blue-400 mb-4 uppercase tracking-widest">Strategic improvement plan</h2>
+                <div id="summary" class="text-slate-400 leading-relaxed text-sm"></div>
+            </div>
+
+            <div class="glass rounded-[2.5rem] overflow-hidden">
+                <div class="p-8 border-b border-white/5 flex justify-between">
+                    <h3 class="text-xl font-bold text-white uppercase">60+ Technical Probes Elaborated</h3>
+                </div>
+                <div id="m-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 p-8 max-h-[500px] overflow-y-auto custom-scroll"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        let lastData = null;
-        async function runAudit() {
-            const url = document.getElementById('url').value;
-            if(!url) return;
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-            
-            const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-            const data = await res.json();
-            lastData = data;
+    let lastData = null; let chart = null;
 
-            for(let i=1; i<=60; i++) {
-                await new Promise(r => setTimeout(r, 30));
-                document.getElementById('progress').style.width = `${(i/60)*100}%`;
-                document.getElementById('status').innerText = `Probe ${i}/60: Scanning ${data.metrics[i-1].category}...`;
-            }
+    async function runAudit() {
+        const url = document.getElementById('url').value;
+        if(!url) return;
 
-            document.getElementById('loading').classList.add('hidden');
+        document.getElementById('loading-zone').classList.remove('hidden');
+        document.getElementById('results').classList.add('hidden');
+        document.getElementById('btn').disabled = true;
+
+        const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+        const data = await res.json();
+        lastData = data;
+
+        const terminal = document.getElementById('terminal');
+        const bar = document.getElementById('progress-bar');
+        terminal.innerHTML = "";
+
+        for(let i=1; i<=60; i++) {
+            await new Promise(r => setTimeout(r, 40));
+            const line = document.createElement('div');
+            line.innerHTML = `> [PROBE ${i}/60] ${data.metrics[i-1].name} ... <span class="text-white">DONE</span>`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            bar.style.width = `${(i/60)*100}%`;
+        }
+
+        setTimeout(() => {
+            document.getElementById('loading-zone').classList.add('hidden');
             document.getElementById('results').classList.remove('hidden');
             document.getElementById('grade').innerText = data.grade;
-            document.getElementById('score').innerText = data.score + "%";
+            document.getElementById('scoreVal').innerText = data.score + "%";
             document.getElementById('summary').innerText = data.summary;
 
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            if(chart) chart.destroy();
+            chart = new Chart(ctx, { type: 'doughnut', data: { datasets: [{ data: [data.score, 100-data.score], backgroundColor: ['#10b981', '#1e293b'], borderWidth: 0 }] }, options: { cutout: '80%', plugins: { legend: false } } });
+
             document.getElementById('cat-grid').innerHTML = Object.entries(data.cat_scores).map(([n, s]) => `
-                <div class="glass p-6 rounded-2xl text-center ${n === data.weak_area ? 'weak-box' : ''}">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase">${n}</p>
-                    <p class="text-2xl font-black text-blue-400">${s}%</p>
-                    ${n === data.weak_area ? '<p class="text-[8px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Weak Area Identified</p>' : ''}
+                <div class="p-6 rounded-2xl glass text-center ${n === data.weak_area ? 'weak-highlight' : ''}">
+                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">${n}</p>
+                    <p class="text-2xl font-black text-blue-400 mt-2">${s}%</p>
+                    ${n === data.weak_area ? '<p class="text-[7px] text-red-500 font-bold mt-1 uppercase">Weak area identified</p>' : ''}
                 </div>
             `).join('');
 
             document.getElementById('m-grid').innerHTML = data.metrics.map(m => `
-                <div class="p-6 rounded-3xl glass border border-white/5">
+                <div class="p-5 rounded-2xl glass border border-white/5">
                     <div class="flex justify-between text-[9px] font-bold uppercase mb-2">
-                        <span class="text-blue-500 tracking-widest">${m.category}</span>
+                        <span class="text-blue-500">${m.category}</span>
                         <span class="${m.status==='PASS'?'text-emerald-500':'text-red-500'}">${m.status}</span>
                     </div>
-                    <h4 class="text-sm font-bold text-white mb-1">${m.name}</h4>
-                    <p class="text-[10px] text-slate-500 leading-tight">${m.desc}</p>
+                    <h4 class="text-[11px] font-bold text-white mb-2">${m.name}</h4>
+                    <p class="text-[9px] text-slate-500 mb-2">${m.desc}</p>
+                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="h-full bg-blue-500" style="width:${m.score}%"></div></div>
                 </div>
             `).join('');
-        }
+            document.getElementById('btn').disabled = false;
+        }, 500);
+    }
 
-        async function downloadReport() {
-            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(lastData) });
-            const blob = await res.blob();
-            const a = document.createElement('a');
-            a.href = window.URL.createObjectURL(blob);
-            a.download = "Strategic_Web_Audit.pdf";
-            a.click();
-        }
+    async function downloadPDF() {
+        const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(lastData) });
+        const blob = await res.blob();
+        const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = "Swaleh_Elite_Report.pdf"; a.click();
+    }
     </script>
 </body>
 </html>
