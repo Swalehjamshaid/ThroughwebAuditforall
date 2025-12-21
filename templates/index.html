@@ -1,116 +1,85 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Swaleh Web Audit Elite</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
-.glass { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-</style>
-</head>
-<body class="p-6 md:p-10">
-<div class="max-w-7xl mx-auto">
-    <div class="text-center mb-12 text-5xl font-black text-blue-500">SWALEH WEB AUDIT</div>
+<body class="bg-slate-950 text-white">
+    <div class="max-w-6xl mx-auto p-10">
+        <header class="text-center mb-16">
+            <h1 class="text-6xl font-black text-blue-500 mb-2">SWALEH AUDIT</h1>
+            <p class="text-slate-500 uppercase tracking-widest text-sm font-bold">Elite 57-Point Diagnostic Engine</p>
+        </header>
 
-    <div class="glass p-6 rounded-3xl flex gap-4 mb-10 shadow-2xl">
-        <input type="text" id="url" placeholder="Enter URL..." class="flex-1 bg-transparent border-none text-2xl outline-none">
-        <button onclick="startAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">RUN DEEP SCAN</button>
-    </div>
-
-    <div id="results" class="hidden">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div class="glass p-10 rounded-[2rem] text-center">
-                <p class="text-slate-500 text-xs font-bold">GRADE</p>
-                <div id="grade" class="text-7xl font-black text-blue-500 mt-2"></div>
-            </div>
-            <div class="glass p-10 rounded-[2rem] text-center">
-                <p class="text-slate-500 text-xs font-bold">SCORE</p>
-                <div id="score" class="text-7xl font-black text-emerald-500 mt-2"></div>
-            </div>
-            <div class="glass p-10 rounded-[2rem] flex flex-col justify-center">
-                <button onclick="downloadPDF()" class="bg-white text-black py-4 rounded-xl font-bold">DOWNLOAD PDF</button>
-            </div>
+        <div class="bg-slate-900 p-4 rounded-3xl flex gap-4 mb-16 shadow-2xl">
+            <input type="text" id="url" placeholder="https://..." class="flex-1 bg-transparent px-6 py-4 text-white outline-none text-xl">
+            <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-bold transition-all">ANALYZE NOW</button>
         </div>
 
-        <div id="metric-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10"></div>
-
-        <div class="glass p-6 rounded-xl mb-10">
-            <h3 class="text-xl font-bold mb-4">Category Scores</h3>
-            <canvas id="categoryChart"></canvas>
-        </div>
-    </div>
-</div>
-
-<script>
-let lastAuditData = {};
-
-async function startAudit() {
-    const url = document.getElementById('url').value;
-    const res = await fetch('/audit', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({url})
-    });
-    const data = await res.json();
-    lastAuditData = data.summary;
-    document.getElementById('results').classList.remove('hidden');
-    document.getElementById('grade').innerText = data.summary.grade;
-    document.getElementById('score').innerText = data.summary.score + "%";
-
-    const grid = document.getElementById('metric-grid');
-    grid.innerHTML = "";
-    Object.values(data.summary.metrics).forEach(m => {
-        grid.innerHTML += `
-            <div class="glass p-4 rounded-xl">
-                <div class="flex justify-between text-[10px] mb-2">
-                    <span class="text-blue-400 font-bold uppercase">${m.cat}</span>
-                    <span class="${m.status==='PASS'?'text-emerald-400':'text-rose-400'} font-bold">${m.status}</span>
+        <div id="results" class="hidden space-y-12">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-slate-900 p-10 rounded-[3rem] text-center border-b-4 border-blue-500">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Global Grade</p>
+                    <div id="grade" class="text-8xl font-black text-white mt-2"></div>
                 </div>
-                <h3 class="text-xs font-bold">${m.name}</h3>
-            </div>`;
-    });
+                <div class="bg-slate-900 p-10 rounded-[3rem] text-center">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest">Efficiency Score</p>
+                    <div id="score" class="text-8xl font-black text-emerald-500 mt-2"></div>
+                </div>
+                <div class="bg-slate-900 p-10 rounded-[3rem] flex flex-col justify-center gap-4">
+                    <button onclick="downloadPDF()" class="bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest">Download Full PDF</button>
+                </div>
+            </div>
 
-    const ctx = document.getElementById('categoryChart').getContext('2d');
-    if(window.categoryChart) window.categoryChart.destroy();
-    window.categoryChart = new Chart(ctx, {
-        type:'bar',
-        data:{
-            labels:Object.keys(data.summary.category_scores),
-            datasets:[{
-                label:'Average Score',
-                data:Object.values(data.summary.category_scores),
-                backgroundColor:['#28a745','#ffc107','#dc3545','#17a2b8']
-            }]
-        },
-        options:{scales:{y:{beginAtZero:true,max:100}}}
-    });
-}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="category-grid"></div>
 
-async function downloadPDF() {
-    if (!lastAuditData) return alert("Run an audit first!");
-    const res = await fetch('/download_pdf', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-            url: document.getElementById('url').value,
-            grade: lastAuditData.grade,
-            score: lastAuditData.score,
-            metrics: lastAuditData.metrics,
-            text: lastAuditData.text,
-            category_scores: lastAuditData.category_scores
-        })
-    });
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "Swaleh_Web_Audit_Report.pdf";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-}
-</script>
+            <div class="bg-slate-900 rounded-[3rem] overflow-hidden">
+                <div class="p-8 border-b border-white/5 flex justify-between items-center">
+                    <h3 class="text-2xl font-bold text-blue-500 uppercase tracking-tighter">Full Technical Breakdown</h3>
+                    <span class="text-slate-500 font-mono text-sm uppercase font-bold">57 Points Mapped</span>
+                </div>
+                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 p-8 max-h-[600px] overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let lastData = null;
+    async function runAudit() {
+        const url = document.getElementById('url').value;
+        const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+        const data = await res.json();
+        lastData = data;
+
+        document.getElementById('results').classList.remove('hidden');
+        document.getElementById('grade').innerText = data.grade;
+        document.getElementById('score').innerText = data.score + "%";
+
+        // Populate Categories
+        const catGrid = document.getElementById('category-grid');
+        catGrid.innerHTML = Object.entries(data.cat_scores).map(([name, s]) => `
+            <div class="bg-slate-900 p-6 rounded-2xl text-center border border-white/5">
+                <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">${name}</p>
+                <p class="text-2xl font-black text-blue-400">${s}%</p>
+            </div>
+        `).join('');
+
+        // Populate Metrics
+        const mGrid = document.getElementById('metrics-grid');
+        mGrid.innerHTML = data.metrics.map(m => `
+            <div class="p-5 rounded-2xl bg-white/5 border border-white/5">
+                <div class="flex justify-between text-[9px] font-bold uppercase mb-3">
+                    <span class="text-blue-500">${m.category}</span>
+                    <span class="${m.status==='PASS'?'text-emerald-500':'text-rose-500'}">${m.status}</span>
+                </div>
+                <h4 class="text-sm font-bold text-white mb-2">${m.name}</h4>
+                <div class="w-full bg-slate-800 h-1 rounded-full"><div class="h-full bg-blue-500" style="width:${m.score}%"></div></div>
+            </div>
+        `).join('');
+    }
+
+    async function downloadPDF() {
+        if(!lastData) return alert("Run audit first");
+        const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(lastData) });
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = window.URL.createObjectURL(blob);
+        a.download = "Swaleh_Audit_Report.pdf";
+        a.click();
+    }
+    </script>
 </body>
-</html>
