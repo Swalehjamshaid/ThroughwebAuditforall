@@ -1,111 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Swaleh Audit | Realistic Intelligence</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .metric-card { background: rgba(30, 41, 59, 0.4); border: 1px solid #1e293b; border-radius: 12px; }
-        .critical { border-left: 4px solid #ef4444; }
-        .warning { border-left: 4px solid #f59e0b; }
-        .pass { border-left: 4px solid #22c55e; }
-        .score-circle { width: 120px; height: 120px; border-radius: 50%; border: 8px solid #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 900; }
-    </style>
-</head>
-<body class="p-6 lg:p-12">
-    <div class="max-w-6xl mx-auto">
-        <header class="text-center mb-10">
-            <h1 class="text-5xl font-black text-white">SWALEH <span class="text-blue-500">REAL-AUDIT</span></h1>
-            <p class="text-slate-400 tracking-widest text-xs mt-2 uppercase">Elite Heuristic Analysis Engine</p>
-        </header>
+<div id="results" class="hidden space-y-10">
+    <div class="flex flex-wrap gap-4 justify-center py-4 border-b border-slate-800">
+        <span class="text-[10px] text-slate-400 uppercase font-bold">Weighting Engine:</span>
+        <span class="px-2 py-1 bg-red-950/30 text-red-500 rounded text-[10px] border border-red-500/20">SECURITY (3.0x)</span>
+        <span class="px-2 py-1 bg-blue-950/30 text-blue-500 rounded text-[10px] border border-blue-500/20">PERFORMANCE (2.5x)</span>
+        <span class="px-2 py-1 bg-slate-800 text-slate-400 rounded text-[10px]">ACCESSIBILITY (0.5x)</span>
+    </div>
 
-        <div class="flex flex-col md:flex-row gap-4 mb-16">
-            <input id="urlInput" type="text" placeholder="Enter URL (e.g. apple.com)" class="flex-1 bg-slate-900 border border-slate-700 p-4 rounded-lg focus:ring-2 ring-blue-500 outline-none text-white">
-            <button onclick="runAudit()" id="btn" class="bg-blue-600 hover:bg-blue-700 px-10 py-4 rounded-lg font-bold transition transform active:scale-95">START DEEP SCAN</button>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="glass-panel p-10 text-center flex flex-col items-center border-t-4 border-blue-500">
+            <h2 class="text-7xl font-black mb-2" id="bigScore">0</h2>
+            <p class="text-blue-400 uppercase tracking-widest font-bold text-xs">Weighted Grade</p>
+            <div class="mt-6 w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div id="scoreBar" class="h-full bg-blue-500 transition-all duration-1000" style="width: 0%"></div>
+            </div>
         </div>
-
-        <div id="loader" class="hidden text-center py-20 animate-pulse">
-            <p class="text-blue-400 font-mono tracking-tighter text-xl">PARSING DOM STRUCTURE... MEASURING LATENCY... CHECKING SSL... [60 METRICS]</p>
-        </div>
-
-        <div id="results" class="hidden">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-                <div class="metric-card p-6 flex flex-col items-center">
-                    <span class="text-xs text-slate-500 font-bold mb-4 uppercase">Overall Health</span>
-                    <div id="bigScore" class="score-circle">0%</div>
+        
+        <div class="lg:col-span-2 glass-panel p-10 bg-gradient-to-br from-slate-900 to-blue-900/10">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                Strategic Financial Forensic
+            </h3>
+            <p id="summary" class="text-slate-300 leading-relaxed text-lg mb-6"></p>
+            <div class="grid grid-cols-2 gap-8 border-t border-slate-800 pt-6">
+                <div>
+                    <span class="block text-xs text-slate-500 font-bold mb-1">REVENUE LEAKAGE RATE</span>
+                    <span id="leakageVal" class="text-3xl font-black text-red-500">0%</span>
                 </div>
-                <div class="md:col-span-3 metric-card p-8 bg-gradient-to-br from-slate-900 to-red-950/20">
-                    <h2 class="text-red-500 font-bold uppercase text-xs mb-2">Vulnerability Alert</h2>
-                    <p class="text-3xl font-bold mb-2">Primary Bottleneck: <span id="weakArea" class="text-white">...</span></p>
-                    <p id="summary" class="text-slate-400 leading-relaxed italic"></p>
+                <div>
+                    <span class="block text-xs text-slate-500 font-bold mb-1">ANNUAL POTENTIAL LOSS</span>
+                    <span id="lossVal" class="text-3xl font-black text-white">$0</span>
                 </div>
             </div>
-
-            <div class="flex justify-between items-end mb-6">
-                <h3 class="text-2xl font-bold">60-POINT TECHNICAL SCORECARD</h3>
-                <button onclick="downloadPDF()" class="bg-white text-black px-4 py-2 rounded font-bold text-sm">EXPORT FULL PDF</button>
-            </div>
-
-            <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                </div>
         </div>
     </div>
 
-    <script>
-        let reportData = null;
-
-        async function runAudit() {
-            const url = document.getElementById('urlInput').value;
-            if(!url) return;
-
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-
-            const res = await fetch('/audit', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({url})
-            });
-
-            reportData = await res.json();
-            
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
-            
-            document.getElementById('bigScore').innerText = reportData.avg_score + "%";
-            document.getElementById('weakArea').innerText = reportData.weak_area;
-            document.getElementById('summary').innerText = reportData.summary;
-
-            const grid = document.getElementById('metricsGrid');
-            grid.innerHTML = '';
-            reportData.metrics.forEach(m => {
-                const sClass = m.status.toLowerCase();
-                grid.innerHTML += `
-                    <div class="metric-card p-5 ${sClass}">
-                        <div class="flex justify-between text-xs font-bold opacity-50 mb-1">
-                            <span>${m.category}</span>
-                            <span>${m.score}%</span>
-                        </div>
-                        <h4 class="font-bold text-sm">${m.name}</h4>
-                        <p class="text-[10px] text-slate-500 mt-2">${m.desc}</p>
-                    </div>
-                `;
-            });
-        }
-
-        async function downloadPDF() {
-            const res = await fetch('/download', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(reportData)
-            });
-            const blob = await res.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = "Swaleh_Elite_Audit.pdf";
-            a.click();
-        }
-    </script>
-</body>
-</html>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" id="metricsGrid">
+        </div>
+</div>
