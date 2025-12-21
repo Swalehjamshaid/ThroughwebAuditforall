@@ -1,118 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>Swaleh Web Audit Elite</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swaleh Elite Web Audit Report</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #020617; font-family: 'Inter', sans-serif; color: white; }
-        .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .weak-highlight { border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
+        body { font-family: 'Inter', sans-serif; }
+        .status-pass { @apply bg-green-100 text-green-800; }
+        .status-fail { @apply bg-red-100 text-red-800; }
     </style>
 </head>
-<body class="p-6 md:p-12">
-    <div class="max-w-6xl mx-auto">
-        <header class="text-center mb-12">
-            <h1 class="text-6xl font-black text-blue-500">SWALEH AUDIT</h1>
-            <p class="text-slate-500 uppercase tracking-widest text-sm font-bold">Elite Strategic Intelligence</p>
-        </header>
+<body class="bg-gray-50 text-gray-800">
 
-        <div class="glass p-4 rounded-3xl flex gap-4 mb-12 shadow-2xl">
-            <input type="text" id="url" placeholder="Enter URL (https://...)" class="flex-1 bg-transparent px-6 py-4 text-xl outline-none">
-            <button onclick="startAudit()" id="audit-btn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-bold transition-all">ANALYZE NOW</button>
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="bg-slate-900 text-white rounded-t-lg px-8 py-10 text-center">
+            <h1 class="text-4xl font-bold mb-2">SWALEH WEB AUDIT: ELITE STRATEGY</h1>
+            <p class="text-xl opacity-90">Comprehensive 60+ Point Technical Analysis • December 2025 Standards</p>
+            <p class="mt-4 text-lg">Website Audited: <span class="font-semibold" id="url-display">{{ audit_data.url }}</span></p>
         </div>
 
-        <div id="loading-zone" class="hidden glass p-10 rounded-[3rem] text-center mb-12">
-            <p id="status-text" class="text-blue-400 font-mono mb-4 text-sm uppercase tracking-widest">Initializing 57 Probes...</p>
-            <div class="w-full bg-slate-800 h-4 rounded-full overflow-hidden">
-                <div id="progress-bar" class="h-full bg-blue-600 transition-all duration-300" style="width: 0%"></div>
+        <!-- Overall Score & Grade -->
+        <div class="bg-white shadow-lg -mt-4 rounded-b-lg px-8 py-6 flex flex-col md:flex-row justify-between items-center">
+            <div class="text-center md:text-left">
+                <h2 class="text-2xl font-semibold">Overall Score</h2>
+                <p class="text-5xl font-bold text-slate-900 mt-2">{{ audit_data.score }}<span class="text-3xl">%</span></p>
+                <p class="text-3xl font-bold mt-4 text-indigo-600">Grade: {{ audit_data.grade }}</p>
+            </div>
+            <div class="mt-6 md:mt-0 text-center">
+                <p class="text-lg font-medium">Primary Weak Area</p>
+                <p class="text-2xl font-bold text-red-600 mt-2">{{ audit_data.weak_area }}</p>
+                <p class="text-sm text-gray-600">(Score: {{ audit_data.cat_scores[audit_data.weak_area] }}%)</p>
+            </div>
+            <div class="mt-6 md:mt-0">
+                <button onclick="downloadPDF()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow transition">
+                    Download PDF Report
+                </button>
             </div>
         </div>
 
-        <div id="results" class="hidden space-y-12">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="glass p-10 rounded-[3rem] text-center border-b-4 border-blue-500">
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest tracking-widest">Global Grade</p>
-                    <div id="grade" class="text-8xl font-black text-white mt-2"></div>
-                </div>
-                <div class="glass p-10 rounded-[3rem] text-center">
-                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest tracking-widest">Efficiency Score</p>
-                    <div id="score" class="text-8xl font-black text-emerald-500 mt-2"></div>
-                </div>
-                <div class="glass p-10 rounded-[3rem] flex flex-col justify-center">
-                    <button onclick="downloadPDF()" class="bg-white text-black py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl">Download PDF</button>
-                </div>
+        <!-- Executive Summary (200+ Words Suggestive Improvement Plan) -->
+        <div class="mt-10 bg-white rounded-lg shadow-lg p-8">
+            <h2 class="text-3xl font-bold text-slate-900 mb-6">Executive Strategy & Improvement Plan</h2>
+            <div class="prose prose-lg max-w-none text-gray-700 leading-relaxed">
+                {{ audit_data.summary | safe }}
+            </div>
+        </div>
+
+        <!-- Category Scores Overview -->
+        <div class="mt-10 grid grid-cols-1 md:grid-cols-4 gap-6">
+            {% for category in ["Performance", "SEO", "Security", "Accessibility"] %}
+            <div class="bg-white rounded-lg shadow p-6 text-center {% if category == audit_data.weak_area %}ring-4 ring-red-400{% endif %}">
+                <h3 class="text-xl font-semibold text-gray-800">{{ category }}</h3>
+                <p class="text-4xl font-bold mt-4 {% if audit_data.cat_scores[category] >= 85 %}text-green-600{% else %}text-red-600{% endif %}">
+                    {{ audit_data.cat_scores[category] }}%
+                </p>
+                <p class="mt-2 text-sm text-gray-600">
+                    {% if audit_data.cat_scores[category] >= 85 %}Strong Performance{% else %}Needs Immediate Attention{% endif %}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Detailed Metrics Table -->
+        <div class="mt-10 bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="px-8 py-6 bg-gray-100 border-b">
+                <h2 class="text-2xl font-bold">Detailed {{ audit_data.metrics | length }}-Point Technical Scorecard</h2>
+                <p class="text-gray-600 mt-1">All metrics evaluated with strict 2025 compliance thresholds</p>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="cat-grid"></div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 border-b-2 border-gray-200">
+                        <tr>
+                            <th class="px-6 py-4 text-left font-semibold text-gray-900">Metric Name</th>
+                            <th class="px-6 py-4 text-left font-semibold text-gray-900">Category</th>
+                            <th class="px-6 py-4 text-center font-semibold text-gray-900">Score</th>
+                            <th class="px-6 py-4 text-center font-semibold text-gray-900">Status</th>
+                            <th class="px-6 py-4 text-left font-semibold text-gray-900">Description & Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for metric in audit_data.metrics %}
+                        <tr class="{% if metric.status == 'FAIL' %}bg-red-50{% endif %} hover:bg-gray-50 transition">
+                            <td class="px-6 py-4 font-medium">{{ metric.name }}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                                    {{ metric.category }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-center font-bold {% if metric.score >= 85 %}text-green-600{% else %}text-red-600{% endif %}">
+                                {{ metric.score }}%
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="px-4 py-2 rounded-full text-xs font-bold {% if metric.status == 'PASS' %}status-pass{% else %}status-fail{% endif %}">
+                                    {{ metric.status }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-700">{{ metric.desc }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-            <h3 class="text-xl font-bold uppercase text-slate-400 tracking-widest">57 Data Points Elaborated</h3>
-            <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-2"></div>
+        <!-- Footer -->
+        <div class="mt-12 text-center text-gray-500 text-sm">
+            <p>Swaleh Elite Web Audit • Powered by Advanced Diagnostics • Report generated on December 21, 2025</p>
+            <p class="mt-2">For personalized consultation and implementation support, contact our elite strategy team.</p>
         </div>
     </div>
 
     <script>
-    let lastData = null;
-    async function startAudit() {
-        const url = document.getElementById('url').value;
-        if(!url) return alert("Please enter a URL");
-
-        document.getElementById('audit-btn').disabled = true;
-        document.getElementById('loading-zone').classList.remove('hidden');
-        document.getElementById('results').classList.add('hidden');
-
-        const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-        const data = await res.json();
-        lastData = data;
-
-        // Visual Sequence for 57 Metrics
-        const progressBar = document.getElementById('progress-bar');
-        const statusText = document.getElementById('status-text');
-        
-        for(let i=1; i<=57; i++) {
-            await new Promise(r => setTimeout(r, 40));
-            progressBar.style.width = `${(i/57)*100}%`;
-            statusText.innerText = `Probe ${i}/57: Analyzing ${data.metrics[i-1].category} layers...`;
+        function downloadPDF() {
+            fetch('/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({{ audit_data | tojson }})
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Swaleh_Audit_Report_{{ audit_data.url | replace("https://", "") | replace("http://", "") | replace("/", "_") }}.pdf';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(err => alert('Error generating PDF: ' + err));
         }
-
-        setTimeout(() => {
-            document.getElementById('loading-zone').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('grade').innerText = data.grade;
-            document.getElementById('score').innerText = data.score + "%";
-
-            // Category Scores
-            document.getElementById('cat-grid').innerHTML = Object.entries(data.cat_scores).map(([n, s]) => `
-                <div class="glass p-6 rounded-2xl text-center ${n === data.weak_area ? 'weak-highlight' : ''}">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">${n}</p>
-                    <p class="text-2xl font-black text-blue-400">${s}%</p>
-                    ${n === data.weak_area ? '<p class="text-[8px] text-red-500 font-bold mt-1 uppercase">Weak Area</p>' : ''}
-                </div>
-            `).join('');
-
-            // Detailed Metrics
-            document.getElementById('metrics-grid').innerHTML = data.metrics.map(m => `
-                <div class="p-5 rounded-2xl glass border border-white/5">
-                    <div class="flex justify-between text-[9px] font-bold uppercase mb-2">
-                        <span class="text-blue-500 tracking-widest">${m.category}</span>
-                        <span class="${m.status==='PASS'?'text-emerald-500':'text-rose-500'}">${m.status}</span>
-                    </div>
-                    <h4 class="text-sm font-bold text-white mb-1">${m.name}</h4>
-                    <p class="text-[9px] text-slate-500 mb-3 leading-tight">${m.desc}</p>
-                    <div class="w-full bg-slate-800 h-1 rounded-full"><div class="h-full bg-blue-500" style="width:${m.score}%"></div></div>
-                </div>
-            `).join('');
-            document.getElementById('audit-btn').disabled = false;
-        }, 500);
-    }
-
-    async function downloadPDF() {
-        const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(lastData) });
-        const blob = await res.blob();
-        const a = document.createElement('a');
-        a.href = window.URL.createObjectURL(blob);
-        a.download = "Audit_Report.pdf";
-        a.click();
-    }
     </script>
+
 </body>
 </html>
