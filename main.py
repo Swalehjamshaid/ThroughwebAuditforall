@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
 
+# Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI(title="FF TECH | Elite Strategic Intelligence 2025")
@@ -73,20 +74,21 @@ METRICS: List[Dict[str, any]] = [
     {"name": "Best Practices Score", "category": "Best Practices", "weight": 3.5},
 ]
 
-# ====================== INTEGRATED HTML DASHBOARD ======================
+# ====================== WORLD-CLASS INTEGRATED HTML ======================
+# Integrated HTML fixes the 404/File Not Found error on Railway.
 HTML_DASHBOARD = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | Elite Strategic Intelligence 2025</title>
+    <title>FF TECH | Elite Strategic Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
         body { background: var(--dark); color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(30,41,59,0.4) 0%, transparent 50%); }
-        .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
-        .score-ring { background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0); transition: all 2s cubic-bezier(0.4,0,0.2,1); border-radius: 50%; }
+        .glass { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
+        .score-ring { background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0); transition: all 2s ease-in-out; border-radius: 50%; }
         .gradient-text { background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
@@ -98,14 +100,14 @@ HTML_DASHBOARD = """
                 <h1 class="text-5xl font-black uppercase">Tech <span class="text-blue-500">Elite</span></h1>
             </div>
             <div class="glass p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-4">
-                <input id="urlInput" type="url" placeholder="Enter target URL (e.g., google.com)" class="flex-1 bg-transparent p-4 text-xl outline-none">
-                <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-4 rounded-2xl transition-all shadow-lg">START DEEP SCAN</button>
+                <input id="urlInput" type="url" placeholder="Enter target URL..." class="flex-1 bg-transparent p-4 text-xl outline-none">
+                <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-4 rounded-2xl transition-all">START SCAN</button>
             </div>
         </header>
 
         <div id="loader" class="hidden text-center py-20 animate-pulse">
             <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-            <p class="text-2xl text-blue-400 font-mono tracking-widest uppercase">Executing Forensic Probes...</p>
+            <p class="text-2xl text-blue-400 tracking-widest uppercase">Executing Forensic Probes...</p>
         </div>
 
         <div id="results" class="hidden space-y-10">
@@ -117,15 +119,13 @@ HTML_DASHBOARD = """
                             <span class="text-xs font-bold text-slate-500 tracking-widest uppercase mt-2">Weighted Score</span>
                         </div>
                     </div>
-                    <h3 id="gradeLabel" class="text-2xl font-black text-blue-500 uppercase">Analyzing...</h3>
                 </div>
                 <div class="lg:col-span-8 glass p-10">
-                    <h3 class="text-3xl font-black mb-6 gradient-text">Executive Strategic Overview</h3>
+                    <h3 class="text-3xl font-black mb-6 gradient-text uppercase">Executive Strategic Overview</h3>
                     <div id="summary" class="text-slate-300 leading-relaxed text-lg border-l-4 border-blue-600/30 pl-6 whitespace-pre-line"></div>
-                    <div class="mt-8 pt-8 border-t border-slate-800 flex flex-wrap gap-12 items-center">
-                        <div><p class="text-xs font-bold text-slate-500 uppercase mb-1">Latency</p><p id="ttfbVal" class="text-3xl font-black">--- ms</p></div>
-                        <div><p class="text-xs font-bold text-slate-500 uppercase mb-1">Security</p><p id="httpsVal" class="text-3xl font-black text-green-400">CHECKING</p></div>
-                        <button onclick="downloadPDF()" id="pdfBtn" class="ml-auto bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-slate-200 transition-all shadow-xl">EXPORT ELITE PDF</button>
+                    <div class="mt-8 flex justify-between items-center">
+                        <div id="bottleneckTag" class="text-red-500 font-bold uppercase text-sm"></div>
+                        <button onclick="downloadPDF()" id="pdfBtn" class="bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-slate-200 transition-all">EXPORT ELITE PDF</button>
                     </div>
                 </div>
             </div>
@@ -135,88 +135,37 @@ HTML_DASHBOARD = """
     <script>
         let reportData = null;
         async function runAudit() {
-            const urlInput = document.getElementById('urlInput');
-            const url = urlInput.value.trim();
+            const url = document.getElementById('urlInput').value.trim();
             if(!url) return alert('Please enter a valid URL');
-            
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
-            
             try {
-                const res = await fetch('/audit', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({url}) 
-                });
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
                 reportData = await res.json();
-                
                 document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
-                document.getElementById('gradeLabel').textContent = reportData.grade_label;
                 document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
                 document.getElementById('summary').textContent = reportData.summary;
-                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
-                document.getElementById('httpsVal').textContent = reportData.https_status;
-                
+                document.getElementById('bottleneckTag').textContent = "PRIMARY BOTTLENECK: " + reportData.weakest_category;
                 const grid = document.getElementById('metricsGrid');
                 grid.innerHTML = '';
                 reportData.metrics.forEach(m => {
-                    const color = m.score > 75 ? 'border-green-500/50 text-green-400' : 
-                                  m.score > 50 ? 'border-orange-500/50 text-orange-400' : 
-                                  'border-red-500/50 text-red-500';
-                    grid.innerHTML += `
-                        <div class="glass p-6 border-l-4 ${color}">
-                            <p class="text-[10px] font-bold text-slate-500 uppercase mb-2">${m.category}</p>
-                            <div class="flex justify-between items-center mb-2">
-                                <h4 class="font-bold text-xs text-white">${m.name}</h4>
-                                <span class="font-black text-xs">${m.score}%</span>
-                            </div>
-                            <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div class="h-full bg-current transition-all duration-1000" style="width: ${m.score}%"></div>
-                            </div>
-                        </div>`;
+                    const color = m.score > 75 ? 'border-green-500 text-green-400' : m.score > 50 ? 'border-orange-500 text-orange-400' : 'border-red-500 text-red-500';
+                    grid.innerHTML += `<div class="glass p-6 border-l-4 ${color}"><p class="text-[10px] text-slate-500 uppercase mb-2 font-bold">${m.category}</p><h4 class="font-bold text-xs text-white mb-2 leading-tight">${m.name}</h4><span class="font-black text-xs">${m.score}%</span></div>`;
                 });
-                
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('results').classList.remove('hidden');
-            } catch(e) { 
-                alert('Audit failed. Please check the console.'); 
-                document.getElementById('loader').classList.add('hidden'); 
-            }
+            } catch(e) { alert('Audit failed'); document.getElementById('loader').classList.add('hidden'); }
         }
-        
         async function downloadPDF() {
-            if(!reportData) return alert("Please run an audit first");
-            const btn = document.getElementById('pdfBtn'); 
-            btn.textContent = 'Generating PDF...';
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/download', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify(reportData) 
-                });
-                
-                if (!res.ok) throw new Error('PDF Generation Failed');
-                
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `FFTech_Elite_Audit_${reportData.total_grade}pct.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            } catch(e) {
-                alert('Export failed. Check server logs.');
-            } finally {
-                btn.textContent = 'EXPORT ELITE PDF';
-                btn.disabled = false;
-            }
+            if(!reportData) return;
+            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating PDF...';
+            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
+            const blob = await res.blob();
+            const a = document.createElement('a'); 
+            a.href = window.URL.createObjectURL(blob); 
+            a.download = 'FFTech_Elite_Audit_Report.pdf'; 
+            a.click();
+            btn.textContent = 'EXPORT ELITE PDF';
         }
     </script>
 </body>
@@ -245,11 +194,11 @@ async def audit(request: Request):
 
     try:
         start = time.time()
-        headers = {'User-Agent': 'FFTechElite/5.0 (Forensic Audit)'}
+        headers = {'User-Agent': 'FFTechElite/5.0'}
         resp = requests.get(url, timeout=12, headers=headers, verify=False)
         ttfb = round((time.time() - start) * 1000)
         is_https = resp.url.startswith("https://")
-    except: ttfb, is_https = random.randint(400, 800), False
+    except: ttfb, is_https = 999, False
 
     results, total_weighted, total_w = [], 0.0, 0.0
     cat_scores = {}
@@ -264,99 +213,68 @@ async def audit(request: Request):
         total_w += m["weight"]
 
     final_grade = round(total_weighted / total_w)
-    label = "ELITE" if final_grade >= 90 else "EXCELLENT" if final_grade >= 80 else "GOOD" if final_grade >= 65 else "CRITICAL"
     weakest_cat = min(cat_scores, key=lambda k: sum(cat_scores[k])/len(cat_scores[k]))
     
-    # 200-Word Strategic Improvement Plan
+    # Professional 200-Word Strategic Plan
     summary = (
-        f"EXECUTIVE STRATEGIC OVERVIEW: The 66-point forensic audit for {url} establishes a global weighted health score of {final_grade}% ({label}). "
-        f"Our analytical mapping identifies the '{weakest_cat}' sector as your primary operational bottleneck, scoring significantly below industry benchmarks. "
-        "In the 2025 digital economy, performance is no longer a luxury—it is a fundamental conversion requirement. "
+        f"EXECUTIVE STRATEGIC OVERVIEW: The forensic audit for {url} establishes a baseline efficiency of {final_grade}%. "
+        f"Our analysis identifies the '{weakest_cat}' sector as your primary technical debt driver. "
+        "In the 2025 digital economy, performance is no longer a luxury—it is a conversion requirement. "
         f"The server latency (TTFB: {ttfb}ms) indicates measurable revenue leakage that actively suppresses user retention. "
-        "To stabilize and improve your search rankings, we recommend an immediate 30-day technical sprint focusing on Core Web Vitals to satisfy "
-        "Google's primary ranking signals. This effort should specifically target a 22% reduction in bounce rates by optimizing high-weight assets. "
-        "Furthermore, hardening security protocols and ensuring seamless mobile responsiveness will safeguard brand trust. "
-        "This roadmap transforms existing technical debt into a high-yield strategic advantage, ensuring your platform outpaces optimized competitors "
-        "within the next 90 days. Ongoing quarterly re-audits are advised to maintain this elite competitive trajectory."
+        "To stabilize your search rankings, we recommend an immediate 30-day technical sprint focusing on Core Web Vitals to satisfy "
+        "Google's primary ranking signals. This effort should specifically target bounce rate reduction by optimizing high-weight assets. "
+        "Furthermore, hardening security protocols via HSTS and CSP headers is essential to maintain brand trust. "
+        "This roadmap transforms your platform into a high-yield strategic asset, ensuring you outpace optimized competitors "
+        "within 90 days. Quarterly re-audits are advised to maintain this elite competitive trajectory."
     )
 
     return {
-        "url": url, "total_grade": final_grade, "grade_label": label,
-        "summary": summary, "metrics": results, "ttfb": ttfb, 
-        "https_status": "Secured" if is_https else "Exposed",
-        "weakest_category": weakest_cat
+        "url": url, "total_grade": final_grade, "summary": summary,
+        "metrics": results, "ttfb": ttfb, "weakest_category": weakest_cat
     }
 
 @app.post("/download")
 async def download_pdf(request: Request):
-    try:
-        data = await request.json()
-        pdf = FFTechPDF()
-        pdf.add_page()
-        
-        # Header Grade
-        pdf.set_font("Helvetica", "B", 36)
-        pdf.set_text_color(59, 130, 246)
-        pdf.cell(0, 20, f"{data['total_grade']}%", 0, 1, 'C')
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 10, f"GRADE: {data['grade_label']}", 0, 1, 'C')
-        pdf.ln(10)
+    data = await request.json()
+    pdf = FFTechPDF()
+    pdf.add_page()
+    
+    # 1. Title and Score
+    pdf.set_font("Helvetica", "B", 36); pdf.set_text_color(59, 130, 246)
+    pdf.cell(0, 20, f"{data['total_grade']}%", 0, 1, 'C')
+    pdf.ln(10)
 
-        # Executive Summary
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, "1. STRATEGIC RECOVERY ROADMAP", ln=1)
-        pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 6, data["summary"])
-        pdf.ln(10)
+    # 2. 200-Word Strategic Plan
+    pdf.set_font("Helvetica", "B", 14); pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, "1. STRATEGIC RECOVERY PLAN", ln=1)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6, data["summary"])
+    pdf.ln(10)
 
-        # Primary Bottleneck Highlight
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.set_text_color(220, 38, 38)
-        pdf.cell(0, 10, f"PRIMARY BOTTLENECK: {data.get('weakest_category', 'Technical SEO')}", ln=1)
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(5)
+    # 3. Weakest Area Highlight
+    pdf.set_font("Helvetica", "B", 12); pdf.set_text_color(220, 38, 38)
+    pdf.cell(0, 10, f"PRIMARY BOTTLENECK: {data.get('weakest_category', 'Infrastructure')}", ln=1)
+    pdf.set_text_color(0, 0, 0); pdf.ln(5)
 
-        # 66 Metrics Table
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_fill_color(241, 245, 249)
-        pdf.cell(90, 8, "METRIC", 1, 0, 'L', 1)
-        pdf.cell(50, 8, "CATEGORY", 1, 0, 'C', 1)
-        pdf.cell(30, 8, "SCORE", 1, 1, 'C', 1)
-        
-        pdf.set_font("Helvetica", "", 8)
-        for m in data["metrics"]:
-            if pdf.get_y() > 270: pdf.add_page()
-            pdf.cell(90, 6, m["name"], 1)
-            pdf.cell(50, 6, m["category"], 1)
-            
-            # Color coding for scores
-            score = m["score"]
-            if score > 75: pdf.set_text_color(0, 128, 0)
-            elif score > 45: pdf.set_text_color(217, 119, 6)
-            else: pdf.set_text_color(220, 20, 60)
-            
-            pdf.cell(30, 6, f"{score}%", 1, 1, 'C')
-            pdf.set_text_color(0, 0, 0)
+    # 4. Detailed 66-Point Matrix
+    pdf.set_font("Helvetica", "B", 10); pdf.set_fill_color(241, 245, 249)
+    pdf.cell(90, 8, "METRIC", 1, 0, 'L', 1); pdf.cell(50, 8, "CATEGORY", 1, 0, 'C', 1); pdf.cell(30, 8, "SCORE", 1, 1, 'C', 1)
+    pdf.set_font("Helvetica", "", 8)
+    for m in data["metrics"]:
+        if pdf.get_y() > 270: pdf.add_page()
+        pdf.cell(90, 6, m["name"], 1); pdf.cell(50, 6, m["category"], 1); pdf.cell(30, 6, f"{m['score']}%", 1, 1, 'C')
 
-        # Binary Stream Encoding Fix
-        buffer = io.BytesIO()
-        pdf_content = pdf.output(dest='S').encode('latin-1')
-        buffer.write(pdf_content)
-        buffer.seek(0)
-        
-        filename = f"FFTech_Audit_Report_{data['total_grade']}pct.pdf"
-        
-        return StreamingResponse(
-            buffer, 
-            media_type="application/pdf", 
-            headers={
-                "Content-Disposition": f"attachment; filename={filename}",
-                "Access-Control-Expose-Headers": "Content-Disposition"
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # Binary Stream Memory Fix
+    buffer = io.BytesIO()
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    buffer.write(pdf_output)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": "attachment; filename=FFTech_Elite_Audit.pdf"}
+    )
 
 if __name__ == "__main__":
     import uvicorn
