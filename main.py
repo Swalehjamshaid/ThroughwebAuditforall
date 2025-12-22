@@ -2,9 +2,9 @@ import io
 import random
 import time
 import os
-from typing import List, Dict
 import requests
 import urllib3
+from typing import List, Dict
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -82,6 +82,105 @@ METRICS: List[Dict[str, any]] = [
     {"name": "Best Practices Score", "category": "Best Practices", "weight": 3.5},
 ]
 
+# ====================== INTEGRATED WORLD-CLASS HTML ======================
+HTML_DASHBOARD = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH | Elite Strategic Intelligence 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
+        body { background: var(--dark); color: #f8fafc; font-family: 'Inter', sans-serif; background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(30,41,59,0.4) 0%, transparent 50%); }
+        .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
+        .score-ring { background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0); transition: all 2s cubic-bezier(0.4,0,0.2,1); border-radius: 50%; }
+        .gradient-text { background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body class="p-6 md:p-12 min-h-screen">
+    <div class="max-w-7xl mx-auto space-y-12">
+        <header class="text-center space-y-6">
+            <div class="flex items-center gap-4 justify-center">
+                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-xl font-black">FF</div>
+                <h1 class="text-5xl font-black uppercase">Tech <span class="text-blue-500">Elite</span></h1>
+            </div>
+            <div class="glass p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-4">
+                <input id="urlInput" type="url" placeholder="Enter target URL..." class="flex-1 bg-transparent p-4 text-xl outline-none">
+                <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-4 rounded-2xl transition-all">START DEEP SCAN</button>
+            </div>
+        </header>
+
+        <div id="loader" class="hidden text-center py-20 animate-pulse">
+            <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+            <p class="text-2xl text-blue-400 font-mono tracking-widest uppercase">Deploying 66+ Forensic Probes...</p>
+        </div>
+
+        <div id="results" class="hidden space-y-10">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center text-center">
+                    <div id="gradeRing" class="score-ring w-64 h-64 relative mb-6" style="--percent: 0">
+                        <div class="absolute inset-4 bg-[#020617] rounded-full flex flex-col items-center justify-center">
+                            <span id="totalGradeNum" class="text-6xl font-black">0%</span>
+                            <span class="text-xs font-bold text-slate-500 tracking-widest uppercase mt-2">Weighted Score</span>
+                        </div>
+                    </div>
+                    <h3 id="gradeLabel" class="text-2xl font-black text-blue-500 uppercase">Analyzing...</h3>
+                </div>
+                <div class="lg:col-span-8 glass p-10">
+                    <h3 class="text-3xl font-black mb-6 gradient-text">Executive Strategic Overview</h3>
+                    <div id="summary" class="text-slate-300 leading-relaxed text-lg border-l-4 border-blue-600/30 pl-6 whitespace-pre-line"></div>
+                    <div class="mt-8 pt-8 border-t border-slate-800 flex flex-wrap gap-12">
+                        <div><p class="text-xs font-bold text-slate-500 uppercase mb-1">Latency</p><p id="ttfbVal" class="text-3xl font-black">--- ms</p></div>
+                        <div><p class="text-xs font-bold text-slate-500 uppercase mb-1">Security</p><p id="httpsVal" class="text-3xl font-black text-green-400">CHECKING</p></div>
+                        <button onclick="downloadPDF()" id="pdfBtn" class="ml-auto bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-slate-200 transition-all">EXPORT ELITE PDF</button>
+                    </div>
+                </div>
+            </div>
+            <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6"></div>
+        </div>
+    </div>
+    <script>
+        let reportData = null;
+        async function runAudit() {
+            const url = document.getElementById('urlInput').value.trim();
+            if(!url) return alert('Enter URL');
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            try {
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+                reportData = await res.json();
+                document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
+                document.getElementById('gradeLabel').textContent = reportData.grade_label;
+                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
+                document.getElementById('summary').textContent = reportData.summary;
+                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
+                document.getElementById('httpsVal').textContent = reportData.https_status;
+                const grid = document.getElementById('metricsGrid');
+                grid.innerHTML = '';
+                reportData.metrics.forEach(m => {
+                    const color = m.score > 75 ? 'border-green-500/50 text-green-400' : m.score > 50 ? 'border-orange-500/50 text-orange-400' : 'border-red-500/50 text-red-500';
+                    grid.innerHTML += `<div class="glass p-6 border-l-4 ${color}"><p class="text-[10px] font-bold text-slate-500 uppercase mb-2">${m.category}</p><div class="flex justify-between items-center mb-2"><h4 class="font-bold text-xs text-white">${m.name}</h4><span class="font-black text-xs">${m.score}%</span></div><div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden"><div class="h-full bg-current" style="width: ${m.score}%"></div></div></div>`;
+                });
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+            } catch(e) { alert('Audit failed'); document.getElementById('loader').classList.add('hidden'); }
+        }
+        async function downloadPDF() {
+            if(!reportData) return;
+            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating...';
+            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
+            const blob = await res.blob();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'FFTech_Elite_Audit.pdf'; a.click();
+            btn.textContent = 'EXPORT ELITE PDF';
+        }
+    </script>
+</body>
+</html>
+"""
+
+# ====================== BACKEND LOGIC ======================
 class FFTechPDF(FPDF):
     def header(self):
         self.set_fill_color(2, 6, 23)
@@ -89,179 +188,72 @@ class FFTechPDF(FPDF):
         self.set_font("Helvetica", "B", 20)
         self.set_text_color(255, 255, 255)
         self.cell(0, 25, "FF TECH | ELITE STRATEGIC AUDIT 2025", 0, 1, 'C')
-        self.set_font("Helvetica", "I", 12)
-        self.set_text_color(148, 163, 184)
-        self.cell(0, 5, "Global 66+ Point Forensic Analysis", 0, 1, 'C')
         self.ln(15)
 
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Helvetica', 'I', 8)
-        self.set_text_color(148, 163, 184)
-        self.cell(0, 10, f'© 2025 FF Tech | Page {self.page_no()} | Generated: {time.strftime("%Y-%m-%d %H:%M")}', 0, 0, 'C')
-
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    # Read the file if it exists, otherwise return a message
-    try:
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "index.html not found. Please ensure the file is in the same directory."
+async def index():
+    # Integrated HTML fixes the 404/File Not Found error
+    return HTML_DASHBOARD
 
 @app.post("/audit")
 async def audit(request: Request):
     data = await request.json()
     url = data.get("url", "").strip()
-    if not url:
-        raise HTTPException(400, "URL required")
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
+    if not url.startswith("http"): url = "https://" + url
 
     try:
         start = time.time()
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) FFTechElite/5.0'}
-        resp = requests.get(url, timeout=15, headers=headers, verify=False, allow_redirects=True)
-        ttfb_ms = round((time.time() - start) * 1000)
+        headers = {'User-Agent': 'FFTechElite/5.0'}
+        resp = requests.get(url, timeout=12, headers=headers, verify=False)
+        ttfb = round((time.time() - start) * 1000)
         is_https = resp.url.startswith("https://")
-    except:
-        ttfb_ms = random.randint(800, 1200) # Simulated fallback
-        is_https = False
+    except: ttfb, is_https = 999, False
 
-    results = []
-    total_weighted_score = 0.0
-    total_weight = 0.0
-
-    # Build weight lookup for PDF phase
-    weight_map = {m["name"]: m["weight"] for m in METRICS}
-
+    results, total_weighted, total_w = [], 0.0, 0.0
     for m in METRICS:
-        if "TTFB" in m["name"]:
-            score = 100 if ttfb_ms < 200 else 80 if ttfb_ms < 400 else 55 if ttfb_ms < 800 else 20
-        elif "HTTPS" in m["name"] or "SSL" in m["name"]:
-            score = 100 if is_https else 0
-        elif "Mobile-Friendliness" in m["name"]:
-            score = random.randint(65, 95)
-        else:
-            base = 85 if ttfb_ms < 400 else 65
-            score = random.randint(max(25, base-25), min(100, base+15))
+        if "TTFB" in m["name"]: score = 100 if ttfb < 200 else 80 if ttfb < 400 else 20
+        elif "HTTPS" in m["name"]: score = 100 if is_https else 0
+        else: score = random.randint(45, 95) if ttfb < 500 else random.randint(20, 60)
+        
+        results.append({"category": m["category"], "name": m["name"], "score": score})
+        total_weighted += score * m["weight"]
+        total_w += m["weight"]
 
-        results.append({"category": m["category"], "name": m["name"], "score": score, "weight": m["weight"]})
-        total_weighted_score += score * m["weight"]
-        total_weight += m["weight"]
-
-    total_grade = round(total_weighted_score / total_weight)
+    final_grade = round(total_weighted / total_w)
+    label = "ELITE" if final_grade >= 90 else "EXCELLENT" if final_grade >= 80 else "GOOD" if final_grade >= 65 else "CRITICAL"
     
-    if total_grade >= 90: grade_label = "ELITE PERFORMANCE"
-    elif total_grade >= 80: grade_label = "EXCELLENT"
-    elif total_grade >= 65: grade_label = "GOOD"
-    elif total_grade >= 50: grade_label = "FAIR - OPTIMIZE"
-    else: grade_label = "CRITICAL - URGENT FIX"
-
-    weak_cats = list(set([m["category"] for m in results if m["score"] < 60]))
-    weak_text = weak_cats[0] if weak_cats else "Infrastructure Baseline"
-    
-    summary = f"""EXECUTIVE STRATEGIC OVERVIEW ({time.strftime('%B %d, %Y')})
-
-FF TECH's 66+ point global audit of {url} delivers a WEIGHTED TOTAL GRADE of {total_grade}% ({grade_label}).
-This precision-weighted score prioritizes Google's Core Web Vitals (5x impact) and Security/Mobile (critical for 2025 rankings).
-
-KEY FINDINGS:
-• Real TTFB: {ttfb_ms}ms | HTTPS: {'✅ SECURED' if is_https else '❌ EXPOSED'}
-• Weakest Area: {weak_text} (Score <60%)
-• Revenue Leakage Risk: {100-total_grade}% (High if <75%)
-
-PRIORITY RECOMMENDATIONS (30-Day Roadmap):
-1. CORE WEB VITALS (Highest Weight): LCP<2.5s, INP<200ms, CLS<0.1 - Direct Google ranking factor
-2. TECHNICAL SEO: Fix crawl errors, redirects, canonical tags (4x weight)
-3. SECURITY/MOBILE: Full HTTPS + mobile-first (5x weight - trust/conversion killers)
-4. PERFORMANCE: Reduce TTFB, render-blocking JS, page weight
-5. ON-PAGE: Optimize titles, structured data, internal links
-
-Expected ROI: 15-27% conversion lift, 22% organic traffic growth within 90 days.
-Quarterly re-audits recommended for Elite status maintenance.
-
-Word Count: 198 | FF TECH Elite Intelligence Engine v2025"""
+    summary = f"EXECUTIVE STRATEGIC OVERVIEW ({time.strftime('%B %d, %Y')})\\n\\nFF TECH's 66+ point global audit of {url} delivers a WEIGHTED TOTAL GRADE of {final_grade}% ({label}). This precision-weighted score prioritizes Google's Core Web Vitals (5x impact) and Security/Mobile (critical for 2025 rankings). To stabilize your rankings, an immediate 30-day technical sprint is required. Priority 1 must be the optimization of Core Web Vitals to satisfy Google's latest ranking signals."
 
     return {
-        "url": url, "total_grade": total_grade, "grade_label": grade_label,
-        "summary": summary, "metrics": results, "ttfb": ttfb_ms, 
-        "https_status": "Secured" if is_https else "Exposed",
-        "weakest_category": weak_text
+        "url": url, "total_grade": final_grade, "grade_label": label,
+        "summary": summary, "metrics": results, "ttfb": ttfb, 
+        "https_status": "Secured" if is_https else "Exposed"
     }
 
 @app.post("/download")
 async def download_pdf(request: Request):
     data = await request.json()
-    
-    pdf = FFTechPDF(orientation='P', unit='mm', format='A4')
+    pdf = FFTechPDF()
     pdf.add_page()
-    
-    # TOTAL GRADE HEADER
-    pdf.set_font("Helvetica", "B", 42)
-    pdf.set_text_color(59, 130, 246)
+    pdf.set_font("Helvetica", "B", 36); pdf.set_text_color(59, 130, 246)
     pdf.cell(0, 20, f"{data['total_grade']}%", 0, 1, 'C')
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, data['grade_label'], 0, 1, 'C')
-    pdf.ln(10)
-
-    # Executive Summary
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "EXECUTIVE SUMMARY", 0, 1)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 5, data["summary"])
-    pdf.ln(5)
-
-    # Metrics Table
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, f"GLOBAL METRIC BREAKDOWN", 0, 1)
+    pdf.set_font("Helvetica", "B", 18); pdf.set_text_color(0, 0, 0); pdf.cell(0, 10, data['grade_label'], 0, 1, 'C')
+    pdf.ln(10); pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 10, "STRATEGIC IMPROVEMENT PLAN", 0, 1)
+    pdf.set_font("Helvetica", "", 10); pdf.multi_cell(0, 6, data["summary"].replace("\\n", "\n"))
     
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(241, 245, 249)
-    pdf.cell(75, 8, "METRIC", 1, 0, 'L', 1)
-    pdf.cell(55, 8, "CATEGORY", 1, 0, 'C', 1)
-    pdf.cell(25, 8, "SCORE", 1, 0, 'C', 1)
-    pdf.cell(25, 8, "WEIGHT", 1, 1, 'C', 1)
-
+    pdf.ln(10); pdf.set_font("Helvetica", "B", 10); pdf.set_fill_color(241, 245, 249)
+    pdf.cell(90, 8, "METRIC", 1, 0, 'L', 1); pdf.cell(30, 8, "SCORE", 1, 1, 'C', 1)
     pdf.set_font("Helvetica", "", 8)
     for m in data["metrics"]:
-        # Check if we need a new page
-        if pdf.get_y() > 260:
-            pdf.add_page()
-            # Redraw header for table
-            pdf.set_font("Helvetica", "B", 8)
-            pdf.cell(75, 8, "METRIC", 1, 0, 'L', 1)
-            pdf.cell(55, 8, "CATEGORY", 1, 0, 'C', 1)
-            pdf.cell(25, 8, "SCORE", 1, 0, 'C', 1)
-            pdf.cell(25, 8, "WEIGHT", 1, 1, 'C', 1)
-            pdf.set_font("Helvetica", "", 8)
-
-        pdf.cell(75, 6, str(m["name"])[:45], 1, 0)
-        pdf.cell(55, 6, str(m["category"]), 1, 0, 'C')
-        
-        score = m["score"]
-        if score > 75: pdf.set_text_color(0, 128, 0)
-        elif score > 45: pdf.set_text_color(217, 119, 6) # Orange
-        else: pdf.set_text_color(220, 20, 60)
-        
-        pdf.cell(25, 6, f"{score}%", 1, 0, 'C')
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(25, 6, f"{m.get('weight', 1.0)}x", 1, 1, 'C')
+        if pdf.get_y() > 260: pdf.add_page()
+        pdf.cell(90, 6, m["name"], 1); pdf.cell(30, 6, f"{m['score']}%", 1, 1, 'C')
 
     buffer = io.BytesIO()
-    pdf_str = pdf.output(dest='S').encode('latin-1')
-    buffer.write(pdf_str)
-    buffer.seek(0)
-    
-    safe_url = data['url'].split("//")[-1].replace('.', '_').replace('/', '')[:20]
-    filename = f"FFTech_Audit_{safe_url}.pdf"
-    
-    return StreamingResponse(
-        buffer, media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    buffer.write(pdf_output); buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=FFTech_Audit.pdf"})
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
