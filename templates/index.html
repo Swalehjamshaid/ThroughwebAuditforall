@@ -1,83 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>FF TECH | Elite Web Audit</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<title>MS TECH | 66-Metric Web Audit</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-950 text-white p-10">
 
-<div class="max-w-6xl mx-auto space-y-8">
+<body class="bg-slate-950 text-white p-8">
 
-    <h1 class="text-5xl font-black text-center">
-        FF TECH <span class="text-blue-500">ELITE</span>
-    </h1>
+<div class="max-w-7xl mx-auto space-y-8">
 
-    <div class="flex gap-4 justify-center">
-        <input id="url" class="p-4 w-96 text-black rounded" placeholder="https://example.com">
-        <button onclick="runAudit()" class="bg-blue-600 px-6 py-4 rounded font-bold">
-            Run Audit
-        </button>
-    </div>
+<h1 class="text-5xl font-black text-center">MS TECH – Web Audit Engine</h1>
 
-    <div id="result" class="hidden space-y-6">
+<div class="flex gap-4 justify-center">
+<input id="url" placeholder="https://example.com"
+ class="px-4 py-3 w-96 rounded text-black">
+<button onclick="runAudit()"
+ class="bg-blue-600 px-8 py-3 rounded font-bold">Scan</button>
+</div>
 
-        <div class="text-center">
-            <div id="score" class="text-7xl font-black text-blue-400"></div>
-            <p class="uppercase tracking-widest text-slate-400">Overall Health</p>
-        </div>
+<div id="score" class="text-center text-6xl font-black mt-6"></div>
 
-        <pre id="summary" class="bg-slate-800 p-6 rounded text-sm"></pre>
+<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4" id="metrics"></div>
 
-        <button onclick="downloadPDF()" class="bg-white text-black px-6 py-4 rounded font-bold">
-            Download PDF
-        </button>
+<div class="text-center mt-10">
+<button onclick="downloadPDF()"
+ class="bg-emerald-500 px-10 py-4 rounded font-black">
+Download Full PDF
+</button>
+</div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="metrics"></div>
-
-    </div>
 </div>
 
 <script>
 let report = null;
 
-async function runAudit() {
+async function runAudit(){
     const url = document.getElementById("url").value;
     const res = await fetch("/audit", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {"Content-Type":"application/json"},
         body: JSON.stringify({url})
     });
-
     report = await res.json();
 
-    document.getElementById("result").classList.remove("hidden");
-    document.getElementById("score").innerText = report.total_grade + "/100";
-    document.getElementById("summary").innerText = report.summary;
+    document.getElementById("score").innerText =
+        report.overall + "/100";
 
     const grid = document.getElementById("metrics");
     grid.innerHTML = "";
+
     report.metrics.forEach(m => {
+        const color = m.score >= 80 ? "text-green-400"
+                    : m.score >= 50 ? "text-yellow-400"
+                    : "text-red-500";
         grid.innerHTML += `
-            <div class="bg-slate-800 p-4 rounded">
-                <div class="text-xs text-slate-400">${m.category}</div>
-                <div class="font-bold text-sm">${m.name}</div>
-                <div class="text-2xl font-black text-blue-400">${m.score}</div>
-            </div>
-        `;
+        <div class="bg-slate-800 p-4 rounded">
+            <div class="text-xs text-slate-400">${m.id}</div>
+            <div class="font-semibold text-sm h-10">${m.name}</div>
+            <div class="text-2xl font-black ${color}">${m.score}</div>
+        </div>`;
     });
 }
 
-async function downloadPDF() {
-    const res = await fetch("/download", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(report)
+async function downloadPDF(){
+    const res = await fetch("/download-pdf",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(report)
     });
     const blob = await res.blob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "FFTech_Audit.pdf";
+    a.download = "MS_Tech_66_Audit.pdf";
     a.click();
 }
 </script>
