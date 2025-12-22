@@ -1,8 +1,8 @@
-fastapi
-uvicorn
-requests
-beautifulsoup4
-fpdf2
-matplotlib
-numpy
-jinja2
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+requests>=2.32.0
+beautifulsoup4>=4.12.0
+fpdf2>=2.8.0
+matplotlib>=3.9.0
+numpy>=2.1.0
+jinja2>=3.1.0
