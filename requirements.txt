@@ -1,5 +1,6 @@
 fastapi
 uvicorn
-requests
+aiohttp
 beautifulsoup4
+requests
 fpdf2
