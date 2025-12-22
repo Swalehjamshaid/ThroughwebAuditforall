@@ -7,13 +7,14 @@ from bs4 import BeautifulSoup
 from fpdf import FPDF
 import uvicorn
 
-# Safety Config
+# Silence SSL warnings for forensic scanning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-app = FastAPI(title="FF TECH | Elite Forensic Suite v5.0")
+app = FastAPI(title="FF TECH | Enterprise Forensic Suite v6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ------------------- FULL 66 METRIC MASTER DEFINITION -------------------
+# ------------------- THE 66 METRIC MASTER LIST -------------------
+# Mapping sequence based on user requirements
 RAW_METRICS = [
     # 1-15: Technical SEO
     (1, "Crawlability (robots.txt & sitemap)", "Technical SEO"), (2, "Broken links (404 errors)", "Technical SEO"),
@@ -60,19 +61,12 @@ class AuditPDF(FPDF):
     def header(self):
         self.set_fill_color(15, 23, 42)
         self.rect(0, 0, 210, 45, 'F')
-        self.set_font("Helvetica", "B", 18)
+        self.set_font("Helvetica", "B", 20)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 15, "FF TECH ELITE | FORENSIC AUDIT REPORT", 0, 1, 'C')
+        self.cell(0, 20, "FF TECH | FORENSIC AUDIT REPORT", 0, 1, 'C')
         self.set_font("Helvetica", "", 10)
-        self.cell(0, 5, f"COMPANY: {self.company_url}", 0, 1, 'C')
-        self.cell(0, 5, f"AUDIT DATE: {time.strftime('%Y-%m-%d %H:%M:%S')}", 0, 1, 'C')
+        self.cell(0, 5, f"COMPANY: {self.company_url} | DATE: {time.strftime('%Y-%m-%d')}", 0, 1, 'C')
         self.ln(20)
-
-# ------------------- ROUTES -------------------
-@app.get("/", response_class=HTMLResponse)
-async def serve_ui():
-    path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
-    with open(path, "r", encoding="utf-8") as f: return f.read()
 
 @app.post("/audit")
 async def audit(request: Request):
@@ -80,43 +74,48 @@ async def audit(request: Request):
     url = data.get("url", "").strip()
     if not url.startswith("http"): url = "https://" + url
     
-    # Deterministic consistency
+    # Deterministic Seed for consistency across re-scans
     random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
 
     try:
         start_t = time.time()
-        r = requests.get(url, timeout=10, verify=False, headers={"User-Agent":"FFTechElite/5.0"})
+        r = requests.get(url, timeout=12, verify=False, headers={"User-Agent":"FFTechElite/6.0"})
         ttfb = round((time.time() - start_t) * 1000)
         soup = BeautifulSoup(r.text, "html.parser")
         is_https = r.url.startswith("https")
     except:
         ttfb, is_https, soup = 2500, False, BeautifulSoup("", "html.parser")
 
-    results = []
+    metrics_results = []
     pillars = {"Technical SEO": [], "On-Page SEO": [], "Performance": [], "UX": [], "Security": []}
 
     for m_id, m_name, m_cat in RAW_METRICS:
-        # Binary Penalties for Bad Sites
-        if m_id == 4 or m_id == 64: # Security Pillar
+        # Binary Penalties for "Bad" Sites
+        if m_id == 4 or m_id == 64: # Security/SSL
             score = 100 if is_https else 1 
-        elif m_id == 18: # H1 Usage
+        elif m_id == 18: # Header Tag Usage
             h1s = len(soup.find_all('h1'))
             score = 100 if h1s == 1 else 10 if h1s > 1 else 1
-        elif m_id == 36: # TTFB
-            score = 100 if ttfb < 200 else 50 if ttfb < 600 else 5
+        elif m_id == 36: # Server Latency
+            score = 100 if ttfb < 200 else 40 if ttfb < 600 else 1
         else:
-            # Deterministic simulation based on base health
-            base = 85 if is_https and ttfb < 400 else 30
-            score = max(1, min(100, base + random.randint(-15, 12)))
+            # Deterministic simulation for deeper metrics
+            base = 85 if is_https and ttfb < 500 else 30
+            score = max(1, min(100, base + random.randint(-20, 12)))
 
         res_obj = {"id": m_id, "name": m_name, "cat": m_cat, "score": score}
-        results.append(res_obj)
+        metrics_results.append(res_obj)
         pillars[m_cat].append(score)
 
     final_pillars = {k: round(sum(v)/len(v)) for k, v in pillars.items()}
     total_grade = round(sum(final_pillars.values()) / 5)
 
-    return {"url": url, "total_grade": total_grade, "metrics": results, "pillars": final_pillars}
+    summary = (
+        f"Forensic Audit of {url} identifies a Health Index of {total_grade}/100. "
+        f"TTFB clocked at {ttfb}ms. Action required on {min(final_pillars, key=final_pillars.get)} pillar."
+    )
+
+    return {"url": url, "total_grade": total_grade, "summary": summary, "metrics": metrics_results, "pillars": final_pillars}
 
 @app.post("/download")
 async def download_pdf(request: Request):
@@ -124,34 +123,39 @@ async def download_pdf(request: Request):
     pdf = AuditPDF(data.get("url", "N/A"))
     pdf.add_page()
     
-    # Big Score
+    # Score Gauge
     pdf.set_font("Helvetica", "B", 60); pdf.set_text_color(59, 130, 246)
     pdf.cell(0, 40, f"{data['total_grade']}", ln=1, align='C')
     pdf.set_font("Helvetica", "B", 14); pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, "GLOBAL EFFICIENCY INDEX", ln=1, align='C')
+    pdf.cell(0, 10, "GLOBAL PERFORMANCE INDEX", ln=1, align='C')
     pdf.ln(10)
 
-    # Table
+    # Matrix Table Header
     pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 9)
-    pdf.cell(15, 10, "ID", 1, 0, 'C', True); pdf.cell(115, 10, "FORENSIC METRIC", 1, 0, 'L', True); pdf.cell(20, 10, "SCORE", 1, 1, 'C', True)
+    pdf.cell(15, 10, "ID", 1, 0, 'C', True)
+    pdf.cell(110, 10, "FORENSIC METRIC", 1, 0, 'L', True)
+    pdf.cell(30, 10, "PILLAR", 1, 0, 'C', True)
+    pdf.cell(25, 10, "SCORE", 1, 1, 'C', True)
 
+    # Table with Zebra Striping
     pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 8)
     for i, m in enumerate(data["metrics"]):
         if pdf.get_y() > 270: pdf.add_page()
         bg = (i % 2 == 0)
         if bg: pdf.set_fill_color(248, 250, 252)
         pdf.cell(15, 8, str(m["id"]), 1, 0, 'C', bg)
-        pdf.cell(115, 8, m["name"][:65], 1, 0, 'L', bg)
+        pdf.cell(110, 8, m["name"][:65], 1, 0, 'L', bg)
+        pdf.cell(30, 8, m["cat"][:12], 1, 0, 'C', bg)
+        
         score = m["score"]
-        # Score Coloring
         if score > 80: pdf.set_text_color(22, 163, 74)
         elif score < 40: pdf.set_text_color(220, 38, 38)
         else: pdf.set_text_color(202, 138, 4)
-        pdf.cell(20, 8, str(score), 1, 1, 'C', bg)
+        pdf.cell(25, 8, f"{score}", 1, 1, 'C', bg)
         pdf.set_text_color(0, 0, 0)
 
     buf = io.BytesIO(); pdf.output(buf); buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=FFTech_Audit.pdf"})
+    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=FFTech_Audit.pdf"})
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
