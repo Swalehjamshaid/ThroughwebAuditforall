@@ -1,224 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FF TECH | Elite Strategic Intelligence 2025</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #3b82f6; --secondary: #8b5cf6;
-            --dark: #020617; --glass: rgba(15, 23, 42, 0.9);
-            --glow: 0 0 40px rgba(59, 130, 246, 0.4);
-        }
-        body { 
-            background: var(--dark); 
-            color: #f8fafc; 
-            font-family: 'Inter', sans-serif;
-            background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.4) 0%, transparent 50%),
-                              radial-gradient(circle at 80% 20%, rgba(30,41,59,0.4) 0%, transparent 50%);
-            scroll-behavior: smooth;
-        }
-        .glass {
-            background: var(--glass); backdrop-filter: blur(24px);
-            border: 1px solid rgba(255,255,255,0.08); border-radius: 32px;
-        }
-        .gradient-text {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .score-ring {
-            background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0);
-            transition: all 2s cubic-bezier(0.4,0,0.2,1);
-            border-radius: 50%;
-        }
-        .metric-card { transition: all 0.3s ease; }
-        .metric-card:hover { transform: translateY(-8px); border-color: rgba(59, 130, 246, 0.5); }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--dark); }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-
-        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-        .scanning-text { animation: pulse-slow 2s infinite; }
+        :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
+        body { background: var(--dark); color: #f8fafc; font-family: sans-serif; }
+        .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
     </style>
 </head>
-<body class="p-4 md:p-12 min-h-screen">
-    <div class="max-w-7xl mx-auto space-y-16">
-        
-        <header class="text-center space-y-8">
-            <div class="flex items-center gap-4 justify-center">
-                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-lg shadow-blue-500/20">FF</div>
-                <h1 class="text-5xl font-black tracking-tighter uppercase">Tech <span class="text-blue-500">Elite</span></h1>
-            </div>
-            
-            <div class="glass p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-4">
-                <input id="urlInput" type="url" placeholder="Enter target URL (e.g., https://google.com)" 
-                       class="flex-1 bg-transparent p-4 text-xl outline-none border-none focus:ring-0">
-                <button onclick="runAudit()" id="auditBtn" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-4 rounded-2xl transition-all active:scale-95 shadow-lg shadow-blue-500/20">
-                    START DEEP SCAN
-                </button>
+<body class="p-12 min-h-screen">
+    <div class="max-w-7xl mx-auto space-y-12">
+        <header class="text-center space-y-6">
+            <h1 class="text-5xl font-black">FF TECH <span class="text-blue-500">ELITE</span></h1>
+            <div class="glass p-4 max-w-3xl mx-auto flex gap-4">
+                <input id="urlInput" type="url" placeholder="Enter target URL..." class="flex-1 bg-transparent p-4 outline-none">
+                <button onclick="runAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">START SCAN</button>
             </div>
         </header>
 
-        <div id="loader" class="hidden text-center py-20">
-            <div class="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-            <p class="text-2xl text-blue-400 font-mono scanning-text uppercase tracking-widest">Deploying 66+ Forensic Probes...</p>
-        </div>
-
-        <div id="results" class="hidden space-y-12">
-            
+        <div id="results" class="hidden space-y-10">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center text-center">
-                    <div id="gradeRing" class="score-ring w-64 h-64 relative mb-6" style="--percent: 0">
-                        <div class="absolute inset-4 bg-[#020617] rounded-full flex flex-col items-center justify-center">
-                            <span id="totalGradeNum" class="text-6xl font-black">0%</span>
-                            <span class="text-xs font-bold text-slate-500 tracking-widest uppercase mt-2">Global Score</span>
-                        </div>
-                    </div>
-                    <h3 id="gradeLabel" class="text-2xl font-black text-blue-500 uppercase">Analyzing...</h3>
+                <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center">
+                    <span id="totalGradeNum" class="text-6xl font-black">0%</span>
                 </div>
-
-                <div class="lg:col-span-8 glass p-10 relative overflow-hidden">
-                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"></div>
-                    <h3 class="text-3xl font-black mb-6 gradient-text">Executive Strategic Overview</h3>
-                    <div id="summary" class="text-slate-300 leading-relaxed text-lg whitespace-pre-line border-l-4 border-blue-600/30 pl-6">
-                        </div>
-                    
-                    <div class="mt-8 flex flex-wrap gap-8 border-t border-slate-800 pt-8">
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase mb-2">Server Latency</p>
-                            <p id="ttfbVal" class="text-3xl font-black text-white">--- ms</p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase mb-2">Security Status</p>
-                            <p id="httpsVal" class="text-3xl font-black text-green-400">CHECKING</p>
-                        </div>
-                    </div>
+                <div class="lg:col-span-8 glass p-10">
+                    <h3 class="text-3xl font-black mb-6">Strategic Overview</h3>
+                    <div id="summary" class="text-slate-300 leading-relaxed text-lg pl-6"></div>
+                    <button onclick="downloadPDF()" id="pdfBtn" class="mt-8 bg-white text-black px-10 py-4 rounded-2xl font-black">EXPORT PDF REPORT</button>
                 </div>
             </div>
-
-            <div class="glass p-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                <div>
-                    <h4 class="text-xl font-bold">Comprehensive Technical Scorecard</h4>
-                    <p class="text-slate-500 text-sm">A complete breakdown of every metric by weighted impact.</p>
-                </div>
-                <button onclick="downloadPDF()" id="pdfBtn" 
-                        class="bg-white text-black hover:bg-slate-200 px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                    EXPORT ELITE PDF
-                </button>
-            </div>
-
-            <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                </div>
+            <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
         </div>
-
-        <footer class="text-center text-slate-600 text-sm py-10 border-t border-slate-900">
-            FF TECH ELITE © 2025 | International Website Audit Standards v5.2
-        </footer>
     </div>
-
     <script>
         let reportData = null;
-
         async function runAudit() {
             const url = document.getElementById('urlInput').value.trim();
-            if (!url) return alert('Please enter a website URL');
-
-            const btn = document.getElementById('auditBtn');
-            const loader = document.getElementById('loader');
-            const results = document.getElementById('results');
-
-            btn.disabled = true;
-            loader.classList.remove('hidden');
-            results.classList.add('hidden');
-
+            if(!url) return;
             try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ url })
-                });
-                
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                reportData = await response.json();
-
-                // UI Updates
+                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
+                reportData = await res.json();
                 document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
-                document.getElementById('gradeLabel').textContent = reportData.grade_label;
-                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
                 document.getElementById('summary').textContent = reportData.summary;
-                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
-                document.getElementById('httpsVal').textContent = reportData.https_status;
-                document.getElementById('httpsVal').className = reportData.https_status === 'Secured' ? 'text-3xl font-black text-green-400' : 'text-3xl font-black text-red-500';
-
-                // Grid Rendering
                 const grid = document.getElementById('metricsGrid');
                 grid.innerHTML = '';
-                
                 reportData.metrics.forEach(m => {
-                    const colorClass = m.score > 75 ? 'border-green-500/50 text-green-400' : 
-                                       m.score > 50 ? 'border-orange-500/50 text-orange-400' : 
-                                       'border-red-500/50 text-red-500';
-                    
-                    grid.innerHTML += `
-                        <div class="glass p-6 border-l-4 ${colorClass} metric-card">
-                            <div class="flex justify-between items-start mb-4">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">${m.category}</span>
-                                <span class="font-black">${m.score}%</span>
-                            </div>
-                            <h4 class="font-bold text-white text-sm leading-tight">${m.name}</h4>
-                            <div class="mt-4 w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                <div class="h-full bg-current transition-all duration-1000" style="width: ${m.score}%"></div>
-                            </div>
-                        </div>
-                    `;
+                    grid.innerHTML += `<div class="glass p-6"><h4>${m.name}</h4><span class="font-black">${m.score}%</span></div>`;
                 });
-
-                loader.classList.add('hidden');
-                results.classList.remove('hidden');
-                window.scrollTo({ top: results.offsetTop - 50, behavior: 'smooth' });
-
-            } catch (error) {
-                alert('Audit failed. Please ensure the server is running.');
-                console.error(error);
-            } finally {
-                btn.disabled = false;
-                loader.classList.add('hidden');
-            }
+                document.getElementById('results').classList.remove('hidden');
+            } catch(e) { alert('Audit failed'); }
         }
-
         async function downloadPDF() {
-            if (!reportData) return;
-            const btn = document.getElementById('pdfBtn');
-            btn.innerHTML = '⏳ Generating PDF...';
-            
-            try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(reportData)
-                });
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `FFTech_Elite_Audit_${reportData.url.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } catch (error) {
-                alert('Export failed.');
-            } finally {
-                btn.innerHTML = '📄 EXPORT ELITE PDF';
-            }
+            if(!reportData) return;
+            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating...';
+            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
+            const blob = await res.blob();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'FFTech_Elite_Audit.pdf'; a.click();
+            btn.textContent = 'EXPORT PDF REPORT';
         }
     </script>
 </body>
