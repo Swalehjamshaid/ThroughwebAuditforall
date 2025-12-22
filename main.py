@@ -6,7 +6,7 @@ import requests
 import urllib3
 from typing import List, Dict
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
@@ -84,72 +84,6 @@ METRICS: List[Dict] = [
     {"no": 58, "name": "Best Practices Score", "category": "Best Practices", "weight": 3.5},
 ]
 
-# ====================== YOUR EXACT HTML DASHBOARD ======================
-HTML_DASHBOARD = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | Elite Strategic Intelligence 2025</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
-        body { background: var(--dark); color: #f8fafc; font-family: sans-serif; }
-        .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
-    </style>
-</head>
-<body class="p-12 min-h-screen">
-    <div class="max-w-7xl mx-auto space-y-12">
-        <header class="text-center space-y-6">
-            <h1 class="text-5xl font-black">FF TECH <span class="text-blue-500">ELITE</span></h1>
-            <div class="glass p-4 max-w-3xl mx-auto flex gap-4">
-                <input id="urlInput" type="url" placeholder="Enter target URL..." class="flex-1 bg-transparent p-4 outline-none">
-                <button onclick="runAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">START SCAN</button>
-            </div>
-        </header>
-        <div id="results" class="hidden space-y-10">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center">
-                    <span id="totalGradeNum" class="text-6xl font-black">0%</span>
-                </div>
-                <div class="lg:col-span-8 glass p-10">
-                    <h3 class="text-3xl font-black mb-6">Strategic Overview</h3>
-                    <div id="summary" class="text-slate-300 leading-relaxed text-lg pl-6"></div>
-                    <button onclick="downloadPDF()" id="pdfBtn" class="mt-8 bg-white text-black px-10 py-4 rounded-2xl font-black">EXPORT PDF REPORT</button>
-                </div>
-            </div>
-            <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
-        </div>
-    </div>
-    <script>
-        let reportData = null;
-        async function runAudit() {
-            const url = document.getElementById('urlInput').value.trim();
-            if(!url) return;
-            try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                reportData = await res.json();
-                document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
-                document.getElementById('summary').textContent = reportData.summary;
-                const grid = document.getElementById('metricsGrid');
-                grid.innerHTML = '';
-                reportData.metrics.forEach(m => {
-                    grid.innerHTML += `<div class="glass p-6"><h4>${m.name}</h4><span class="font-black">${m.score}%</span></div>`;
-                });
-                document.getElementById('results').classList.remove('hidden');
-            } catch(e) { alert('Audit failed'); }
-        }
-        async function downloadPDF() {
-            if(!reportData) return;
-            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating...';
-            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
-            const blob = await res.blob();
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'FFTech_Elite_Audit.pdf'; a.click();
-            btn.textContent = 'EXPORT PDF REPORT';
-        }
-    </script>
-</body>
-</html>"""
-
 # ====================== PDF CLASS ======================
 class FFTechPDF(FPDF):
     def header(self):
@@ -161,9 +95,18 @@ class FFTechPDF(FPDF):
         self.ln(10)
 
 # ====================== ROUTES ======================
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    return HTML_DASHBOARD
+    # Fix for the templates structure
+    # This looks for index.html inside a 'templates' folder relative to this file
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
+    
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=404, detail="Frontend Template (templates/index.html) Not Found")
+        
+    with open(template_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.post("/audit")
 async def audit(request: Request):
@@ -203,11 +146,9 @@ async def audit(request: Request):
         total_weight += m["weight"]
 
     total_grade = round(total_weighted / total_weight) if total_weight else 50
-
     grade_label = "WORLD-CLASS" if total_grade >= 90 else "EXCELLENT" if total_grade >= 80 else "STRONG" if total_grade >= 70 else "AVERAGE" if total_grade >= 60 else "NEEDS WORK"
 
-    summary = f"""
-EXECUTIVE STRATEGIC SUGGESTIONS ({time.strftime('%B %d, %Y')})
+    summary = f"""EXECUTIVE STRATEGIC SUGGESTIONS ({time.strftime('%B %d, %Y')})
 
 The elite audit of {url} delivers a weighted efficiency score of {total_grade}% — {grade_label}.
 
@@ -221,14 +162,7 @@ Recommended 90-day Plan:
 2. Reduce TTFB and eliminate render-blocking resources
 3. Ensure full HTTPS with HSTS
 4. Optimize images, enable compression, minify code
-5. Fix crawl errors and mobile responsiveness
-
-Expected: Up to 30% traffic growth, 20% conversion lift.
-
-Quarterly audits recommended.
-
-(Word count: 198)
-    """
+5. Fix crawl errors and mobile responsiveness"""
 
     return {
         "url": url,
@@ -263,35 +197,44 @@ async def download_pdf(request: Request):
     # Metrics Table
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 15, "66+ GLOBAL METRICS BREAKDOWN", ln=1)
+    
+    # Header
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_fill_color(30, 41, 59)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(20, 12, "NO", 1, 0, 'C', True)
     pdf.cell(100, 12, "METRIC", 1, 0, 'L', True)
     pdf.cell(50, 12, "CATEGORY", 1, 0, 'C', True)
-    pdf.cell(30, 12, "SCORE", 1, 1, 'C', True)
+    pdf.cell(20, 12, "%", 1, 1, 'C', True)
 
     pdf.set_font("Helvetica", "", 10)
     pdf.set_text_color(0, 0, 0)
     for m in data["metrics"]:
         if pdf.get_y() > 270:
             pdf.add_page()
-            pdf.set_font("Helvetica", "B", 11)
+            # Redraw headers on new page
             pdf.set_fill_color(30, 41, 59)
             pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Helvetica", "B", 11)
             pdf.cell(20, 12, "NO", 1, 0, 'C', True)
             pdf.cell(100, 12, "METRIC", 1, 0, 'L', True)
             pdf.cell(50, 12, "CATEGORY", 1, 0, 'C', True)
-            pdf.cell(30, 12, "SCORE", 1, 1, 'C', True)
+            pdf.cell(20, 12, "%", 1, 1, 'C', True)
             pdf.set_font("Helvetica", "", 10)
             pdf.set_text_color(0, 0, 0)
 
         pdf.cell(20, 10, str(m["no"]), 1, 0, 'C')
-        pdf.cell(100, 10, m["name"][:50] + ("..." if len(m["name"]) > 50 else ""), 1, 0, 'L')
+        name_short = m["name"][:50] + ("..." if len(m["name"]) > 50 else "")
+        pdf.cell(100, 10, name_short, 1, 0, 'L')
         pdf.cell(50, 10, m["category"], 1, 0, 'C')
-        score_color = (0, 150, 0) if m["score"] > 75 else (255, 140, 0) if m["score"] > 50 else (220, 38, 38)
-        pdf.set_text_color(*score_color)
-        pdf.cell(30, 10, f"{m['score']}%", 1, 1, 'C')
+        
+        # Color score
+        sc = m["score"]
+        if sc > 75: pdf.set_text_color(0, 150, 0)
+        elif sc > 50: pdf.set_text_color(255, 140, 0)
+        else: pdf.set_text_color(220, 38, 38)
+        
+        pdf.cell(20, 10, f"{sc}", 1, 1, 'C')
         pdf.set_text_color(0, 0, 0)
 
     buffer = io.BytesIO()
