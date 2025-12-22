@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | ELITE FORENSIC SUITE</title>
+    <meta charset="UTF-8"><title>FF TECH | ELITE 2025</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -14,70 +13,72 @@
     <div class="max-w-7xl mx-auto space-y-10">
         <header class="text-center">
             <h1 class="text-6xl font-black italic tracking-tighter">FF TECH <span class="text-blue-500">ELITE</span></h1>
-            <div class="mt-8 glass p-4 max-w-2xl mx-auto flex gap-4 shadow-2xl">
-                <input id="urlInput" type="url" placeholder="Enter target domain..." class="flex-1 bg-transparent px-4 outline-none border-r border-white/10">
-                <button onclick="runAudit()" id="scanBtn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold hover:bg-blue-500 transition-all uppercase tracking-widest">SWEEP</button>
+            <div class="mt-8 glass p-4 max-w-2xl mx-auto flex gap-4">
+                <input id="urlInput" type="url" placeholder="https://domain.com" class="flex-1 bg-transparent p-2 outline-none">
+                <button onclick="runAudit()" id="scanBtn" class="bg-blue-600 px-10 py-3 rounded-xl font-bold">SWEEP</button>
             </div>
         </header>
+
+        <div id="loading" class="hidden glass p-10 text-center space-y-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <div id="log" class="text-xs text-blue-400 font-mono"></div>
+        </div>
 
         <div id="results" class="hidden space-y-8 animate-in fade-in duration-500">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div class="lg:col-span-3 glass p-10 flex flex-col items-center justify-center">
                     <span id="gradeNum" class="text-9xl font-black text-blue-500 italic">0</span>
-                    <p class="text-[10px] font-bold uppercase mt-2 opacity-50">Global Index</p>
+                    <p class="text-[10px] font-bold uppercase mt-2 opacity-50">Global Health Index</p>
                 </div>
                 <div class="lg:col-span-6 glass p-6 flex items-center justify-center">
                     <canvas id="radarChart"></canvas>
                 </div>
                 <div class="lg:col-span-3 glass p-8">
-                    <h3 class="text-sm font-bold opacity-50 uppercase tracking-widest mb-4">Pillar Scores</h3>
+                    <h3 class="text-sm font-bold opacity-50 uppercase mb-4">Pillar Scores</h3>
                     <div id="pillarList" class="space-y-4"></div>
                 </div>
             </div>
-
-            <div>
-                <h3 class="text-sm font-bold mb-4 text-slate-500 uppercase tracking-[0.5em]">Forensic Matrix (66 Metrics)</h3>
-                <div id="matrix" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
-            </div>
-
-            <div class="flex justify-center pt-10">
-                <button onclick="downloadPDF()" class="bg-white text-black px-12 py-4 rounded-2xl font-black uppercase hover:scale-105 transition-transform">Download Investor-Ready PDF</button>
-            </div>
+            <div id="matrix" class="grid grid-cols-2 md:grid-cols-6 gap-3"></div>
+            <div class="flex justify-center"><button onclick="downloadPDF()" class="bg-white text-black px-12 py-4 rounded-2xl font-black">DOWNLOAD REPORT</button></div>
         </div>
     </div>
 
     <script>
-        let report = null;
         let radarChart = null;
+        let report = null;
 
         async function runAudit() {
             const url = document.getElementById('urlInput').value;
             if(!url) return;
-            document.getElementById('scanBtn').innerText = 'AUDITING...';
-            const res = await fetch('/audit', { method: 'POST', body: JSON.stringify({url}), headers: {'Content-Type': 'application/json'} });
+            
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            
+            // Live Log Simulation
+            const log = document.getElementById('log');
+            const steps = ["Pinging Server...", "Checking SSL...", "Parsing DOM...", "Analyzing 66 Metrics...", "Calculating Pillars..."];
+            for(let step of steps) {
+                log.innerText = step;
+                await new Promise(r => setTimeout(r, 600));
+            }
+
+            const res = await fetch('/audit', { method: 'POST', body: JSON.stringify({url}), headers: {'Content-Type':'application/json'} });
             report = await res.json();
             
+            document.getElementById('loading').classList.add('hidden');
             document.getElementById('gradeNum').innerText = report.total_grade;
             updateRadar(report.pillars);
             
-            const pList = document.getElementById('pillarList');
-            pList.innerHTML = Object.entries(report.pillars).map(([name, score]) => `
-                <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span class="text-xs font-bold">${name}</span>
-                    <span class="text-lg font-black ${score < 50 ? 'text-rose-500' : 'text-blue-400'}">${score}</span>
-                </div>
-            `).join('');
-
             const matrix = document.getElementById('matrix');
             matrix.innerHTML = report.metrics.map(m => `
                 <div class="glass p-3 text-center">
                     <div class="text-[8px] opacity-30 uppercase truncate">${m.cat}</div>
-                    <div class="text-[10px] font-bold mt-1 h-8 line-clamp-2 leading-tight">${m.name}</div>
-                    <div class="text-lg font-black mt-1 ${m.score < 50 ? 'text-rose-500' : 'text-slate-200'}">${m.score}</div>
+                    <div class="text-[10px] font-bold truncate">${m.name}</div>
+                    <div class="text-lg font-black ${m.score < 40 ? 'text-rose-500' : 'text-blue-400'}">${m.score}</div>
                 </div>
             `).join('');
+            
             document.getElementById('results').classList.remove('hidden');
-            document.getElementById('scanBtn').innerText = 'SWEEP';
         }
 
         function updateRadar(pillars) {
@@ -85,27 +86,9 @@
             if(radarChart) radarChart.destroy();
             radarChart = new Chart(ctx, {
                 type: 'radar',
-                data: {
-                    labels: Object.keys(pillars),
-                    datasets: [{
-                        data: Object.values(pillars),
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                        borderColor: '#3b82f6',
-                        borderWidth: 2,
-                        pointRadius: 0
-                    }]
-                },
-                options: { 
-                    scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.05)' }, pointLabels: { color: '#64748b', font: { size: 10, weight: 'bold' } } } },
-                    plugins: { legend: { display: false } }
-                }
+                data: { labels: Object.keys(pillars), datasets: [{ data: Object.values(pillars), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6' }] },
+                options: { scales: { r: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.05)' } } }, plugins: { legend: { display: false } } }
             });
-        }
-
-        async function downloadPDF() {
-            const res = await fetch('/download', { method: 'POST', body: JSON.stringify(report), headers: {'Content-Type': 'application/json'} });
-            const blob = await res.blob();
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Forensic_Report.pdf'; a.click();
         }
     </script>
 </body>
