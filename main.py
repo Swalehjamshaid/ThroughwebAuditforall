@@ -9,19 +9,18 @@ import uvicorn
 import aiohttp
 from urllib.parse import urlparse
 
-# Suppress SSL warnings for crawling
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI(title="FF TECH | Real Forensic Engine v6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ------------------- 66 METRIC MASTER MAPPING -------------------
-METRIC_DESCRIPTIONS = {
-    "Performance": "Evaluates server response times, asset delivery speed, and rendering efficiency.",
-    "Technical SEO": "Analyzes crawlability, indexing signals, and architecture semantic integrity.",
-    "On-Page SEO": "Probes keyword relevance, content depth, and internal linking structures.",
-    "Security": "Inspects SSL validity, encryption headers, and vulnerability mitigation.",
-    "User Experience": "Measures visual stability, interactivity, and mobile-first design compliance."
+# Remediation Database for the PDF
+REMEDIATION_GUIDE = {
+    "Performance": "Optimize server-side caching and implement a global CDN to reduce latency.",
+    "Technical SEO": "Correct robots.txt directives and ensure XML sitemap is submitted to Search Console.",
+    "On-Page SEO": "Increase keyword semantic density and fix heading hierarchy (H1-H6).",
+    "Security": "Hardening required: Implement HSTS headers and update TLS to version 1.3.",
+    "User Experience": "Improve Core Web Vitals by deferring non-critical JS and fixing layout shifts."
 }
 
 RAW_METRICS = [
@@ -60,129 +59,67 @@ RAW_METRICS = [
     (65, "Multilingual Support", "User Experience"), (66, "Progressive Web App Features", "User Experience")
 ]
 
-class ForensicAuditor:
-    def __init__(self, url: str):
-        self.url = url
-        self.soup = None
-        self.ttfb = 0
-
-    async def fetch_page(self):
-        start_time = time.time()
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.url, ssl=False, timeout=10, 
-                    headers={"User-Agent": "FFTech-Forensic-Bot/6.0"}) as response:
-                    self.ttfb = (time.time() - start_time) * 1000
-                    html = await response.text()
-                    self.soup = BeautifulSoup(html, 'html.parser')
-                    return True
-        except Exception: return False
-
 class ExecutivePDF(FPDF):
     def __init__(self, url, grade):
-        super().__init__()
+        super().__init__(orientation='L', unit='mm', format='A4') # Landscape for more detail
         self.target_url = url
         self.grade = grade
+
     def header(self):
         self.set_fill_color(15, 23, 42)
-        self.rect(0, 0, 210, 50, 'F')
-        self.set_font("Helvetica", "B", 22)
+        self.rect(0, 0, 297, 40, 'F')
+        self.set_font("Helvetica", "B", 20)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 20, "FF TECH | EXECUTIVE FORENSIC REPORT", 0, 1, 'C')
-        self.set_font("Helvetica", "", 10)
-        self.cell(0, 5, f"SITE AUDITED: {self.target_url}", 0, 1, 'C')
-        self.cell(0, 5, f"DATE: {time.strftime('%B %d, %Y')}", 0, 1, 'C')
-        self.ln(25)
-
-@app.post("/audit")
-async def audit(request: Request):
-    data = await request.json()
-    url = data.get("url", "").strip()
-    if not url.startswith("http"): url = "https://" + url
-    
-    auditor = ForensicAuditor(url)
-    if not await auditor.fetch_page():
-        return JSONResponse({"total_grade": 0, "summary": "Site Unreachable"}, status_code=400)
-
-    # Deterministic randomness based on URL for consistency
-    random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
-    results = []
-    pillars = {"Performance": [], "Technical SEO": [], "On-Page SEO": [], "Security": [], "User Experience": []}
-
-    for m_id, m_name, m_cat in RAW_METRICS:
-        # Simple Logic Injection for "Real" forensics
-        if m_id == 42: score = 100 if url.startswith("https") else 10
-        elif m_id == 5: score = 100 if auditor.ttfb < 300 else 40
-        elif m_id == 26: score = 100 if auditor.soup.find('h1') else 20
-        else: score = random.randint(60, 98) if "google" in url else random.randint(40, 85)
-        
-        results.append({"no": m_id, "name": m_name, "category": m_cat, "score": score})
-        pillars[m_cat].append(score)
-
-    final_pillars = {k: round(sum(v)/len(v)) for k, v in pillars.items()}
-    total_grade = round(sum(final_pillars.values()) / 5)
-
-    return {
-        "total_grade": total_grade,
-        "metrics": results,
-        "pillars": final_pillars,
-        "url": url,
-        "summary": f"Audit of {url} completed. Overall Health Index: {total_grade}%. All forensic markers validated."
-    }
+        self.cell(0, 15, "FF TECH | ELITE FORENSIC REMEDIATION REPORT", 0, 1, 'C')
+        self.set_font("Helvetica", "", 9)
+        self.cell(0, 5, f"TARGET: {self.target_url}  |  HEALTH INDEX: {self.grade}%", 0, 1, 'C')
+        self.ln(10)
 
 @app.post("/download")
 async def download_pdf(request: Request):
     data = await request.json()
-    url, grade = data.get("url", "N/A"), data.get("total_grade", 0)
-    
-    pdf = ExecutivePDF(url, grade)
+    pdf = ExecutivePDF(data['url'], data['total_grade'])
     pdf.add_page()
     
-    # Header Score
-    pdf.set_font("Helvetica", "B", 60)
-    pdf.set_text_color(59, 130, 246)
-    pdf.cell(0, 40, f"{grade}%", ln=1, align='C')
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 10, "FORENSIC HEALTH INDEX", ln=1, align='C')
-    pdf.ln(10)
-
-    # Matrix Table
+    # Header for the Matrix
     pdf.set_fill_color(30, 41, 59)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(15, 10, "ID", 1, 0, 'C', True)
-    pdf.cell(75, 10, "METRIC", 1, 0, 'L', True)
-    pdf.cell(75, 10, "CATEGORY", 1, 0, 'L', True)
-    pdf.cell(25, 10, "SCORE", 1, 1, 'C', True)
+    pdf.cell(10, 10, "ID", 1, 0, 'C', True)
+    pdf.cell(60, 10, "FORENSIC METRIC", 1, 0, 'L', True)
+    pdf.cell(30, 10, "CATEGORY", 1, 0, 'L', True)
+    pdf.cell(20, 10, "SCORE", 1, 0, 'C', True)
+    pdf.cell(157, 10, "ACTIONABLE REMEDIATION / FIX", 1, 1, 'L', True)
 
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 8)
+    pdf.set_font("Helvetica", "", 7)
+    
     for i, m in enumerate(data['metrics']):
-        if pdf.get_y() > 270: pdf.add_page()
+        if pdf.get_y() > 180: pdf.add_page() # Page break for landscape
         bg = (i % 2 == 0)
-        if bg: pdf.set_fill_color(245, 247, 250)
+        if bg: pdf.set_fill_color(248, 250, 252)
         
-        pdf.cell(15, 8, str(m['no']), 1, 0, 'C', bg)
-        pdf.cell(75, 8, m['name'][:40], 1, 0, 'L', bg)
-        pdf.cell(75, 8, m['category'], 1, 0, 'L', bg)
+        # Determine remediation text
+        fix_text = REMEDIATION_GUIDE.get(m['category'], "Verify technical implementation.")
+        if m['score'] > 90: fix_text = "Optimized. Maintain current configuration."
         
-        score = m['score']
-        pdf.set_text_color(22, 163, 74) if score > 80 else pdf.set_text_color(220, 38, 38)
-        pdf.cell(25, 8, f"{score}%", 1, 1, 'C', bg)
+        pdf.cell(10, 7, str(m['no']), 1, 0, 'C', bg)
+        pdf.cell(60, 7, m['name'][:40], 1, 0, 'L', bg)
+        pdf.cell(30, 7, m['category'], 1, 0, 'L', bg)
+        
+        # Color score
+        if m['score'] > 85: pdf.set_text_color(22, 163, 74)
+        elif m['score'] < 50: pdf.set_text_color(220, 38, 38)
+        else: pdf.set_text_color(202, 138, 4)
+        
+        pdf.cell(20, 7, f"{m['score']}%", 1, 0, 'C', bg)
         pdf.set_text_color(0, 0, 0)
+        pdf.cell(157, 7, fix_text, 1, 1, 'L', bg)
 
     buf = io.BytesIO()
-    pdf_output = pdf.output(dest='S')
-    # Standardizing binary stream for StreamingResponse
-    buf.write(pdf_output if isinstance(pdf_output, bytes) else pdf_output.encode('latin-1'))
+    pdf_out = pdf.output(dest='S')
+    buf.write(pdf_out if isinstance(pdf_out, bytes) else pdf_out.encode('latin-1'))
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf")
 
-@app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    with open("index.html", "r") as f:
-        return f.read()
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# ... (rest of the FastAPI /audit and index endpoints)
