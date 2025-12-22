@@ -1,65 +1,204 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | Elite Strategic Intelligence 2025</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
-        body { background: var(--dark); color: #f8fafc; font-family: sans-serif; }
-        .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
-    </style>
-</head>
-<body class="p-12 min-h-screen">
-    <div class="max-w-7xl mx-auto space-y-12">
-        <header class="text-center space-y-6">
-            <h1 class="text-5xl font-black">FF TECH <span class="text-blue-500">ELITE</span></h1>
-            <div class="glass p-4 max-w-3xl mx-auto flex gap-4">
-                <input id="urlInput" type="url" placeholder="Enter target URL..." class="flex-1 bg-transparent p-4 outline-none">
-                <button onclick="runAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">START SCAN</button>
-            </div>
-        </header>
 
-        <div id="results" class="hidden space-y-10">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center">
-                    <span id="totalGradeNum" class="text-6xl font-black">0%</span>
-                </div>
-                <div class="lg:col-span-8 glass p-10">
-                    <h3 class="text-3xl font-black mb-6">Strategic Overview</h3>
-                    <div id="summary" class="text-slate-300 leading-relaxed text-lg pl-6"></div>
-                    <button onclick="downloadPDF()" id="pdfBtn" class="mt-8 bg-white text-black px-10 py-4 rounded-2xl font-black">EXPORT PDF REPORT</button>
-                </div>
-            </div>
-            <div id="metricsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6"></div>
-        </div>
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FF TECH | Elite Strategic Intelligence 2025</title>
+  https://cdn.tailwindcss.com</script>
+  <style>
+    :root {
+      --primary: #3b82f6; /* Tailwind blue-500 */
+      --accent: #22d3ee;  /* cyan-400 */
+      --dark: #0b1220;    /* deep dark */
+      --glass: rgba(15, 23, 42, 0.75);
+    }
+    body { background: radial-gradient(1200px 600px at 20% 0%, #0b1220 0%, #0b1220 50%, #030712 100%); color: #f8fafc; }
+    .glass { background: var(--glass); backdrop-filter: blur(22px); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; }
+    .ring-gradient { filter: drop-shadow(0 10px 30px rgba(34, 211, 238, 0.35)); }
+    .mono { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+    .summary { white-space: pre-wrap; }
+    /* Accessible focus outline */
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+  </style>
+</head>
+<body class="min-h-screen p-6 md:p-12">
+  <div class="max-w-7xl mx-auto space-y-12">
+    <!-- Header -->
+    <header class="text-center space-y-5">
+      <div class="inline-flex items-center gap-3 px-5 py-2 rounded-full border border-white/10 glass">
+        <span class="text-xs font-semibold tracking-wider text-white/80">ELITE SUITE</span>
+        <span class="inline-flex items-center text-xs text-cyan-300">Strategic Intelligence 2025</span>
+      </div>
+      <h1 class="text-4xl md:text-6xl font-black leading-tight">
+        FF TECH <span class="text-blue-500">ELITE</span>
+      </h1>
+      <p class="text-white/70 max-w-2xl mx-auto">
+        Forensic web audit with weighted impact scoring across Technical SEO, Security, Performance,
+        Accessibility, UX/Mobile, and Advanced Analytics.
+      </p>
+
+      <!-- Input Bar -->
+      <div class="glass p-3 md:p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-3 md:gap-4">
+        <label for="urlInput" class="sr-only">Target URL</label>
+        <input id="urlInput" type="url" inputmode="url"
+               placeholder="Enter target URL (e.g., https://example.com)"
+               class="flex-1 bg-transparent px-4 py-3 rounded-xl outline-none placeholder:text-white/40 border border-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400">
+        <button id="scanBtn"
+                class="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition-colors px-6 py-3 rounded-xl font-bold">
+          START SCAN
+        </button>
+      </div>
+
+      <!-- Helper actions -->
+      <div class="flex items-center justify-center gap-4 text-xs text-white/60">
+        <button id="demoBtn" class="underline hover:text-white/90">Use demo URL</button>
+        <span aria-hidden="true">•</span>
+        <span>Press <kbd class="px-1 py-0.5 bg-white/10 rounded">Enter</kbd> to scan</span>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loading" class="hidden">
+      <div class="glass p-6 flex items-center justify-center gap-4">
+        <svg class="animate-spin h-5 w-5 text-cyan-300" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-opacity="0.2"/>
+          <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4"/>
+        </svg>
+        <span class="text-white/80">Scanning target…</span>
+      </div>
     </div>
-    <script>
-        let reportData = null;
-        async function runAudit() {
-            const url = document.getElementById('urlInput').value.trim();
-            if(!url) return;
-            try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                reportData = await res.json();
-                document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
-                document.getElementById('summary').textContent = reportData.summary;
-                const grid = document.getElementById('metricsGrid');
-                grid.innerHTML = '';
-                reportData.metrics.forEach(m => {
-                    grid.innerHTML += `<div class="glass p-6"><h4>${m.name}</h4><span class="font-black">${m.score}%</span></div>`;
-                });
-                document.getElementById('results').classList.remove('hidden');
-            } catch(e) { alert('Audit failed'); }
-        }
-        async function downloadPDF() {
-            if(!reportData) return;
-            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating...';
-            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
-            const blob = await res.blob();
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'FFTech_Elite_Audit.pdf'; a.click();
-            btn.textContent = 'EXPORT PDF REPORT';
-        }
-    </script>
-</body>
-</html>
+
+    <!-- Results -->
+    <section id="results" class="hidden space-y-10">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Grade Ring -->
+        <div class="lg:col-span-4 glass p-8 flex items-center justify-center">
+          <div class="relative">
+            <svg width="220" height="220" class="ring-gradient" aria-labelledby="gradeLabel" role="img">
+              <title id="gradeLabel">Overall Health Score</title>
+              <circle cx="110" cy="110" r="92" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="22"/>
+              <circle id="gradeArc" cx="110" cy="110" r="92" fill="none"
+                      stroke="url(#grad)" stroke-width="22"
+                      stroke-linecap="round" transform="rotate(-90 110 110)"/>
+              <defs>
+                <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#22d3ee"/>
+                  <stop offset="100%" stop-color="#3b82f6"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="absolute inset-0 grid place-items-center">
+              <div class="text-center">
+                <div id="totalGradeNum" class="text-5xl md:text-6xl font-black mono">0%</div>
+                <div class="text-xs uppercase tracking-wider text-white/60 mt-1">Overall Health</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategic Overview -->
+        <div class="lg:col-span-8 glass p-8">
+          <div class="flex items-center justify-between">
+            <h3 class="text-2xl md:text-3xl font-black">Strategic Overview</h3>
+            <div class="flex items-center gap-2">
+              <button id="copySummaryBtn" class="text-xs px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15">
+                Copy Summary
+              </button>
+              <button onclick="downloadPDF()" id="pdfBtn"
+                      class="text-xs md:text-sm bg-white text-black px-4 py-2 md:px-6 md:py-3 rounded-xl font-black">
+                EXPORT PDF REPORT
+              </button>
+            </div>
+          </div>
+          <div id="summary" class="summary text-slate-200 leading-relaxed text-base md:text-lg mt-4"></div>
+
+          <!-- Top Priorities -->
+          <div class="mt-8">
+            <h4 class="text-xl font-bold mb-3">Top Priorities</h4>
+            <ul id="topIssues" class="grid grid-cols-1 md:grid-cols-2 gap-3"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Accordions -->
+      <div id="categories" class="space-y-6"></div>
+    </section>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 hidden">
+      <div class="glass px-4 py-3 rounded-xl text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = ""; // same origin. Set to "http://localhost:8000" if serving HTML separately.
+
+    let reportData = null;
+
+    const $ = (id) => document.getElementById(id);
+    const show = (el) => el.classList.remove('hidden');
+    const hide = (el) => el.classList.add('hidden');
+
+    function toast(msg, ok = true) {
+      const container = $('toast');
+      const box = container.querySelector('div');
+      box.textContent = msg;
+      box.className = `glass px-4 py-3 rounded-xl text-sm ${ok ? 'text-cyan-200' : 'text-red-300'}`;
+      show(container);
+      setTimeout(() => hide(container), 2000);
+    }
+
+    function setGradeRing(percent) {
+      const arc = $('gradeArc');
+      const r = 92;
+      const circ = 2 * Math.PI * r;
+      const clamped = Math.max(0, Math.min(100, percent));
+      const filled = (clamped / 100) * circ;
+      arc.setAttribute('stroke-dasharray', `${filled} ${circ}`);
+      arc.setAttribute('stroke-dashoffset', '0');
+      $('totalGradeNum').textContent = `${clamped}%`;
+    }
+
+    function colorByScore(score) {
+      if (score >= 90) return 'text-green-300';
+      if (score >= 75) return 'text-amber-300';
+      return 'text-red-300';
+    }
+
+    function bgByScore(score) {
+      if (score >= 90) return 'bg-green-500/10';
+      if (score >= 75) return 'bg-amber-500/10';
+      return 'bg-red-500/10';
+    }
+
+    function metricChip(m) {
+      return `
+        <div class="flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${bgByScore(m.score)} border border-white/10">
+          <span class="text-sm text-white/80">${m.name}</span>
+          <span class="text-sm font-bold mono ${colorByScore(m.score)}">${m.score}%</span>
+        </div>`;
+    }
+
+    function buildCategories(metrics) {
+      const byCat = {};
+      metrics.forEach(m => (byCat[m.category] ||= []).push(m));
+
+      const container = $('categories');
+      container.innerHTML = '';
+
+      Object.entries(byCat).forEach(([cat, items], idx) => {
+        const avg = Math.round(items.reduce((a, b) => a + b.score, 0) / items.length);
+        const open = idx < 3 ? '' : 'hidden'; // open first 3 by default
+        const catId = `cat-${idx}`;
+        const block = document.createElement('div');
+        block.className = 'glass p-6';
+
+        block.innerHTML = `
+          <button class="w-full flex items-center justify-between" aria-expanded="${open === ''}">
+            <div>
+              <h4 class="text-xl font-bold">${cat}</h4>
+              <p class="text-xs text-white/60">Avg: <span class="mono ${colorByScore(avg)}">${avg}%</span></p>
+            </div>
+            <div class="text-white/60">▼</div>
+          </button>
