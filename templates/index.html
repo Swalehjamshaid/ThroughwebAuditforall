@@ -3,49 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH ELITE | Forensic Audit Report</title>
+    <title>FF TECH ELITE | Forensic Audit Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
+        
         body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         .neon-border { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); }
         .mono { font-family: 'JetBrains Mono', monospace; }
-        @keyframes loading-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-        .animate-loading { animation: loading-bar 2s infinite linear; }
+        
+        /* Loading Animation */
+        @keyframes scan {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+        .scan-line { animation: scan 2s infinite linear; }
     </style>
 </head>
 <body class="p-4 md:p-10 min-h-screen">
     <div class="max-w-7xl mx-auto space-y-10">
+        
         <header class="text-center space-y-4">
             <div class="inline-block px-4 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-widest uppercase">
-                FF TECH ELITE AUDIT ENGINE
+                Forensic Engine v6.0
             </div>
             <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter italic text-white uppercase">
                 FF TECH <span class="text-blue-500">ELITE</span>
             </h1>
             <div class="max-w-2xl mx-auto pt-6">
                 <div class="glass neon-border p-2 rounded-2xl flex flex-col md:flex-row gap-2">
-                    <input id="urlInput" type="text" value="https://www.apple.com" 
+                    <input id="urlInput" type="text" placeholder="https://www.apple.com" 
                            class="flex-1 bg-transparent px-6 py-4 outline-none text-white text-lg placeholder:opacity-30">
-                    <button onclick="startAudit()" id="auditBtn" 
-                            class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase tracking-widest transition-all">
-                        Run Audit
+                    <button onclick="runAudit()" id="auditBtn" 
+                            class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase tracking-widest transition-all active:scale-95">
+                        Start Sweep
                     </button>
                 </div>
             </div>
         </header>
 
-        <div id="dashboard" class="space-y-8">
+        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
+            
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 <div class="lg:col-span-4 glass rounded-[40px] p-10 flex flex-col items-center justify-center text-center">
                     <div class="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Overall Health Index</div>
-                    <div class="text-9xl font-black italic text-blue-500 leading-none">66%</div>
-                    <div class="mt-4 px-4 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-bold text-sm">NEEDS OPTIMIZATION</div>
-                    <p class="mt-8 text-sm opacity-60 leading-relaxed italic">
-                        Audit of https://www.apple.com identifies a Health Index of 66%. Real Performance: TTFB 36ms.
-                    </p>
+                    <div id="gradeValue" class="text-9xl font-black italic text-blue-500 leading-none">0%</div>
+                    <div class="mt-4 px-4 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-bold text-sm uppercase tracking-widest">Forensic Verified</div>
+                    <p id="summaryText" class="mt-8 text-sm opacity-60 leading-relaxed italic"></p>
                 </div>
 
                 <div class="lg:col-span-5 glass rounded-[40px] p-8 flex items-center justify-center">
@@ -54,84 +61,121 @@
 
                 <div class="lg:col-span-3 space-y-4">
                     <div class="glass p-6 rounded-3xl space-y-4">
-                        <h3 class="text-xs font-bold opacity-40 uppercase tracking-widest">Executive Suggestions</h3>
-                        <p class="text-xs leading-relaxed opacity-80">
-                            Strategic focus must immediately shift toward infrastructure hardening and Core Web Vital optimization to prevent further ranking degradation.
+                        <h3 class="text-xs font-bold opacity-40 uppercase tracking-widest text-blue-400">Executive Suggestion</h3>
+                        <p class="text-xs leading-relaxed opacity-80 italic">
+                            Infrastructure hardening and Core Web Vital optimization are required to reach elite status. Asset delivery pipelines show significant bottlenecks.
                         </p>
                     </div>
-                    <button class="w-full py-6 glass hover:bg-white hover:text-black transition-all rounded-3xl font-black uppercase tracking-widest text-sm border-white/20">
-                        Download Report PDF
+                    <button onclick="downloadPDF()" class="w-full py-6 glass hover:bg-green-600 hover:text-white transition-all rounded-3xl font-black uppercase tracking-widest text-sm border-white/10 flex items-center justify-center gap-2">
+                        Download Executive PDF
                     </button>
                 </div>
             </div>
 
             <div class="space-y-6">
-                <div class="space-y-1">
-                    <h2 class="text-2xl font-bold">Detailed Forensic Matrix</h2>
-                    <p class="text-xs opacity-40 uppercase tracking-widest">Core Technical Metrics</p>
+                <div class="flex justify-between items-end">
+                    <div class="space-y-1">
+                        <h2 class="text-2xl font-bold uppercase italic">Forensic Matrix</h2>
+                        <p class="text-xs opacity-40 uppercase tracking-widest">66 Comprehensive Data Points</p>
+                    </div>
                 </div>
                 <div id="matrixGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                    <div class="glass p-4 rounded-2xl border-l-2 border-blue-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">Core Web Vitals</div>
-                        <div class="text-[10px] font-bold mt-1">Largest Contentful Paint (LCP)</div>
-                        <div class="text-xl font-black mt-1 text-blue-400">69%</div>
                     </div>
-                    <div class="glass p-4 rounded-2xl border-l-2 border-green-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">Performance</div>
-                        <div class="text-[10px] font-bold mt-1">Time to First Byte (TTFB)</div>
-                        <div class="text-xl font-black mt-1 text-green-400">100%</div>
-                    </div>
-                    <div class="glass p-4 rounded-2xl border-l-2 border-blue-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">On-Page SEO</div>
-                        <div class="text-[10px] font-bold mt-1">Title Tag Optimization</div>
-                        <div class="text-xl font-black mt-1 text-blue-400">70%</div>
-                    </div>
-                    <div class="glass p-4 rounded-2xl border-l-2 border-green-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">On-Page SEO</div>
-                        <div class="text-[10px] font-bold mt-1">Heading Structure (H1-H6)</div>
-                        <div class="text-xl font-black mt-1 text-green-400">100%</div>
-                    </div>
-                    <div class="glass p-4 rounded-2xl border-l-2 border-green-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">Security</div>
-                        <div class="text-[10px] font-bold mt-1">HTTPS Full Implementation</div>
-                        <div class="text-xl font-black mt-1 text-green-400">100%</div>
-                    </div>
-                    <div class="glass p-4 rounded-2xl border-l-2 border-red-500">
-                        <div class="text-[8px] opacity-30 font-bold uppercase">General Audit</div>
-                        <div class="text-[10px] font-bold mt-1">Forensic Probe Point 6</div>
-                        <div class="text-xl font-black mt-1 text-red-500">33%</div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // Radar Chart configuration matching the 5 pillars in the Audit Report
-        const ctx = document.getElementById('radarChart');
-        new Chart(ctx, {
-            type: 'radar',
-            data: {
-                labels: ['Core Web Vitals', 'Performance', 'On-Page SEO', 'Security', 'General Audit'],
-                datasets: [{
-                    label: 'Efficiency Index',
-                    data: [69, 100, 85, 100, 45],
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    borderColor: '#3b82f6',
-                    pointBackgroundColor: '#3b82f6'
-                }]
-            },
-            options: {
-                scales: {
-                    r: {
-                        min: 0, max: 100, ticks: { display: false },
-                        grid: { color: 'rgba(255,255,255,0.05)' },
-                        pointLabels: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: 'bold' } }
-                    }
-                },
-                plugins: { legend: { display: false } }
+        let radar = null;
+        let currentData = null;
+
+        async function runAudit() {
+            const btn = document.getElementById('auditBtn');
+            const url = document.getElementById('urlInput').value;
+            if(!url) return alert("Enter URL");
+
+            btn.innerText = "SCANNING...";
+            btn.classList.add('opacity-50');
+
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                currentData = await res.json();
+                
+                renderResults(currentData);
+                btn.innerText = "START SWEEP";
+                btn.classList.remove('opacity-50');
+            } catch (err) {
+                alert("Audit failed. Check server connection.");
+                btn.innerText = "START SWEEP";
             }
-        });
+        }
+
+        function renderResults(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('gradeValue').innerText = data.total_grade + '%';
+            document.getElementById('summaryText').innerText = data.summary;
+
+            // Matrix Rendering
+            const grid = document.getElementById('matrixGrid');
+            grid.innerHTML = data.metrics.map(m => `
+                <div class="glass p-4 rounded-2xl border-l-2 ${m.score > 80 ? 'border-green-500' : 'border-blue-500/50'}">
+                    <div class="text-[8px] opacity-30 font-bold uppercase truncate">${m.category}</div>
+                    <div class="text-[10px] font-bold mt-1 h-8 line-clamp-2">${m.name}</div>
+                    <div class="text-xl font-black mt-1 ${m.score > 80 ? 'text-green-400' : 'text-blue-400'}">${m.score}%</div>
+                </div>
+            `).join('');
+
+            // Radar Chart Rendering
+            const ctx = document.getElementById('radarChart');
+            if(radar) radar.destroy();
+            radar = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(data.pillars),
+                    datasets: [{
+                        label: 'Efficiency',
+                        data: Object.values(data.pillars),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            min: 0, max: 100, ticks: { display: false },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            pointLabels: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: 'bold' } }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        async function downloadPDF() {
+            if(!currentData) return;
+            const res = await fetch('/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(currentData)
+            });
+            
+            // Correct Blob Handling for Binary Data
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `FF_TECH_Audit_${currentData.total_grade}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
     </script>
 </body>
 </html>
