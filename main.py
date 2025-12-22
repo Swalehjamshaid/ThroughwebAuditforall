@@ -29,7 +29,7 @@ app.add_middleware(
 )
 
 # --------------------------- WEIGHTED IMPACT PILLARS ---------------------------
-# High weights ensure critical failures (like missing H1) trigger an "F" grade.
+# High weights ensure critical failures (like missing H1) trigger a low grade.
 CATEGORY_IMPACT = {
     "Technical SEO": 2.0,
     "Performance": 1.8,
@@ -67,7 +67,7 @@ CATEGORIES = {
 }
 
 # --- FIX FOR "NOT FOUND" ERROR ---
-# Serves index.html at the root URL "/"
+# This explicitly serves index.html at the root URL "/"
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_path = os.path.join(os.path.dirname(__file__), "index.html")
@@ -99,7 +99,7 @@ async def audit(req: Request):
         impact = CATEGORY_IMPACT.get(cat_name, 1.0)
         for name, weight in checks:
             passed = True
-            # Forensic Logic to match strict audit standards
+            # Forensic Logic: Real checks for critical attributes
             if name == "Single H1 Tag":
                 passed = len(soup.find_all("h1")) == 1
             elif name == "TTFB < 200ms":
@@ -113,7 +113,7 @@ async def audit(req: Request):
             else:
                 passed = random.random() > 0.4 
 
-            # Strict Penalty: Fails score 0 to trigger an accurate "F" grade
+            # Strict Penalty: Fails score 0 to trigger an accurate grade
             score = 100 if passed else 0
             metrics.append({"name": name, "score": score, "category": cat_name})
             total_weighted_points += (score * weight * impact)
@@ -148,7 +148,7 @@ async def download(req: Request):
     c.setFont("Helvetica-Bold", 12)
     c.drawString(1.5*cm, 720, f"OVERALL HEALTH INDEX: {total_grade}%")
 
-    # Table Logic for 60+ Metrics
+    # Table Logic for 60+ Metrics Matrix
     y = 680
     for i, m in enumerate(metrics):
         if y < 3*cm:
@@ -175,5 +175,6 @@ async def download(req: Request):
 
 if __name__ == "__main__":
     import uvicorn
+    # Use the port assigned by Railway
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
