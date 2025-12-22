@@ -3,213 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | Elite Strategic Intelligence</title>
+    <title>FF TECH | Strategic Audit Elite</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --brand-primary: #3b82f6;
-            --brand-dark: #020617;
-            --glass: rgba(15, 23, 42, 0.8);
-        }
-        body { 
-            background: var(--brand-dark); 
-            color: #f8fafc; 
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #020617 80%);
-            min-height: 100vh;
-        }
-        .glass-panel { 
-            background: var(--glass); 
-            backdrop-filter: blur(12px); 
-            border: 1px solid rgba(255,255,255,0.1); 
-            border-radius: 24px; 
-        }
-        .ff-logo {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.5));
-        }
-        .score-ring {
-            transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
-            background: conic-gradient(var(--brand-primary) calc(var(--percent) * 1%), #1e293b 0);
-            position: relative;
-        }
-        .score-ring::before {
-            content: "";
-            position: absolute;
-            inset: 8px;
-            background: var(--brand-dark);
-            border-radius: 50%;
-        }
-        .metric-card {
-            transition: transform 0.2s ease, border-color 0.2s ease;
-        }
-        .metric-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--brand-primary);
-        }
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .animate-scan { animation: pulse-slow 2s infinite; }
+        body { background: #020617; font-family: 'Space Grotesk', sans-serif; color: white; }
+        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; }
+        .glow-text { text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+        .metric-row:hover { background: rgba(59, 130, 246, 0.1); }
     </style>
 </head>
-<body class="p-4 md:p-10">
+<body class="p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
-        <nav class="flex justify-between items-center mb-12">
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-600 text-white font-black px-3 py-1 rounded-lg text-2xl">FF</div>
-                <span class="text-2xl font-extrabold tracking-tighter uppercase ff-logo">Tech</span>
+        <nav class="flex justify-between items-center mb-16">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-black text-2xl">FF</div>
+                <h1 class="text-3xl font-bold tracking-tighter">TECH <span class="text-blue-500">ELITE</span></h1>
             </div>
-            <div class="hidden md:block text-[10px] tracking-[0.3em] text-slate-500 font-bold uppercase">
-                System Status: Operational // v2.0.5
-            </div>
+            <div class="text-slate-500 font-mono text-xs">A.I. AUDIT ENGINE v4.0.1 // 2025</div>
         </nav>
 
-        <div class="text-center mb-16">
-            <h1 class="text-4xl md:text-6xl font-extrabold mb-6 tracking-tight">
-                Stop <span class="text-blue-500">Revenue Leakage</span><br>With Strategic Audits
-            </h1>
-            <div class="flex flex-col md:flex-row gap-3 max-w-3xl mx-auto glass-panel p-2">
-                <input id="urlInput" type="text" placeholder="Enter business URL (e.g. store.com)" 
-                       class="flex-1 bg-transparent px-6 py-4 outline-none text-lg">
-                <button onclick="runAudit()" id="btn" 
-                        class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-4 rounded-xl transition-all shadow-lg shadow-blue-900/20">
-                    ANALYZE ASSET
-                </button>
-            </div>
-        </div>
-
-        <div id="loader" class="hidden">
-            <div class="flex flex-col items-center justify-center py-20">
-                <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-                <p class="text-blue-400 font-mono animate-scan">INJECTING HEURISTIC PROBES... MAPPING 60 CRITICAL POINTS...</p>
+        <div class="text-center mb-24">
+            <h2 class="text-5xl md:text-7xl font-bold mb-8 glow-text">Forensic Website Audit</h2>
+            <div class="max-w-3xl mx-auto flex gap-4 p-2 bento-card">
+                <input id="urlInput" type="text" placeholder="Enter target domain..." class="flex-1 bg-transparent px-6 py-4 outline-none text-xl">
+                <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-2xl transition-all shadow-xl shadow-blue-900/40">SCAN ASSET</button>
             </div>
         </div>
 
         <div id="results" class="hidden space-y-8">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div class="lg:col-span-4 glass-panel p-8 flex flex-col items-center justify-center text-center">
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Asset Efficiency</span>
-                    <div id="ringContainer" class="score-ring w-48 h-48 rounded-full flex items-center justify-center mb-6" style="--percent: 0">
-                        <span id="bigScore" class="relative z-10 text-5xl font-black">0%</span>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bento-card p-10 flex flex-col items-center justify-center">
+                    <div id="scoreRing" class="relative w-48 h-48 rounded-full border-8 border-slate-800 flex items-center justify-center">
+                        <span id="bigScore" class="text-6xl font-black">0%</span>
                     </div>
-                    <p class="text-sm text-slate-400" id="healthTag">Awaiting calculation...</p>
+                    <p class="mt-6 text-slate-400 font-bold uppercase tracking-widest text-xs">Compliance Index</p>
                 </div>
 
-                <div class="lg:col-span-8 glass-panel p-8 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-4 opacity-10">
-                        <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2v20M2 12h20"/></svg>
-                    </div>
-                    <div class="flex items-center gap-2 mb-4">
-                        <span class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                        <h2 class="text-red-500 font-bold uppercase text-xs tracking-widest">Financial Impact Warning</h2>
-                    </div>
-                    <h3 class="text-3xl font-bold mb-4">Executive Strategic Overview</h3>
-                    <p id="summary" class="text-slate-300 leading-relaxed mb-6 text-lg"></p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-800 pt-6">
-                        <div>
-                            <p class="text-xs text-slate-500 uppercase font-bold">Estimated Conversion Loss</p>
-                            <p id="leakageVal" class="text-2xl font-bold text-white">0%</p>
-                        </div>
-                        <div>
-                            <p class="text-xs text-slate-500 uppercase font-bold">Potential Annual Benefit Loss</p>
-                            <p id="lossVal" class="text-2xl font-bold text-blue-500">$0.00</p>
-                        </div>
+                <div class="lg:col-span-2 bento-card p-10 bg-gradient-to-br from-blue-900/20 to-transparent">
+                    <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                        <span class="w-2 h-8 bg-blue-500 rounded-full"></span>
+                        Strategic Improvement Plan
+                    </h3>
+                    <p id="summary" class="text-slate-300 leading-relaxed text-lg italic"></p>
+                    <div class="mt-8 flex gap-4">
+                        <button onclick="downloadPDF()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm">EXPORT RECOVERY PDF</button>
                     </div>
                 </div>
             </div>
 
-            <div class="flex justify-between items-center bg-slate-900/50 p-6 rounded-2xl border border-slate-800">
-                <div>
-                    <h4 class="text-xl font-bold">Technical Scorecard</h4>
-                    <p class="text-sm text-slate-500">Full 60-Point Forensic Breakout</p>
-                </div>
-                <button onclick="downloadPDF()" class="bg-white text-black hover:bg-slate-200 px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-colors">
-                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3"/></svg>
-                    DOWNLOAD STRATEGY PDF
-                </button>
+            <div class="bento-card p-10">
+                <h3 class="text-xl font-bold mb-8">65-Point Forensic Matrix</h3>
+                <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-2">
+                    </div>
             </div>
-
-            <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                </div>
         </div>
     </div>
 
     <script>
-        let reportData = null;
-
         async function runAudit() {
-            const urlInput = document.getElementById('urlInput');
-            if(!urlInput.value) return;
-
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
-
-            try {
-                const res = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: urlInput.value})
-                });
-
-                reportData = await res.json();
-                
-                // Populate Data
-                document.getElementById('bigScore').innerText = reportData.avg_score + "%";
-                document.getElementById('ringContainer').style.setProperty('--percent', reportData.avg_score);
-                document.getElementById('summary').innerText = reportData.summary;
-                document.getElementById('leakageVal').innerText = reportData.financial_impact.leakage + "%";
-                document.getElementById('lossVal').innerText = reportData.financial_impact.annual_loss;
-                
-                const grid = document.getElementById('metricsGrid');
-                grid.innerHTML = '';
-                
-                reportData.metrics.forEach(m => {
-                    const statusColor = m.score > 75 ? 'text-green-500' : (m.score > 45 ? 'text-orange-500' : 'text-red-500');
-                    const borderColor = m.score > 75 ? 'border-green-500/20' : (m.score > 45 ? 'border-orange-500/20' : 'border-red-500/20');
-                    
-                    grid.innerHTML += `
-                        <div class="glass-panel p-5 metric-card border-l-4 ${borderColor}">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-[10px] font-bold text-slate-500 uppercase">${m.category}</span>
-                                <span class="text-xs font-black ${statusColor}">${m.score}%</span>
-                            </div>
-                            <h4 class="font-bold text-sm text-white mb-1">${m.name}</h4>
-                            <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div class="h-full bg-current ${statusColor}" style="width: ${m.score}%"></div>
-                            </div>
-                        </div>
-                    `;
-                });
-
-                document.getElementById('loader').classList.add('hidden');
-                document.getElementById('results').classList.remove('hidden');
-
-            } catch (e) {
-                alert("Scan Failed: Check connection to FF Tech server.");
-                document.getElementById('loader').classList.add('hidden');
-            }
-        }
-
-        async function downloadPDF() {
-            const btn = event.target;
-            btn.innerText = "GENERATING...";
-            const res = await fetch('/download', {
+            const url = document.getElementById('urlInput').value;
+            const res = await fetch('/audit', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(reportData)
+                body: JSON.stringify({url})
             });
-            const blob = await res.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `FF_Tech_Audit_${reportData.url.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-            a.click();
-            btn.innerHTML = "DOWNLOAD STRATEGY PDF";
+            const data = await res.json();
+            
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('bigScore').innerText = data.avg_score + "%";
+            document.getElementById('summary').innerText = data.summary;
+
+            const list = document.getElementById('metricsList');
+            list.innerHTML = '';
+            data.metrics.forEach(m => {
+                const color = m.score > 80 ? 'text-green-400' : m.score > 50 ? 'text-yellow-400' : 'text-red-400';
+                list.innerHTML += `
+                    <div class="flex justify-between items-center py-2 border-b border-white/5 metric-row">
+                        <span class="text-xs text-slate-400 uppercase font-bold tracking-tighter">${m.name}</span>
+                        <span class="text-xs font-black ${color}">${m.score}%</span>
+                    </div>
+                `;
+            });
         }
     </script>
 </body>
