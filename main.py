@@ -86,9 +86,10 @@ HTML_DASHBOARD = """
         :root { --primary: #3b82f6; --dark: #020617; --glass: rgba(15, 23, 42, 0.9); }
         body { background: var(--dark); color: #f8fafc; font-family: sans-serif; background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.4) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(30,41,59,0.4) 0%, transparent 50%); }
         .glass { background: var(--glass); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.08); border-radius: 32px; }
+        .score-ring { background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0); transition: all 2s cubic-bezier(0.4,0,0.2,1); border-radius: 50%; }
     </style>
 </head>
-<body class="p-12 min-h-screen">
+<body class="p-6 md:p-12 min-h-screen">
     <div class="max-w-7xl mx-auto space-y-12">
         <header class="text-center space-y-6">
             <h1 class="text-5xl font-black uppercase">FF TECH <span class="text-blue-500">ELITE</span></h1>
@@ -106,13 +107,17 @@ HTML_DASHBOARD = """
         <div id="results" class="hidden space-y-10">
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div class="lg:col-span-4 glass p-10 flex flex-col items-center justify-center">
-                    <span id="totalGradeNum" class="text-8xl font-black text-blue-500">0%</span>
-                    <p class="text-slate-500 uppercase font-bold tracking-widest mt-4">Weighted Score</p>
+                    <div id="gradeRing" class="score-ring w-64 h-64 relative mb-6" style="--percent: 0">
+                        <div class="absolute inset-4 bg-[#020617] rounded-full flex flex-col items-center justify-center">
+                            <span id="totalGradeNum" class="text-6xl font-black">0%</span>
+                        </div>
+                    </div>
+                    <h3 id="gradeLabel" class="text-2xl font-black text-blue-500 uppercase">Analyzing...</h3>
                 </div>
                 <div class="lg:col-span-8 glass p-10">
-                    <h3 class="text-3xl font-black mb-6 border-b border-slate-800 pb-4">Strategic Recovery Roadmap</h3>
-                    <div id="summary" class="text-slate-300 leading-relaxed text-lg whitespace-pre-line"></div>
-                    <button onclick="downloadPDF()" id="pdfBtn" class="mt-8 bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-slate-200 transition-all">EXPORT PDF REPORT</button>
+                    <h3 class="text-3xl font-black mb-6">Executive Strategic Overview</h3>
+                    <div id="summary" class="text-slate-300 leading-relaxed text-lg border-l-4 border-blue-600 pl-6 whitespace-pre-line"></div>
+                    <button onclick="downloadPDF()" id="pdfBtn" class="mt-8 bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-slate-200 transition-all">EXPORT ELITE PDF</button>
                 </div>
             </div>
             <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6"></div>
@@ -129,6 +134,8 @@ HTML_DASHBOARD = """
                 const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
                 reportData = await res.json();
                 document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
+                document.getElementById('gradeLabel').textContent = reportData.grade_label;
+                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
                 document.getElementById('summary').textContent = reportData.summary;
                 const grid = document.getElementById('metricsGrid');
                 grid.innerHTML = '';
@@ -142,11 +149,14 @@ HTML_DASHBOARD = """
         }
         async function downloadPDF() {
             if(!reportData) return;
-            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating...';
+            const btn = document.getElementById('pdfBtn'); btn.textContent = 'Generating PDF...';
             const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
             const blob = await res.blob();
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'FFTech_Elite_Audit.pdf'; a.click();
-            btn.textContent = 'EXPORT PDF REPORT';
+            const a = document.createElement('a'); 
+            a.href = window.URL.createObjectURL(blob); 
+            a.download = 'FFTech_Elite_Audit_Report.pdf'; 
+            a.click();
+            btn.textContent = 'EXPORT ELITE PDF';
         }
     </script>
 </body>
@@ -198,12 +208,15 @@ async def audit(request: Request):
         f"Our analysis identifies '{weakest_cat}' as your primary operational bottleneck. "
         "In the 2025 digital economy, performance is no longer a luxury—it is a conversion requirement. "
         f"The server latency (TTFB: {ttfb}ms) indicates measurable revenue leakage. "
-        "Immediate roadmap: Stabilize Core Web Vitals to satisfy Google's primary ranking signals and reduce bounce rates by approximately 22%."
+        "Immediate roadmap: Stabilize Core Web Vitals to satisfy Google's primary ranking signals and reduce bounce rates by approximately 22%. "
+        "Optimizing high-weight assets in this category will yield the highest return on technical investment. "
+        "Furthermore, hardening security protocols and mobile responsiveness will safeguard brand trust. "
+        "This roadmap is designed to transform technical debt into strategic market advantage within 90 days."
     )
 
     return {
-        "url": url, "total_grade": final_grade, "summary": summary,
-        "metrics": results, "ttfb": ttfb, "weakest_category": weakest_cat
+        "url": url, "total_grade": final_grade, "grade_label": "ELITE" if final_grade > 85 else "OPTIMIZE",
+        "summary": summary, "metrics": results, "weakest_category": weakest_cat
     }
 
 @app.post("/download")
@@ -217,7 +230,7 @@ async def download_pdf(request: Request):
     pdf.cell(0, 20, f"{data['total_grade']}%", 0, 1, 'C')
     pdf.ln(10)
 
-    # Executive Summary (The 200 Words)
+    # Executive Summary (200 Words)
     pdf.set_font("Helvetica", "B", 14); pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 10, "1. STRATEGIC RECOVERY PLAN", ln=1)
     pdf.set_font("Helvetica", "", 10)
@@ -238,12 +251,16 @@ async def download_pdf(request: Request):
         if pdf.get_y() > 270: pdf.add_page()
         pdf.cell(90, 6, m["name"], 1); pdf.cell(30, 6, f"{m['score']}%", 1, 1, 'C')
 
-    # FIX: Correct PDF streaming to avoid empty files
+    # Binary Stream Fix
+    buffer = io.BytesIO()
     pdf_bytes = pdf.output(dest='S').encode('latin-1')
+    buffer.write(pdf_bytes)
+    buffer.seek(0)
+    
     return StreamingResponse(
-        io.BytesIO(pdf_bytes), 
+        buffer, 
         media_type="application/pdf", 
-        headers={"Content-Disposition": "attachment; filename=FFTech_Elite_Audit.pdf"}
+        headers={"Content-Disposition": "attachment; filename=FFTech_Audit_Report.pdf"}
     )
 
 if __name__ == "__main__":
