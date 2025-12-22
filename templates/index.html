@@ -8,201 +8,262 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #3b82f6; --secondary: #8b5cf6;
-            --dark: #020617; --glass: rgba(15, 23, 42, 0.9);
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --dark: #020617;
+            --glass: rgba(15, 23, 42, 0.9);
             --glow: 0 0 40px rgba(59, 130, 246, 0.4);
         }
-        body { 
-            background: var(--dark); 
-            color: #f8fafc; 
+        body {
+            background: var(--dark);
+            color: #f8fafc;
             font-family: 'Inter', sans-serif;
-            background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.6) 0%, transparent 50%),
-                              radial-gradient(circle at 80% 20%, rgba(30,41,59,0.6) 0%, transparent 50%);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(30,41,59,0.6) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(30,41,59,0.6) 0%, transparent 50%);
         }
         .glass {
-            background: var(--glass); backdrop-filter: blur(24px);
-            border: 1px solid rgba(255,255,255,0.08); border-radius: 32px;
+            background: var(--glass);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 32px;
             box-shadow: var(--glow);
         }
         .gradient-text {
             background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         .score-ring {
-            background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0);
+            background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0%);
             transition: all 2s cubic-bezier(0.4,0,0.2,1);
             box-shadow: var(--glow);
         }
-        .metric-card:hover { transform: translateY(-12px) scale(1.03); }
-        @keyframes pulse-glow { 0%,100%{box-shadow:var(--glow);} 50%{box-shadow:0 0 60px rgba(59,130,246,0.6);} }
+        .metric-card:hover {
+            transform: translateY(-12px) scale(1.03);
+            transition: all 0.4s ease;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: var(--glow); }
+            50% { box-shadow: 0 0 60px rgba(59,130,246,0.6); }
+        }
         .animate-glow { animation: pulse-glow 3s infinite; }
+        .scrollbar-thin::-webkit-scrollbar { width: 8px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #0f172a; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
     </style>
 </head>
 <body class="p-8 md:p-16 min-h-screen">
     <div class="max-w-7xl mx-auto space-y-20">
-        <!-- HERO WITH TOTAL GRADE SPACE -->
+        <!-- HERO SECTION -->
         <div class="text-center space-y-12">
             <div class="flex items-center gap-6 justify-center mb-8">
-                <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center text-2xl font-black text-white">FF</div>
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center text-3xl font-black text-white shadow-2xl">
+                    FF
+                </div>
                 <h1 class="text-6xl md:text-7xl font-black gradient-text tracking-tight">TECH</h1>
             </div>
             <p class="text-2xl md:text-4xl text-slate-300 font-light">Elite Strategic Intelligence • 2025 Global Standards</p>
-            <div class="glass p-8 max-w-2xl mx-auto">
-                <input id="urlInput" type="url" placeholder="https://yourwebsite.com" 
-                       class="w-full bg-transparent p-6 text-2xl outline-none placeholder-slate-500">
-                <button onclick="runAudit()" class="mt-8 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-xl py-8 rounded-3xl glow transition-all hover:scale-[1.02]">
+
+            <!-- INPUT FORM -->
+            <div class="glass p-8 max-w-3xl mx-auto">
+                <input 
+                    id="urlInput" 
+                    type="text" 
+                    placeholder="Enter website URL (e.g. https://example.com)" 
+                    class="w-full bg-transparent p-6 text-2xl outline-none placeholder-slate-500 border-b-2 border-slate-700 focus:border-blue-500 transition"
+                />
+                <button 
+                    onclick="runAudit()" 
+                    class="mt-10 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-2xl py-8 rounded-3xl glow transition-all hover:scale-105 shadow-2xl"
+                >
                     🚀 LAUNCH 66+ POINT ELITE AUDIT
                 </button>
             </div>
-            <!-- TOTAL GRADE (Shows after audit - TOP POSITION) -->
-            <div id="totalGrade" class="hidden glass p-12 max-w-4xl mx-auto animate-glow">
+
+            <!-- TOTAL GRADE RING (Shown after audit - Prominent on Top) -->
+            <div id="totalGrade" class="hidden glass p-16 max-w-5xl mx-auto animate-glow rounded-3xl">
                 <div class="text-center">
-                    <div id="gradeRing" class="score-ring w-72 h-72 mx-auto relative mb-8" style="--percent:0">
-                        <div class="absolute inset-16 bg-[var(--dark)] rounded-full flex flex-col items-center justify-center min-h-[224px]">
-                            <span id="totalGradeNum" class="text-7xl md:text-8xl font-black text-white">0%</span>
-                            <span id="gradeLabel" class="text-2xl font-bold text-slate-300 mt-4 uppercase tracking-widest">ANALYZING...</span>
+                    <div id="gradeRing" class="score-ring w-80 h-80 mx-auto relative mb-10 rounded-full" style="--percent: 0">
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="totalGradeNum" class="text-8xl font-black text-white">0%</span>
+                            <span id="gradeLabel" class="text-3xl font-bold text-slate-300 mt-6 uppercase tracking-widest">ANALYZING...</span>
                         </div>
                     </div>
-                    <p class="text-xl text-slate-400">WEIGHTED TOTAL GRADE (Core Web Vitals 5x Impact)</p>
+                    <p class="text-2xl text-slate-400 font-medium">WEIGHTED TOTAL GRADE<br><span class="text-sm">Core Web Vitals & Security have 5x Impact</span></p>
                 </div>
             </div>
         </div>
 
         <!-- LOADER -->
-        <div id="loader" class="hidden flex flex-col items-center py-32 animate-glow">
-            <div class="w-28 h-28 border-8 border-blue-500 border-t-transparent rounded-full animate-spin mb-12"></div>
-            <p class="text-3xl text-blue-400 font-mono tracking-wider">🔍 DEPLOYING 66+ GLOBAL METRIC PROBES...</p>
+        <div id="loader" class="hidden flex flex-col items-center justify-center py-40 animate-glow">
+            <div class="w-32 h-32 border-8 border-blue-500 border-t-transparent rounded-full animate-spin mb-12"></div>
+            <p class="text-4xl text-blue-400 font-mono tracking-wider">🔍 DEPLOYING 66+ GLOBAL METRIC PROBES...</p>
         </div>
 
-        <!-- RESULTS -->
-        <div id="results" class="hidden space-y-20">
+        <!-- RESULTS SECTION -->
+        <div id="results" class="hidden space-y-24">
             <!-- EXECUTIVE SUMMARY -->
-            <section class="glass p-12 lg:p-20">
-                <h2 class="text-5xl font-black mb-12 text-center gradient-text">🏆 EXECUTIVE STRATEGIC OVERVIEW</h2>
-                <div id="summary" class="text-xl leading-relaxed text-slate-200 prose prose-lg max-w-5xl mx-auto whitespace-pre-line"></div>
+            <section class="glass p-16 rounded-3xl">
+                <h2 class="text-6xl font-black mb-12 text-center gradient-text">🏆 EXECUTIVE STRATEGIC OVERVIEW</h2>
+                <pre id="summary" class="text-xl leading-relaxed text-slate-200 whitespace-pre-line font-sans"></pre>
             </section>
 
-            <!-- FINANCIAL IMPACT -->
-            <section class="glass p-12 lg:p-20">
-                <div class="flex items-center gap-6 mb-12">
-                    <div class="w-8 h-8 bg-red-500 rounded-full animate-pulse"></div>
-                    <h3 class="text-4xl font-black text-red-400">⚠️ FINANCIAL LEAKAGE IMPACT</h3>
+            <!-- KEY FINDINGS (TTFB + HTTPS) -->
+            <section class="glass p-16 rounded-3xl">
+                <div class="flex items-center gap-8 mb-16">
+                    <div class="w-10 h-10 bg-red-500 rounded-full animate-pulse"></div>
+                    <h3 class="text-5xl font-black text-red-400">⚠️ CRITICAL PERFORMANCE & SECURITY ALERT</h3>
                 </div>
-                <div class="grid md:grid-cols-2 gap-12 text-center">
-                    <div>
-                        <p class="text-2xl text-slate-400 uppercase tracking-wider mb-6">Server Response (TTFB)</p>
-                        <p id="ttfbVal" class="text-6xl font-black text-blue-400">--- ms</p>
+                <div class="grid md:grid-cols-2 gap-16 text-center">
+                    <div class="glass p-10 rounded-3xl">
+                        <p class="text-2xl text-slate-400 uppercase mb-6">Server Response Time</p>
+                        <p id="ttfbVal" class="text-7xl font-black text-blue-400">--- ms</p>
                     </div>
-                    <div>
-                        <p class="text-2xl text-slate-400 uppercase tracking-wider mb-6">HTTPS Security</p>
-                        <p id="httpsVal" class="text-6xl font-black text-green-400">SECURED</p>
+                    <div class="glass p-10 rounded-3xl">
+                        <p class="text-2xl text-slate-400 uppercase mb-6">HTTPS Encryption</p>
+                        <p id="httpsVal" class="text-7xl font-black text-green-400">SECURED</p>
                     </div>
                 </div>
             </section>
 
-            <!-- METRICS GRID -->
-            <section class="glass p-12 lg:p-20">
-                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
+            <!-- METRICS SCORECARD -->
+            <section class="glass p-16 rounded-3xl">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-10">
                     <div>
-                        <h3 class="text-5xl font-black mb-4 gradient-text">📊 66+ GLOBAL FORENSIC SCORECARD</h3>
-                        <p class="text-2xl text-slate-400">2025 International Standards • Weighted Analysis</p>
+                        <h3 class="text-6xl font-black mb-6 gradient-text">📊 66+ GLOBAL FORENSIC SCORECARD</h3>
+                        <p class="text-2xl text-slate-400">2025 International Standards • Weighted Intelligence Engine</p>
                     </div>
-                    <button onclick="downloadPDF()" id="pdfBtn" class="bg-white text-black px-12 py-8 rounded-3xl text-2xl font-black shadow-2xl hover:shadow-blue-500/50 transition-all hover:scale-105 whitespace-nowrap">
+                    <button 
+                        onclick="downloadPDF()" 
+                        id="pdfBtn" 
+                        class="bg-white text-black px-16 py-10 rounded-3xl text-3xl font-black shadow-2xl hover:shadow-blue-500/60 transition-all hover:scale-110"
+                    >
                         📄 DOWNLOAD ELITE PDF REPORT
                     </button>
                 </div>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8 max-h-[70vh] overflow-y-auto pr-4 -mr-4 scrollbar-thin scrollbar-thumb-blue-500/50 scrollbar-track-slate-900"></div>
+
+                <div 
+                    id="metricsGrid" 
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-10 max-h-[80vh] overflow-y-auto scrollbar-thin pr-4"
+                ></div>
             </section>
         </div>
     </div>
 
     <script>
         let reportData = null;
-        const metricsGrid = document.getElementById('metricsGrid');
 
         async function runAudit() {
-            const url = document.getElementById('urlInput').value.trim();
-            if (!url) return alert('Enter website URL');
-            
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a valid website URL');
+                return;
+            }
+
+            // Show loader, hide results
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
             document.getElementById('totalGrade').classList.add('hidden');
 
             try {
-                const res = await fetch('/audit', {
+                const response = await fetch('/audit', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
                 });
-                reportData = await res.json();
 
-                // TOTAL GRADE ON TOP (WEIGHTED)
+                if (!response.ok) throw new Error('Audit failed');
+
+                reportData = await response.json();
+
+                // Update Total Grade Ring (Top Position)
                 document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
                 document.getElementById('gradeLabel').textContent = reportData.grade_label;
-                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
+                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade / 100);
                 document.getElementById('totalGrade').classList.remove('hidden');
 
-                // Populate all fields
+                // Summary
                 document.getElementById('summary').textContent = reportData.summary;
-                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
-                document.getElementById('httpsVal').textContent = reportData.https_status;
-                document.getElementById('httpsVal').className = reportData.https_status === 'Secured' ? 'text-6xl font-black text-green-400' : 'text-6xl font-black text-red-400';
 
-                // METRICS GRID (Color-coded + Progress bars)
-                metricsGrid.innerHTML = '';
+                // Key Metrics
+                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
+                const httpsEl = document.getElementById('httpsVal');
+                httpsEl.textContent = reportData.https_status.toUpperCase();
+                httpsEl.className = reportData.https_status === 'Secured' 
+                    ? 'text-7xl font-black text-green-400' 
+                    : 'text-7xl font-black text-red-400';
+
+                // Metrics Grid
+                const grid = document.getElementById('metricsGrid');
+                grid.innerHTML = '';
                 reportData.metrics.forEach(m => {
                     const status = m.score > 75 ? 'green' : m.score > 45 ? 'orange' : 'red';
-                    const colorClass = status === 'green' ? 'border-green-500 bg-green-500/10 text-green-400' :
-                                       status === 'orange' ? 'border-orange-500 bg-orange-500/10 text-orange-400' :
-                                                             'border-red-500 bg-red-500/10 text-red-400';
-                    
-                    metricsGrid.innerHTML += `
-                        <div class="glass p-8 rounded-3xl border-l-8 ${colorClass} hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] transition-all duration-300 group">
-                            <div class="flex justify-between items-start mb-4">
-                                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-200">${m.category}</span>
-                                <span class="text-3xl font-black ${colorClass.split(' ')[2]}">${m.score}%</span>
+                    const borderColor = status === 'green' ? 'border-green-500' : status === 'orange' ? 'border-orange-500' : 'border-red-500';
+                    const bgColor = status === 'green' ? 'bg-green-500/10' : status === 'orange' ? 'bg-orange-500/10' : 'bg-red-500/10';
+                    const textColor = status === 'green' ? 'text-green-400' : status === 'orange' ? 'text-orange-400' : 'text-red-400';
+
+                    grid.innerHTML += `
+                        <div class="glass p-10 rounded-3xl ${borderColor} border-l-8 ${bgColor} hover:shadow-2xl transition-all duration-500">
+                            <div class="flex justify-between items-start mb-6">
+                                <span class="text-sm font-bold uppercase tracking-widest text-slate-400">${m.category}</span>
+                                <span class="text-4xl font-black ${textColor}">${m.score}%</span>
                             </div>
-                            <h4 class="font-bold text-lg text-white leading-tight mb-6 group-hover:gradient-text">${m.name}</h4>
-                            <div class="w-full bg-slate-800 h-3 rounded-2xl overflow-hidden shadow-inner">
-                                <div class="h-full ${status}-500/20 transition-all duration-1000 rounded-2xl" style="width: ${m.score}%"></div>
+                            <h4 class="font-bold text-xl text-white leading-tight mb-8">${m.name}</h4>
+                            <div class="w-full bg-slate-800 h-4 rounded-full overflow-hidden">
+                                <div class="h-full ${status === 'green' ? 'bg-green-500' : status === 'orange' ? 'bg-orange-500' : 'bg-red-500'} opacity-30 transition-all duration-1500" style="width: ${m.score}%"></div>
                             </div>
-                        </div>`;
+                        </div>
+                    `;
                 });
 
+                // Hide loader, show results
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('results').classList.remove('hidden');
-            } catch(e) {
-                alert('Audit failed: ' + e.message);
+            } catch (error) {
+                alert('Audit failed: ' + error.message);
                 document.getElementById('loader').classList.add('hidden');
             }
         }
 
         async function downloadPDF() {
-            if (!reportData) return alert('Run audit first');
+            if (!reportData) {
+                alert('Please run an audit first');
+                return;
+            }
+
             const btn = document.getElementById('pdfBtn');
-            const original = btn.innerHTML;
+            const originalText = btn.innerHTML;
             btn.innerHTML = '⏳ GENERATING ELITE PDF...';
             btn.disabled = true;
 
             try {
-                const res = await fetch('/download', {
+                const response = await fetch('/download', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reportData)
                 });
-                const blob = await res.blob();
+
+                if (!response.ok) throw new Error('PDF generation failed');
+
+                const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `FFTech_Elite_Audit_${reportData.url.replace(/[^a-z0-9]/gi,'_')}_${reportData.total_grade}pct.pdf`;
+                a.download = `FFTech_Elite_Audit_${reportData.url.replace(/[^a-z0-9]/gi, '_')}_${reportData.total_grade}pct.pdf`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-            } catch(e) {
-                alert('PDF failed: ' + e.message);
+            } catch (error) {
+                alert('PDF download failed: ' + error.message);
             }
-            btn.innerHTML = original;
+
+            btn.innerHTML = originalText;
             btn.disabled = false;
         }
     </script>
