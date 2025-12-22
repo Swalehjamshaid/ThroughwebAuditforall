@@ -1,97 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | ELITE 2025</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; }
-        .score-low { color: #ef4444; } .score-mid { color: #f59e0b; } .score-high { color: #10b981; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF TECH | Elite Audit 2025</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root {
+--primary:#3b82f6;--accent:#22d3ee;--dark:#020617;--glass:rgba(15,23,42,0.9);
+}
+body {background:radial-gradient(circle at top left,#020617,#0f172a); color:#f8fafc; font-family: 'Inter', sans-serif;}
+.glass {background: var(--glass); backdrop-filter: blur(24px); border:1px solid rgba(255,255,255,0.08); border-radius:32px;}
+.metric-card {transition: all 0.3s ease;}
+.metric-card:hover {transform: translateY(-5px); border-color: var(--primary);}
+</style>
 </head>
-<body class="p-6 md:p-12 min-h-screen">
-    <div class="max-w-7xl mx-auto space-y-12">
-        <header class="text-center space-y-4">
-            <h1 class="text-6xl font-black tracking-tighter italic">FF TECH <span class="text-blue-500">ELITE</span></h1>
-            <div class="glass p-4 max-w-2xl mx-auto flex gap-4 shadow-2xl">
-                <input id="urlInput" type="url" placeholder="https://target-domain.com" class="flex-1 bg-transparent px-4 outline-none border-r border-white/10">
-                <button onclick="runAudit()" id="scanBtn" class="bg-blue-600 px-8 py-3 rounded-xl font-bold hover:bg-blue-500 transition-all">SWEEP SITE</button>
-            </div>
-        </header>
+<body class="p-6 md:p-12">
+<div class="max-w-7xl mx-auto space-y-12">
+<header class="text-center space-y-6">
+<h1 class="text-5xl md:text-7xl font-black">FF TECH <span class="text-blue-500">ELITE</span></h1>
+<div class="glass p-3 md:p-4 max-w-3xl mx-auto flex gap-4">
+<input id="urlInput" type="url" placeholder="https://target-website.com" class="flex-1 p-4 bg-transparent outline-none border-b border-white/10 placeholder:text-slate-500">
+<button onclick="runAudit()" class="bg-blue-600 px-10 py-4 rounded-2xl font-bold">START SCAN</button>
+</div>
+</header>
 
-        <div id="results" class="hidden space-y-10 animate-in fade-in duration-700">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div class="lg:col-span-3 glass p-8 flex flex-col items-center justify-center">
-                    <div id="totalGrade" class="text-7xl font-black text-blue-400 italic">0%</div>
-                    <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mt-2">Overall Health Index</p>
-                </div>
-                <div id="keyIndicatorGrid" class="lg:col-span-9 grid grid-cols-2 md:grid-cols-5 gap-4">
-                    </div>
-            </div>
+<div id="loading" class="hidden py-20 text-center">
+<div class="inline-block w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+<p class="mt-4 text-blue-400 font-bold">SCANNING 60+ METRICS...</p>
+</div>
 
-            <div class="glass p-8 flex flex-col md:flex-row justify-between items-center gap-8">
-                <p id="summary" class="text-slate-400 text-sm leading-relaxed max-w-3xl"></p>
-                <button onclick="downloadPDF()" class="bg-white text-black px-10 py-4 rounded-2xl font-black whitespace-nowrap hover:scale-105 transition-transform">EXPORT 60-POINT PDF</button>
-            </div>
+<div id="results" class="hidden space-y-10">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<div class="lg:col-span-4 glass p-10 flex flex-col items-center">
+<svg class="w-48 h-48 transform -rotate-90">
+<circle cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" class="text-white/5"></circle>
+<circle id="scoreCircle" cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" stroke-dasharray="552.9" stroke-dashoffset="552.9" class="text-blue-500 transition-all duration-1000"></circle>
+</svg>
+<span id="totalGradeNum" class="absolute text-4xl font-black italic">0%</span>
+<p class="mt-6 text-xs font-bold tracking-widest">Weighted Score</p>
+</div>
 
-            <div>
-                <h3 class="text-xl font-bold mb-6 text-slate-500 uppercase tracking-widest italic">Forensic Matrix Breakdown (60+ Metrics)</h3>
-                <div id="fullMatrixGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
-            </div>
-        </div>
-    </div>
+<div class="lg:col-span-8 glass p-10">
+<h3 class="text-3xl font-black mb-6 italic border-l-4 border-blue-600 pl-6">Executive Summary</h3>
+<div id="summary" class="text-slate-300 whitespace-pre-wrap"></div>
+<button onclick="downloadPDF()" class="bg-white text-black px-10 py-4 rounded-2xl font-black mt-4">EXPORT PDF</button>
+</div>
+</div>
 
-    <script>
-        let reportData = null;
-        async function runAudit() {
-            const url = document.getElementById('urlInput').value.trim();
-            if(!url) return;
-            document.getElementById('scanBtn').innerText = 'SCANNING...';
-            
-            try {
-                const res = await fetch('/audit', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url}) });
-                reportData = await res.json();
-                
-                // Set UI
-                document.getElementById('totalGrade').innerText = reportData.total_grade + '%';
-                document.getElementById('summary').innerText = reportData.summary;
-                
-                // Render Top 5 Keys
-                const keyGrid = document.getElementById('keyIndicatorGrid');
-                keyGrid.innerHTML = reportData.metrics.filter(m => m.key).map(m => `
-                    <div class="glass p-5 text-center border-blue-500/30">
-                        <div class="text-[9px] uppercase font-bold text-slate-500 truncate">${m.cat}</div>
-                        <div class="text-xs font-bold mt-1 line-clamp-1">${m.name}</div>
-                        <div class="text-2xl font-black mt-2 ${getScoreClass(m.score)}">${m.score}%</div>
-                    </div>
-                `).join('');
+<div>
+<h3 class="text-xl font-bold mb-6 text-slate-400">Forensic Metrics</h3>
+<div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4"></div>
+</div>
+</div>
+</div>
 
-                // Render Full 60 Matrix
-                const matrixGrid = document.getElementById('fullMatrixGrid');
-                matrixGrid.innerHTML = reportData.metrics.map(m => `
-                    <div class="glass p-4 text-center">
-                        <div class="text-[8px] uppercase text-slate-600 truncate">${m.cat}</div>
-                        <div class="text-[10px] font-semibold mt-1 truncate">${m.name}</div>
-                        <div class="text-lg font-black mt-1 ${getScoreClass(m.score)}">${m.score}%</div>
-                    </div>
-                `).join('');
+<script>
+let reportData=null;
 
-                document.getElementById('results').classList.remove('hidden');
-            } catch(e) { alert("Server connectivity failed."); }
-            finally { document.getElementById('scanBtn').innerText = 'SWEEP SITE'; }
-        }
+async function runAudit(){
+const url=document.getElementById('urlInput').value.trim();
+if(!url) return alert("Enter URL");
+document.getElementById('loading').classList.remove('hidden');
+document.getElementById('results').classList.add('hidden');
+try{
+const res=await fetch('/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+reportData=await res.json();
+renderResults();
+}catch(e){alert('Server error');}
+finally{document.getElementById('loading').classList.add('hidden');}
+}
 
-        function getScoreClass(s) {
-            return s > 80 ? 'score-high' : s > 40 ? 'score-mid' : 'score-low';
-        }
+function renderResults(){
+const grade=reportData.total_grade;
+document.getElementById('totalGradeNum').textContent=grade+'%';
+const circle=document.getElementById('scoreCircle');
+const circumference=2*Math.PI*88;
+const offset=circumference-(grade/100)*circumference;
+circle.style.strokeDashoffset=offset;
+document.getElementById('summary').textContent=reportData.summary;
 
-        async function downloadPDF() {
-            if(!reportData) return;
-            const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(reportData) });
-            const blob = await res.blob();
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Forensic_Audit_FFTech.pdf'; a.click();
-        }
-    </script>
+const grid=document.getElementById('metricsGrid');
+grid.innerHTML='';
+reportData.metrics.forEach(m=>{
+let color=m.score>80?'text-emerald-400':m.score>50?'text-amber-400':'text-rose-500';
+grid.innerHTML+=`<div class="glass p-4 metric-card"><p class="text-xs text-slate-500 font-bold">${m.cat}</p><h4 class="text-xs font-semibold">${m.name}</h4><div class="mt-2 font-black ${color}">${m.score}%</div></div>`;
+});
+document.getElementById('results').classList.remove('hidden');
+}
+
+async function downloadPDF(){
+if(!reportData) return;
+try{
+const res=await fetch('/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(reportData)});
+const blob=await res.blob();
+const a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download=`FFTech_Audit_${new Date().getTime()}.pdf`;
+a.click();
+}catch(e){alert('PDF generation failed');}
+}
+</script>
 </body>
 </html>
