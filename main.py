@@ -25,41 +25,8 @@ METRIC_DEFS = {
     "User Experience": "Measures visual stability, interactivity, and mobile-first design compliance."
 }
 
-RAW_METRICS = [
-    (1, "Largest Contentful Paint (LCP)", "Performance"), (2, "First Input Delay (FID)", "Performance"),
-    (3, "Cumulative Layout Shift (CLS)", "Performance"), (4, "First Contentful Paint (FCP)", "Performance"),
-    (5, "Time to First Byte (TTFB)", "Performance"), (6, "Total Blocking Time (TBT)", "Performance"),
-    (7, "Speed Index", "Performance"), (8, "Time to Interactive (TTI)", "Performance"),
-    (9, "Total Page Size", "Performance"), (10, "HTTP Requests Count", "Performance"),
-    (11, "Image Optimization", "Performance"), (12, "CSS Minification", "Performance"),
-    (13, "JavaScript Minification", "Performance"), (14, "GZIP/Brotli Compression", "Performance"),
-    (15, "Browser Caching", "Performance"), (16, "Mobile Responsiveness", "Technical SEO"),
-    (17, "Viewport Configuration", "Technical SEO"), (18, "Structured Data Markup", "Technical SEO"),
-    (19, "Canonical Tags", "Technical SEO"), (20, "Robots.txt Configuration", "Technical SEO"),
-    (21, "XML Sitemap", "Technical SEO"), (22, "URL Structure", "Technical SEO"),
-    (23, "Breadcrumb Navigation", "Technical SEO"), (24, "Title Tag Optimization", "Technical SEO"),
-    (25, "Meta Description", "Technical SEO"), (26, "Heading Structure (H1-H6)", "Technical SEO"),
-    (27, "Internal Linking", "Technical SEO"), (28, "External Linking Quality", "Technical SEO"),
-    (29, "Schema.org Implementation", "Technical SEO"), (30, "AMP Compatibility", "Technical SEO"),
-    (31, "Content Quality Score", "On-Page SEO"), (32, "Keyword Density Analysis", "On-Page SEO"),
-    (33, "Content Readability", "On-Page SEO"), (34, "Content Freshness", "On-Page SEO"),
-    (35, "Content Length Adequacy", "On-Page SEO"), (36, "Image Alt Text", "On-Page SEO"),
-    (37, "Video Optimization", "On-Page SEO"), (38, "Content Uniqueness", "On-Page SEO"),
-    (39, "LSI Keywords", "On-Page SEO"), (40, "Content Engagement Signals", "On-Page SEO"),
-    (41, "Content Hierarchy", "On-Page SEO"), (42, "HTTPS Full Implementation", "Security"),
-    (43, "Security Headers", "Security"), (44, "Cross-Site Scripting Protection", "Security"),
-    (45, "SQL Injection Protection", "Security"), (46, "Mixed Content Detection", "Security"),
-    (47, "TLS/SSL Certificate Validity", "Security"), (48, "Cookie Security", "Security"),
-    (49, "HTTP Strict Transport Security", "Security"), (50, "Content Security Policy", "Security"),
-    (51, "Clickjacking Protection", "Security"), (52, "Referrer Policy", "Security"),
-    (53, "Permissions Policy", "Security"), (54, "X-Content-Type-Options", "Security"),
-    (55, "Frame Options", "Security"), (56, "Core Web Vitals Compliance", "User Experience"),
-    (57, "Mobile-First Design", "User Experience"), (58, "Accessibility Compliance", "User Experience"),
-    (59, "Page Load Animation", "User Experience"), (60, "Navigation Usability", "User Experience"),
-    (61, "Form Optimization", "User Experience"), (62, "404 Error Page", "User Experience"),
-    (63, "Search Functionality", "User Experience"), (64, "Social Media Integration", "User Experience"),
-    (65, "Multilingual Support", "User Experience"), (66, "Progressive Web App Features", "User Experience")
-]
+# Generate 66 Metrics
+RAW_METRICS = [(i, f"Forensic Probe Point {i}", "Performance" if i < 15 else "Technical SEO" if i < 30 else "On-Page SEO" if i < 45 else "Security" if i < 55 else "User Experience") for i in range(1, 67)]
 
 class ExecutivePDF(FPDF):
     def __init__(self, url, grade):
@@ -84,7 +51,15 @@ async def audit(request: Request):
     if not url.startswith("http"): url = "https://" + url
     random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
     results = [{"no": m[0], "name": m[1], "category": m[2], "score": random.randint(40, 95)} for m in RAW_METRICS]
-    return {"total_grade": 83, "metrics": results, "url": url}
+    pillars = {
+        "Performance": random.randint(60, 95),
+        "Technical SEO": random.randint(60, 95),
+        "On-Page SEO": random.randint(60, 95),
+        "Security": random.randint(60, 95),
+        "User Experience": random.randint(60, 95)
+    }
+    total_grade = round(sum(pillars.values()) / 5)
+    return {"total_grade": total_grade, "metrics": results, "pillars": pillars, "url": url}
 
 @app.post("/download")
 async def download_pdf(request: Request):
@@ -94,14 +69,11 @@ async def download_pdf(request: Request):
     
     pdf = ExecutivePDF(url, grade)
     pdf.add_page()
-    
-    # 1. Overall Grade Hero
     pdf.set_font("Helvetica", "B", 40)
     pdf.set_text_color(59, 130, 246)
     pdf.cell(0, 30, f"Health Index: {grade}%", ln=1, align='C')
     pdf.ln(5)
 
-    # 2. Executive Strategic Recommendation (200 Words)
     pdf.set_font("Helvetica", "B", 14); pdf.set_text_color(0, 0, 0)
     pdf.cell(0, 10, "STRATEGIC IMPROVEMENT ROADMAP", ln=1)
     pdf.set_font("Helvetica", "", 10)
@@ -124,7 +96,6 @@ async def download_pdf(request: Request):
     )
     pdf.multi_cell(0, 6, roadmap); pdf.ln(10)
 
-    # 3. Metrics Table
     pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 8)
     pdf.cell(10, 10, "ID", 1, 0, 'C', True)
     pdf.cell(60, 10, "METRIC NAME", 1, 0, 'L', True)
@@ -136,16 +107,13 @@ async def download_pdf(request: Request):
         if pdf.get_y() > 270: pdf.add_page()
         bg = (i % 2 == 0)
         if bg: pdf.set_fill_color(248, 250, 252)
-        
         desc = METRIC_DEFS.get(m['category'], "Technical inspection point.")
         pdf.cell(10, 7, str(m['no']), 1, 0, 'C', bg)
         pdf.cell(60, 7, m['name'][:35], 1, 0, 'L', bg)
         pdf.cell(100, 7, desc, 1, 0, 'L', bg)
         pdf.cell(20, 7, f"{m['score']}%", 1, 1, 'C', bg)
 
-    # --- THE FIX: CORRECT BINARY STREAMING ---
     pdf_string = pdf.output(dest='S')
-    # latin-1 encoding is required for FPDF strings to preserve binary characters
     pdf_bytes = pdf_string.encode('latin-1') 
     
     return StreamingResponse(
@@ -160,39 +128,79 @@ async def serve_index():
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8"><title>FF TECH | Forensic Suite</title>
+        <meta charset="UTF-8">
+        <title>FF TECH ELITE | Dashboard</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <style>body { background: #020617; color: white; }</style>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+            body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+            .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+            .neon-border { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); }
+        </style>
     </head>
-    <body class="p-8">
-        <div class="max-w-4xl mx-auto space-y-10">
-            <header class="text-center">
-                <h1 class="text-6xl font-black text-blue-500 italic uppercase">FF TECH ELITE</h1>
-                <div class="mt-8 flex gap-2">
-                    <input id="urlInput" type="text" class="flex-1 p-4 bg-slate-900 rounded-xl outline-none" placeholder="https://example.com">
-                    <button onclick="runAudit()" class="bg-blue-600 px-8 py-4 rounded-xl font-bold">SWEEP</button>
+    <body class="p-6 md:p-12">
+        <div class="max-w-7xl mx-auto space-y-12">
+            <header class="text-center space-y-4">
+                <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter italic uppercase text-white">
+                    FF TECH <span class="text-blue-500">ELITE</span>
+                </h1>
+                <div class="max-w-2xl mx-auto pt-4">
+                    <div class="glass neon-border p-2 rounded-2xl flex flex-col md:flex-row gap-2">
+                        <input id="urlInput" type="text" placeholder="https://example.com" class="flex-1 bg-transparent px-6 py-4 outline-none text-white">
+                        <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase transition-all">Start Sweep</button>
+                    </div>
                 </div>
             </header>
-            <div id="results" class="hidden text-center space-y-6">
-                <button onclick="downloadPDF()" class="bg-green-600 px-10 py-4 rounded-2xl font-black uppercase">Download Executive PDF</button>
-                <div id="grade" class="text-9xl font-black text-blue-500">0%</div>
+
+            <div id="results" class="hidden space-y-10">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="glass rounded-[40px] p-10 flex flex-col items-center justify-center text-center">
+                        <div class="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Health Index</div>
+                        <div id="gradeValue" class="text-9xl font-black italic text-blue-500">0%</div>
+                        <button onclick="downloadPDF()" class="mt-8 bg-green-600 hover:bg-green-500 px-6 py-3 rounded-xl font-bold uppercase text-xs">Download Report PDF</button>
+                    </div>
+                    <div class="lg:col-span-2 glass rounded-[40px] p-8">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+                <div id="matrixGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
             </div>
         </div>
         <script>
-            let currentData = null;
+            let radar = null; let currentData = null;
             async function runAudit() {
                 const url = document.getElementById('urlInput').value;
+                const btn = document.getElementById('auditBtn'); btn.innerText = "SWEEPING...";
                 const res = await fetch('/audit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
                 currentData = await res.json();
+                btn.innerText = "START SWEEP";
                 document.getElementById('results').classList.remove('hidden');
-                document.getElementById('grade').innerText = currentData.total_grade + '%';
+                document.getElementById('gradeValue').innerText = currentData.total_grade + '%';
+                
+                const ctx = document.getElementById('radarChart');
+                if(radar) radar.destroy();
+                radar = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: Object.keys(currentData.pillars),
+                        datasets: [{ label: 'Performance', data: Object.values(currentData.pillars), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6' }]
+                    },
+                    options: { scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, pointLabels: { color: 'white' } } }, plugins: { legend: { display: false } } }
+                });
+
+                document.getElementById('matrixGrid').innerHTML = currentData.metrics.map(m => `
+                    <div class="glass p-4 rounded-2xl border-l-4 ${m.score > 80 ? 'border-green-500' : 'border-blue-500'}">
+                        <div class="text-[10px] font-bold opacity-40 uppercase truncate">${m.category}</div>
+                        <div class="text-xs font-bold mt-1 line-clamp-1">${m.name}</div>
+                        <div class="text-2xl font-black mt-2 text-blue-400">${m.score}%</div>
+                    </div>
+                `).join('');
             }
             async function downloadPDF() {
-                if(!currentData) return;
                 const res = await fetch('/download', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(currentData)});
                 const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `Forensic_Report.pdf`; a.click();
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'Forensic_Audit.pdf'; a.click();
             }
         </script>
     </body>
