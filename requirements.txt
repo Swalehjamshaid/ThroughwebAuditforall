@@ -3,13 +3,3 @@ uvicorn
 requests
 beautifulsoup4
 reportlab
-fastapi==0.115.5
-uvicorn[standard]==0.32.0
-
-requests==2.32.3
-urllib3==2.2.3
-
-beautifulsoup4==4.12.3
-
-# fpdf2 provides modern FPDF with the import: from fpdf import FPDF
-fpdf2==2.7.9
