@@ -10,7 +10,7 @@ import asyncio
 import aiohttp
 from urllib.parse import urlparse, urljoin
 
-# Suppress SSL warnings
+# Suppress SSL warnings for varied infrastructure probing
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI(title="FF TECH | Real Forensic Engine v6.0")
@@ -127,7 +127,7 @@ async def audit(request: Request):
         "metrics": results,
         "pillars": final_pillars,
         "url": url,
-        "summary": f"Audit of {url} completed. Performance is {final_pillars['Performance']}%. Security Index: {final_pillars['Security']}%."
+        "summary": f"Audit of {url} completed. Overall Health: {total_grade}%."
     }
 
 @app.post("/download")
@@ -169,12 +169,11 @@ async def download_pdf(request: Request):
     pdf.multi_cell(0, 6, suggestion)
     pdf.ln(10)
 
-    # Metrics Table
     pdf.set_fill_color(30, 41, 59)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 8)
     pdf.cell(10, 10, "NO", 1, 0, 'C', True)
-    pdf.cell(100, 10, "METRIC / FORENSIC DEFINITION", 1, 0, 'L', True)
+    pdf.cell(100, 10, "METRIC NAME", 1, 0, 'L', True)
     pdf.cell(50, 10, "CATEGORY", 1, 0, 'L', True)
     pdf.cell(25, 10, "SCORE", 1, 1, 'C', True)
 
@@ -195,7 +194,6 @@ async def download_pdf(request: Request):
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf")
 
-# ------------------- HTML SERVING -------------------
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     return """
@@ -223,9 +221,7 @@ async def serve_index():
             
             <div id="results" class="hidden space-y-8">
                 <div class="flex justify-end gap-4">
-                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition flex items-center gap-2">
-                        <span>Download Executive PDF</span>
-                    </button>
+                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition">Download Executive PDF</button>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass p-8 rounded-3xl text-center">
@@ -236,7 +232,6 @@ async def serve_index():
                         <canvas id="radarChart"></canvas>
                     </div>
                 </div>
-                
                 <div class="glass p-8 rounded-3xl overflow-hidden">
                     <table class="w-full text-left">
                         <thead class="text-slate-400 text-xs uppercase">
@@ -247,14 +242,10 @@ async def serve_index():
                 </div>
             </div>
         </div>
-
         <script>
-            let radar = null;
-            let currentData = null;
-
+            let radar = null; let currentData = null;
             async function runAudit() {
-                const btn = document.getElementById('auditBtn');
-                btn.innerText = "Scanning...";
+                const btn = document.getElementById('auditBtn'); btn.innerText = "Scanning...";
                 const url = document.getElementById('urlInput').value;
                 const res = await fetch('/audit', {
                     method: 'POST',
@@ -262,7 +253,6 @@ async def serve_index():
                     body: JSON.stringify({url})
                 });
                 currentData = await res.json();
-                
                 document.getElementById('results').classList.remove('hidden');
                 document.getElementById('gradeValue').innerText = currentData.total_grade + '%';
                 btn.innerText = "AUDIT";
@@ -274,7 +264,7 @@ async def serve_index():
                     data: {
                         labels: Object.keys(currentData.pillars),
                         datasets: [{
-                            label: 'Site Performance',
+                            label: 'Pillar Distribution',
                             data: Object.values(currentData.pillars),
                             backgroundColor: 'rgba(59, 130, 246, 0.2)',
                             borderColor: '#3b82f6',
@@ -283,7 +273,6 @@ async def serve_index():
                     },
                     options: { scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' } } } }
                 });
-
                 document.getElementById('metricBody').innerHTML = currentData.metrics.map(m => `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
                         <td class="p-4 opacity-50 font-mono">${m.no}</td>
@@ -293,7 +282,6 @@ async def serve_index():
                     </tr>
                 `).join('');
             }
-
             async function downloadPDF() {
                 if(!currentData) return;
                 const res = await fetch('/download', {
@@ -304,8 +292,7 @@ async def serve_index():
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = `Executive_Audit_Report.pdf`;
+                a.href = url; a.download = `Executive_Audit_${currentData.total_grade}.pdf`;
                 a.click();
             }
         </script>
