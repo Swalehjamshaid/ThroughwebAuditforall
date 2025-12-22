@@ -120,7 +120,7 @@ async def audit(request: Request):
             h1s = auditor.soup.find_all('h1')
             score = 100 if len(h1s) == 1 else 30
         else:
-            base = 85 if "apple.com" in url or "google.com" in url else 50
+            base = 85 if any(x in url for x in ["apple.com", "google.com"]) else 50
             score = random.randint(base - 15, base + 15)
         
         score = max(1, min(100, score))
@@ -197,11 +197,14 @@ async def download_pdf(request: Request):
         if bg: pdf.set_fill_color(248, 250, 252)
         
         desc = METRIC_DESCRIPTIONS.get(m['category'], "Technical forensic inspection point.")
+        
+        # Clean string to avoid latin-1 encoding issues in FPDF
+        name_clean = m['name'][:35].encode('latin-1', 'replace').decode('latin-1')
+        
         pdf.cell(10, 8, str(m['no']), 1, 0, 'C', bg)
-        pdf.cell(60, 8, m['name'][:35], 1, 0, 'L', bg)
+        pdf.cell(60, 8, name_clean, 1, 0, 'L', bg)
         pdf.cell(100, 8, desc, 1, 0, 'L', bg)
         
-        # Color coding score
         score_val = m['score']
         if score_val >= 90: pdf.set_text_color(22, 163, 74)
         elif score_val < 50: pdf.set_text_color(220, 38, 38)
@@ -210,16 +213,21 @@ async def download_pdf(request: Request):
         pdf.cell(20, 8, f"{score_val}%", 1, 1, 'C', bg)
         pdf.set_text_color(0, 0, 0)
 
-    buf = io.BytesIO()
-    pdf_out = pdf.output(dest='S')
-    # Ensuring byte stream for correct file decoding
-    buf.write(pdf_out if isinstance(pdf_out, bytes) else pdf_out.encode('latin1'))
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Forensic_Audit_{grade}.pdf"})
+    # Correct PDF generation for StreamingResponse
+    pdf_bytes = pdf.output(dest='S')
+    if isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode('latin1')
+    
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": f"attachment; filename=Forensic_Audit_{grade}.pdf"}
+    )
 
 # ------------------- HTML / JS INTERFACE -------------------
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
+    # ... (Keep your original HTML/JS here)
     return """
     <!DOCTYPE html>
     <html lang="en">
