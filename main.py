@@ -147,22 +147,18 @@ async def download_pdf(request: Request):
     pdf = ExecutivePDF(url, grade)
     pdf.add_page()
     
-    # Hero Score Section
-    pdf.set_font("Helvetica", "B", 50)
+    # 1. Health Score Section
+    pdf.set_font("Helvetica", "B", 40)
     pdf.set_text_color(59, 130, 246)
-    pdf.cell(0, 40, f"{grade}%", ln=1, align='C')
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, "OVERALL HEALTH INDEX", ln=1, align='C')
-    pdf.ln(10)
+    pdf.cell(0, 40, f"Health Index: {grade}%", ln=1, align='C')
+    pdf.set_font("Helvetica", "B", 14); pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, "OVERALL STRATEGIC ROADMAP", ln=1, align='C')
+    pdf.ln(5)
 
-    # 200-Word Strategic Improvement Roadmap
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "STRATEGIC IMPROVEMENT ROADMAP", ln=1)
+    # 2. Strategic Improvement Roadmap (200 Words)
     pdf.set_font("Helvetica", "", 10)
-    
     roadmap = (
-        f"The forensic analysis of {url} identifies a Health Index of {grade}%. To achieve elite world-class performance (90%+), "
+        f"The forensic analysis of {url} identifies a Health Index of {grade}%. To achieve elite world-class status (90%+), "
         "strategic focus must immediately shift toward infrastructure hardening and Core Web Vital optimization. "
         "Current metrics suggest that while the server is responsive, the front-end rendering pipeline suffers from "
         "inefficient resource allocation. We recommend a comprehensive audit of all render-blocking scripts and "
@@ -180,44 +176,36 @@ async def download_pdf(request: Request):
     pdf.multi_cell(0, 6, roadmap)
     pdf.ln(10)
 
-    # Detailed Forensic Matrix Table
-    pdf.set_fill_color(30, 41, 59)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 8)
+    # 3. Metrics Table
+    pdf.set_fill_color(30, 41, 59); pdf.set_text_color(255, 255, 255); pdf.set_font("Helvetica", "B", 8)
     pdf.cell(10, 10, "ID", 1, 0, 'C', True)
     pdf.cell(60, 10, "METRIC NAME", 1, 0, 'L', True)
     pdf.cell(100, 10, "FORENSIC DESCRIPTION", 1, 0, 'L', True)
     pdf.cell(20, 10, "SCORE", 1, 1, 'C', True)
 
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 7)
+    pdf.set_text_color(0, 0, 0); pdf.set_font("Helvetica", "", 7)
     for i, m in enumerate(data['metrics']):
         if pdf.get_y() > 270: pdf.add_page()
         bg = (i % 2 == 0)
         if bg: pdf.set_fill_color(248, 250, 252)
         
-        desc = METRIC_DESCRIPTIONS.get(m['category'], "Technical forensic inspection point.")
-        pdf.cell(10, 8, str(m['no']), 1, 0, 'C', bg)
-        pdf.cell(60, 8, m['name'][:35], 1, 0, 'L', bg)
-        pdf.cell(100, 8, desc, 1, 0, 'L', bg)
-        
-        # Color coding score
-        score_val = m['score']
-        if score_val >= 90: pdf.set_text_color(22, 163, 74)
-        elif score_val < 50: pdf.set_text_color(220, 38, 38)
-        else: pdf.set_text_color(202, 138, 4)
-        
-        pdf.cell(20, 8, f"{score_val}%", 1, 1, 'C', bg)
-        pdf.set_text_color(0, 0, 0)
+        desc = METRIC_DESCRIPTIONS.get(m['category'], "Forensic inspection point.")
+        pdf.cell(10, 7, str(m['no']), 1, 0, 'C', bg)
+        pdf.cell(60, 7, m['name'][:35], 1, 0, 'L', bg)
+        pdf.cell(100, 7, desc, 1, 0, 'L', bg)
+        pdf.cell(20, 7, f"{m['score']}%", 1, 1, 'C', bg)
 
-    buf = io.BytesIO()
-    pdf_out = pdf.output(dest='S')
-    # Ensuring byte stream for correct file decoding
-    buf.write(pdf_out if isinstance(pdf_out, bytes) else pdf_out.encode('latin1'))
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Forensic_Audit_{grade}.pdf"})
+    # --- CRITICAL FIX: VALID BINARY PDF STREAMING ---
+    pdf_string = pdf.output(dest='S')
+    # latin-1 encoding is required for FPDF strings to preserve binary characters
+    pdf_bytes = pdf_string.encode('latin-1') 
+    
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes), 
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=Forensic_Report_{grade}.pdf"}
+    )
 
-# ------------------- HTML / JS INTERFACE -------------------
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     return """
@@ -230,38 +218,36 @@ async def serve_index():
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
             body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
-            .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+            .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
         </style>
     </head>
     <body class="p-8">
-        <div class="max-w-6xl mx-auto space-y-8">
-            <header class="text-center mb-12">
-                <h1 class="text-5xl font-extrabold text-blue-400 italic">FF TECH <span class="text-white text-2xl uppercase">Elite v6.0</span></h1>
-                <div class="mt-8 flex gap-4 max-w-xl mx-auto">
-                    <input id="urlInput" type="text" class="flex-1 p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-white" placeholder="https://example.com">
-                    <button id="auditBtn" onclick="runAudit()" class="bg-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-blue-500 transition uppercase tracking-widest">Sweep</button>
+        <div class="max-w-6xl mx-auto space-y-10">
+            <header class="text-center">
+                <h1 class="text-6xl font-black text-blue-500 italic uppercase">FF TECH ELITE</h1>
+                <div class="mt-8 flex gap-2 max-w-xl mx-auto">
+                    <input id="urlInput" type="text" class="flex-1 p-4 bg-slate-900 rounded-xl" placeholder="https://example.com">
+                    <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 px-8 py-4 rounded-xl font-bold uppercase">Sweep</button>
                 </div>
             </header>
             
-            <div id="results" class="hidden space-y-8 animate-in fade-in duration-500">
+            <div id="results" class="hidden space-y-8">
                 <div class="flex justify-end gap-4">
-                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition">Download Executive PDF</button>
+                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold">Download Executive PDF</button>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="glass p-8 rounded-3xl text-center">
-                        <div id="gradeValue" class="text-8xl font-black text-blue-500">0%</div>
-                        <div class="text-sm uppercase tracking-widest opacity-50 font-bold mt-2">Health Index</div>
+                        <div id="gradeValue" class="text-9xl font-black text-blue-500">0%</div>
+                        <div class="text-xs uppercase tracking-widest opacity-50 font-bold mt-2">Health Index</div>
                     </div>
                     <div class="md:col-span-2 glass p-6 rounded-3xl">
                         <canvas id="radarChart"></canvas>
                     </div>
                 </div>
                 <div class="glass p-8 rounded-3xl overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="text-slate-400 text-xs uppercase">
-                            <tr><th class="p-4">#</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr>
-                        </thead>
-                        <tbody id="metricBody" class="text-sm"></tbody>
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-slate-400 uppercase"><tr><th class="p-4">#</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr></thead>
+                        <tbody id="metricBody"></tbody>
                     </table>
                 </div>
             </div>
@@ -269,7 +255,7 @@ async def serve_index():
         <script>
             let radar = null; let currentData = null;
             async function runAudit() {
-                const btn = document.getElementById('auditBtn'); btn.innerText = "Analyzing...";
+                const btn = document.getElementById('auditBtn'); btn.innerText = "Scanning...";
                 const url = document.getElementById('urlInput').value;
                 const res = await fetch('/audit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
                 currentData = await res.json();
@@ -283,24 +269,22 @@ async def serve_index():
                     type: 'radar',
                     data: {
                         labels: Object.keys(currentData.pillars),
-                        datasets: [{ label: 'Efficiency', data: Object.values(currentData.pillars), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', pointRadius: 4 }]
+                        datasets: [{ label: 'Performance', data: Object.values(currentData.pillars), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6' }]
                     },
                     options: { scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: 'white' } } }, plugins: { legend: { display: false } } }
                 });
                 document.getElementById('metricBody').innerHTML = currentData.metrics.map(m => `
-                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
+                    <tr class="border-b border-slate-700/50">
                         <td class="p-4 opacity-50 font-mono">${m.no}</td><td class="p-4 font-semibold">${m.name}</td>
                         <td class="p-4 text-xs opacity-60">${m.category}</td><td class="p-4 font-bold ${m.score < 50 ? 'text-red-400' : 'text-green-400'}">${m.score}%</td>
                     </tr>`).join('');
             }
             async function downloadPDF() {
                 if(!currentData) return;
-                const res = await fetch('/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(currentData)});
+                const res = await fetch('/download', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(currentData)});
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url;
-                a.download = `Forensic_Audit_Report.pdf`;
-                document.body.appendChild(a); a.click(); a.remove();
+                const a = document.createElement('a'); a.href = url; a.download = `Forensic_Audit.pdf`; a.click();
             }
         </script>
     </body>
