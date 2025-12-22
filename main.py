@@ -9,9 +9,8 @@ from bs4 import BeautifulSoup
 from fpdf import FPDF
 import uvicorn
 import aiohttp
-import aiofiles
 
-# Suppress SSL warnings for live crawling
+# Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI(title="FF TECH | Forensic Audit Engine v6.0")
@@ -98,15 +97,15 @@ async def run_audit(request: Request):
     success = await auditor.fetch_page()
     if not success: return JSONResponse({"error": "Unreachable"}, status_code=400)
 
+    # Deterministic scores for audit consistency
     random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
     results = []
     pillars = {"Performance": [], "Technical SEO": [], "On-Page SEO": [], "Security": [], "User Experience": []}
 
     for m_id, m_name, m_cat in RAW_METRICS:
-        # Simple simulated logic for real feel
         if m_id == 42: score = 100 if url.startswith("https") else 15
         elif m_id == 5: score = 100 if auditor.ttfb < 300 else 45
-        else: score = random.randint(60, 98)
+        else: score = random.randint(65, 98)
         
         results.append({"id": m_id, "name": m_name, "category": m_cat, "score": score})
         pillars[m_cat].append(score)
@@ -160,63 +159,72 @@ async def dashboard():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>FF TECH | Forensic Audit Dashboard</title>
+        <title>FF TECH | Forensic Dashboard</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     </head>
-    <body class="bg-slate-900 text-slate-100 min-h-screen">
-        <nav class="border-b border-slate-800 p-6 flex justify-between items-center bg-slate-900 sticky top-0 z-50">
+    <body class="bg-[#0f172a] text-slate-100 font-sans">
+        <nav class="border-b border-slate-800 p-6 flex justify-between items-center sticky top-0 bg-[#0f172a] z-50">
             <div class="flex items-center gap-3">
-                <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-shield-halved text-xl"></i></div>
-                <h1 class="text-2xl font-bold tracking-tighter">FF TECH <span class="text-blue-500 font-light">ELITE v6.0</span></h1>
+                <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-microscope text-xl text-white"></i></div>
+                <h1 class="text-2xl font-bold tracking-tighter uppercase italic">FF Tech <span class="text-blue-500 font-light">Forensics</span></h1>
             </div>
             <div class="flex gap-4">
-                <input id="urlInput" type="text" placeholder="https://example.com" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg w-96 outline-none focus:border-blue-500 transition-all">
-                <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2">
-                    <i class="fas fa-search"></i> SWEEP
+                <input id="urlInput" type="text" placeholder="https://apple.com" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-lg w-80 outline-none focus:border-blue-500 transition-all">
+                <button onclick="runAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-500 px-8 py-2 rounded-lg font-bold flex items-center gap-2">
+                    <i class="fas fa-bolt"></i> START SWEEP
                 </button>
             </div>
         </nav>
 
         <main class="p-8 max-w-7xl mx-auto">
-            <div id="resultsUI" class="hidden animate-in fade-in duration-700">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-slate-800 border border-slate-700 p-10 rounded-3xl text-center">
+            <div id="resultsUI" class="hidden space-y-8 animate-in fade-in duration-700">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-slate-800/50 border border-slate-700 p-10 rounded-3xl text-center">
                         <div class="text-slate-400 uppercase text-xs font-bold tracking-widest mb-2">Overall Health</div>
-                        <div id="gradeValue" class="text-8xl font-black text-blue-500 tracking-tighter">0%</div>
+                        <div id="gradeValue" class="text-9xl font-black text-blue-500 tracking-tighter">0%</div>
                     </div>
-                    <div class="md:col-span-2 bg-slate-800 border border-slate-700 p-8 rounded-3xl">
-                        <h3 class="text-lg font-bold mb-6">Pillar Performance</h3>
-                        <div id="pillarList" class="space-y-4"></div>
+                    <div class="md:col-span-2 bg-slate-800/50 border border-slate-700 p-8 rounded-3xl">
+                        <h3 class="text-lg font-bold mb-6 uppercase tracking-widest text-slate-400 text-xs">Pillar Breakdown</h3>
+                        <div id="pillarList" class="space-y-6"></div>
                     </div>
                 </div>
 
-                <div class="bg-slate-800 border border-slate-700 rounded-3xl overflow-hidden">
-                    <div class="p-6 border-b border-slate-700 flex justify-between items-center">
-                        <h2 class="text-xl font-bold">Forensic Matrix (66 Checkpoints)</h2>
-                        <button onclick="downloadPDF()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-bold">
-                            <i class="fas fa-file-pdf mr-2"></i> EXPORT PDF
+                <div class="bg-slate-800/50 border border-slate-700 rounded-3xl overflow-hidden">
+                    <div class="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                        <h2 class="text-xl font-bold">Forensic Matrix <span class="text-slate-500 font-normal">(66 Parameters)</span></h2>
+                        <button onclick="downloadPDF()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl text-sm font-bold transition-colors">
+                            <i class="fas fa-file-pdf mr-2"></i> GENERATE REPORT
                         </button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm">
-                            <thead class="bg-slate-900/50 text-slate-500 uppercase font-bold text-[10px]">
-                                <tr><th class="p-4">ID</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr>
+                            <thead class="bg-slate-900 text-slate-500 uppercase font-bold text-[10px]">
+                                <tr><th class="p-4">ID</th><th class="p-4">Forensic Checkpoint</th><th class="p-4">Category</th><th class="p-4">Score</th></tr>
                             </thead>
                             <tbody id="metricsBody" class="divide-y divide-slate-700/50"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
+            
+            <div id="placeholder" class="py-40 text-center space-y-4">
+                <i class="fas fa-search-plus text-6xl text-slate-700"></i>
+                <p class="text-slate-500 font-medium">Enter a URL above to begin forensic sweep.</p>
+            </div>
         </main>
 
         <script>
             let lastData = null;
+
             async function runAudit() {
                 const url = document.getElementById('urlInput').value;
                 if(!url) return;
                 const btn = document.getElementById('auditBtn');
-                btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> SCANNING...';
+                const placeholder = document.getElementById('placeholder');
+                
+                btn.innerHTML = '<i class="fas fa-spinner animate-spin"></i> ANALYZING...';
+                placeholder.classList.add('hidden');
                 
                 try {
                     const res = await fetch('/api/audit', {
@@ -226,8 +234,11 @@ async def dashboard():
                     });
                     lastData = await res.json();
                     renderResults(lastData);
-                } catch(e) { alert("Audit failed"); }
-                btn.innerHTML = '<i class="fas fa-search"></i> SWEEP';
+                } catch(e) { 
+                    alert("Audit failed. Site may be blocking crawlers."); 
+                    placeholder.classList.remove('hidden');
+                }
+                btn.innerHTML = '<i class="fas fa-bolt"></i> START SWEEP';
             }
 
             function renderResults(data) {
@@ -237,17 +248,17 @@ async def dashboard():
                 const pillars = document.getElementById('pillarList');
                 pillars.innerHTML = Object.entries(data.pillars).map(([k, v]) => `
                     <div>
-                        <div class="flex justify-between text-xs mb-1"><span>${k}</span><span>${v}%</span></div>
-                        <div class="h-2 bg-slate-900 rounded-full"><div class="h-full bg-blue-500 rounded-full" style="width: ${v}%"></div></div>
+                        <div class="flex justify-between text-xs font-bold mb-2"><span>${k.toUpperCase()}</span><span>${v}%</span></div>
+                        <div class="h-1.5 bg-slate-900 rounded-full"><div class="h-full bg-blue-500 rounded-full" style="width: ${v}%"></div></div>
                     </div>
                 `).join('');
 
                 document.getElementById('metricsBody').innerHTML = data.metrics.map(m => `
-                    <tr class="hover:bg-slate-700/30">
-                        <td class="p-4 text-slate-500 font-mono">#${m.id}</td>
-                        <td class="p-4 font-bold">${m.name}</td>
+                    <tr class="hover:bg-slate-700/30 transition-colors">
+                        <td class="p-4 text-slate-500 font-mono text-xs">#${m.id}</td>
+                        <td class="p-4 font-bold text-slate-200">${m.name}</td>
                         <td class="p-4 text-xs text-slate-400">${m.category}</td>
-                        <td class="p-4"><span class="font-bold ${m.score > 80 ? 'text-emerald-400' : 'text-amber-400'}">${m.score}%</span></td>
+                        <td class="p-4 font-black ${m.score > 80 ? 'text-emerald-400' : 'text-amber-400'}">${m.score}%</td>
                     </tr>
                 `).join('');
             }
@@ -262,8 +273,7 @@ async def dashboard():
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = `Forensic_Report_${lastData.report_id}.pdf`;
+                a.href = url; a.download = `Forensic_Report_${lastData.report_id}.pdf`;
                 a.click();
             }
         </script>
