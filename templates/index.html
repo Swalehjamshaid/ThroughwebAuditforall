@@ -6,91 +6,196 @@
 <title>FF TECH | Elite Strategic Intelligence 2025</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-:root{--primary:#3b82f6;--accent:#22d3ee;--dark:#020617;--glass:rgba(15,23,42,0.9);}
-body{background:radial-gradient(circle at top left,#020617,#0f172a);color:#f8fafc;font-family:'Inter',sans-serif;min-height:100vh;}
-.glass{background:var(--glass);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08);border-radius:32px;}
-.metric-card{transition:all 0.3s ease;}
-.metric-card:hover{transform:translateY(-5px);border-color:var(--primary);}
-.circle-container{position:relative;width:120px;height:120px;}
-.circle-container svg circle{transition:stroke-dashoffset 1s ease-out;}
+    :root {
+        --primary: #3b82f6;
+        --accent: #22d3ee;
+        --dark: #020617;
+        --glass: rgba(15, 23, 42, 0.9);
+    }
+    body {
+        background: radial-gradient(circle at top left, #020617, #0f172a);
+        color: #f8fafc;
+        font-family: 'Inter', system-ui, sans-serif;
+        min-height: 100vh;
+    }
+    .glass {
+        background: var(--glass);
+        backdrop-filter: blur(24px);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 32px;
+    }
+    .metric-card {
+        transition: all 0.3s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        border-color: var(--primary);
+    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--dark); }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
 </style>
 </head>
 <body class="p-6 md:p-12">
+
 <div class="max-w-7xl mx-auto space-y-12">
+    <header class="text-center space-y-6">
+        <div class="inline-block px-4 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs font-bold tracking-widest uppercase">
+            Enterprise Forensic Engine v4.0
+        </div>
+        <h1 class="text-5xl md:text-7xl font-black tracking-tighter">
+            FF TECH <span class="text-blue-500">ELITE</span>
+        </h1>
+        <p class="text-slate-400 max-w-2xl mx-auto">Global Growth Intelligence & Weighted Efficiency Auditing for 2025 Market Dominance.</p>
+        
+        <div class="glass p-3 md:p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 shadow-2xl">
+            <input id="urlInput" type="url" placeholder="https://target-website.com" 
+                   class="flex-1 bg-transparent p-4 outline-none text-white placeholder:text-slate-500 border-b md:border-b-0 md:border-r border-white/10">
+            <button onclick="runAudit()" id="scanBtn" 
+                    class="bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all px-10 py-4 rounded-2xl font-bold whitespace-nowrap">
+                START DEEP SCAN
+            </button>
+        </div>
+    </header>
 
-<header class="text-center space-y-6">
-<h1 class="text-5xl md:text-7xl font-black tracking-tighter">FF TECH <span class="text-blue-500">ELITE</span></h1>
-<p class="text-slate-400 max-w-2xl mx-auto">Global Growth Intelligence & Weighted Efficiency Auditing for 2025 Market Dominance.</p>
+    <div id="loading" class="hidden py-20 text-center">
+        <div class="inline-block w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+        <p class="mt-4 text-blue-400 font-bold tracking-widest animate-pulse">ANALYZING 66+ FORENSIC DATA POINTS...</p>
+    </div>
 
-<div class="glass p-3 md:p-4 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 shadow-2xl">
-<input id="urlInput" type="url" placeholder="https://target-website.com" class="flex-1 bg-transparent p-4 outline-none text-white placeholder:text-slate-500 border-b md:border-b-0 md:border-r border-white/10">
-<button onclick="runAudit()" id="scanBtn" class="bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all px-10 py-4 rounded-2xl font-bold whitespace-nowrap">START DEEP SCAN</button>
-</div>
-</header>
+    <div id="results" class="hidden space-y-10 animate-in fade-in duration-700">
 
-<div id="loading" class="hidden py-20 text-center">
-<div class="inline-block w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-<p class="mt-4 text-blue-400 font-bold tracking-widest animate-pulse">ANALYZING 66+ FORENSIC DATA POINTS...</p>
-</div>
+        <!-- 5 Key Indicators -->
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-6">
+            <div class="glass p-6 flex flex-col items-center">
+                <svg class="w-24 h-24 -rotate-90">
+                    <circle cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" class="text-white/10"/>
+                    <circle id="lcpCircle" cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="263.89" stroke-dashoffset="263.89" class="text-blue-500 transition-all duration-1000 ease-out"/>
+                </svg>
+                <p class="mt-2 text-sm font-bold">LCP</p>
+                <span id="lcpScore" class="text-xl font-black">0%</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <svg class="w-24 h-24 -rotate-90">
+                    <circle cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" class="text-white/10"/>
+                    <circle id="clsCircle" cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="263.89" stroke-dashoffset="263.89" class="text-blue-500 transition-all duration-1000 ease-out"/>
+                </svg>
+                <p class="mt-2 text-sm font-bold">CLS</p>
+                <span id="clsScore" class="text-xl font-black">0%</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <svg class="w-24 h-24 -rotate-90">
+                    <circle cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" class="text-white/10"/>
+                    <circle id="fidCircle" cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="263.89" stroke-dashoffset="263.89" class="text-blue-500 transition-all duration-1000 ease-out"/>
+                </svg>
+                <p class="mt-2 text-sm font-bold">FID</p>
+                <span id="fidScore" class="text-xl font-black">0%</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <svg class="w-24 h-24 -rotate-90">
+                    <circle cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" class="text-white/10"/>
+                    <circle id="ttfbCircle" cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="263.89" stroke-dashoffset="263.89" class="text-blue-500 transition-all duration-1000 ease-out"/>
+                </svg>
+                <p class="mt-2 text-sm font-bold">TTFB</p>
+                <span id="ttfbScore" class="text-xl font-black">0%</span>
+            </div>
+            <div class="glass p-6 flex flex-col items-center">
+                <svg class="w-24 h-24 -rotate-90">
+                    <circle cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" class="text-white/10"/>
+                    <circle id="httpsCircle" cx="48" cy="48" r="42" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="263.89" stroke-dashoffset="263.89" class="text-blue-500 transition-all duration-1000 ease-out"/>
+                </svg>
+                <p class="mt-2 text-sm font-bold">HTTPS</p>
+                <span id="httpsScore" class="text-xl font-black">0%</span>
+            </div>
+        </div>
 
-<div id="results" class="hidden space-y-10 animate-in fade-in duration-700">
+        <!-- Metrics Grid -->
+        <div class="mt-8">
+            <h3 class="text-xl font-bold mb-6 text-slate-400 uppercase tracking-widest">Forensic Matrix Breakdown</h3>
+            <div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+        </div>
 
-<!-- 5 Key Indicators -->
-<div class="grid grid-cols-1 sm:grid-cols-5 gap-6">
-<div class="glass p-5 flex flex-col items-center metric-card">
-<div class="circle-container"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="45" stroke="#1e293b" stroke-width="10" fill="transparent"/><circle id="keyLCPCircle" cx="50" cy="50" r="45" stroke="var(--primary)" stroke-width="10" fill="transparent" stroke-dasharray="282.6" stroke-dashoffset="282.6"/></svg></div>
-<p class="mt-3 text-sm font-bold uppercase">LCP</p><p id="keyLCPNum" class="text-xl font-black mt-1">0%</p>
-</div>
-<div class="glass p-5 flex flex-col items-center metric-card">
-<div class="circle-container"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="45" stroke="#1e293b" stroke-width="10" fill="transparent"/><circle id="keyTTFBCircle" cx="50" cy="50" r="45" stroke="var(--accent)" stroke-width="10" fill="transparent" stroke-dasharray="282.6" stroke-dashoffset="282.6"/></svg></div>
-<p class="mt-3 text-sm font-bold uppercase">TTFB</p><p id="keyTTFBNum" class="text-xl font-black mt-1">0%</p>
-</div>
-<div class="glass p-5 flex flex-col items-center metric-card">
-<div class="circle-container"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="45" stroke="#1e293b" stroke-width="10" fill="transparent"/><circle id="keyHTTPSCircle" cx="50" cy="50" r="45" stroke="#facc15" stroke-width="10" fill="transparent" stroke-dasharray="282.6" stroke-dashoffset="282.6"/></svg></div>
-<p class="mt-3 text-sm font-bold uppercase">HTTPS</p><p id="keyHTTPSNum" class="text-xl font-black mt-1">0%</p>
-</div>
-<div class="glass p-5 flex flex-col items-center metric-card">
-<div class="circle-container"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="45" stroke="#1e293b" stroke-width="10" fill="transparent"/><circle id="keySEOCircle" cx="50" cy="50" r="45" stroke="#22d3ee" stroke-width="10" fill="transparent" stroke-dasharray="282.6" stroke-dashoffset="282.6"/></svg></div>
-<p class="mt-3 text-sm font-bold uppercase">SEO Score</p><p id="keySEONum" class="text-xl font-black mt-1">0%</p>
-</div>
-<div class="glass p-5 flex flex-col items-center metric-card">
-<div class="circle-container"><svg viewBox="0 0 100 100" class="w-full h-full"><circle cx="50" cy="50" r="45" stroke="#1e293b" stroke-width="10" fill="transparent"/><circle id="keyBrokenCircle" cx="50" cy="50" r="45" stroke="#f87171" stroke-width="10" fill="transparent" stroke-dasharray="282.6" stroke-dashoffset="282.6"/></svg></div>
-<p class="mt-3 text-sm font-bold uppercase">Broken Links</p><p id="keyBrokenNum" class="text-xl font-black mt-1">0%</p>
-</div>
-</div>
+        <div class="mt-8 flex justify-center">
+            <button onclick="downloadPDF()" class="bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-blue-50 transition-all">
+                EXPORT FULL PDF REPORT
+            </button>
+        </div>
 
-<h3 class="text-xl font-bold mb-6 text-slate-400 uppercase tracking-widest mt-8">Forensic Matrix Breakdown</h3>
-<div id="metricsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 max-h-[600px] overflow-y-scroll"></div>
-
-<div class="mt-8 flex justify-center">
-<button onclick="downloadPDF()" id="pdfBtn" class="bg-white text-black px-10 py-4 rounded-2xl font-black hover:bg-blue-50 transition-all flex items-center gap-2">EXPORT INVESTOR-READY PDF</button>
-</div>
+    </div>
 </div>
 
 <script>
-let reportData=null;
-async function runAudit(){
-const url=document.getElementById('urlInput').value.trim();
-if(!url) return alert("Enter valid URL");
-document.getElementById('scanBtn').disabled=true;
-document.getElementById('loading').classList.remove('hidden');
-document.getElementById('results').classList.add('hidden');
-try{
-const res=await fetch('/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-reportData=await res.json();
-renderResults();
-}catch(e){alert('Connection lost');}finally{document.getElementById('scanBtn').disabled=false;document.getElementById('loading').classList.add('hidden');}
+let reportData = null;
+
+async function runAudit() {
+    const url = document.getElementById('urlInput').value.trim();
+    if(!url) return alert("Enter a valid URL");
+
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('results').classList.add('hidden');
+
+    try {
+        const res = await fetch('/audit',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({url})
+        });
+        reportData = await res.json();
+        renderResults();
+    } catch(e){
+        alert("Audit failed: "+e);
+    } finally {
+        document.getElementById('loading').classList.add('hidden');
+    }
 }
 
-function animateCircle(id,value){const circle=document.getElementById(id);circle.style.strokeDashoffset=282.6-(value/100)*282.6;}
-
 function renderResults(){
-const metrics=reportData.metrics;
-const keyMetrics=[
-{elem:"keyLCPNum",circle:"keyLCPCircle",metric:metrics.find(m=>m.name.includes("LCP"))},
-{elem:"keyTTFBNum",circle:"keyTTFBCircle",metric:metrics.find(m=>m.name.includes("TTFB"))},
-{elem:"keyHTTPSNum",circle:"keyHTTPSCircle",metric:metrics.find(m=>m.name.includes("HTTPS"))},
-{elem:"keySEONum",circle:"keySEOCircle",metric:{score:Math.round(metrics.filter(m=>m.cat==="SEO").reduce((a,b)=>a+b.score,0)/metrics.filter(m=>m.cat==="SEO").length)}},
-{elem:"keyBrokenNum",circle:"keyBrokenCircle",metric:metrics.find(m=>m.name.includes("Broken"))}
-];
-keyMetrics.forEach(k=>{document.getElementById(k.elem).textContent=k.metric.scor
+    const keys = ["lcp","cls","fid","ttfb","https"];
+    keys.forEach(k=>{
+        let score=0;
+        if(k=="lcp") score = reportData.metrics[0].score;
+        if(k=="cls") score = reportData.metrics[1].score;
+        if(k=="fid") score = reportData.metrics[2].score;
+        if(k=="ttfb") score = reportData.metrics.find(m=>m.name.includes("TTFB")).score;
+        if(k=="https") score = reportData.metrics.find(m=>m.name.includes("HTTPS")).score;
+
+        const circle = document.getElementById(k+"Circle");
+        const span = document.getElementById(k+"Score");
+        const c = 2*Math.PI*42;
+        circle.style.strokeDashoffset = c-(score/100)*c;
+        span.textContent = score+"%";
+    });
+
+    // Metrics Grid
+    const grid = document.getElementById('metricsGrid');
+    grid.innerHTML='';
+    reportData.metrics.forEach(m=>{
+        const scoreColor = m.score>75?'text-emerald-400': m.score>45?'text-amber-400':'text-rose-500';
+        grid.innerHTML+=`
+            <div class="glass p-4 metric-card border-white/5 bg-white/5">
+                <p class="text-[10px] text-slate-500 font-bold uppercase truncate">${m.cat}</p>
+                <h4 class="text-xs font-semibold h-8 mt-1 line-clamp-2">${m.name}</h4>
+                <div class="mt-2 text-xl font-black ${scoreColor}">${m.score}%</div>
+            </div>
+        `;
+    });
+
+    document.getElementById('results').classList.remove('hidden');
+}
+
+async function downloadPDF(){
+    if(!reportData) return;
+    const res = await fetch('/download',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(reportData)
+    });
+    const blob = await res.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download="FFTech_Elite_Audit.pdf";
+    a.click();
+}
+</script>
+</body>
+</html>
