@@ -2,59 +2,55 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH | Strategic Audit Elite</title>
+    <title>FF TECH | Elite Strategic Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&display=swap" rel="stylesheet">
     <style>
-        body { background: #020617; font-family: 'Space Grotesk', sans-serif; color: white; }
-        .bento-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; }
-        .glow-text { text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-        .metric-row:hover { background: rgba(59, 130, 246, 0.1); }
+        body { background: #020617; font-family: 'Space Grotesk', sans-serif; color: #f8fafc; }
+        .glass-bento { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); border-radius: 24px; }
+        .score-glow { text-shadow: 0 0 30px rgba(59, 130, 246, 0.6); }
+        .heatmap-cell { transition: all 0.2s; }
+        .heatmap-cell:hover { background: rgba(59, 130, 246, 0.1); border-color: #3b82f6; }
     </style>
 </head>
 <body class="p-6 md:p-12">
     <div class="max-w-7xl mx-auto">
         <nav class="flex justify-between items-center mb-16">
             <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-black text-2xl">FF</div>
+                <div class="bg-blue-600 px-4 py-1 rounded-lg font-black text-2xl">FF</div>
                 <h1 class="text-3xl font-bold tracking-tighter">TECH <span class="text-blue-500">ELITE</span></h1>
             </div>
-            <div class="text-slate-500 font-mono text-xs">A.I. AUDIT ENGINE v4.0.1 // 2025</div>
+            <div class="text-slate-500 font-mono text-[10px] tracking-widest uppercase">System Status: Active // v5.0.0</div>
         </nav>
 
         <div class="text-center mb-24">
-            <h2 class="text-5xl md:text-7xl font-bold mb-8 glow-text">Forensic Website Audit</h2>
-            <div class="max-w-3xl mx-auto flex gap-4 p-2 bento-card">
-                <input id="urlInput" type="text" placeholder="Enter target domain..." class="flex-1 bg-transparent px-6 py-4 outline-none text-xl">
-                <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-2xl transition-all shadow-xl shadow-blue-900/40">SCAN ASSET</button>
+            <h2 class="text-5xl md:text-7xl font-bold mb-8 tracking-tighter">Stop Revenue Leakage</h2>
+            <div class="max-w-3xl mx-auto flex gap-3 glass-bento p-2">
+                <input id="urlInput" type="text" placeholder="Enter target domain (e.g. apple.com)" class="flex-1 bg-transparent px-6 py-4 outline-none text-xl">
+                <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-2xl transition-all">SCAN ASSET</button>
             </div>
         </div>
 
-        <div id="results" class="hidden space-y-8">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="bento-card p-10 flex flex-col items-center justify-center">
-                    <div id="scoreRing" class="relative w-48 h-48 rounded-full border-8 border-slate-800 flex items-center justify-center">
-                        <span id="bigScore" class="text-6xl font-black">0%</span>
-                    </div>
-                    <p class="mt-6 text-slate-400 font-bold uppercase tracking-widest text-xs">Compliance Index</p>
+        <div id="results" class="hidden space-y-10">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-4 glass-bento p-10 flex flex-col items-center justify-center">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-10">Weighted Global Index</h3>
+                    <div class="text-8xl font-black score-glow" id="bigScore">0%</div>
+                    <p class="mt-8 text-sm text-slate-400">Total Score based on 65+ Forensics</p>
                 </div>
 
-                <div class="lg:col-span-2 bento-card p-10 bg-gradient-to-br from-blue-900/20 to-transparent">
-                    <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
-                        <span class="w-2 h-8 bg-blue-500 rounded-full"></span>
-                        Strategic Improvement Plan
+                <div class="lg:col-span-8 glass-bento p-10 bg-gradient-to-br from-blue-900/10 to-transparent">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-3">
+                        <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
+                        Strategic Recovery Roadmap
                     </h3>
-                    <p id="summary" class="text-slate-300 leading-relaxed text-lg italic"></p>
-                    <div class="mt-8 flex gap-4">
-                        <button onclick="downloadPDF()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm">EXPORT RECOVERY PDF</button>
-                    </div>
+                    <p id="summary" class="text-slate-300 leading-relaxed text-lg italic mb-8"></p>
+                    <button onclick="downloadPDF()" class="bg-white text-black px-8 py-3 rounded-xl font-black hover:bg-slate-200">EXPORT STRATEGY PDF</button>
                 </div>
             </div>
 
-            <div class="bento-card p-10">
-                <h3 class="text-xl font-bold mb-8">65-Point Forensic Matrix</h3>
-                <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-2">
+            <div class="glass-bento p-10">
+                <h3 class="text-xl font-bold mb-8">Forensic Matrix (65+ KPIs)</h3>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     </div>
             </div>
         </div>
@@ -62,11 +58,11 @@
 
     <script>
         async function runAudit() {
-            const url = document.getElementById('urlInput').value;
+            const urlInput = document.getElementById('urlInput');
             const res = await fetch('/audit', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({url})
+                body: JSON.stringify({url: urlInput.value})
             });
             const data = await res.json();
             
@@ -74,17 +70,25 @@
             document.getElementById('bigScore').innerText = data.avg_score + "%";
             document.getElementById('summary').innerText = data.summary;
 
-            const list = document.getElementById('metricsList');
-            list.innerHTML = '';
+            const grid = document.getElementById('metricsGrid');
+            grid.innerHTML = '';
+            
+            // Clustering for 65 metrics
+            const clusters = {};
             data.metrics.forEach(m => {
-                const color = m.score > 80 ? 'text-green-400' : m.score > 50 ? 'text-yellow-400' : 'text-red-400';
-                list.innerHTML += `
-                    <div class="flex justify-between items-center py-2 border-b border-white/5 metric-row">
-                        <span class="text-xs text-slate-400 uppercase font-bold tracking-tighter">${m.name}</span>
-                        <span class="text-xs font-black ${color}">${m.score}%</span>
-                    </div>
-                `;
+                if(!clusters[m.category]) clusters[m.category] = [];
+                clusters[m.category].push(m);
             });
+
+            for(const [cat, metrics] of Object.entries(clusters)) {
+                let html = `<div class="p-4 rounded-xl border border-white/5 bg-white/2"><h4 class="text-[10px] font-bold text-blue-500 uppercase mb-4 tracking-widest">${cat}</h4><div class="space-y-2">`;
+                metrics.forEach(m => {
+                    const color = m.score > 80 ? 'text-green-400' : m.score > 50 ? 'text-orange-400' : 'text-red-400';
+                    html += `<div class="flex justify-between text-[10px] heatmap-cell p-1 rounded"><span class="text-slate-400 font-medium">${m.name}</span><span class="${color} font-black">${m.score}%</span></div>`;
+                });
+                html += `</div></div>`;
+                grid.innerHTML += html;
+            }
         }
     </script>
 </body>
