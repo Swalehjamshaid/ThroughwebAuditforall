@@ -16,7 +16,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = FastAPI(title="FF TECH | Real Forensic Engine v6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ------------------- 66 METRIC MASTER MAPPING -------------------
+# ------------------- 66 METRIC MASTER MAPPING & DESCRIPTIONS -------------------
+METRIC_DESCRIPTIONS = {
+    "Performance": "Evaluates server response times, asset delivery speed, and rendering efficiency.",
+    "Technical SEO": "Analyzes crawlability, indexing signals, and architecture semantic integrity.",
+    "On-Page SEO": "Probes keyword relevance, content depth, and internal linking structures.",
+    "Security": "Inspects SSL validity, encryption headers, and vulnerability mitigation.",
+    "User Experience": "Measures visual stability, interactivity, and mobile-first design compliance."
+}
+
 RAW_METRICS = [
     (1, "Largest Contentful Paint (LCP)", "Performance"), (2, "First Input Delay (FID)", "Performance"),
     (3, "Cumulative Layout Shift (CLS)", "Performance"), (4, "First Contentful Paint (FCP)", "Performance"),
@@ -85,7 +93,7 @@ class ExecutivePDF(FPDF):
         self.rect(0, 0, 210, 50, 'F')
         self.set_font("Helvetica", "B", 22)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 20, "FF TECH | EXECUTIVE AUDIT REPORT", 0, 1, 'C')
+        self.cell(0, 20, "FF TECH | EXECUTIVE FORENSIC REPORT", 0, 1, 'C')
         self.set_font("Helvetica", "", 10)
         self.cell(0, 5, f"SITE AUDITED: {self.target_url}", 0, 1, 'C')
         self.cell(0, 5, f"DATE: {time.strftime('%B %d, %Y')}", 0, 1, 'C')
@@ -138,6 +146,8 @@ async def download_pdf(request: Request):
     
     pdf = ExecutivePDF(url, grade)
     pdf.add_page()
+    
+    # Hero Score
     pdf.set_font("Helvetica", "B", 50)
     pdf.set_text_color(59, 130, 246)
     pdf.cell(0, 40, f"{grade}%", ln=1, align='C')
@@ -146,12 +156,13 @@ async def download_pdf(request: Request):
     pdf.cell(0, 10, "OVERALL HEALTH INDEX", ln=1, align='C')
     pdf.ln(10)
 
+    # 200-Word Strategic Suggestion
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "STRATEGIC IMPROVEMENT ROADMAP (200 WORDS)", ln=1)
+    pdf.cell(0, 10, "STRATEGIC IMPROVEMENT ROADMAP", ln=1)
     pdf.set_font("Helvetica", "", 10)
     
-    suggestion = (
-        f"The forensic sweep of {url} indicates a Health Index of {grade}%. To achieve elite world-class performance (90%+), "
+    roadmap = (
+        f"The forensic analysis of {url} identifies a Health Index of {grade}%. To reach a World-Class 95%+ Elite status, "
         "strategic focus must immediately shift toward infrastructure hardening and Core Web Vital optimization. "
         "Current metrics suggest that while the server is responsive, the front-end rendering pipeline suffers from "
         "inefficient resource allocation. We recommend a comprehensive audit of all render-blocking scripts and "
@@ -166,33 +177,52 @@ async def download_pdf(request: Request):
         "but also ensure long-term stability and resilience against future search algorithm updates. This roadmap "
         "prioritizes speed, security, and structural integrity as the primary drivers for technical growth."
     )
-    pdf.multi_cell(0, 6, suggestion)
+    pdf.multi_cell(0, 6, roadmap)
     pdf.ln(10)
+
+    # Metrics Matrix with Detail
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "DETAILED METRIC FORENSICS", ln=1)
+    pdf.ln(5)
 
     pdf.set_fill_color(30, 41, 59)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(10, 10, "NO", 1, 0, 'C', True)
-    pdf.cell(100, 10, "METRIC NAME", 1, 0, 'L', True)
-    pdf.cell(50, 10, "CATEGORY", 1, 0, 'L', True)
-    pdf.cell(25, 10, "SCORE", 1, 1, 'C', True)
+    pdf.cell(10, 10, "ID", 1, 0, 'C', True)
+    pdf.cell(60, 10, "METRIC NAME", 1, 0, 'L', True)
+    pdf.cell(100, 10, "FORENSIC DESCRIPTION", 1, 0, 'L', True)
+    pdf.cell(20, 10, "SCORE", 1, 1, 'C', True)
 
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 8)
+    pdf.set_font("Helvetica", "", 7)
+    
     for i, m in enumerate(data['metrics']):
         if pdf.get_y() > 270: pdf.add_page()
         bg = (i % 2 == 0)
         if bg: pdf.set_fill_color(248, 250, 252)
+        
+        # Pulling specific definition based on category
+        desc = METRIC_DESCRIPTIONS.get(m['category'], "Technical forensic inspection point.")
+        
         pdf.cell(10, 8, str(m['no']), 1, 0, 'C', bg)
-        pdf.cell(100, 8, m['name'], 1, 0, 'L', bg)
-        pdf.cell(50, 8, m['category'], 1, 0, 'L', bg)
-        pdf.cell(25, 8, f"{m['score']}%", 1, 1, 'C', bg)
+        pdf.cell(60, 8, m['name'][:35], 1, 0, 'L', bg)
+        pdf.cell(100, 8, desc, 1, 0, 'L', bg)
+        
+        # Color coding score
+        score_val = m['score']
+        if score_val >= 90: pdf.set_text_color(22, 163, 74)
+        elif score_val < 50: pdf.set_text_color(220, 38, 38)
+        else: pdf.set_text_color(202, 138, 4)
+        
+        pdf.cell(20, 8, f"{score_val}%", 1, 1, 'C', bg)
+        pdf.set_text_color(0, 0, 0)
 
     buf = io.BytesIO()
     pdf_out = pdf.output(dest='S')
+    # Force bytes conversion for streaming
     buf.write(pdf_out if isinstance(pdf_out, bytes) else pdf_out.encode('latin1'))
     buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf")
+    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=Forensic_Audit_{grade}.pdf"})
 
 # ------------------- HTML SERVING -------------------
 @app.get("/", response_class=HTMLResponse)
@@ -211,52 +241,37 @@ async def serve_index():
         </style>
     </head>
     <body class="p-8">
-        <div class="max-w-6xl mx-auto">
+        <div class="max-w-6xl mx-auto space-y-8">
             <header class="text-center mb-12">
-                <h1 class="text-5xl font-extrabold text-blue-400">FF TECH <span class="text-white text-2xl">Forensic v6.0</span></h1>
+                <h1 class="text-5xl font-extrabold text-blue-400">FF TECH <span class="text-white text-2xl uppercase">Elite v6.0</span></h1>
                 <div class="mt-8 flex gap-4 max-w-xl mx-auto">
                     <input id="urlInput" type="text" class="flex-1 p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-white" placeholder="https://example.com">
-                    <button id="auditBtn" onclick="runAudit()" class="bg-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-blue-500 transition">AUDIT</button>
+                    <button id="auditBtn" onclick="runAudit()" class="bg-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-blue-500 transition uppercase tracking-widest">Sweep</button>
                 </div>
             </header>
             
-            <div id="results" class="hidden space-y-8">
-                <div class="flex justify-end gap-4">
-                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition">Download Executive PDF</button>
-                </div>
+            <div id="results" class="hidden space-y-8 animate-in fade-in duration-500">
+                <div class="flex justify-end"><button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition">Download Executive PDF</button></div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="glass p-8 rounded-3xl text-center">
-                        <div id="gradeValue" class="text-8xl font-black text-blue-500">0%</div>
-                        <div class="text-sm uppercase tracking-widest opacity-50 font-bold mt-2">Overall Health</div>
-                    </div>
-                    <div class="md:col-span-2 glass p-6 rounded-3xl">
-                        <canvas id="radarChart"></canvas>
-                    </div>
+                    <div class="glass p-8 rounded-3xl text-center"><div id="gradeValue" class="text-8xl font-black text-blue-500">0%</div><div class="text-sm uppercase tracking-widest opacity-50 font-bold mt-2">Health Index</div></div>
+                    <div class="md:col-span-2 glass p-6 rounded-3xl"><canvas id="radarChart"></canvas></div>
                 </div>
                 <div class="glass p-8 rounded-3xl overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="text-slate-400 text-xs uppercase">
-                            <tr><th class="p-4">#</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr>
-                        </thead>
-                        <tbody id="metricBody" class="text-sm"></tbody>
-                    </table>
+                    <table class="w-full text-left"><thead class="text-slate-400 text-xs uppercase"><tr><th class="p-4">#</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr></thead>
+                    <tbody id="metricBody" class="text-sm"></tbody></table>
                 </div>
             </div>
         </div>
         <script>
             let radar = null; let currentData = null;
             async function runAudit() {
-                const btn = document.getElementById('auditBtn'); btn.innerText = "Scanning...";
+                const btn = document.getElementById('auditBtn'); btn.innerText = "Analyzing...";
                 const url = document.getElementById('urlInput').value;
-                const res = await fetch('/audit', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url})
-                });
+                const res = await fetch('/audit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
                 currentData = await res.json();
                 document.getElementById('results').classList.remove('hidden');
                 document.getElementById('gradeValue').innerText = currentData.total_grade + '%';
-                btn.innerText = "AUDIT";
+                btn.innerText = "Sweep";
 
                 const ctx = document.getElementById('radarChart');
                 if(radar) radar.destroy();
@@ -264,42 +279,24 @@ async def serve_index():
                     type: 'radar',
                     data: {
                         labels: Object.keys(currentData.pillars),
-                        datasets: [{
-                            label: 'Pillar Distribution',
-                            data: Object.values(currentData.pillars),
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            borderColor: '#3b82f6',
-                            pointRadius: 4
-                        }]
+                        datasets: [{ label: 'Efficiency', data: Object.values(currentData.pillars), backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6', pointRadius: 4 }]
                     },
                     options: { scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: 'white' } } }, plugins: { legend: { display: false } } }
                 });
                 document.getElementById('metricBody').innerHTML = currentData.metrics.map(m => `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
-                        <td class="p-4 opacity-50 font-mono">${m.no}</td>
-                        <td class="p-4 font-semibold">${m.name}</td>
-                        <td class="p-4 text-xs opacity-60">${m.category}</td>
-                        <td class="p-4 font-bold ${m.score < 50 ? 'text-red-400' : 'text-green-400'}">${m.score}%</td>
-                    </tr>
-                `).join('');
+                        <td class="p-4 opacity-50 font-mono">${m.no}</td><td class="p-4 font-semibold">${m.name}</td>
+                        <td class="p-4 text-xs opacity-60">${m.category}</td><td class="p-4 font-bold ${m.score < 50 ? 'text-red-400' : 'text-green-400'}">${m.score}%</td>
+                    </tr>`).join('');
             }
-
-            // FIXED: PDF Download Function
             async function downloadPDF() {
                 if(!currentData) return;
-                const res = await fetch('/download', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(currentData)
-                });
+                const res = await fetch('/download', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(currentData)});
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; 
-                a.download = `Executive_Audit_${currentData.total_grade}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+                const a = document.createElement('a'); a.href = url;
+                a.download = `Forensic_Audit_${currentData.total_grade}.pdf`;
+                document.body.appendChild(a); a.click(); a.remove();
             }
         </script>
     </body>
