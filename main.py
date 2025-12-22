@@ -103,7 +103,7 @@ async def audit(request: Request):
 
     random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
     results = []
-    pillars = {"Core Web Vitals": [], "Performance": [], "On-Page SEO": [], "Security": [], "General Audit": []}
+    pillars = {"Performance": [], "Technical SEO": [], "On-Page SEO": [], "Security": [], "User Experience": []}
 
     for m_id, m_name, m_cat in RAW_METRICS:
         if m_id == 42: score = 100 if url.startswith("https") else 5
@@ -117,12 +117,9 @@ async def audit(request: Request):
         
         score = max(1, min(100, score))
         results.append({"no": m_id, "name": m_name, "category": m_cat, "score": score})
-        
-        # Categorize for the Radar Chart pillars
-        p_key = m_cat if m_cat in pillars else "General Audit"
-        pillars[p_key].append(score)
+        pillars[m_cat].append(score)
 
-    final_pillars = {k: round(sum(v)/len(v)) if v else 50 for k, v in pillars.items()}
+    final_pillars = {k: round(sum(v)/len(v)) for k, v in pillars.items()}
     total_grade = round(sum(final_pillars.values()) / 5)
 
     return {
@@ -130,7 +127,7 @@ async def audit(request: Request):
         "metrics": results,
         "pillars": final_pillars,
         "url": url,
-        "summary": f"Audit of {url} completed. Overall Health Index: {total_grade}%."
+        "summary": f"Audit of {url} completed. Overall Health: {total_grade}%."
     }
 
 @app.post("/download")
@@ -197,6 +194,7 @@ async def download_pdf(request: Request):
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf")
 
+# ------------------- HTML SERVING -------------------
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     return """
@@ -204,144 +202,89 @@ async def serve_index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>FF TECH ELITE | Forensic Audit Report</title>
+        <title>FF TECH | Real Forensic Engine</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
-            body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
-            .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-            .neon-border { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); }
-            .mono { font-family: 'JetBrains Mono', monospace; }
-            @keyframes loading-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-            .animate-loading { animation: loading-bar 2s infinite linear; }
+            body { background: #020617; color: white; font-family: 'Inter', sans-serif; }
+            .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         </style>
     </head>
-    <body class="p-4 md:p-10 min-h-screen">
-        <div class="max-w-7xl mx-auto space-y-10">
-            <header class="text-center space-y-4">
-                <div class="inline-block px-4 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-widest uppercase">
-                    FF TECH ELITE AUDIT ENGINE
-                </div>
-                <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter italic text-white uppercase">
-                    FF TECH <span class="text-blue-500">ELITE</span>
-                </h1>
-                <div class="max-w-2xl mx-auto pt-6">
-                    <div class="glass neon-border p-2 rounded-2xl flex flex-col md:flex-row gap-2">
-                        <input id="urlInput" type="text" value="https://www.apple.com" 
-                               class="flex-1 bg-transparent px-6 py-4 outline-none text-white text-lg placeholder:opacity-30">
-                        <button onclick="runAudit()" id="auditBtn" 
-                                class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase tracking-widest transition-all">
-                            Run Audit
-                        </button>
-                    </div>
+    <body class="p-8">
+        <div class="max-w-6xl mx-auto">
+            <header class="text-center mb-12">
+                <h1 class="text-5xl font-extrabold text-blue-400">FF TECH <span class="text-white text-2xl">Forensic v6.0</span></h1>
+                <div class="mt-8 flex gap-4 max-w-xl mx-auto">
+                    <input id="urlInput" type="text" class="flex-1 p-4 rounded-xl bg-slate-800 border border-slate-700 outline-none text-white" placeholder="https://example.com">
+                    <button id="auditBtn" onclick="runAudit()" class="bg-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-blue-500 transition">AUDIT</button>
                 </div>
             </header>
-
-            <div id="resultsDisplay" class="hidden space-y-8 animate-in fade-in duration-700">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    <div class="lg:col-span-4 glass rounded-[40px] p-10 flex flex-col items-center justify-center text-center">
-                        <div class="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Overall Health Index</div>
-                        <div id="gradeValue" class="text-9xl font-black italic text-blue-500 leading-none">66%</div>
-                        <div id="gradeLabel" class="mt-4 px-4 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-bold text-sm uppercase">Needs Optimization</div>
-                        <p id="summaryText" class="mt-8 text-sm opacity-60 leading-relaxed italic"></p>
+            
+            <div id="results" class="hidden space-y-8">
+                <div class="flex justify-end gap-4">
+                    <button onclick="downloadPDF()" class="bg-green-600 px-6 py-2 rounded-lg font-bold hover:bg-green-500 transition">Download Executive PDF</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="glass p-8 rounded-3xl text-center">
+                        <div id="gradeValue" class="text-8xl font-black text-blue-500">0%</div>
+                        <div class="text-sm uppercase tracking-widest opacity-50 font-bold mt-2">Overall Health</div>
                     </div>
-
-                    <div class="lg:col-span-5 glass rounded-[40px] p-8 flex items-center justify-center">
+                    <div class="md:col-span-2 glass p-6 rounded-3xl">
                         <canvas id="radarChart"></canvas>
                     </div>
-
-                    <div class="lg:col-span-3 space-y-4">
-                        <div class="glass p-6 rounded-3xl space-y-4">
-                            <h3 class="text-xs font-bold opacity-40 uppercase tracking-widest">Executive Suggestions</h3>
-                            <p id="suggestionSnippet" class="text-xs leading-relaxed opacity-80"></p>
-                        </div>
-                        <button onclick="downloadPDF()" class="w-full py-6 glass hover:bg-white hover:text-black transition-all rounded-3xl font-black uppercase tracking-widest text-sm border-white/20">
-                            Download Report PDF
-                        </button>
-                    </div>
                 </div>
-
-                <div class="space-y-6">
-                    <div class="space-y-1">
-                        <h2 class="text-2xl font-bold">Detailed Forensic Matrix</h2>
-                        <p class="text-xs opacity-40 uppercase tracking-widest">Core Technical Metrics</p>
-                    </div>
-                    <div id="matrixGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+                <div class="glass p-8 rounded-3xl overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="text-slate-400 text-xs uppercase">
+                            <tr><th class="p-4">#</th><th class="p-4">Metric</th><th class="p-4">Category</th><th class="p-4">Score</th></tr>
+                        </thead>
+                        <tbody id="metricBody" class="text-sm"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
-
         <script>
-            let radar = null;
-            let currentData = null;
-
+            let radar = null; let currentData = null;
             async function runAudit() {
-                const btn = document.getElementById('auditBtn');
+                const btn = document.getElementById('auditBtn'); btn.innerText = "Scanning...";
                 const url = document.getElementById('urlInput').value;
-                btn.innerText = "Scanning...";
-                
-                try {
-                    const res = await fetch('/audit', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({url})
-                    });
-                    currentData = await res.json();
-                    
-                    btn.innerText = "Run Audit";
-                    displayResults(currentData);
-                } catch (e) {
-                    alert("Audit Failed. Ensure backend is running.");
-                    btn.innerText = "Run Audit";
-                }
-            }
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                currentData = await res.json();
+                document.getElementById('results').classList.remove('hidden');
+                document.getElementById('gradeValue').innerText = currentData.total_grade + '%';
+                btn.innerText = "AUDIT";
 
-            function displayResults(data) {
-                document.getElementById('resultsDisplay').classList.remove('hidden');
-                document.getElementById('gradeValue').innerText = data.total_grade + '%';
-                document.getElementById('summaryText').innerText = data.summary;
-                document.getElementById('suggestionSnippet').innerText = "Strategic focus must immediately shift toward infrastructure hardening and Core Web Vital optimization to prevent further ranking degradation.";
-                
-                // Matrix Grid
-                const grid = document.getElementById('matrixGrid');
-                grid.innerHTML = data.metrics.map(m => `
-                    <div class="glass p-4 rounded-2xl border-l-2 ${m.score > 80 ? 'border-green-500' : m.score < 40 ? 'border-red-500' : 'border-blue-500'}">
-                        <div class="text-[8px] opacity-30 font-bold uppercase truncate">${m.category}</div>
-                        <div class="text-[10px] font-bold mt-1 h-8 line-clamp-2">${m.name}</div>
-                        <div class="text-xl font-black mt-1 ${m.score > 80 ? 'text-green-400' : m.score < 40 ? 'text-red-400' : 'text-blue-400'}">${m.score}%</div>
-                    </div>
-                `).join('');
-
-                // Radar Chart
                 const ctx = document.getElementById('radarChart');
                 if(radar) radar.destroy();
                 radar = new Chart(ctx, {
                     type: 'radar',
                     data: {
-                        labels: Object.keys(data.pillars),
+                        labels: Object.keys(currentData.pillars),
                         datasets: [{
-                            label: 'Efficiency Index',
-                            data: Object.values(data.pillars),
+                            label: 'Pillar Distribution',
+                            data: Object.values(currentData.pillars),
                             backgroundColor: 'rgba(59, 130, 246, 0.2)',
                             borderColor: '#3b82f6',
-                            pointBackgroundColor: '#3b82f6'
+                            pointRadius: 4
                         }]
                     },
-                    options: {
-                        scales: {
-                            r: {
-                                min: 0, max: 100, ticks: { display: false },
-                                grid: { color: 'rgba(255,255,255,0.05)' },
-                                pointLabels: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: 'bold' } }
-                            }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
+                    options: { scales: { r: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: 'white' } } }, plugins: { legend: { display: false } } }
                 });
+                document.getElementById('metricBody').innerHTML = currentData.metrics.map(m => `
+                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
+                        <td class="p-4 opacity-50 font-mono">${m.no}</td>
+                        <td class="p-4 font-semibold">${m.name}</td>
+                        <td class="p-4 text-xs opacity-60">${m.category}</td>
+                        <td class="p-4 font-bold ${m.score < 50 ? 'text-red-400' : 'text-green-400'}">${m.score}%</td>
+                    </tr>
+                `).join('');
             }
 
+            // FIXED: PDF Download Function
             async function downloadPDF() {
                 if(!currentData) return;
                 const res = await fetch('/download', {
@@ -352,9 +295,11 @@ async def serve_index():
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url;
-                a.download = `Forensic_Report_${currentData.total_grade}.pdf`;
+                a.href = url; 
+                a.download = `Executive_Audit_${currentData.total_grade}.pdf`;
+                document.body.appendChild(a);
                 a.click();
+                document.body.removeChild(a);
             }
         </script>
     </body>
