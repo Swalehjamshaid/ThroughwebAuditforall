@@ -5,178 +5,205 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FF TECH | Elite Strategic Intelligence 2025</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #3b82f6;
-            --primary-glow: rgba(59, 130, 246, 0.4);
-            --dark-bg: #020617;
-            --glass: rgba(15, 23, 42, 0.85);
-            --border: rgba(255, 255, 255, 0.08);
+            --primary: #3b82f6; --secondary: #8b5cf6;
+            --dark: #020617; --glass: rgba(15, 23, 42, 0.9);
+            --glow: 0 0 40px rgba(59, 130, 246, 0.4);
         }
-        body {
-            background: var(--dark-bg);
-            color: #f8fafc;
+        body { 
+            background: var(--dark); 
+            color: #f8fafc; 
             font-family: 'Inter', sans-serif;
-            min-height: 100vh;
-            background-image: radial-gradient(circle at 10% 90%, #1e293b 0%, transparent 50%),
-                              radial-gradient(circle at 90% 10%, #1e293b 0%, transparent 50%);
+            background-image: radial-gradient(circle at 20% 80%, rgba(30,41,59,0.6) 0%, transparent 50%),
+                              radial-gradient(circle at 80% 20%, rgba(30,41,59,0.6) 0%, transparent 50%);
         }
         .glass {
-            background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--border);
-            border-radius: 32px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        .glow {
-            box-shadow: 0 0 40px var(--primary-glow);
-        }
-        .score-ring {
-            background: conic-gradient(var(--primary) calc(var(--percent) * 1%), #1e293b 0);
-            transition: all 1.5s ease;
-        }
-        .metric-card:hover {
-            transform: translateY(-8px);
-            transition: all 0.4s ease;
-            box-shadow: 0 20px 40px rgba(59, 130, 246, 0.2);
+            background: var(--glass); backdrop-filter: blur(24px);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 32px;
+            box-shadow: var(--glow);
         }
         .gradient-text {
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
+        .score-ring {
+            background: conic-gradient(var(--primary) calc(var(--percent)*1%), #1e293b 0);
+            transition: all 2s cubic-bezier(0.4,0,0.2,1);
+            box-shadow: var(--glow);
+        }
+        .metric-card:hover { transform: translateY(-12px) scale(1.03); }
+        @keyframes pulse-glow { 0%,100%{box-shadow:var(--glow);} 50%{box-shadow:0 0 60px rgba(59,130,246,0.6);} }
+        .animate-glow { animation: pulse-glow 3s infinite; }
     </style>
 </head>
-<body class="p-8 md:p-16">
+<body class="p-8 md:p-16 min-h-screen">
     <div class="max-w-7xl mx-auto space-y-20">
-        <!-- Hero & Input -->
+        <!-- HERO WITH TOTAL GRADE SPACE -->
         <div class="text-center space-y-12">
-            <h1 class="text-6xl md:text-8xl font-extrabold gradient-text">FF TECH</h1>
-            <p class="text-3xl md:text-5xl font-light text-slate-300">Elite Strategic Intelligence • 2025</p>
-            <div class="max-w-4xl mx-auto glass p-6">
-                <input id="urlInput" type="url" placeholder="Enter website URL (e.g., example.com)"
-                       class="w-full bg-transparent text-2xl px-8 py-6 outline-none text-white placeholder-slate-500">
-                <button onclick="runAudit()" class="mt-6 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-xl py-6 rounded-2xl glow transition">
-                    LAUNCH ELITE AUDIT
+            <div class="flex items-center gap-6 justify-center mb-8">
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center text-2xl font-black text-white">FF</div>
+                <h1 class="text-6xl md:text-7xl font-black gradient-text tracking-tight">TECH</h1>
+            </div>
+            <p class="text-2xl md:text-4xl text-slate-300 font-light">Elite Strategic Intelligence • 2025 Global Standards</p>
+            <div class="glass p-8 max-w-2xl mx-auto">
+                <input id="urlInput" type="url" placeholder="https://yourwebsite.com" 
+                       class="w-full bg-transparent p-6 text-2xl outline-none placeholder-slate-500">
+                <button onclick="runAudit()" class="mt-8 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-xl py-8 rounded-3xl glow transition-all hover:scale-[1.02]">
+                    🚀 LAUNCH 66+ POINT ELITE AUDIT
                 </button>
             </div>
+            <!-- TOTAL GRADE (Shows after audit - TOP POSITION) -->
+            <div id="totalGrade" class="hidden glass p-12 max-w-4xl mx-auto animate-glow">
+                <div class="text-center">
+                    <div id="gradeRing" class="score-ring w-72 h-72 mx-auto relative mb-8" style="--percent:0">
+                        <div class="absolute inset-16 bg-[var(--dark)] rounded-full flex flex-col items-center justify-center min-h-[224px]">
+                            <span id="totalGradeNum" class="text-7xl md:text-8xl font-black text-white">0%</span>
+                            <span id="gradeLabel" class="text-2xl font-bold text-slate-300 mt-4 uppercase tracking-widest">ANALYZING...</span>
+                        </div>
+                    </div>
+                    <p class="text-xl text-slate-400">WEIGHTED TOTAL GRADE (Core Web Vitals 5x Impact)</p>
+                </div>
+            </div>
         </div>
 
-        <!-- Loader -->
-        <div id="loader" class="hidden text-center py-32">
-            <div class="inline-block w-24 h-24 border-8 border-blue-500 border-t-transparent rounded-full animate-spin glow"></div>
-            <p class="mt-8 text-2xl text-blue-400">Analyzing 66+ Global Metrics...</p>
+        <!-- LOADER -->
+        <div id="loader" class="hidden flex flex-col items-center py-32 animate-glow">
+            <div class="w-28 h-28 border-8 border-blue-500 border-t-transparent rounded-full animate-spin mb-12"></div>
+            <p class="text-3xl text-blue-400 font-mono tracking-wider">🔍 DEPLOYING 66+ GLOBAL METRIC PROBES...</p>
         </div>
 
-        <!-- Results -->
+        <!-- RESULTS -->
         <div id="results" class="hidden space-y-20">
-            <!-- Executive Summary -->
-            <div class="glass p-12">
-                <h2 class="text-5xl font-bold mb-8 text-center gradient-text">Executive Strategic Overview</h2>
-                <p id="summary" class="text-xl leading-relaxed text-slate-300 whitespace-pre-line"></p>
-            </div>
+            <!-- EXECUTIVE SUMMARY -->
+            <section class="glass p-12 lg:p-20">
+                <h2 class="text-5xl font-black mb-12 text-center gradient-text">🏆 EXECUTIVE STRATEGIC OVERVIEW</h2>
+                <div id="summary" class="text-xl leading-relaxed text-slate-200 prose prose-lg max-w-5xl mx-auto whitespace-pre-line"></div>
+            </section>
 
-            <!-- Score Ring & Financial Impact -->
-            <div class="grid md:grid-cols-3 gap-12">
-                <div class="glass p-12 flex flex-col items-center justify-center text-center glow">
-                    <div class="w-64 h-64 rounded-full score-ring relative" id="ringContainer" style="--percent: 0">
-                        <div class="absolute inset-12 bg-var(--dark-bg) rounded-full flex items-center justify-center">
-                            <div>
-                                <span id="bigScore" class="text-7xl font-black">0%</span>
-                                <p id="healthTag" class="text-xl text-slate-400 mt-4">Analyzing...</p>
-                            </div>
-                        </div>
-                    </div>
-                    <p class="mt-8 text-2xl font-semibold">Weighted Efficiency Score</p>
+            <!-- FINANCIAL IMPACT -->
+            <section class="glass p-12 lg:p-20">
+                <div class="flex items-center gap-6 mb-12">
+                    <div class="w-8 h-8 bg-red-500 rounded-full animate-pulse"></div>
+                    <h3 class="text-4xl font-black text-red-400">⚠️ FINANCIAL LEAKAGE IMPACT</h3>
                 </div>
-
-                <div class="md:col-span-2 glass p-12 space-y-12">
-                    <div class="flex items-center gap-6">
-                        <div class="w-6 h-6 bg-red-500 rounded-full animate-pulse"></div>
-                        <h3 class="text-3xl font-bold text-red-400">Financial Leakage Alert</h3>
-                    </div>
-                    <div class="grid md:grid-cols-2 gap-12">
-                        <div>
-                            <p class="text-slate-400 text-xl uppercase">Conversion Leakage</p>
-                            <p id="leakageVal" class="text-6xl font-black text-white mt-4">0%</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-400 text-xl uppercase">Annual Revenue Impact</p>
-                            <p id="lossVal" class="text-6xl font-black gradient-text mt-4">$0</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Metrics Grid & Download -->
-            <div class="glass p-12">
-                <div class="flex justify-between items-center mb-12">
+                <div class="grid md:grid-cols-2 gap-12 text-center">
                     <div>
-                        <h3 class="text-4xl font-bold">66+ Point Global Forensic Scorecard</h3>
-                        <p class="text-xl text-slate-400 mt-4">2025 International Standards</p>
+                        <p class="text-2xl text-slate-400 uppercase tracking-wider mb-6">Server Response (TTFB)</p>
+                        <p id="ttfbVal" class="text-6xl font-black text-blue-400">--- ms</p>
                     </div>
-                    <button onclick="downloadPDF()" class="bg-white text-black px-12 py-6 rounded-2xl text-2xl font-bold glow hover:scale-105 transition">
-                        EXPORT PDF REPORT
+                    <div>
+                        <p class="text-2xl text-slate-400 uppercase tracking-wider mb-6">HTTPS Security</p>
+                        <p id="httpsVal" class="text-6xl font-black text-green-400">SECURED</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- METRICS GRID -->
+            <section class="glass p-12 lg:p-20">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-16 gap-8">
+                    <div>
+                        <h3 class="text-5xl font-black mb-4 gradient-text">📊 66+ GLOBAL FORENSIC SCORECARD</h3>
+                        <p class="text-2xl text-slate-400">2025 International Standards • Weighted Analysis</p>
+                    </div>
+                    <button onclick="downloadPDF()" id="pdfBtn" class="bg-white text-black px-12 py-8 rounded-3xl text-2xl font-black shadow-2xl hover:shadow-blue-500/50 transition-all hover:scale-105 whitespace-nowrap">
+                        📄 DOWNLOAD ELITE PDF REPORT
                     </button>
                 </div>
-                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 overflow-y-auto max-h-screen"></div>
-            </div>
+                <div id="metricsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8 max-h-[70vh] overflow-y-auto pr-4 -mr-4 scrollbar-thin scrollbar-thumb-blue-500/50 scrollbar-track-slate-900"></div>
+            </section>
         </div>
     </div>
 
     <script>
         let reportData = null;
+        const metricsGrid = document.getElementById('metricsGrid');
 
         async function runAudit() {
-            const input = document.getElementById('urlInput').value.trim();
-            if (!input) return alert('Enter a URL');
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return alert('Enter website URL');
+            
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
+            document.getElementById('totalGrade').classList.add('hidden');
 
             try {
                 const res = await fetch('/audit', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url: input})
+                    body: JSON.stringify({url})
                 });
                 reportData = await res.json();
 
-                document.getElementById('bigScore').innerText = reportData.avg_score + '%';
-                document.getElementById('healthTag').innerText = 'Elite Performance'; // Customize if needed
-                document.getElementById('ringContainer').style.setProperty('--percent', reportData.avg_score);
-                document.getElementById('summary').innerText = reportData.summary;
-                // Populate financial if available
+                // TOTAL GRADE ON TOP (WEIGHTED)
+                document.getElementById('totalGradeNum').textContent = reportData.total_grade + '%';
+                document.getElementById('gradeLabel').textContent = reportData.grade_label;
+                document.getElementById('gradeRing').style.setProperty('--percent', reportData.total_grade);
+                document.getElementById('totalGrade').classList.remove('hidden');
 
-                const grid = document.getElementById('metricsGrid');
-                grid.innerHTML = '';
+                // Populate all fields
+                document.getElementById('summary').textContent = reportData.summary;
+                document.getElementById('ttfbVal').textContent = reportData.ttfb + ' ms';
+                document.getElementById('httpsVal').textContent = reportData.https_status;
+                document.getElementById('httpsVal').className = reportData.https_status === 'Secured' ? 'text-6xl font-black text-green-400' : 'text-6xl font-black text-red-400';
+
+                // METRICS GRID (Color-coded + Progress bars)
+                metricsGrid.innerHTML = '';
                 reportData.metrics.forEach(m => {
-                    const color = m.score > 75 ? 'border-green-500 bg-green-500/10 text-green-400' :
-                                  m.score > 45 ? 'border-orange-500 bg-orange-500/10 text-orange-400' :
-                                                 'border-red-500 bg-red-500/10 text-red-400';
-                    grid.innerHTML += `
-                        <div class="glass p-8 metric-card border-l-8 ${color} rounded-3xl">
-                            <p class="text-sm text-slate-500 uppercase">${m.category}</p>
-                            <h4 class="text-xl font-bold mt-4">${m.name}</h4>
-                            <div class="mt-6 bg-slate-800 rounded-full h-4 overflow-hidden">
-                                <div class="h-full ${color.split(' ')[1]}" style="width:${m.score}%"></div>
+                    const status = m.score > 75 ? 'green' : m.score > 45 ? 'orange' : 'red';
+                    const colorClass = status === 'green' ? 'border-green-500 bg-green-500/10 text-green-400' :
+                                       status === 'orange' ? 'border-orange-500 bg-orange-500/10 text-orange-400' :
+                                                             'border-red-500 bg-red-500/10 text-red-400';
+                    
+                    metricsGrid.innerHTML += `
+                        <div class="glass p-8 rounded-3xl border-l-8 ${colorClass} hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] transition-all duration-300 group">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-200">${m.category}</span>
+                                <span class="text-3xl font-black ${colorClass.split(' ')[2]}">${m.score}%</span>
                             </div>
-                            <p class="text-3xl font-black mt-4">${m.score}%</p>
+                            <h4 class="font-bold text-lg text-white leading-tight mb-6 group-hover:gradient-text">${m.name}</h4>
+                            <div class="w-full bg-slate-800 h-3 rounded-2xl overflow-hidden shadow-inner">
+                                <div class="h-full ${status}-500/20 transition-all duration-1000 rounded-2xl" style="width: ${m.score}%"></div>
+                            </div>
                         </div>`;
                 });
 
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('results').classList.remove('hidden');
-            } catch (e) {
-                alert('Audit failed');
+            } catch(e) {
+                alert('Audit failed: ' + e.message);
                 document.getElementById('loader').classList.add('hidden');
             }
         }
 
         async function downloadPDF() {
-            if (!reportData) return;
-            // Call your /download endpoint
+            if (!reportData) return alert('Run audit first');
+            const btn = document.getElementById('pdfBtn');
+            const original = btn.innerHTML;
+            btn.innerHTML = '⏳ GENERATING ELITE PDF...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(reportData)
+                });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `FFTech_Elite_Audit_${reportData.url.replace(/[^a-z0-9]/gi,'_')}_${reportData.total_grade}pct.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch(e) {
+                alert('PDF failed: ' + e.message);
+            }
+            btn.innerHTML = original;
+            btn.disabled = false;
         }
     </script>
 </body>
