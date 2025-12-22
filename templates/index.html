@@ -1,23 +1,19 @@
-import io, time, asyncio
-from typing import Dict
+import io, time, asyncio, hashlib, os
+from typing import List, Dict
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from bs4 import BeautifulSoup
 from fpdf import FPDF
-import uvicorn
-import aiohttp
+from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from pyppeteer import launch
-import nest_asyncio
+import aiohttp
+from playwright.async_api import async_playwright
 
-nest_asyncio.apply()
-
-# ---------------- FASTAPI SETUP ----------------
-app = FastAPI(title="FF TECH ELITE | Forensic Audit v6.0")
+# ---------------- FastAPI App ----------------
+app = FastAPI(title="FF TECH ELITE | Real Forensic Engine v6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ---------------- METRICS ----------------
+# ---------------- Metric Descriptions ----------------
 METRIC_DESCRIPTIONS = {
     "Performance": "Evaluates server response times, asset delivery speed, and rendering efficiency.",
     "Technical SEO": "Analyzes crawlability, indexing signals, and architecture semantic integrity.",
@@ -26,136 +22,149 @@ METRIC_DESCRIPTIONS = {
     "User Experience": "Measures visual stability, interactivity, and mobile-first design compliance."
 }
 
-RAW_METRICS = [(i+1, name, cat) for i,(name,cat) in enumerate([
-("Largest Contentful Paint (LCP)","Performance"),
-("First Input Delay (FID)","Performance"),
-("Cumulative Layout Shift (CLS)","Performance"),
-("First Contentful Paint (FCP)","Performance"),
-("Time to First Byte (TTFB)","Performance"),
-("Total Blocking Time (TBT)","Performance"),
-("Speed Index","Performance"),
-("Time to Interactive (TTI)","Performance"),
-("Total Page Size","Performance"),
-("HTTP Requests Count","Performance"),
-("Image Optimization","Performance"),
-("CSS Minification","Performance"),
-("JavaScript Minification","Performance"),
-("GZIP/Brotli Compression","Performance"),
-("Browser Caching","Performance"),
-("Mobile Responsiveness","Technical SEO"),
-("Viewport Configuration","Technical SEO"),
-("Structured Data Markup","Technical SEO"),
-("Canonical Tags","Technical SEO"),
-("Robots.txt Configuration","Technical SEO"),
-("XML Sitemap","Technical SEO"),
-("URL Structure","Technical SEO"),
-("Breadcrumb Navigation","Technical SEO"),
-("Title Tag Optimization","Technical SEO"),
-("Meta Description","Technical SEO"),
-("Heading Structure (H1-H6)","Technical SEO"),
-("Internal Linking","Technical SEO"),
-("External Linking Quality","Technical SEO"),
-("Schema.org Implementation","Technical SEO"),
-("AMP Compatibility","Technical SEO"),
-("Content Quality Score","On-Page SEO"),
-("Keyword Density Analysis","On-Page SEO"),
-("Content Readability","On-Page SEO"),
-("Content Freshness","On-Page SEO"),
-("Content Length Adequacy","On-Page SEO"),
-("Image Alt Text","On-Page SEO"),
-("Video Optimization","On-Page SEO"),
-("Content Uniqueness","On-Page SEO"),
-("LSI Keywords","On-Page SEO"),
-("Content Engagement Signals","On-Page SEO"),
-("Content Hierarchy","On-Page SEO"),
-("HTTPS Full Implementation","Security"),
-("Security Headers","Security"),
-("Cross-Site Scripting Protection","Security"),
-("SQL Injection Protection","Security"),
-("Mixed Content Detection","Security"),
-("TLS/SSL Certificate Validity","Security"),
-("Cookie Security","Security"),
-("HTTP Strict Transport Security","Security"),
-("Content Security Policy","Security"),
-("Clickjacking Protection","Security"),
-("Referrer Policy","Security"),
-("Permissions Policy","Security"),
-("X-Content-Type-Options","Security"),
-("Frame Options","Security"),
-("Core Web Vitals Compliance","User Experience"),
-("Mobile-First Design","User Experience"),
-("Accessibility Compliance","User Experience"),
-("Page Load Animation","User Experience"),
-("Navigation Usability","User Experience"),
-("Form Optimization","User Experience"),
-("404 Error Page","User Experience"),
-("Search Functionality","User Experience"),
-("Social Media Integration","User Experience"),
-("Multilingual Support","User Experience"),
-("Progressive Web App Features","User Experience")
+RAW_METRICS = [(i+1, name, cat) for i, (name, cat) in enumerate([
+    # Performance
+    ("Largest Contentful Paint (LCP)","Performance"),
+    ("First Input Delay (FID)","Performance"),
+    ("Cumulative Layout Shift (CLS)","Performance"),
+    ("First Contentful Paint (FCP)","Performance"),
+    ("Time to First Byte (TTFB)","Performance"),
+    ("Total Blocking Time (TBT)","Performance"),
+    ("Speed Index","Performance"),
+    ("Time to Interactive (TTI)","Performance"),
+    ("Total Page Size","Performance"),
+    ("HTTP Requests Count","Performance"),
+    ("Image Optimization","Performance"),
+    ("CSS Minification","Performance"),
+    ("JavaScript Minification","Performance"),
+    ("GZIP/Brotli Compression","Performance"),
+    ("Browser Caching","Performance"),
+    # Technical SEO
+    ("Mobile Responsiveness","Technical SEO"),
+    ("Viewport Configuration","Technical SEO"),
+    ("Structured Data Markup","Technical SEO"),
+    ("Canonical Tags","Technical SEO"),
+    ("Robots.txt Configuration","Technical SEO"),
+    ("XML Sitemap","Technical SEO"),
+    ("URL Structure","Technical SEO"),
+    ("Breadcrumb Navigation","Technical SEO"),
+    ("Title Tag Optimization","Technical SEO"),
+    ("Meta Description","Technical SEO"),
+    ("Heading Structure (H1-H6)","Technical SEO"),
+    ("Internal Linking","Technical SEO"),
+    ("External Linking Quality","Technical SEO"),
+    ("Schema.org Implementation","Technical SEO"),
+    ("AMP Compatibility","Technical SEO"),
+    # On-Page SEO
+    ("Content Quality Score","On-Page SEO"),
+    ("Keyword Density Analysis","On-Page SEO"),
+    ("Content Readability","On-Page SEO"),
+    ("Content Freshness","On-Page SEO"),
+    ("Content Length Adequacy","On-Page SEO"),
+    ("Image Alt Text","On-Page SEO"),
+    ("Video Optimization","On-Page SEO"),
+    ("Content Uniqueness","On-Page SEO"),
+    ("LSI Keywords","On-Page SEO"),
+    ("Content Engagement Signals","On-Page SEO"),
+    ("Content Hierarchy","On-Page SEO"),
+    # Security
+    ("HTTPS Full Implementation","Security"),
+    ("Security Headers","Security"),
+    ("Cross-Site Scripting Protection","Security"),
+    ("SQL Injection Protection","Security"),
+    ("Mixed Content Detection","Security"),
+    ("TLS/SSL Certificate Validity","Security"),
+    ("Cookie Security","Security"),
+    ("HTTP Strict Transport Security","Security"),
+    ("Content Security Policy","Security"),
+    ("Clickjacking Protection","Security"),
+    ("Referrer Policy","Security"),
+    ("Permissions Policy","Security"),
+    ("X-Content-Type-Options","Security"),
+    ("Frame Options","Security"),
+    # User Experience
+    ("Core Web Vitals Compliance","User Experience"),
+    ("Mobile-First Design","User Experience"),
+    ("Accessibility Compliance","User Experience"),
+    ("Page Load Animation","User Experience"),
+    ("Navigation Usability","User Experience"),
+    ("Form Optimization","User Experience"),
+    ("404 Error Page","User Experience"),
+    ("Search Functionality","User Experience"),
+    ("Social Media Integration","User Experience"),
+    ("Multilingual Support","User Experience"),
+    ("Progressive Web App Features","User Experience"),
 ])]
 
-# ---------------- HELPERS ----------------
-def score_bool(cond, ok=100, fail=30): return ok if cond else fail
+# ---------------- Helper Functions ----------------
+def score_bool(cond, ok=100, fail=30):
+    return ok if cond else fail
+
 def score_range(val, rules):
     for lim, sc in rules:
-        if val <= lim: return sc
+        if val <= lim:
+            return sc
     return rules[-1][1]
-def header(h, k): return k.lower() in [x.lower() for x in h]
-def count(s, t): return len(s.find_all(t))
 
-# ---------------- AUDITOR ----------------
+# ---------------- Auditor ----------------
 class ForensicAuditor:
     def __init__(self, url):
-        self.url = url
-        self.domain = urlparse(url).netloc
-        self.ttfb = 0
-        self.headers = {}
-        self.html = ""
+        self.url = url if url.startswith("http") else "https://" + url
+        self.domain = urlparse(self.url).netloc
         self.soup = None
+        self.headers = {}
+        self.ttfb = 0
+        self.page_size = 0
+        self.requests_count = 0
+        self.images_missing_alt = 0
+        self.metrics = {}
 
-    async def fetch(self):
+    async def fetch_basic(self):
         try:
-            start = time.time()
-            async with aiohttp.ClientSession() as s:
-                async with s.get(self.url, ssl=False, timeout=15,
-                    headers={"User-Agent":"FFTECH-ForensicBot/6.0"}) as r:
-                    self.ttfb = (time.time()-start)*1000
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.url, ssl=False, timeout=15,
+                                       headers={"User-Agent":"FFTECH-ForensicBot/6.0"}) as r:
+                    self.ttfb = r.headers.get('x-response-time', 0) or 0
+                    html = await r.text()
+                    self.soup = BeautifulSoup(html,"html.parser")
                     self.headers = dict(r.headers)
-                    self.html = await r.text()
-                    self.soup = BeautifulSoup(self.html,"html.parser")
+                    self.page_size = len(html.encode()) / 1024
+                    self.requests_count = len(self.soup.find_all("img")) + len(self.soup.find_all("script")) + len(self.soup.find_all("link"))
+                    self.images_missing_alt = len([img for img in self.soup.find_all("img") if not img.get("alt")])
                     return True
-        except: return False
-
-    async def get_core_web_vitals(self):
-        try:
-            browser = await launch(headless=True, args=['--no-sandbox'])
-            page = await browser.newPage()
-            await page.goto(self.url, {"waitUntil":"networkidle2"})
-            metrics = await page.evaluate("""() => {
-                const lcp = (window.performance.getEntriesByType('largest-contentful-paint').pop() || {}).renderTime || 0;
-                const fcp = (window.performance.getEntriesByName('first-contentful-paint')[0] || {}).startTime || 0;
-                const tti = window.__tti?.tti || 0;
-                const cls = window.__webVitals?.CLS?.value || 0;
-                const fid = window.__webVitals?.FID?.value || 0;
-                const tbt = window.__webVitals?.TBT?.value || 0;
-                return {LCP: lcp, FCP: fcp, TTI: tti, CLS: cls, FID: fid, TBT: tbt};
-            }""")
-            await browser.close()
-            # Convert metrics to score 0-100
-            def conv_score(val, metric):
-                if metric in ["CLS","FID"]: return max(100 - val*200,0)
-                if metric in ["LCP","FCP","TTI","TBT"]: return max(100 - val/50,0)
-                return 70
-            return {k:int(conv_score(v,k)) for k,v in metrics.items()}
         except:
-            return {"LCP":70,"FID":70,"CLS":70,"FCP":70,"TBT":70,"TTI":70}
+            return False
+
+    async def fetch_cwv(self):
+        # Playwright headless browser for Core Web Vitals
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            start = time.time()
+            try:
+                await page.goto(self.url, wait_until='networkidle')
+                metrics = await page.evaluate("""() => {
+                    const perf = window.performance.timing;
+                    const lcp = window.performance.getEntriesByType('largest-contentful-paint');
+                    const cls = window.performance.getEntriesByType('layout-shift');
+                    return {
+                        LCP: lcp.length ? lcp[lcp.length-1].renderTime || lcp[lcp.length-1].loadTime : 0,
+                        CLS: cls.length ? cls.map(c=>c.value).reduce((a,b)=>a+b,0) : 0,
+                        FCP: perf.responseStart ? perf.responseStart-perf.requestStart : 0,
+                        TTI: 0,
+                        TBT: 0
+                    };
+                }""")
+                self.metrics.update(metrics)
+            finally:
+                await browser.close()
 
 # ---------------- PDF ----------------
 class ExecutivePDF(FPDF):
     def __init__(self, url, grade):
         super().__init__()
-        self.url=url; self.grade=grade
+        self.url = url
+        self.grade = grade
     def header(self):
         self.set_fill_color(15,23,42)
         self.rect(0,0,210,40,"F")
@@ -166,79 +175,99 @@ class ExecutivePDF(FPDF):
         self.cell(0,6,self.url,0,1,"C")
         self.ln(10)
 
-# ---------------- AUDIT ----------------
+# ---------------- Audit Endpoint ----------------
 @app.post("/audit")
-async def audit(request:Request):
+async def audit(request: Request):
     data = await request.json()
-    url = data.get("url","").strip()
-    if not url.startswith("http"): url="https://"+url
-
+    url = data.get("url", "").strip()
     auditor = ForensicAuditor(url)
-    if not await auditor.fetch():
-        return JSONResponse({"total_grade":0,"summary":"Site unreachable"})
+    ok = await auditor.fetch_basic()
+    if not ok:
+        return JSONResponse({"total_grade":1,"summary":"Site Unreachable"})
 
-    vitals = await auditor.get_core_web_vitals()
+    await auditor.fetch_cwv()
+
+    # ---------------- Scoring ----------------
+    results = []
+    pillars = {k:[] for k in METRIC_DESCRIPTIONS}
     s = auditor.soup
     h = auditor.headers
-    size = len(auditor.html.encode())/1024
-    imgs = s.find_all("img")
-    links = s.find_all("a")
 
-    pillars = {k:[] for k in METRIC_DESCRIPTIONS}
-    results = []
+    for i, name, cat in RAW_METRICS:
+        if name=="Largest Contentful Paint (LCP)":
+            val = auditor.metrics.get("LCP",0)
+            sc = score_range(val,[(2500,100),(4000,70),(10000,40)])
+        elif name=="Cumulative Layout Shift (CLS)":
+            val = auditor.metrics.get("CLS",0)
+            sc = score_range(val,[(0.1,100),(0.25,70),(1,40)])
+        elif name=="First Contentful Paint (FCP)":
+            val = auditor.metrics.get("FCP",0)
+            sc = score_range(val,[(2000,100),(4000,70),(10000,40)])
+        elif name=="Time to First Byte (TTFB)":
+            val = auditor.ttfb
+            sc = score_range(val,[(200,100),(600,70),(1500,40)])
+        elif name=="Total Page Size":
+            val = auditor.page_size
+            sc = score_range(val,[(800,100),(2000,70),(5000,40)])
+        elif name=="HTTP Requests Count":
+            val = auditor.requests_count
+            sc = score_range(val,[(50,100),(120,70),(300,40)])
+        elif name=="Image Optimization":
+            val = auditor.images_missing_alt
+            sc = score_range(val,[(0,100),(5,70),(20,40)])
+        elif name=="Title Tag Optimization":
+            sc = score_bool(s.title and 10<=len(s.title.text)<=60)
+        elif name=="Meta Description":
+            m = s.find("meta", attrs={"name":"description"})
+            sc = score_bool(m and 50<=len(m.get("content",""))<=160)
+        elif name=="Heading Structure (H1-H6)":
+            sc = score_bool(len(s.find_all("h1"))==1)
+        elif name=="HTTPS Full Implementation":
+            sc = score_bool(auditor.url.startswith("https"))
+        elif name=="HTTP Strict Transport Security":
+            sc = score_bool("strict-transport-security" in h)
+        elif name=="Content Security Policy":
+            sc = score_bool("content-security-policy" in h)
+        elif name=="X-Content-Type-Options":
+            sc = score_bool("x-content-type-options" in h)
+        elif name=="Frame Options":
+            sc = score_bool("x-frame-options" in h)
+        elif name=="Mobile-First Design":
+            sc = score_bool(s.find("meta", attrs={"name":"viewport"}))
+        elif name=="Navigation Usability":
+            sc = score_bool(s.find("nav"))
+        else:
+            sc = 70
+        sc = max(1,min(100,sc))
+        results.append({"no":i,"name":name,"category":cat,"score":sc})
+        pillars[cat].append(sc)
 
-    for i,n,c in RAW_METRICS:
-        if n=="Time to First Byte (TTFB)": sc=score_range(auditor.ttfb,[(200,100),(600,70),(1500,40)])
-        elif n=="Total Page Size": sc=score_range(size,[(800,100),(2000,70),(5000,40)])
-        elif n=="HTTP Requests Count": sc=score_range(len(imgs)+len(links),[(50,100),(120,70),(300,40)])
-        elif n=="Image Optimization": sc=score_range(len([i for i in imgs if not i.get("alt")]),[(0,100),(5,70),(20,40)])
-        elif n=="Title Tag Optimization": sc=100 if s.title and 10<=len(s.title.text)<=60 else 40
-        elif n=="Meta Description": m=s.find("meta",attrs={"name":"description"}); sc=100 if m and 50<=len(m.get("content",""))<=160 else 40
-        elif n=="Heading Structure (H1-H6)": sc=100 if count(s,"h1")==1 else 40
-        elif n=="HTTPS Full Implementation": sc=score_bool(url.startswith("https"))
-        elif n=="HTTP Strict Transport Security": sc=score_bool(header(h,"strict-transport-security"))
-        elif n=="Content Security Policy": sc=score_bool(header(h,"content-security-policy"))
-        elif n=="X-Content-Type-Options": sc=score_bool(header(h,"x-content-type-options"))
-        elif n=="Frame Options": sc=score_bool(header(h,"x-frame-options"))
-        elif n=="Mobile-First Design": sc=score_bool(s.find("meta",attrs={"name":"viewport"}))
-        elif n in vitals: sc=vitals[n]
-        else: sc=70
+    pillar_avg = {k: round(sum(v)/len(v)) for k,v in pillars.items()}
+    total = round(sum(pillar_avg.values())/5)
 
-        sc=max(1,min(100,sc))
-        results.append({"no":i,"name":n,"category":c,"score":sc})
-        pillars[c].append(sc)
+    return {"url":auditor.url,"total_grade":total,"pillars":pillar_avg,"metrics":results,
+            "summary":f"Real forensic audit completed. Health Index {total}%."}
 
-    pillar_avg = {k:round(sum(v)/len(v)) for k,v in pillars.items()}
-    total_grade = round(sum(pillar_avg.values())/5)
-
-    return {
-        "url":url,
-        "total_grade":total_grade,
-        "pillars":pillar_avg,
-        "metrics":results,
-        "summary":f"Real forensic audit completed. Health Index {total_grade}%."
-    }
-
-# ---------------- PDF DOWNLOAD ----------------
+# ---------------- Download PDF ----------------
 @app.post("/download")
-async def download(request:Request):
-    data = await request.json()
-    pdf = ExecutivePDF(data["url"], data["total_grade"])
+async def download(request: Request):
+    d = await request.json()
+    pdf = ExecutivePDF(d["url"], d["total_grade"])
     pdf.add_page()
     pdf.set_font("Helvetica","B",40)
     pdf.set_text_color(59,130,246)
-    pdf.cell(0,30,f'{data["total_grade"]}%',1,1,"C")
-    pdf.set_font("Helvetica","B",12)
-    pdf.set_text_color(255,255,255)
-    pdf.multi_cell(0,6,"Executive Roadmap: Optimize Core Web Vitals, Hardening Security, Improve SEO & UX for elite status.",0,"L")
+    pdf.cell(0,30,f'{d["total_grade"]}%',1,1,"C")
     out = pdf.output(dest="S").encode("latin1")
-    return StreamingResponse(io.BytesIO(out), media_type="application/pdf", headers={"Content-Disposition":"attachment; filename=FF_TECH_Elite_Audit.pdf"})
+    return StreamingResponse(io.BytesIO(out),
+                             media_type="application/pdf",
+                             headers={"Content-Disposition":"attachment; filename=Audit_Report.pdf"})
 
-# ---------------- HTML INTERFACE ----------------
+# ---------------- UI ----------------
 @app.get("/", response_class=HTMLResponse)
 async def ui():
-    return open("audit_dashboard.html","r").read()  # your HTML file here
+    with open("dashboard.html","r", encoding="utf-8") as f:
+        return f.read()
 
-# ---------------- RUN ----------------
 if __name__=="__main__":
-    uvicorn.run(app,host="0.0.0.0",port=8000)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
