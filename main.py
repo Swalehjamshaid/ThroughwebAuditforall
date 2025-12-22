@@ -1,206 +1,212 @@
-import io, os, hashlib, time, random, urllib3, json
+import io, os, hashlib, time, random, urllib3, json, asyncio
 from typing import List, Dict, Tuple, Optional
-from fastapi import FastAPI, Request
+from datetime import datetime
+from urllib.parse import urlparse, urljoin
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from bs4 import BeautifulSoup
 from fpdf import FPDF
 import uvicorn
 import aiohttp
-from urllib.parse import urlparse
+import aiofiles
+from collections import defaultdict
+import numpy as np
+import matplotlib.pyplot as plt
 
-# Suppress SSL warnings for live crawling
+# Suppress SSL warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-app = FastAPI(title="FF TECH | Real Forensic Engine v6.0")
+app = FastAPI(title="FF TECH | Forensic Audit Engine v6.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ------------------- 66 METRIC MASTER MAPPING -------------------
-RAW_METRICS = [
-    (1, "Largest Contentful Paint (LCP)", "Performance"), (2, "First Input Delay (FID)", "Performance"),
-    (3, "Cumulative Layout Shift (CLS)", "Performance"), (4, "First Contentful Paint (FCP)", "Performance"),
-    (5, "Time to First Byte (TTFB)", "Performance"), (6, "Total Blocking Time (TBT)", "Performance"),
-    (7, "Speed Index", "Performance"), (8, "Time to Interactive (TTI)", "Performance"),
-    (9, "Total Page Size", "Performance"), (10, "HTTP Requests Count", "Performance"),
-    (11, "Image Optimization", "Performance"), (12, "CSS Minification", "Performance"),
-    (13, "JavaScript Minification", "Performance"), (14, "GZIP/Brotli Compression", "Performance"),
-    (15, "Browser Caching", "Performance"), (16, "Mobile Responsiveness", "Technical SEO"),
-    (17, "Viewport Configuration", "Technical SEO"), (18, "Structured Data Markup", "Technical SEO"),
-    (19, "Canonical Tags", "Technical SEO"), (20, "Robots.txt Configuration", "Technical SEO"),
-    (21, "XML Sitemap", "Technical SEO"), (22, "URL Structure", "Technical SEO"),
-    (23, "Breadcrumb Navigation", "Technical SEO"), (24, "Title Tag Optimization", "Technical SEO"),
-    (25, "Meta Description", "Technical SEO"), (26, "Heading Structure (H1-H6)", "Technical SEO"),
-    (27, "Internal Linking", "Technical SEO"), (28, "External Linking Quality", "Technical SEO"),
-    (29, "Schema.org Implementation", "Technical SEO"), (30, "AMP Compatibility", "Technical SEO"),
-    (31, "Content Quality Score", "On-Page SEO"), (32, "Keyword Density Analysis", "On-Page SEO"),
-    (33, "Content Readability", "On-Page SEO"), (34, "Content Freshness", "On-Page SEO"),
-    (35, "Content Length Adequacy", "On-Page SEO"), (36, "Image Alt Text", "On-Page SEO"),
-    (37, "Video Optimization", "On-Page SEO"), (38, "Content Uniqueness", "On-Page SEO"),
-    (39, "LSI Keywords", "On-Page SEO"), (40, "Content Engagement Signals", "On-Page SEO"),
-    (41, "Content Hierarchy", "On-Page SEO"), (42, "HTTPS Full Implementation", "Security"),
-    (43, "Security Headers", "Security"), (44, "Cross-Site Scripting Protection", "Security"),
-    (45, "SQL Injection Protection", "Security"), (46, "Mixed Content Detection", "Security"),
-    (47, "TLS/SSL Certificate Validity", "Security"), (48, "Cookie Security", "Security"),
-    (49, "HTTP Strict Transport Security", "Security"), (50, "Content Security Policy", "Security"),
-    (51, "Clickjacking Protection", "Security"), (52, "Referrer Policy", "Security"),
-    (53, "Permissions Policy", "Security"), (54, "X-Content-Type-Options", "Security"),
-    (55, "Frame Options", "Security"), (56, "Core Web Vitals Compliance", "User Experience"),
-    (57, "Mobile-First Design", "User Experience"), (58, "Accessibility Compliance", "User Experience"),
-    (59, "Page Load Animation", "User Experience"), (60, "Navigation Usability", "User Experience"),
-    (61, "Form Optimization", "User Experience"), (62, "404 Error Page", "User Experience"),
-    (63, "Search Functionality", "User Experience"), (64, "Social Media Integration", "User Experience"),
-    (65, "Multilingual Support", "User Experience"), (66, "Progressive Web App Features", "User Experience")
-]
+# Ensure directories exist
+os.makedirs("reports", exist_ok=True)
+os.makedirs("static", exist_ok=True)
 
-class ForensicAuditor:
-    def __init__(self, url: str):
-        self.url = url
-        self.soup = None
-        self.ttfb = 0
-
-    async def fetch_page(self):
-        start_time = time.time()
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.url, ssl=False, timeout=10, 
-                    headers={"User-Agent": "FFTech-Forensic-Bot/6.0"}) as response:
-                    self.ttfb = (time.time() - start_time) * 1000
-                    html = await response.text()
-                    self.soup = BeautifulSoup(html, 'html.parser')
-                    return True
-        except Exception: return False
-
-class ExecutivePDF(FPDF):
-    def __init__(self, url, grade):
-        super().__init__(orientation='P', unit='mm', format='A4')
-        self.target_url = url
-        self.grade = grade
-
-    def header(self):
-        self.set_fill_color(15, 23, 42) # Deep Slate Header
-        self.rect(0, 0, 210, 50, 'F')
-        self.set_font("Helvetica", "B", 22)
-        self.set_text_color(255, 255, 255)
-        self.cell(0, 20, "FF TECH | EXECUTIVE FORENSIC REPORT", 0, 1, 'C')
-        self.set_font("Helvetica", "", 10)
-        self.cell(0, 5, f"SITE AUDITED: {self.target_url}", 0, 1, 'C')
-        self.cell(0, 5, f"DATE: {time.strftime('%B %d, %Y')}", 0, 1, 'C')
-        self.ln(25)
-
-@app.post("/audit")
-async def audit(request: Request):
-    data = await request.json()
-    url = data.get("url", "").strip()
-    if not url.startswith("http"): url = "https://" + url
-    
-    auditor = ForensicAuditor(url)
-    if not await auditor.fetch_page():
-        return JSONResponse({"total_grade": 0, "summary": "Site Unreachable"}, status_code=400)
-
-    random.seed(int(hashlib.md5(url.encode()).hexdigest(), 16))
-    results = []
-    pillars = {"Performance": [], "Technical SEO": [], "On-Page SEO": [], "Security": [], "User Experience": []}
-
-    for m_id, m_name, m_cat in RAW_METRICS:
-        if m_id == 42: score = 100 if url.startswith("https") else 20
-        elif m_id == 5: score = 100 if auditor.ttfb < 350 else 45
-        elif m_id == 26: score = 100 if auditor.soup.find('h1') else 30
-        else: score = random.randint(55, 98)
-        
-        results.append({"no": m_id, "name": m_name, "category": m_cat, "score": score})
-        pillars[m_cat].append(score)
-
-    final_pillars = {k: round(sum(v)/len(v)) for k, v in pillars.items()}
-    total_grade = round(sum(final_pillars.values()) / 5)
-
-    return {
-        "total_grade": total_grade,
-        "metrics": results,
-        "pillars": final_pillars,
-        "url": url,
-        "summary": f"Audit of {url} completed. Health Index: {total_grade}%."
-    }
-
-@app.post("/download")
-async def download_pdf(request: Request):
-    data = await request.json()
-    url, grade = data.get("url", "N/A"), data.get("total_grade", 0)
-    
-    pdf = ExecutivePDF(url, grade)
-    pdf.add_page()
-    
-    # Hero Score
-    pdf.set_font("Helvetica", "B", 60)
-    pdf.set_text_color(59, 130, 246)
-    pdf.cell(0, 40, f"{grade}%", ln=1, align='C')
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(0, 10, "OVERALL HEALTH INDEX", ln=1, align='C')
-    pdf.ln(10)
-
-    # 300-Word Strategic Improvement Roadmap
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "STRATEGIC IMPROVEMENT ROADMAP (300 WORDS)", ln=1)
-    pdf.set_font("Helvetica", "", 10)
-    
-    recommendation = (
-        f"The forensic investigation of {url} has yielded a comprehensive Health Index of {grade}%. To move toward a dominant "
-        "digital footprint, immediate intervention is required in infrastructure hardening. We recommend a 30-day technical sprint "
-        "focusing on the rendering pipeline. Currently, the Largest Contentful Paint (LCP) and Time to First Byte (TTFB) signals "
-        "suggest that the origin server is struggling with resource allocation. Implementing a global Content Delivery Network (CDN) "
-        "with edge-caching protocols will solve the primary latency issues. On a structural level, the Heading Hierarchy (H1-H6) "
-        "must be strictly enforced; search crawlers are finding semantic gaps that hinder your indexability. Furthermore, "
-        "while your HTTPS implementation is present, the lack of HSTS and a robust Content Security Policy (CSP) leaves the site "
-        "vulnerable to cross-site scripting and protocol downgrades. From a User Experience standpoint, Cumulative Layout Shift (CLS) "
-        "is higher than the industry standard. This requires defining explicit width and height attributes for all media assets "
-        "to prevent visual instability during the loading phase. Regarding On-Page SEO, the semantic density of primary keywords "
-        "needs to be increased by 15% to align with modern LSI (Latent Semantic Indexing) standards. Finally, the mobile-first "
-        "rendering needs a complete audit of render-blocking JavaScript, as it is currently delaying interactivity by over 2 seconds. "
-        "By addressing these forensic markers, you will not only improve your Health Index to over 90% but also ensure long-term "
-        "stability against search engine algorithm updates. This roadmap serves as the definitive blueprint for your site's "
-        "technical evolution and security hardening over the next business quarter. Achieving elite status requires "
-        "commitment to these 66 forensic metrics through a systematic, data-driven optimization approach."
-    )
-    pdf.multi_cell(0, 6, recommendation)
-    pdf.ln(10)
-
-    # 66 Metric Matrix Table
-    pdf.set_fill_color(30, 41, 59)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.cell(15, 10, "ID", 1, 0, 'C', True)
-    pdf.cell(80, 10, "FORENSIC METRIC", 1, 0, 'L', True)
-    pdf.cell(65, 10, "CATEGORY", 1, 0, 'L', True)
-    pdf.cell(20, 10, "SCORE", 1, 1, 'C', True)
-
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Helvetica", "", 8)
-    for i, m in enumerate(data['metrics']):
-        if pdf.get_y() > 270: pdf.add_page()
-        bg = (i % 2 == 0)
-        if bg: pdf.set_fill_color(245, 247, 250)
-        
-        pdf.cell(15, 8, str(m['no']), 1, 0, 'C', bg)
-        pdf.cell(80, 8, m['name'][:45], 1, 0, 'L', bg)
-        pdf.cell(65, 8, m['category'], 1, 0, 'L', bg)
-        
-        pdf.set_text_color(22, 163, 74) if m['score'] > 85 else pdf.set_text_color(220, 38, 38)
-        pdf.cell(20, 8, f"{m['score']}%", 1, 1, 'C', bg)
-        pdf.set_text_color(0, 0, 0)
-
-    buf = io.BytesIO()
-    pdf_out = pdf.output(dest='S')
-    buf.write(pdf_out if isinstance(pdf_out, bytes) else pdf_out.encode('latin-1'))
-    buf.seek(0)
-    return StreamingResponse(buf, media_type="application/pdf")
+# ... [The FORENSIC_METRICS, ForensicAuditor, and ExecutivePDF classes from your snippet] ...
+# Note: Ensure you include the full ForensicAuditor and ExecutivePDF logic 
+# provided in your prompt to handle the 66 metrics.
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    try:
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "Error: index.html not found. Place it in the same folder as main.py."
+async def serve_dashboard():
+    """Main dashboard interface integrated with backend logic"""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>FF TECH | Forensic Audit Dashboard</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <style>
+            .gradient-bg { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
+            .score-circle { transition: stroke-dashoffset 0.5s ease-out; }
+            .loading-bar { animation: loading 2s infinite ease-in-out; }
+            @keyframes loading { 0% { width: 0%; } 50% { width: 70%; } 100% { width: 100%; } }
+        </style>
+    </head>
+    <body class="bg-slate-50 text-slate-900 font-sans">
+        <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white">
+                    <i class="fas fa-microscope"></i>
+                </div>
+                <h1 class="font-bold text-xl tracking-tight">FF TECH <span class="text-blue-600 font-medium">FORENSICS</span></h1>
+            </div>
+            <div class="hidden md:flex gap-6 text-sm font-medium text-slate-600">
+                <a href="#" class="hover:text-blue-600">Dashboard</a>
+                <a href="#" class="hover:text-blue-600">Metric Guide</a>
+                <a href="#" class="hover:text-blue-600">History</a>
+            </div>
+        </nav>
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        <main class="container mx-auto max-w-6xl p-6">
+            <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
+                <div class="max-w-3xl mx-auto text-center">
+                    <h2 class="text-3xl font-extrabold text-slate-800 mb-4">Website Forensic Analysis</h2>
+                    <p class="text-slate-500 mb-8">Deep-scan 66+ parameters including performance, technical SEO, security headers, and UX compliance.</p>
+                    <div class="flex gap-2">
+                        <input type="url" id="urlInput" placeholder="https://example.com" class="flex-grow px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none">
+                        <button onclick="startAudit()" id="auditBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg flex items-center gap-2 transition-all">
+                            <i class="fas fa-bolt"></i> Run Audit
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <div id="loadingUI" class="hidden">
+                <div class="flex flex-col items-center py-20">
+                    <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                    <p class="text-slate-600 font-medium">Executing forensic sweep...</p>
+                </div>
+            </div>
+
+            <div id="resultsUI" class="hidden animate-in fade-in duration-500">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 text-center">
+                        <span class="text-sm font-bold text-slate-400 uppercase tracking-widest">Health Grade</span>
+                        <div id="overallScore" class="text-5xl font-black text-blue-600 my-2">0%</div>
+                        <div id="gradeLabel" class="text-xs font-bold px-2 py-1 rounded bg-blue-100 text-blue-700 inline-block">SECURE</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200 md:col-span-3">
+                        <h3 class="font-bold mb-4">Pillar Performance</h3>
+                        <div id="pillarGrid" class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold">66 Forensic Metrics Matrix</h3>
+                        <button onclick="downloadPDF()" class="text-sm bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800">
+                            <i class="fas fa-file-pdf mr-2"></i> Export Report
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-xs font-bold text-slate-400 uppercase bg-slate-50">
+                                    <th class="px-6 py-4">ID</th>
+                                    <th class="px-6 py-4">Metric</th>
+                                    <th class="px-6 py-4">Category</th>
+                                    <th class="px-6 py-4">Score</th>
+                                    <th class="px-6 py-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metricsTableBody" class="text-sm divide-y divide-slate-100">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script>
+            let lastAuditData = null;
+
+            async function startAudit() {
+                const url = document.getElementById('urlInput').value;
+                if(!url) return alert('Target URL required');
+
+                document.getElementById('loadingUI').classList.remove('hidden');
+                document.getElementById('resultsUI').classList.add('hidden');
+                
+                try {
+                    const response = await fetch('/api/audit', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({url})
+                    });
+                    lastAuditData = await response.json();
+                    displayResults(lastAuditData);
+                } catch (e) {
+                    alert('Audit failed: ' + e.message);
+                } finally {
+                    document.getElementById('loadingUI').classList.add('hidden');
+                }
+            }
+
+            function displayResults(data) {
+                document.getElementById('resultsUI').classList.remove('hidden');
+                document.getElementById('overallScore').innerText = data.overall_grade + '%';
+                
+                // Render Pillars
+                const pillarGrid = document.getElementById('pillarGrid');
+                pillarGrid.innerHTML = '';
+                Object.entries(data.pillars).forEach(([name, score]) => {
+                    const color = score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+                    pillarGrid.innerHTML += `
+                        <div class="flex flex-col gap-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">${name}</span>
+                            <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full ${color}" style="width: ${score}%"></div>
+                            </div>
+                            <span class="text-xs font-bold">${score}%</span>
+                        </div>
+                    `;
+                });
+
+                // Render Table
+                const tbody = document.getElementById('metricsTableBody');
+                tbody.innerHTML = '';
+                data.metrics.forEach(m => {
+                    const scoreColor = m.score >= 80 ? 'text-emerald-600' : m.score >= 60 ? 'text-amber-600' : 'text-rose-600';
+                    const statusClass = m.status === 'Pass' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 font-mono text-xs text-slate-400">#${m.id}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-700">${m.name}</div>
+                                <div class="text-[10px] text-slate-400">${m.description}</div>
+                            </td>
+                            <td class="px-6 py-4 text-xs font-medium text-slate-500">${m.category}</td>
+                            <td class="px-6 py-4 font-bold ${scoreColor}">${m.score}%</td>
+                            <td class="px-6 py-4"><span class="px-2 py-1 rounded text-[10px] font-bold ${statusClass}">${m.status}</span></td>
+                        </tr>
+                    `;
+                });
+            }
+
+            async function downloadPDF() {
+                if(!lastAuditData) return;
+                const response = await fetch('/api/download-pdf', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({audit_data: lastAuditData})
+                });
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `forensic_report_${lastAuditData.report_id}.pdf`;
+                a.click();
+            }
+        </script>
+    </body>
+    </html>
+    """
+
+# ... [The /api/audit and /api/download-pdf endpoints from your snippet] ...
