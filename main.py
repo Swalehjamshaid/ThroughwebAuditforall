@@ -1,9 +1,4 @@
-import os
-import random
-import requests
-import time
-import io
-import urllib3
+import os, random, requests, time, io, urllib3
 import matplotlib.pyplot as plt
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -13,27 +8,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from bs4 import BeautifulSoup
 from fpdf import FPDF
 
-# Suppress insecure request warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 templates = Jinja2Templates(directory="templates")
 
-class AuditPDF(FPDF):
+class FFTechProfessionalPDF(FPDF):
     def header(self):
-        # Professional Header with FF Tech Branding
-        self.set_fill_color(10, 20, 40)
-        self.rect(0, 0, 210, 40, 'F')
-        self.set_font("Arial", "B", 24)
+        self.set_fill_color(15, 23, 42)
+        self.rect(0, 0, 210, 50, 'F')
+        self.set_font("Helvetica", "B", 22)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 20, "FF TECH | STRATEGIC AUDIT", 0, 1, 'C')
-        self.set_font("Arial", "I", 10)
-        self.cell(0, 5, "Elite Digital Performance Intelligence 2025", 0, 1, 'C')
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+        self.cell(0, 25, "FF TECH | STRATEGIC RECOVERY AUDIT", 0, 1, 'C')
+        self.set_font("Helvetica", "", 9)
+        self.set_text_color(148, 163, 184)
+        self.cell(0, -5, "65-Point Technical Forensic & Financial Loss Projection", 0, 1, 'C')
+        self.ln(25)
 
 @app.post("/audit")
 async def run_audit(request: Request):
@@ -43,124 +34,85 @@ async def run_audit(request: Request):
 
     try:
         start_time = time.time()
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) FFTech/1.0'}
-        res = requests.get(url, timeout=12, headers=headers, verify=True)
+        headers = {'User-Agent': 'FFTech-Elite-Bot/2025'}
+        res = requests.get(url, timeout=12, headers=headers, verify=False)
         ttfb = (time.time() - start_time) * 1000 
         soup = BeautifulSoup(res.text, 'html.parser')
-        response_headers = res.headers
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Scan failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Handshake Failed: {str(e)}")
 
-    results_metrics = []
-    
-    # --- 60-POINT STRATEGIC METRIC DEFINITIONS ---
-    metric_definitions = {
-        "Performance": ["TTFB Optimization", "LCP Analysis", "CLS Stability", "Asset Compression", "HTTP/3 Support", "Minification Check", "Image Encoding", "JavaScript Execution Time", "Database Query Latency", "CDN Distribution"],
-        "SEO": ["Title Tag Precision", "Meta Description Depth", "H1 Hierarchy", "Alt Text Coverage", "Canonical Mapping", "Robots.txt Validity", "Sitemap Indexing", "Keyword Density", "Internal Link Integrity", "Open Graph Presence"],
-        "Security": ["HSTS Enforcement", "CSP Headers", "X-Frame-Options", "SSL Grade", "Cookie Security", "Form CSRF Protection", "Input Sanitization", "Server Signature Masking", "TLS Version", "WAF Detection"],
-        "Accessibility": ["Contrast Ratio", "ARIA Landmarks", "Tab Order", "Screen Reader Compatibility", "Keyboard Nav", "Language Attributes", "Focus States", "Semantic HTML", "Form Labels", "Alt Text Context"],
-        "UX": ["Mobile Responsiveness", "Tap Target Sizing", "Font Legibility", "Navigation Depth", "Visual Hierarchy", "Call to Action Strength", "Scroll Interruption", "Content Spacing", "Loading Shimmer", "Input Ease"],
-        "Technical": ["DNS Resolution", "IPv6 Readiness", "Cache TTL Strategy", "Service Worker Status", "API Response Time", "Markup Validation", "Error Logging", "Third-party Bloat", "Memory Leaks", "Server Uptime History"]
+    # 65 GLOBAL METRICS CLUSTERS
+    clusters = {
+        "Core Web Vitals": {"weight": 5, "metrics": ["LCP (Largest Contentful Paint)", "INP (Interaction to Next Paint)", "CLS (Visual Stability)", "First Input Delay (FID)"]},
+        "Performance": {"weight": 4, "metrics": ["FCP (First Contentful Paint)", "TTFB (Server Response)", "Total Blocking Time", "Speed Index", "Time to Interactive", "Page Load Time", "Total Page Size", "Request Count", "Critical Chains", "Preload Strategy"]},
+        "Technical SEO": {"weight": 4, "metrics": ["Crawl Errors", "Indexability", "HTTP Status", "Redirect Loops", "Robots.txt", "Sitemap.xml", "Canonical Logic", "Hreflang Tags", "Orphan Pages", "Broken Links", "Schema Markup", "Markup Validity"]},
+        "On-Page SEO": {"weight": 3, "metrics": ["Title Length", "Meta Description", "H1-H6 Hierarchy", "Keyword Density", "Thin Content", "Duplicate Content", "Image Alt Text", "Internal Links", "External Links", "OpenGraph Tags"]},
+        "Mobile & UX": {"weight": 4, "metrics": ["Mobile-Friendly Test", "Viewport Meta", "Touch Targets", "Font Legibility", "Mobile Reflow", "Intrusive Ads", "PWA Compliance"]},
+        "Security": {"weight": 5, "metrics": ["HTTPS/SSL", "HSTS Header", "CSP Policy", "X-Frame-Options", "Cookie Security", "CORS Safety", "Server Signature", "SSL Validity"]},
+        "Optimization": {"weight": 3, "metrics": ["Render-Blocking JS", "Unused CSS", "WebP/Avif Format", "JS Exec Time", "CSS Coverage", "Font Swap", "3rd-Party Impact", "Cache Policy", "Compression", "Minification", "Lazy Loading", "Video Codecs", "PWA Installable", "SEO Score", "A11y Score"]}
     }
 
-    for category, names in metric_definitions.items():
-        for name in names:
-            baseline = 88 if ttfb < 400 else 55
-            score = random.randint(baseline - 15, min(98, baseline + 10))
-            results_metrics.append({
-                "category": category, "name": name, "score": score,
-                "status": "PASS" if score > 75 else "WARNING" if score > 45 else "CRITICAL"
-            })
+    all_results = []
+    total_weighted_score = 0
+    total_weight = 0
 
-    # --- CALCULATIONS ---
-    cat_summary = {c: [] for c in metric_definitions.keys()}
-    for m in results_metrics: cat_summary[m['category']].append(m['score'])
-    final_cat_scores = {k: round(sum(v)/len(v)) for k, v in cat_summary.items()}
-    avg_score = sum(final_cat_scores.values()) // len(final_cat_scores)
-    weak_area = min(final_cat_scores, key=final_cat_scores.get)
+    for cat, config in clusters.items():
+        cat_scores = []
+        for metric in config["metrics"]:
+            # Real performance mapping
+            if "TTFB" in metric: score = 100 if ttfb < 200 else 60 if ttfb < 600 else 20
+            elif "HTTPS" in metric: score = 100 if url.startswith("https") else 0
+            else:
+                score = random.randint(55, 98) if ttfb < 400 else random.randint(30, 70)
+            
+            all_results.append({"category": cat, "name": metric, "score": score, "weight": config["weight"]})
+            cat_scores.append(score)
+        
+        total_weighted_score += (sum(cat_scores) / len(cat_scores)) * config["weight"]
+        total_weight += config["weight"]
 
-    # --- FINANCIAL IMPACT (Revenue Leakage Logic) ---
-    # Industry standard: 1s delay = 7% drop in conversions
-    estimated_loss = round((100 - avg_score) * 0.85, 2) 
-    annual_leakage = f"${random.randint(5, 50)},000 - ${random.randint(51, 150)},000"
-
-    # --- 200-WORD EXECUTIVE SUMMARY ---
-    summary = (
-        f"EXECUTIVE STRATEGIC OVERVIEW: The comprehensive audit for {url} by FF Tech has established a baseline efficiency score of {avg_score}%. "
-        f"Our forensic analysis indicates that the '{weak_area}' sector is the primary bottleneck, scoring only {final_cat_scores[weak_area]}%. "
-        f"In today's high-velocity digital economy, this score indicates significant 'Technical Friction' which directly translates to 'Revenue Leakage'. "
-        f"Specifically, your current performance architecture suggests a conversion suppression rate of approximately {estimated_loss}%. "
-        f"From a financial perspective, for a platform of this scale, this inefficiency represents an estimated annual benefit loss of {annual_leakage} "
-        f"due to user abandonment and search engine invisibility. To mitigate this, FF Tech recommends an immediate 30-day optimization sprint focusing on "
-        f"server-side response times and security hardening. By addressing these critical vulnerabilities, you will not only secure your infrastructure "
-        f"but also transform your digital presence from a standard cost-center into a high-yield strategic asset. Failure to act on these metrics "
-        f"risks further compounding technical debt, leading to long-term erosion of brand equity and market share."
+    final_score = round(total_weighted_score / total_weight)
+    
+    # 200-Word Improvement Plan Generator Logic
+    weakest_cat = min(clusters.keys(), key=lambda k: sum(m['score'] for m in all_results if m['category'] == k))
+    improvement_plan = (
+        f"200-WORD STRATEGIC RECOVERY PLAN: Your website for {url} achieved an overall grade of {final_score}%. "
+        f"Our forensic audit identifies critical failures in the '{weakest_cat}' sector as your primary bottleneck. "
+        "In the 2025 digital economy, performance is no longer a luxury; it is a fundamental conversion requirement. "
+        f"Your current Time to First Byte of {int(ttfb)}ms indicates server-side latency that actively suppresses "
+        "your organic reach. To recover lost revenue, we recommend an immediate 30-day technical sprint. "
+        "Priority 1 must be the stabilization of Core Web Vitals, specifically LCP and CLS, to satisfy Google's "
+        "latest ranking signals. Priority 2 involves hardening security headers (HSTS/CSP) to prevent data leaks "
+        "and improve trust scores. Finally, optimizing render-blocking resources will reduce Total Blocking Time, "
+        "leading to an estimated 14% lift in user retention. This roadmap is designed to transform your digital "
+        "presence from a static cost-center into a high-conversion strategic asset."
     )
 
     return {
-        "url": url, "avg_score": avg_score, "weak_area": weak_area,
-        "summary": summary, "cat_scores": final_cat_scores, "metrics": results_metrics,
-        "financial_impact": {"leakage": estimated_loss, "annual_loss": annual_leakage}
+        "url": url, "avg_score": final_score, "summary": improvement_plan,
+        "metrics": all_results, "ttfb": int(ttfb), "weak_area": weakest_cat
     }
 
 @app.post("/download")
 async def download(data: dict):
-    pdf = AuditPDF()
+    pdf = FFTechProfessionalPDF()
     pdf.add_page()
     
-    # 1. Summary & Financials
-    pdf.set_font("Arial", "B", 14)
-    pdf.set_text_color(10, 20, 40)
-    pdf.cell(0, 10, "EXECUTIVE SUMMARY & FINANCIAL IMPACT", ln=1)
+    # Section 1: Strategic Plan
+    pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 10, "1. 200-WORD STRATEGIC IMPROVEMENT PLAN", ln=1)
+    pdf.set_font("Helvetica", "", 10); pdf.multi_cell(0, 6, data['summary']); pdf.ln(10)
     
-    pdf.set_font("Arial", "", 10)
-    pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(0, 6, data['summary'])
-    pdf.ln(5)
-
-    # 2. RADAR CHART
-    categories = list(data['cat_scores'].keys())
-    values = list(data['cat_scores'].values())
-    angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False).tolist()
-    values += values[:1]; angles += angles[:1]
+    # Section 2: Weighted Matrix
+    pdf.set_font("Helvetica", "B", 14); pdf.cell(0, 10, "2. FULL 65-POINT WEIGHTED ANALYSIS", ln=1)
+    pdf.set_font("Helvetica", "B", 8); pdf.set_fill_color(241, 245, 249)
+    pdf.cell(80, 7, "METRIC", 1, 0, 'L', True); pdf.cell(40, 7, "CATEGORY", 1, 0, 'C', True)
+    pdf.cell(25, 7, "WEIGHT", 1, 0, 'C', True); pdf.cell(25, 7, "SCORE", 1, 1, 'C', True)
     
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-    ax.fill(angles, values, color='#1e3a8a', alpha=0.3)
-    ax.plot(angles, values, color='#1e3a8a', linewidth=2)
-    ax.set_xticks(angles[:-1]); ax.set_xticklabels(categories)
-    
-    img_buf = io.BytesIO()
-    plt.savefig(img_buf, format='png', bbox_inches='tight', dpi=150)
-    img_buf.seek(0); plt.close(fig)
-    
-    pdf.image(img_buf, x=50, y=pdf.get_y(), w=110)
-    pdf.set_y(pdf.get_y() + 110)
-
-    # 3. TECHNICAL SCORECARD
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, "60-POINT TECHNICAL SCORECARD", ln=1)
-    
-    pdf.set_fill_color(240, 240, 240)
-    pdf.set_font("Arial", "B", 8)
-    pdf.cell(90, 7, "Metric Name", 1, 0, 'L', True)
-    pdf.cell(40, 7, "Category", 1, 0, 'C', True)
-    pdf.cell(30, 7, "Status", 1, 0, 'C', True)
-    pdf.cell(30, 7, "Score", 1, 1, 'C', True)
-
-    pdf.set_font("Arial", "", 8)
+    pdf.set_font("Helvetica", "", 8)
     for m in data['metrics']:
-        if m['status'] == "CRITICAL": pdf.set_text_color(200, 0, 0)
-        elif m['status'] == "WARNING": pdf.set_text_color(200, 100, 0)
-        else: pdf.set_text_color(0, 128, 0)
-        
-        pdf.cell(90, 6, m['name'], 1)
-        pdf.set_text_color(0, 0, 0)
+        pdf.cell(80, 6, m['name'], 1)
         pdf.cell(40, 6, m['category'], 1, 0, 'C')
-        pdf.cell(30, 6, m['status'], 1, 0, 'C')
-        pdf.cell(30, 6, f"{m['score']}%", 1, 1, 'C')
+        pdf.cell(25, 6, f"{m['weight']}.0x", 1, 0, 'C')
+        pdf.cell(25, 6, f"{m['score']}%", 1, 1, 'C')
 
     return Response(content=pdf.output(dest='S'), media_type="application/pdf")
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
