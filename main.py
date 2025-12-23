@@ -13,9 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 
 from bs4 import BeautifulSoup
+
+# ReportLab (PDF)
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image,
+    KeepTogether, ListFlowable, ListItem
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -40,7 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
 templates = Jinja2Templates(directory="templates")
 
 # ==================== CONFIG ====================
@@ -101,6 +103,7 @@ METRICS_LIST: List[Tuple[str, str]] = [
     ("Permissions-Policy Header", "Security"),
 ]
 
+# Fill up to 66 metrics
 while len(METRICS_LIST) < 66:
     METRICS_LIST.append(
         (f"Advanced {CATEGORIES[len(METRICS_LIST) % 4]} Check #{len(METRICS_LIST)+1}",
@@ -138,7 +141,7 @@ def url_is_haier_pk(url: str) -> bool:
     except Exception:
         return False
 
-# ==================== REAL AUDIT ====================
+# ==================== REAL AUDIT (Playwright) ====================
 async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
     if not PLAYWRIGHT_AVAILABLE:
         raise RuntimeError("Playwright not installed.")
@@ -308,43 +311,35 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
         "image_optimization_ratio": image_optimization_ratio,
     }
 
-# ==================== SCORING (CWV & GLOBAL GUIDANCE) ====================
+# ==================== SCORING (CWV & global guidance) ====================
 def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts: Dict[str, Any]) -> int:
+    # Performance (CWV thresholds & guidance)
     if name == "Largest Contentful Paint (LCP)":
         lcp = audit.get("lcp", 0)
         return score_band(lcp, [(2500, 100), (4000, 80), (10000, 60), (9999999, 40)])
-
     if name == "First Contentful Paint (FCP)":
         fcp = audit.get("fcp", 0)
         return score_band(fcp, [(1800, 100), (3000, 85), (8000, 60), (9999999, 40)])
-
     if name == "Time to First Byte (TTFB)":
         ttfb = audit.get("ttfb", 0)
         return score_band(ttfb, [(800, 100), (1800, 80), (4000, 60), (9999999, 40)])
-
     if name == "Cumulative Layout Shift (CLS)":
         cls = float(audit.get("cls", 0.0))
         return score_band(cls, [(0.1, 100), (0.25, 80), (0.5, 60), (9999999, 40)])
-
     if name == "Total Blocking Time (TBT)":
         tbt = audit.get("tbt", 0)
         return score_band(tbt, [(200, 100), (600, 80), (1200, 60), (9999999, 40)])
-
     if name == "Page Weight (KB)":
         kb = audit.get("page_weight_kb", 0)
         return score_band(kb, [(1500, 100), (3000, 85), (6000, 60), (9999999, 40)])
-
     if name == "Number of Requests":
         reqs = audit.get("request_count", 0)
         return score_band(reqs, [(60, 100), (100, 85), (200, 60), (9999999, 40)])
-
     if name == "Image Optimization":
         ratio = facts.get("image_optimization_ratio", 0.0)
         return score_band(ratio, [(50, 60), (75, 80), (90, 95), (9999999, 100)])
-
     if name == "JavaScript Minification":
         return 100 if facts.get("js_minified") else 60
-
     if name == "Font Display Strategy":
         return 100 if facts.get("font_display_swap") else 60
 
@@ -354,38 +349,29 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         if 30 <= tl <= 65: return 100
         if 20 <= tl <= 75: return 85
         return 60 if tl > 0 else 30
-
     if name == "Meta Description (Length & Quality)":
         md = facts.get("meta_desc_length", 0)
         if 120 <= md <= 160: return 100
         if 80 <= md <= 180: return 85
         return 60 if md > 0 else 30
-
     if name == "Canonical Tag Present":
         return 100 if facts.get("canonical_present") else 60
-
     if name == "H1 Tag Unique & Present":
         h1 = facts.get("h1_count", 0)
         return 100 if h1 == 1 else (70 if h1 > 1 else 40)
-
     if name == "Heading Structure (H2-H6)":
         return 100 if facts.get("headings", {}).get("h2", 0) >= 1 else 70
-
     if name == "Image Alt Attributes":
         ratio = facts.get("image_alt_ratio", 0.0)
         return score_band(ratio, [(60, 60), (80, 80), (95, 95), (9999999, 100)])
-
     if name == "Robots Meta Tag":
         robots = facts.get("robots_meta", "")
         if "noindex" in robots or "nofollow" in robots: return 40
         return 90
-
     if name == "Open Graph Tags":
         return 100 if facts.get("og_tags_present") else 70
-
     if name == "Structured Data (Schema.org)":
         return 100 if facts.get("schema_present") else 70
-
     if name == "Internal Links Quality":
         cnt = facts.get("internal_links_count", 0)
         return 100 if cnt >= 20 else (80 if cnt >= 10 else 60)
@@ -393,51 +379,37 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
     # UX
     if name == "Viewport Meta Tag":
         return 100 if facts.get("viewport_present") else 60
-
     if name == "Mobile-Friendly Design":
         return 100 if facts.get("mobile_friendly") else 60
-
     if name == "Favicon Present":
         return 100 if facts.get("favicon_present") else 70
-
     if name == "No Console Errors":
         return 100 if facts.get("no_console_errors") else 60
-
     if name == "Fast Interactivity":
         tbt = audit.get("tbt", 0)
         return score_band(tbt, [(200, 100), (600, 75), (1200, 50), (9999999, 30)])
-
     if name in ("Tap Target Spacing", "Readable Font Sizes", "Color Contrast Ratio", "Touch Icons", "Error Messages Clear"):
         return 80
 
     # Security
     if name == "HTTPS Enforced":
         return 100 if facts.get("is_https") else 40
-
     if name == "HSTS Header":
         return 100 if facts.get("hsts") else 60
-
     if name == "Content-Security-Policy Header":
         return 100 if facts.get("csp") else 60
-
     if name == "X-Frame-Options Header":
         return 100 if facts.get("xfo") else 60
-
     if name == "X-Content-Type-Options Header":
         return 100 if facts.get("xcto") else 70
-
     if name == "Referrer-Policy Header":
         return 100 if facts.get("referrer_policy") else 70
-
     if name == "Permissions-Policy Header":
         return 100 if facts.get("permissions_policy") else 60
-
     if name == "No Mixed Content":
         return 100 if not facts.get("mixed_content_found") else 40
-
     if name == "Secure Cookies":
         return 100 if facts.get("secure_cookies_ok") else 60
-
     if name == "Vulnerable JS Libraries":
         libs = [u for u in (audit.get("resource_names") or []) if any(x in u.lower() for x in ["jquery", "angular", "react"])]
         return 80 if libs else 90
@@ -619,7 +591,7 @@ def get_static_seo_audit(url: str) -> Optional[Dict[str, Any]]:
         ],
     }
 
-# ==================== COMPETITOR ANALYSIS (4 TYPES) FOR haier.com.pk ====================
+# ==================== COMPETITOR ANALYSIS (4 TYPES) ====================
 def get_competitor_analysis_for_haier() -> Dict[str, Any]:
     return {
         "types": [
@@ -635,7 +607,7 @@ def get_competitor_analysis_for_haier() -> Dict[str, Any]:
             },
             {
                 "type": "Retailers & Marketplaces",
-                "description": "E‑commerce platforms driving category traffic and conversions.",
+                "description": "E-commerce platforms driving category traffic and conversions.",
                 "competitors": [
                     {"domain": "daraz.pk", "label": "Daraz", "common_keywords": 15, "competition_level": 0.80, "channel": "Marketplace"},
                     {"domain": "homeshopping.pk", "label": "HomeShopping", "common_keywords": 8, "competition_level": 0.55, "channel": "Retailer"},
@@ -645,7 +617,7 @@ def get_competitor_analysis_for_haier() -> Dict[str, Any]:
             },
             {
                 "type": "Brand Store / Owned Commerce",
-                "description": "Brand‑owned online stores and direct sales portals.",
+                "description": "Brand-owned online stores and direct sales portals.",
                 "competitors": [
                     {"domain": "haiermall.pk", "label": "Haier Mall", "common_keywords": 5, "competition_level": 0.55, "channel": "Owned Store"},
                     {"domain": "dawlance.com.pk", "label": "Dawlance Store", "common_keywords": 4, "competition_level": 0.48, "channel": "Owned Store"},
@@ -666,9 +638,8 @@ def get_competitor_analysis_for_haier() -> Dict[str, Any]:
         ]
     }
 
-# ==================== PDF HELPERS (AUTO-FIT COLUMNS) ====================
+# ==================== PDF HELPERS (World-class formatting) ====================
 def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Optional[List[float]]:
-    """Scale col_widths proportionally to fit the available max_width."""
     if not col_widths:
         return None
     total = sum(col_widths)
@@ -677,36 +648,72 @@ def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Opti
     scale = max_width / float(total)
     return [w * scale for w in col_widths]
 
-def _table(story: List[Any], data: List[List[Any]], col_widths: Optional[List[float]] = None,
-           header_bg: str = "#0f172a", doc: Optional[SimpleDocTemplate] = None):
-    # Compute inner page width from doc margins if doc is provided; else assume 50pt margins.
-    if doc is not None:
-        max_width = A4[0] - doc.leftMargin - doc.rightMargin
-    else:
-        max_width = A4[0] - 50 - 50  # fallback to your defaults
+def _para(text, style):
+    return Paragraph(text or "", style)
 
+def _link(text, url, style):
+    if not url:
+        return Paragraph(text or "", style)
+    safe_text = text or url
+    return Paragraph(f'{url}{safe_text}</link>', style)
+
+def _table(story, data, doc, col_widths=None, header_bg="#0f172a",
+           align_right_cols=None, center_cols=None):
+    max_width = A4[0] - doc.leftMargin - doc.rightMargin
     col_widths = _fit_col_widths(col_widths, max_width)
-
-    t = Table(data, colWidths=col_widths)
-    t.setStyle(TableStyle([
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    ts = [
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor(header_bg)),
         ('TEXTCOLOR', (0,0), (-1,0), colors.white),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
-        ('ALIGN', (0,0), (-1,0), 'LEFT'),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
-    ]))
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+    ]
+    if align_right_cols:
+        for c in align_right_cols:
+            ts.append(('ALIGN', (c,1), (c,-1), 'RIGHT'))
+    if center_cols:
+        for c in center_cols:
+            ts.append(('ALIGN', (c,1), (c,-1), 'CENTER'))
+    t.setStyle(TableStyle(ts))
     story.append(t)
 
 def _add_page_number(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(A4[0] - 40, 20, f"Page {doc.page}")
     canvas.setStrokeColor(colors.HexColor("#e5e7eb"))
-    canvas.line(40, 35, A4[0] - 40, 35)
+    canvas.line(doc.leftMargin, 35, A4[0] - doc.rightMargin, 35)
+    canvas.drawRightString(A4[0] - doc.rightMargin, 20, f"Page {doc.page}")
     canvas.restoreState()
+
+def _styles():
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name='ReportTitle', fontSize=22, leading=26, alignment=1,
+        textColor=colors.HexColor("#10b981"), spaceAfter=12, spaceBefore=6
+    ))
+    styles.add(ParagraphStyle(
+        name='SectionTitle', fontSize=16, leading=20,
+        textColor=colors.HexColor("#0f172a"), spaceBefore=14, spaceAfter=8
+    ))
+    styles.add(ParagraphStyle(
+        name='SubTitle', fontSize=12, leading=16,
+        textColor=colors.HexColor("#0f172a"), spaceBefore=6, spaceAfter=6
+    ))
+    styles.add(ParagraphStyle(
+        name='NormalGrey', fontSize=10, leading=14, textColor=colors.HexColor("#64748b")
+    ))
+    styles.add(ParagraphStyle(
+        name='Normal', fontSize=10, leading=14, textColor=colors.black
+    ))
+    styles.add(ParagraphStyle(
+        name='KPI', fontSize=11, leading=14, textColor=colors.HexColor("#10b981"), spaceAfter=4
+    ))
+    return styles
 
 # ==================== ROUTES ====================
 @app.get("/", response_class=HTMLResponse)
@@ -757,10 +764,10 @@ async def audit(request: Request):
             "request_count": audit_data.get("request_count"),
         },
         "roadmap": results["roadmap"],
-        # detailed SEO audit block, only for haier.com.pk
         "seo_audit": seo_audit
     }
 
+# ==================== WORLD-CLASS PDF ====================
 @app.post("/download")
 async def download_pdf(request: Request):
     data = await request.json()
@@ -770,6 +777,7 @@ async def download_pdf(request: Request):
     url = data.get("url", "")
     seo_audit = data.get("seo_audit")
 
+    # Fallback regen if needed
     if not metrics or not pillars or total_grade is None:
         results = generate_audit_results({"final_url": url, "html": ""}, BeautifulSoup("", "html.parser"))
         metrics = results["metrics"]
@@ -778,208 +786,286 @@ async def download_pdf(request: Request):
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=60, bottomMargin=50,
+        buffer, pagesize=A4,
+        rightMargin=50, leftMargin=50, topMargin=60, bottomMargin=50,
         title="FF TECH ELITE - Enterprise Web Audit Report", author="FF TECH ELITE v3"
     )
-
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleBold', fontSize=20, leading=24, alignment=1, textColor=colors.HexColor("#10b981")))
-    styles.add(ParagraphStyle(name='Section', fontSize=14, leading=18, spaceBefore=20, textColor=colors.HexColor("#0f172a")))
-    styles.add(ParagraphStyle(name='Muted', fontSize=9, textColor=colors.HexColor("#64748b")))
-    styles.add(ParagraphStyle(name='SubTitle', fontSize=12, leading=16, textColor=colors.HexColor("#0f172a")))
-    styles.add(ParagraphStyle(name='RedFlag', fontSize=10, textColor=colors.HexColor("#ef4444")))
-    styles.add(ParagraphStyle(name='Good', fontSize=10, textColor=colors.HexColor("#10b981")))
-
+    s = _styles()
     story: List[Any] = []
 
+    # Cover page
     logo_path = "logo.png"
     if os.path.exists(logo_path):
         try:
             story.append(Image(logo_path, width=120, height=50))
-            story.append(Spacer(1, 20))
+            story.append(Spacer(1, 12))
         except Exception:
             pass
 
-    story.append(Paragraph("FF TECH ELITE - Enterprise Web Audit Report", styles['TitleBold']))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(f"Target URL: {url or 'N/A'}", styles['Normal']))
-    story.append(Paragraph(f"Overall Health Score: {total_grade}%", styles['Section']))
-    story.append(Paragraph(time.strftime("Generated: %B %d, %Y at %H:%M UTC"), styles['Muted']))
-    story.append(Spacer(1, 15))
+    story.append(_para("FF TECH ELITE - Enterprise Web Audit Report", s['ReportTitle']))
+    story.append(_para(f"Target URL: {url or 'N/A'}", s['Normal']))
+    story.append(_para(f"Generated: {time.strftime('%B %d, %Y at %H:%M UTC')}", s['NormalGrey']))
+    story.append(Spacer(1, 6))
+    story.append(_para(f"Overall Health Score: {total_grade}%", s['KPI']))
+    story.append(Spacer(1, 8))
 
-    # Pillars
-    story.append(Paragraph("Pillar Scores", styles['Section']))
+    # Pillars summary table (cover page)
     pillar_table = [["Pillar", "Score"]]
     for cat in CATEGORIES:
         sc = pillars.get(cat, "—")
         pillar_table.append([cat, f"{sc}%" if isinstance(sc, (int, float)) else sc])
-    _table(story, pillar_table, col_widths=[300, 100], doc=doc)
-    story.append(Spacer(1, 20))
-
-    # Metrics
-    story.append(Paragraph("Detailed Metrics", styles['Section']))
-    table_data = [["#", "Metric", "Category", "Score", "Weight"]]
-    for m in metrics:
-        table_data.append([m.get('no', ''), m.get('name', ''), m.get('category', ''), f"{m.get('score', '')}%", m.get('weight', '')])
-    _table(story, table_data, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981", doc=doc)
+    _table(story, pillar_table, doc, col_widths=[300, 100], header_bg="#0f172a", align_right_cols=[1])
     story.append(PageBreak())
 
-    # Improvement roadmap
-    story.append(Paragraph("Improvement Roadmap", styles['TitleBold']))
-    story.append(Spacer(1, 10))
-    roadmap_html = data.get("roadmap") or "<b>Improvement Roadmap:</b><br/><br/>Prioritize critical items first."
-    story.append(Paragraph(roadmap_html, styles['Normal']))
+    # Table of Contents
+    story.append(_para("Table of Contents", s['SectionTitle']))
+    toc_items = [
+        "1. Advanced Diagnostics (metrics)",
+        "2. Improvement Roadmap",
+        "3. SEO Audit Results (if available)",
+        "   3.1 Overview & Section Scores",
+        "   3.2 Issues & Recommendations",
+        "   3.3 On-Page SEO",
+        "   3.4 Keyword Rankings & Top Pages",
+        "   3.5 Technical SEO",
+        "   3.6 Page Performance & Core Web Vitals",
+        "   3.7 Competitors & Competitor Analysis (4 Types)",
+        "   3.8 Off-Page SEO & Top Backlinks",
+        "   3.9 Social Media",
+    ]
+    story.append(ListFlowable([ListItem(_para(it, s['Normal']), leftIndent=10, value='•') for it in toc_items],
+                              bulletType='bullet'))
+    story.append(PageBreak())
 
-    # ==================== SEO AUDIT ====================
+    # Metrics section
+    story.append(_para("Advanced Diagnostics", s['SectionTitle']))
+    table_data = [["#", "Metric", "Category", "Score", "Weight"]]
+    for m in metrics:
+        table_data.append([
+            m.get('no', ''),
+            Paragraph(m.get('name', ''), s['Normal']),
+            Paragraph(m.get('category', ''), s['Normal']),
+            Paragraph(f"{m.get('score', '')}%", s['Normal']),
+            m.get('weight', '')
+        ])
+    _table(story, table_data, doc, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981",
+           align_right_cols=[3, 4], center_cols=[0])
+    story.append(PageBreak())
+
+    # Improvement roadmap as bullets
+    story.append(_para("Improvement Roadmap", s['SectionTitle']))
+    roadmap_html = (data.get("roadmap") or "<b>Improvement Roadmap:</b><br/><br/>Prioritize critical items first.")
+    items = []
+    for line in roadmap_html.split("<br/>"):
+        txt = line.strip()
+        if not txt or txt.lower().startswith("<b>"):
+            continue
+        txt = txt.replace("</b>", "").replace("<b>", "")
+        items.append(txt)
+    if items:
+        story.append(ListFlowable(
+            [ListItem(_para(it, s['Normal']), leftIndent=10, value='–') for it in items],
+            bulletType='bullet'
+        ))
+    else:
+        story.append(_para(roadmap_html, s['Normal']))
+    story.append(PageBreak())
+
+    # SEO AUDIT (if present)
     if seo_audit:
-        story.append(PageBreak())
-        story.append(Paragraph(f"SEO Audit Results for {seo_audit.get('domain')}", styles['TitleBold']))
-        story.append(Spacer(1, 10))
-        story.append(Paragraph(
-            f"The SEO score for this website is <b>{seo_audit.get('seo_score')}</b> out of 100. "
-            f"We found <b>{seo_audit.get('critical_issues')}</b> critical issues and "
-            f"<b>{seo_audit.get('minor_issues')}</b> minor issues.", styles['Normal'])
-        )
-        story.append(Spacer(1, 10))
-
-        # Overview
-        story.append(Paragraph("Overview", styles['Section']))
-        story.append(Paragraph(seo_audit.get("overview_text", ""), styles['Normal']))
+        story.append(_para(f"SEO Audit Results for {seo_audit.get('domain')}", s['ReportTitle']))
+        story.append(Spacer(1, 6))
+        story.append(KeepTogether([
+            _para("Overview", s['SectionTitle']),
+            _para(
+                f"The SEO score for this website is {seo_audit.get('seo_score')}/100. "
+                f"Issues found: {seo_audit.get('critical_issues')} critical, {seo_audit.get('minor_issues')} minor.",
+                s['Normal']
+            ),
+            Spacer(1, 6),
+            _para(seo_audit.get("overview_text", ""), s['Normal'])
+        ]))
         scores = seo_audit.get("section_scores", {})
         overview_table = [["Section", "Score"]]
         for k in ["On-Page SEO", "Technical SEO", "Off-Page SEO", "Social Media"]:
             overview_table.append([k, f"{scores.get(k, 0)}%"])
-        _table(story, overview_table, col_widths=[300, 100], doc=doc)
+        _table(story, overview_table, doc, col_widths=[300, 100], align_right_cols=[1])
         story.append(PageBreak())
 
-        # Issues
-        story.append(Paragraph("Issues and Recommendations", styles['Section']))
+        story.append(_para("Issues and Recommendations", s['SectionTitle']))
         issues = seo_audit.get("issues", [])
         issues_table = [["Type", "Element", "Priority", "Problem / Recommendation"]]
         for item in issues:
-            issues_table.append([item["type"], item["element"], item["priority"], item["message"]])
-        _table(story, issues_table, col_widths=[85, 110, 60, 240], header_bg="#ef4444", doc=doc)
+            issues_table.append([
+                Paragraph(item.get("type",""), s['Normal']),
+                Paragraph(item.get("element",""), s['Normal']),
+                Paragraph(item.get("priority",""), s['Normal']),
+                Paragraph(item.get("message",""), s['Normal'])
+            ])
+        _table(story, issues_table, doc, col_widths=[90, 110, 70, 230], header_bg="#ef4444")
         story.append(PageBreak())
 
-        # On-Page
-        story.append(Paragraph("On-Page SEO", styles['Section']))
+        story.append(_para("On-Page SEO", s['SectionTitle']))
         onp = seo_audit.get("on_page", {})
         onpage_table = [["Element", "Value/Status", "Note"]]
-        onpage_table.append(["URL", onp.get("url", {}).get("value", ""), onp.get("url", {}).get("note", "")])
+        onpage_table.append(["URL", Paragraph(onp.get("url", {}).get("value", ""), s['Normal']),
+                             Paragraph(onp.get("url", {}).get("note", ""), s['Normal'])])
         title = onp.get("title", {})
-        onpage_table.append(["Title", title.get("value", "—"), title.get("note", "")])
+        onpage_table.append(["Title", Paragraph(title.get("value", "—"), s['Normal']),
+                             Paragraph(title.get("note", ""), s['Normal'])])
         md = onp.get("meta_description", {})
-        onpage_table.append(["Meta Description", md.get("value", "Missing"), md.get("note", "")])
+        onpage_table.append(["Meta Description", Paragraph(md.get("value", "Missing"), s['Normal']),
+                             Paragraph(md.get("note", ""), s['Normal'])])
         h1 = onp.get("h1", {})
-        onpage_table.append(["H1", h1.get("value", "Missing"), h1.get("note", "")])
+        onpage_table.append(["H1", Paragraph(h1.get("value", "Missing"), s['Normal']),
+                             Paragraph(h1.get("note", ""), s['Normal'])])
         heads = onp.get("headings", {}).get("structure", {})
-        onpage_table.append(["Heading Structure", f"H2:{heads.get('H2',0)} H3:{heads.get('H3',0)} H4:{heads.get('H4',0)} H5:{heads.get('H5',0)} H6:{heads.get('H6',0)}",
-                             onp.get("headings", {}).get("note","")])
+        onpage_table.append([
+            "Heading Structure",
+            Paragraph(f"H2:{heads.get('H2',0)} H3:{heads.get('H3',0)} H4:{heads.get('H4',0)} H5:{heads.get('H5',0)} H6:{heads.get('H6',0)}", s['Normal']),
+            Paragraph(onp.get("headings", {}).get("note",""), s['Normal'])
+        ])
         imgalt = onp.get("image_alt", {})
-        onpage_table.append(["Image Alt", "All present", imgalt.get("note","")])
-        for c in onp.get("content", []):
-            onpage_table.append(["Content", "—", c.get("note","")])
-        onpage_table.append(["Keyword Density", onp.get("keyword_density","N/A"), "Analyze highest density words & phrases."])
-        _table(story, onpage_table, col_widths=[110, 140, 245], doc=doc)
+        onpage_table.append(["Image Alt", Paragraph("All present", s['Normal']),
+                             Paragraph(imgalt.get("note",""), s['Normal'])])
+        for c in (onp.get("content", []) or []):
+            onpage_table.append(["Content", Paragraph("—", s['Normal']),
+                                 Paragraph(c.get("note",""), s['Normal'])])
+        onpage_table.append(["Keyword Density", Paragraph(str(onp.get("keyword_density","N/A")), s['Normal']),
+                             Paragraph("Analyze highest density words & phrases.", s['Normal'])])
+        _table(story, onpage_table, doc, col_widths=[120, 150, 240])
         story.append(PageBreak())
 
-        # Keyword Rankings
-        story.append(Paragraph("Keyword Rankings", styles['Section']))
+        story.append(_para("Keyword Rankings", s['SectionTitle']))
         kr = seo_audit.get("keyword_rankings", [])
         kr_table = [["Keyword", "Rank", "Traffic %", "Volume", "KD %", "CPC (USD)"]]
         for k in kr:
-            kr_table.append([k["keyword"], k["rank"], k["traffic_pct"], k["volume"], k["kd_pct"], k["cpc_usd"]])
-        _table(story, kr_table, col_widths=[150, 50, 70, 70, 60, 80], doc=doc)
-        story.append(Spacer(1, 10))
+            kr_table.append([Paragraph(k.get("keyword",""), s['Normal']),
+                             k.get("rank", ""),
+                             k.get("traffic_pct", ""),
+                             k.get("volume", ""),
+                             k.get("kd_pct", ""),
+                             k.get("cpc_usd", "")])
+        _table(story, kr_table, doc, col_widths=[150, 50, 70, 70, 60, 80], header_bg="#10b981",
+               center_cols=[1,2,3,4,5])
+        story.append(Spacer(1, 8))
 
-        # Top Pages
-        story.append(Paragraph("Top Pages", styles['Section']))
+        story.append(_para("Top Pages", s['SubTitle']))
         tp = seo_audit.get("top_pages", [])
         tp_table = [["URL", "Traffic %", "Keywords", "Ref Dom", "Backlinks"]]
         for p in tp:
-            tp_table.append([p["url"], p["traffic_pct"], p["keywords"], p["ref_domains"], p["backlinks"]])
-        _table(story, tp_table, col_widths=[220, 60, 60, 75, 80], doc=doc)
+            tp_table.append([
+                _link(p.get("url",""), p.get("url",""), s['Normal']),
+                p.get("traffic_pct",""),
+                p.get("keywords",""),
+                p.get("ref_domains",""),
+                p.get("backlinks","")
+            ])
+        _table(story, tp_table, doc, col_widths=[240, 60, 70, 70, 70], header_bg="#10b981",
+               center_cols=[1,2,3,4])
         story.append(PageBreak())
 
-        # Technical
-        story.append(Paragraph("Technical SEO", styles['Section']))
+        story.append(_para("Technical SEO", s['SectionTitle']))
         tech = seo_audit.get("technical", [])
         tech_table = [["Element", "Priority", "Value", "Recommendation"]]
         for t in tech:
-            tech_table.append([t.get("element",""), t.get("priority",""), t.get("value","—"), t.get("note","")])
-        _table(story, tech_table, col_widths=[120, 80, 90, 205], doc=doc)
+            tech_table.append([
+                Paragraph(t.get("element",""), s['Normal']),
+                Paragraph(t.get("priority",""), s['Normal']),
+                Paragraph(str(t.get("value","—")), s['Normal']),
+                Paragraph(t.get("note",""), s['Normal'])
+            ])
+        _table(story, tech_table, doc, col_widths=[140, 90, 120, 200], header_bg="#0f172a")
         story.append(PageBreak())
 
-        # Page Performance
-        story.append(Paragraph("Page Performance & Core Web Vitals", styles['Section']))
+        story.append(_para("Page Performance & Core Web Vitals", s['SectionTitle']))
         pp = seo_audit.get("page_performance", [])
         pp_table = [["Element", "Priority", "Note"]]
         for p in pp:
-            pp_table.append([p.get("element",""), p.get("priority",""), p.get("note","")])
-        _table(story, pp_table, col_widths=[180, 70, 245], header_bg="#f59e0b", doc=doc)
+            pp_table.append([
+                Paragraph(p.get("element",""), s['Normal']),
+                Paragraph(p.get("priority",""), s['Normal']),
+                Paragraph(p.get("note",""), s['Normal'])
+            ])
+        _table(story, pp_table, doc, col_widths=[200, 80, 240], header_bg="#f59e0b")
         story.append(PageBreak())
 
-        # Competitors (Basic List)
-        story.append(Paragraph("Competitors (Basic List)", styles['Section']))
+        story.append(_para("Competitors (Basic List)", s['SectionTitle']))
         comp = seo_audit.get("competitors", [])
         comp_table = [["Competitor", "Common Keywords", "Competition Level"]]
         for c in comp:
-            comp_table.append([c["competitor"], c["common_keywords"], c["competition_level"]])
-        _table(story, comp_table, col_widths=[220, 140, 120], header_bg="#64748b", doc=doc)
+            comp_table.append([Paragraph(c.get("competitor",""), s['Normal']),
+                               c.get("common_keywords",""),
+                               c.get("competition_level","")])
+        _table(story, comp_table, doc, col_widths=[220, 140, 120], header_bg="#64748b",
+               center_cols=[1,2])
         story.append(PageBreak())
 
-        # ===== Competitor Analysis (4 Types) =====
-        ca = None
-        if seo_audit:
-            ca = seo_audit.get("competitor_analysis") or seo_audit.get("competator_analysis")
+        ca = seo_audit.get("competitor_analysis") or seo_audit.get("competator_analysis")
         types = (ca or {}).get("types", [])
         if types:
-            story.append(Paragraph("Competitor Analysis (4 Types)", styles['TitleBold']))
-            story.append(Spacer(1, 10))
+            story.append(_para("Competitor Analysis (4 Types)", s['ReportTitle']))
+            story.append(Spacer(1, 6))
             for t in types:
-                story.append(Paragraph(t.get("type", "Type"), styles['Section']))
-                story.append(Paragraph(t.get("description", ""), styles['Muted']))
+                block = []
+                block.append(_para(t.get("type", "Type"), s['SectionTitle']))
+                block.append(_para(t.get("description", ""), s['NormalGrey']))
                 ca_table = [["Domain", "Label", "Channel", "Common Keywords", "Competition Level"]]
                 for x in t.get("competitors", []):
                     ca_table.append([
-                        x.get("domain",""),
-                        x.get("label",""),
-                        x.get("channel",""),
+                        _link(x.get("domain",""), f"https://{x.get('domain','')}", s['Normal']),
+                        Paragraph(x.get("label",""), s['Normal']),
+                        Paragraph(x.get("channel",""), s['Normal']),
                         x.get("common_keywords",""),
                         x.get("competition_level","")
                     ])
-                _table(story, ca_table, col_widths=[120, 100, 80, 80, 80], header_bg="#0ea5e9", doc=doc)
-                story.append(Spacer(1, 10))
+                block.append(Spacer(1, 4))
+                story.append(KeepTogether(block))
+                _table(story, ca_table, doc, col_widths=[140, 110, 90, 80, 80], header_bg="#0ea5e9",
+                       center_cols=[3,4])
+                story.append(Spacer(1, 8))
             story.append(PageBreak())
 
-        # Off-Page
-        story.append(Paragraph("Off-Page SEO", styles['Section']))
-        story.append(Paragraph(seo_audit.get("off_page", {}).get("message",""), styles['Muted']))
-        story.append(Spacer(1, 10))
+        story.append(_para("Off-Page SEO", s['SectionTitle']))
+        story.append(_para(seo_audit.get("off_page", {}).get("message",""), s['NormalGrey']))
+        story.append(Spacer(1, 8))
 
-        # Top Backlinks
-        story.append(Paragraph("Top Backlinks", styles['SubTitle']))
+        story.append(_para("Top Backlinks", s['SubTitle']))
         bl = seo_audit.get("top_backlinks", [])
         bl_table = [["Page AS", "Source Title", "Source URL", "Anchor", "Target URL", "Rel"]]
         for b in bl:
-            bl_table.append([b["page_as"], b["source_title"], b["source_url"], b.get("anchor",""), b.get("target_url",""), b.get("rel","")])
-        _table(story, bl_table, col_widths=[40, 140, 120, 70, 95, 30], header_bg="#0ea5e9", doc=doc)
+            bl_table.append([
+                b.get("page_as",""),
+                Paragraph(b.get("source_title",""), s['Normal']),
+                _link(b.get("source_url",""), b.get("source_url",""), s['Normal']),
+                Paragraph(b.get("anchor",""), s['Normal']),
+                _link(b.get("target_url",""), b.get("target_url",""), s['Normal']),
+                Paragraph(b.get("rel","") or "", s['Normal'])
+            ])
+        _table(story, bl_table, doc, col_widths=[50, 140, 120, 90, 95, 40], header_bg="#0ea5e9",
+               center_cols=[0,5])
         story.append(PageBreak())
 
-        # Social Media
-        story.append(Paragraph("Social Media", styles['Section']))
+        story.append(_para("Social Media", s['SectionTitle']))
         sm = seo_audit.get("social_media", [])
         sm_table = [["Network", "Priority", "Recommendation"]]
-        for s in sm:
-            sm_table.append([s["network"], s["priority"], s["note"]])
-        _table(story, sm_table, col_widths=[120, 80, 280], header_bg="#a855f7", doc=doc)
+        for srow in sm:
+            sm_table.append([
+                Paragraph(srow.get("network",""), s['Normal']),
+                Paragraph(srow.get("priority",""), s['Normal']),
+                Paragraph(srow.get("note",""), s['Normal'])
+            ])
+        _table(story, sm_table, doc, col_widths=[120, 80, 280], header_bg="#a855f7")
+        story.append(PageBreak())
 
-    # Build doc
+    # Build PDF
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
     buffer.seek(0)
     filename = f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
-    return StreamingResponse(buffer, media_type="application/pdf",
-                             headers={"Content-Disposition": f"attachment; filename={filename}"})
+    return StreamingResponse(
+        buffer, media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # ==================== MAIN ====================
 if __name__ == "__main__":
