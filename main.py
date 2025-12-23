@@ -38,6 +38,7 @@ if not os.path.exists("templates"):
 
 templates = Jinja2Templates(directory="templates")
 
+
 # ==================== CONFIGURATION ====================
 CATEGORIES = ["Performance", "SEO", "UX", "Security"]
 PILLAR_WEIGHTS = {"Performance": 0.45, "SEO": 0.25, "UX": 0.15, "Security": 0.15}
@@ -88,9 +89,9 @@ METRICS_LIST = [
     ("Permissions-Policy Header", "Security"),
 ]
 
-# Extend to exactly 66 meaningful checks
 while len(METRICS_LIST) < 66:
-    METRICS_LIST.append((f"Advanced {CATEGORIES[len(METRICS_LIST) % 4]} Check #{len(METRICS_LIST)+1}", CATEGORIES[len(METRICS_LIST) % 4]))
+    METRICS_LIST.append((f"Advanced {CATEGORIES[len(METRICS_LIST) % 4]} Check #{len(METRICS_LIST)+1}", 
+                         CATEGORIES[len(METRICS_LIST) % 4]))
 
 
 # ==================== REAL AUDIT WITH PLAYWRIGHT ====================
@@ -112,7 +113,6 @@ async def run_real_audit(url: str, mobile: bool) -> Dict:
 
             ttfb = int((time.time() - start_time) * 1000)
 
-            # Real Core Web Vitals approximation + resource summary
             metrics_js = await page.evaluate("""() => {
                 const paint = performance.getEntriesByType('paint');
                 const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
@@ -159,14 +159,14 @@ async def run_real_audit(url: str, mobile: bool) -> Dict:
 # ==================== SCORING & ROADMAP GENERATION ====================
 def generate_audit_results(audit_data: Dict, soup: BeautifulSoup) -> Dict:
     perf = audit_data
-    headers = perf["headers"]
+    headers = perf.get("headers", {})
 
     metrics = []
     pillar_scores = {cat: [] for cat in CATEGORIES}
-    low_score_issues = []  # For roadmap
+    low_score_issues = []
 
     for i, (name, category) in enumerate(METRICS_LIST, 1):
-        score = 90  # Base high, deduct for real issues
+        score = 90
 
         if category == "Performance":
             if "LCP" in name:
@@ -206,7 +206,7 @@ def generate_audit_results(audit_data: Dict, soup: BeautifulSoup) -> Dict:
             elif "Favicon" in name:
                 score = 100 if soup.find("link", rel=["icon", "shortcut icon"]) else 40
             elif "Mobile-Friendly" in name:
-                score = 95  # Playwright viewport simulates, assume good if loaded
+                score = 95
 
         elif category == "Security":
             if "HTTPS" in name:
@@ -235,30 +235,11 @@ def generate_audit_results(audit_data: Dict, soup: BeautifulSoup) -> Dict:
     pillar_avg = {cat: round(sum(scores)/len(scores)) if scores else 100 for cat, scores in pillar_scores.items()}
     total_grade = round(sum(pillar_avg[cat] * PILLAR_WEIGHTS[cat] for cat in CATEGORIES))
 
-    # Generate ~300-word roadmap
-    roadmap = """
-    <b>Website Improvement Roadmap (Prioritized Action Plan)</b><br/><br/>
-    Based on the audit, here are the top recommendations to improve your site's health score:<br/><br/>
-    """
+    roadmap = "<b>Website Improvement Roadmap (Prioritized Action Plan)</b><br/><br>"
     high = [i for i in low_score_issues if i["priority"] == "High"][:8]
     med = [i for i in low_score_issues if i["priority"] == "Medium"][:6]
-
-    roadmap += "<b>High Priority (Implement Immediately):</b><ul>"
-    for item in high:
-        roadmap += f"<li>{item['issue']}: {item['recommendation']}</li>"
-    roadmap += "</ul><br/>"
-
-    roadmap += "<b>Medium Priority (Next 30 Days):</b><ul>"
-    for item in med:
-        roadmap += f"<li>{item['issue']}: {item['recommendation']}</li>"
-    roadmap += "</ul><br/>"
-
-    roadmap += """
-    <b>Expected Impact:</b> Addressing high-priority issues can increase your overall health score by 20-40%. 
-    Focus on Core Web Vitals first for biggest Performance gains. Then optimize on-page SEO elements. 
-    Finally, add missing security headers. Re-audit after 4-6 weeks to measure progress.<br/><br/>
-    Total word count: ~290
-    """
+    roadmap += "<b>High Priority:</b><ul>" + "".join([f"<li>{i['issue']}: {i['recommendation']}</li>" for i in high]) + "</ul>"
+    roadmap += "<b>Medium Priority:</b><ul>" + "".join([f"<li>{i['issue']}: {i['recommendation']}</li>" for i in med]) + "</ul>"
 
     summary = (f"LCP {perf['lcp']}ms • FCP {perf['fcp']}ms • TTFB {perf['ttfb']}ms • "
                f"CLS {perf['cls']} • Weight {perf['page_weight_kb']}KB")
@@ -287,13 +268,11 @@ async def audit(request: Request):
 
         if not raw_url:
             raise HTTPException(400, "URL required")
-
         if not raw_url.startswith(("http://", "https://")):
             raw_url = "https://" + raw_url
 
         audit_data = await run_real_audit(raw_url, mode)
         soup = BeautifulSoup(audit_data["html"], "html.parser")
-
         results = generate_audit_results(audit_data, soup)
 
         return {
@@ -312,9 +291,8 @@ async def audit(request: Request):
 async def download_pdf(request: Request):
     try:
         data = await request.json()
-        audit_results = generate_audit_results({"final_url": data["url"]}, BeautifulSoup("", "html.parser"))  # Dummy for roadmap only
-        # But use real metrics from payload
         metrics = data.get("metrics", [])
+        audit_results = generate_audit_results({"final_url": data["url"], **data}, BeautifulSoup("", "html.parser"))
 
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=60, bottomMargin=50)
@@ -335,39 +313,37 @@ async def download_pdf(request: Request):
 
         # Pillar scores
         story.append(Paragraph("Pillar Scores", styles['Section']))
-        pillar_data = [["Pillar", "Score"]]
-        for cat, score in data.get("pillars", {}).items():
-            pillar_data.append([cat, f"{score}%"])
+        pillar_data = [["Pillar", "Score"]] + [[cat, f"{score}%"] for cat, score in data.get("pillars", {}).items()]
         t = Table(pillar_data, colWidths=[300, 100])
-        t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
-                               ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-                               ('GRID', (0,0), (-1,-1), 1, colors.grey)]))
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('GRID', (0,0), (-1,-1), 1, colors.grey)
+        ]))
         story.append(t)
         story.append(Spacer(1, 30))
 
-        # Detailed diagnostics table
+        # Detailed diagnostics
         story.append(Paragraph("Detailed Diagnostic Checkpoints", styles['Section']))
-        table_data = [["#", "Checkpoint", "Category", "Score"]]
-        for m in metrics:
-            table_data.append([str(m['no']), m['name'], m['category'], f"{m['score']}%"])
+        table_data = [["#", "Checkpoint", "Category", "Score"]] + [[str(m['no']), m['name'], m['category'], f"{m['score']}%"] for m in metrics]
         dt = Table(table_data, colWidths=[40, 250, 100, 80])
-        dt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor("#10b981")),
-                                ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-                                ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-                                ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#1e293b")),
-                                ('TEXTCOLOR', (0,1), (-1,-1), colors.white)]))
+        dt.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#10b981")),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#1e293b")),
+            ('TEXTCOLOR', (0,1), (-1,-1), colors.white)
+        ]))
         story.append(dt)
-
         story.append(PageBreak())
 
-        # 300-word Improvement Roadmap
+        # Roadmap
         story.append(Paragraph("Improvement Roadmap", styles['TitleBold']))
         story.append(Spacer(1, 20))
         story.append(Paragraph(audit_results["roadmap"], styles['Normal']))
 
         doc.build(story)
         buffer.seek(0)
-
         filename = f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
         return StreamingResponse(buffer, media_type="application/pdf",
                                  headers={"Content-Disposition": f"attachment; filename={filename}"})
