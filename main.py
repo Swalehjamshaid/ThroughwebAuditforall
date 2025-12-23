@@ -3,7 +3,7 @@ import time
 import io
 import os
 from typing import Dict, List, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin  # Import urljoin here
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
@@ -65,7 +65,7 @@ METRICS: List[Tuple[str, str]] = [
 while len(METRICS) < 66:
     METRICS.append((f"Advanced Metric {len(METRICS)+1}", "SEO"))
 
-# ==================== STRICT & REALISTIC SCORING ====================
+# ==================== STRICT SCORING ====================
 def score_strict(val: float, good: float, acceptable: float) -> int:
     if val <= good: return 100
     if val <= acceptable: return 60
@@ -94,12 +94,14 @@ async def browser_audit(url: str, mobile: bool = False):
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
+                    "--ignore-certificate-errors",  # Bypass SSL errors
                     "--disable-blink-features=AutomationControlled"
                 ]
             )
             context = await browser.new_context(
                 viewport={"width": 390, "height": 844} if mobile else {"width": 1366, "height": 768},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36",
+                ignore_https_errors=True  # Key fix for bad certs
             )
             await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => false});")
 
@@ -108,7 +110,7 @@ async def browser_audit(url: str, mobile: bool = False):
 
             try:
                 response = await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-            except:
+            except Exception as e:
                 response = None
 
             ttfb = (time.time() - start) * 1000
@@ -125,13 +127,7 @@ async def browser_audit(url: str, mobile: bool = False):
                         .reduce((a, t) => a + Math.max(0, t.duration - 50), 0);
                     const fcp = p.find(e => e.name === 'first-contentful-paint')?.startTime || 9999;
                     const lcp = l[l.length - 1]?.startTime || 9999;
-                    return {
-                        fcp,
-                        lcp,
-                        cls: s,
-                        tbt: t,
-                        domCount: document.querySelectorAll('*').length
-                    };
+                    return {fcp, lcp, cls: s, tbt: t, domCount: document.querySelectorAll('*').length};
                 }
             """)
 
@@ -156,14 +152,13 @@ async def audit(request: Request):
 
         ttfb, perf, html, headers = await browser_audit(url, mobile)
 
-        # Graceful fallback for blocked/failed audits
         if perf["lcp"] > 9000 or len(html) < 500:
             return {
                 "url": url,
                 "total_grade": 35,
                 "pillars": {"Performance": 20, "SEO": 50, "UX": 40, "Security": 30},
                 "metrics": [{"no": i, "name": n, "category": c, "score": 30} for i, (n, c) in enumerate(METRICS, 1)],
-                "summary": "Audit blocked (anti-bot protection, login required, or timeout). Estimated low score.",
+                "summary": "Audit blocked (anti-bot, bad SSL, login, or timeout). Estimated low score.",
                 "audited_at": time.strftime("%Y-%m-%d %H:%M")
             }
 
@@ -173,7 +168,6 @@ async def audit(request: Request):
         resources = len(soup.find_all(["img", "script", "link", "style", "iframe"]))
         weight_kb = len(html.encode()) / 1024
 
-        # Strict scoring
         scores = {
             "Largest Contentful Paint (ms)": score_strict(perf["lcp"], 1500, 2500),
             "Cumulative Layout Shift": score_strict(perf["cls"], 0.05, 0.1),
@@ -228,17 +222,16 @@ async def audit(request: Request):
         }
 
     except Exception as e:
-        # Ultimate fallback
         return {
             "url": raw_url or "unknown",
             "total_grade": 30,
             "pillars": {"Performance": 20, "SEO": 40, "UX": 30, "Security": 20},
             "metrics": [{"no": i, "name": n, "category": c, "score": 20} for i, (n, c) in enumerate(METRICS, 1)],
-            "summary": "Audit failed - likely private page or anti-bot protection.",
+            "summary": f"Audit failed: {str(e)}",
             "audited_at": time.strftime("%Y-%m-%d %H:%M")
         }
 
-# ==================== PDF REPORT ====================
+# ==================== PDF ====================
 @app.post("/download")
 async def download_pdf(request: Request):
     try:
