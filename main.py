@@ -3,8 +3,6 @@ import time
 import io
 import os
 from typing import List, Dict
-from urllib.parse import urlparse
-
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from bs4 import BeautifulSoup
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
@@ -22,8 +20,7 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
 
-# ================= FastAPI App =================
-app = FastAPI(title="FF TECH ELITE v2.3 - Real Audit Edition")
+app = FastAPI(title="FF TECH ELITE v3.0 - PDF Fix Edition")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,69 +31,66 @@ app.add_middleware(
 
 if not os.path.exists("templates"):
     os.makedirs("templates")
+
 templates = Jinja2Templates(directory="templates")
 
-# ================= Configuration =================
+# ==================== CONFIGURATION ====================
 CATEGORIES = ["Performance", "SEO", "UX", "Security"]
-PILLAR_WEIGHTS = {"Performance": 0.45, "SEO": 0.25, "UX": 0.15, "Security": 0.15}
+PILLAR_WEIGHTS = {"Performance": 0.4, "SEO": 0.3, "UX": 0.2, "Security": 0.1}
 
-# ---------------- Metrics List ----------------
+# Metric name, category, weight (1=minor, 3=important, 5=critical)
 METRICS_LIST = [
-    ("Largest Contentful Paint (LCP)", "Performance"),
-    ("First Contentful Paint (FCP)", "Performance"),
-    ("Time to First Byte (TTFB)", "Performance"),
-    ("Cumulative Layout Shift (CLS)", "Performance"),
-    ("Total Blocking Time (TBT)", "Performance"),
-    ("Page Weight (KB)", "Performance"),
-    ("Number of Requests", "Performance"),
-    ("Image Optimization", "Performance"),
-    ("JavaScript Minification", "Performance"),
-    ("Font Display Strategy", "Performance"),
+    ("Largest Contentful Paint (LCP)", "Performance", 5),
+    ("First Contentful Paint (FCP)", "Performance", 5),
+    ("Time to First Byte (TTFB)", "Performance", 5),
+    ("Cumulative Layout Shift (CLS)", "Performance", 5),
+    ("Total Blocking Time (TBT)", "Performance", 3),
+    ("Page Weight (KB)", "Performance", 3),
+    ("Number of Requests", "Performance", 3),
+    ("Image Optimization", "Performance", 3),
+    ("JavaScript Minification", "Performance", 2),
+    ("Font Display Strategy", "Performance", 2),
 
-    ("Page Title (Length & Quality)", "SEO"),
-    ("Meta Description (Length & Quality)", "SEO"),
-    ("Canonical Tag Present", "SEO"),
-    ("H1 Tag Unique & Present", "SEO"),
-    ("Heading Structure (H2-H6)", "SEO"),
-    ("Image Alt Attributes", "SEO"),
-    ("Robots Meta Tag", "SEO"),
-    ("Open Graph Tags", "SEO"),
-    ("Structured Data (Schema.org)", "SEO"),
-    ("Internal Links Quality", "SEO"),
+    ("Page Title (Length & Quality)", "SEO", 5),
+    ("Meta Description (Length & Quality)", "SEO", 5),
+    ("Canonical Tag Present", "SEO", 3),
+    ("H1 Tag Unique & Present", "SEO", 3),
+    ("Heading Structure (H2-H6)", "SEO", 2),
+    ("Image Alt Attributes", "SEO", 3),
+    ("Robots Meta Tag", "SEO", 2),
+    ("Open Graph Tags", "SEO", 2),
+    ("Structured Data (Schema.org)", "SEO", 3),
+    ("Internal Links Quality", "SEO", 2),
 
-    ("Viewport Meta Tag", "UX"),
-    ("Mobile-Friendly Design", "UX"),
-    ("Tap Target Spacing", "UX"),
-    ("Readable Font Sizes", "UX"),
-    ("Color Contrast Ratio", "UX"),
-    ("Favicon Present", "UX"),
-    ("No Console Errors", "UX"),
-    ("Fast Interactivity", "UX"),
-    ("Touch Icons", "UX"),
-    ("Error Messages Clear", "UX"),
+    ("Viewport Meta Tag", "UX", 3),
+    ("Mobile-Friendly Design", "UX", 5),
+    ("Tap Target Spacing", "UX", 2),
+    ("Readable Font Sizes", "UX", 2),
+    ("Color Contrast Ratio", "UX", 2),
+    ("Favicon Present", "UX", 1),
+    ("No Console Errors", "UX", 3),
+    ("Fast Interactivity", "UX", 3),
+    ("Touch Icons", "UX", 1),
+    ("Error Messages Clear", "UX", 1),
 
-    ("HTTPS Enforced", "Security"),
-    ("HSTS Header", "Security"),
-    ("Content-Security-Policy Header", "Security"),
-    ("X-Frame-Options Header", "Security"),
-    ("X-Content-Type-Options Header", "Security"),
-    ("Referrer-Policy Header", "Security"),
-    ("No Mixed Content", "Security"),
-    ("Secure Cookies", "Security"),
-    ("Vulnerable JS Libraries", "Security"),
-    ("Permissions-Policy Header", "Security"),
+    ("HTTPS Enforced", "Security", 5),
+    ("HSTS Header", "Security", 3),
+    ("Content-Security-Policy Header", "Security", 5),
+    ("X-Frame-Options Header", "Security", 3),
+    ("X-Content-Type-Options Header", "Security", 3),
+    ("Referrer-Policy Header", "Security", 2),
+    ("No Mixed Content", "Security", 3),
+    ("Secure Cookies", "Security", 3),
+    ("Vulnerable JS Libraries", "Security", 5),
+    ("Permissions-Policy Header", "Security", 2),
 ]
 
-# Extend to 66 metrics
-while len(METRICS_LIST) < 66:
-    METRICS_LIST.append((f"Advanced {CATEGORIES[len(METRICS_LIST)%4]} Check #{len(METRICS_LIST)+1}", CATEGORIES[len(METRICS_LIST)%4]))
-
-# ================= Real Audit Function =================
+# ==================== REAL AUDIT FUNCTION ====================
 async def run_real_audit(url: str, mobile: bool) -> Dict:
     if not PLAYWRIGHT_AVAILABLE:
         raise RuntimeError("Playwright not installed.")
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox","--disable-setuid-sandbox"])
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         viewport = {"width": 390, "height": 844} if mobile else {"width": 1366, "height": 768}
         context = await browser.new_context(viewport=viewport)
         page = await context.new_page()
@@ -105,25 +99,34 @@ async def run_real_audit(url: str, mobile: bool) -> Dict:
             response = await page.goto(url, wait_until="networkidle", timeout=60000)
             if not response or response.status >= 400:
                 raise Exception(f"Page failed to load (status: {response.status if response else 'None'})")
-            ttfb = int((time.time()-start_time)*1000)
+            ttfb = int((time.time() - start_time) * 1000)
             metrics_js = await page.evaluate("""() => {
                 const paint = performance.getEntriesByType('paint');
                 const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
                 const resources = performance.getEntriesByType('resource');
-                const fcp = paint.find(e=>e.name==='first-contentful-paint')?.startTime || 0;
-                const lcp = lcpEntries[lcpEntries.length-1]?.startTime || 0;
-                let totalSize = 0; resources.forEach(r=>{if(r.transferSize) totalSize+=r.transferSize;});
-                return { fcp: Math.round(fcp), lcp: Math.round(lcp), totalBytes: totalSize, requestCount: resources.length, cls: performance.getEntriesByType('layout-shift').filter(e=>!e.hadRecentInput).reduce((sum,e)=>sum+e.value,0) };
+                const fcp = paint.find(e => e.name === 'first-contentful-paint')?.startTime || 0;
+                const lcp = lcpEntries[lcpEntries.length - 1]?.startTime || 0;
+                let totalSize = 0;
+                resources.forEach(r => { if (r.transferSize) totalSize += r.transferSize; });
+                return {
+                    fcp: Math.round(fcp),
+                    lcp: Math.round(lcp),
+                    totalBytes: totalSize,
+                    requestCount: resources.length,
+                    cls: performance.getEntriesByType('layout-shift')
+                        .filter(e => !e.hadRecentInput)
+                        .reduce((sum, e) => sum + e.value, 0)
+                };
             }""")
             html = await page.content()
-            headers = {k.lower(): v for k,v in response.headers.items()}
+            headers = {k.lower(): v for k, v in response.headers.items()}
             await browser.close()
             return {
                 "ttfb": ttfb,
                 "fcp": metrics_js["fcp"],
                 "lcp": metrics_js["lcp"],
-                "cls": round(metrics_js["cls"],3),
-                "page_weight_kb": round(metrics_js["totalBytes"]/1024),
+                "cls": round(metrics_js["cls"], 3),
+                "page_weight_kb": round(metrics_js["totalBytes"] / 1024),
                 "request_count": metrics_js["requestCount"],
                 "html": html,
                 "headers": headers,
@@ -133,7 +136,7 @@ async def run_real_audit(url: str, mobile: bool) -> Dict:
             await browser.close()
             raise e
 
-# ================= Scoring with Weighted Formula =================
+# ==================== AUDIT SCORING ====================
 def generate_audit_results(audit_data: Dict, soup: BeautifulSoup) -> Dict:
     perf = audit_data
     headers = perf.get("headers", {})
@@ -141,137 +144,117 @@ def generate_audit_results(audit_data: Dict, soup: BeautifulSoup) -> Dict:
     pillar_scores = {cat: [] for cat in CATEGORIES}
     low_score_issues = []
 
-    for i,(name,category) in enumerate(METRICS_LIST,1):
+    for i, (name, category, weight) in enumerate(METRICS_LIST, 1):
         score = 90
+        if category == "Performance":
+            if "LCP" in name: score = 100 if perf["lcp"] <= 2500 else 50
+            elif "FCP" in name: score = 100 if perf["fcp"] <= 1800 else 50
+            elif "TTFB" in name: score = 100 if perf["ttfb"] <= 800 else 50
+            elif "CLS" in name: score = 100 if perf["cls"] <= 0.1 else 50
+        elif category == "SEO":
+            if "Title" in name: score = 100 if soup.title else 30
+            elif "Meta Description" in name: score = 100 if soup.find("meta", {"name": "description"}) else 30
+        elif category == "UX":
+            if "Viewport" in name: score = 100 if soup.find("meta", {"name": "viewport"}) else 30
+        elif category == "Security":
+            if "HTTPS" in name: score = 100 if perf["final_url"].startswith("https://") else 0
 
-        # Critical metrics get higher weight in scoring
-        if category=="Performance":
-            if "LCP" in name: score = 100 if perf["lcp"]<=2500 else (60 if perf["lcp"]<=4000 else 20)
-            elif "FCP" in name: score = 100 if perf["fcp"]<=1800 else (60 if perf["fcp"]<=3000 else 20)
-            elif "TTFB" in name: score = 100 if perf["ttfb"]<=800 else (50 if perf["ttfb"]<=1800 else 20)
-            elif "CLS" in name: score = 100 if perf["cls"]<=0.1 else (60 if perf["cls"]<=0.25 else 20)
-        elif category=="SEO":
-            if "Title" in name:
-                title = soup.title.string.strip() if soup.title and soup.title.string else ""
-                score = 100 if title and 30<=len(title)<=60 else 30
-            elif "Meta Description" in name:
-                meta = soup.find("meta",attrs={"name":"description"})
-                desc = meta["content"].strip() if meta and meta.get("content") else ""
-                score = 100 if desc and 120<=len(desc)<=158 else 30
-        elif category=="UX":
-            if "Viewport" in name: score=100 if soup.find("meta",attrs={"name":"viewport"}) else 0
-        elif category=="Security":
-            if "HTTPS" in name: score=100 if perf["final_url"].startswith("https://") else 0
-
-        score = max(0,min(100,int(score)))
-        # Intentional weighted formula
-        if category=="Performance": score = int(score*1.3)
-        elif category=="SEO": score = int(score*1.2)
-        elif category=="UX": score = int(score*1.1)
-        elif category=="Security": score = int(score*1.25)
-        score = min(score,100)
-
-        metrics.append({"no":i,"name":name,"category":category,"score":score})
+        # Apply weighted scoring
+        score = max(0, min(100, int(score * (weight/5))))
+        metrics.append({"no": i, "name": name, "category": category, "score": score})
         pillar_scores[category].append(score)
+        if score < 80: low_score_issues.append({"issue": name, "score": score})
 
-        if score<80:
-            low_score_issues.append({"issue":name,"priority":"High" if score<50 else "Medium","recommendation":f"Improve {name} for {category}"})
+    pillar_avg = {cat: round(sum(scores)/len(scores)) if scores else 100 for cat, scores in pillar_scores.items()}
+    total_grade = round(sum(pillar_avg[cat] * PILLAR_WEIGHTS[cat] for cat in CATEGORIES))
 
-    pillar_avg = {cat: round(sum(scores)/len(scores)) if scores else 100 for cat,scores in pillar_scores.items()}
-    total_grade = round(sum(pillar_avg[cat]*PILLAR_WEIGHTS[cat] for cat in CATEGORIES))
-    summary = f"LCP {perf.get('lcp',0)}ms • FCP {perf.get('fcp',0)}ms • TTFB {perf.get('ttfb',0)}ms • CLS {perf.get('cls',0)} • Weight {perf.get('page_weight_kb',0)}KB"
+    # Roadmap
+    roadmap = "<b>Website Improvement Roadmap</b><br><ul>"
+    for item in low_score_issues[:20]:
+        roadmap += f"<li>{item['issue']}: Improve to increase score.</li>"
+    roadmap += "</ul>"
 
-    roadmap = "<b>Website Improvement Roadmap</b><br/><ul>"
-    for item in low_score_issues[:10]:
-        roadmap += f"<li>{item['issue']}: {item['recommendation']}</li>"
-    roadmap += "</ul><br/>Expected impact: Fixing critical metrics will improve total grade by 20-40%."
+    summary = f"LCP {perf['lcp']}ms • FCP {perf['fcp']}ms • TTFB {perf['ttfb']}ms • CLS {perf['cls']} • Weight {perf['page_weight_kb']}KB"
+    return {"metrics": metrics, "pillar_avg": pillar_avg, "total_grade": total_grade, "summary": summary, "roadmap": roadmap}
 
-    return {"metrics":metrics,"pillar_avg":pillar_avg,"total_grade":total_grade,"summary":summary,"roadmap":roadmap}
-
-# ================= Endpoints =================
+# ==================== ENDPOINTS ====================
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/audit")
 async def audit(request: Request):
-    data = await request.json()
-    raw_url = data.get("url","").strip()
-    mode = data.get("mode","desktop")=="mobile"
-    if not raw_url: raise HTTPException(400,"URL required")
-    if not raw_url.startswith(("http://","https://")): raw_url="https://"+raw_url
-    audit_data = await run_real_audit(raw_url,mode)
-    soup = BeautifulSoup(audit_data["html"],"html.parser")
-    results = generate_audit_results(audit_data,soup)
-    return {
-        "url":audit_data["final_url"],
-        "total_grade":results["total_grade"],
-        "pillars":results["pillar_avg"],
-        "metrics":results["metrics"],
-        "summary":results["summary"],
-        "audited_at":time.strftime("%B %d, %Y at %H:%M UTC")
-    }
+    try:
+        data = await request.json()
+        raw_url = data.get("url", "").strip()
+        mobile = data.get("mode", "desktop") == "mobile"
+        if not raw_url: raise HTTPException(400, "URL required")
+        if not raw_url.startswith(("http://","https://")): raw_url = "https://" + raw_url
+        audit_data = await run_real_audit(raw_url, mobile)
+        soup = BeautifulSoup(audit_data["html"], "html.parser")
+        results = generate_audit_results(audit_data, soup)
+        results["url"] = audit_data["final_url"]
+        results["audited_at"] = time.strftime("%B %d, %Y at %H:%M UTC")
+        return results
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 @app.post("/download")
 async def download_pdf(request: Request):
-    data = await request.json()
-    audit_results = generate_audit_results({"final_url":data["url"]},BeautifulSoup("","html.parser"))
-    metrics = data.get("metrics",[])
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer,pagesize=A4,rightMargin=50,leftMargin=50,topMargin=60,bottomMargin=50)
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name='TitleBold', fontSize=20, leading=24, alignment=1, textColor=colors.HexColor("#10b981")))
-    styles.add(ParagraphStyle(name='Section', fontSize=14, leading=18, spaceBefore=20, textColor=colors.HexColor("#f8fafc")))
-    story=[]
-    # Logo placeholder
-    logo_path = "logo.png"
-    if os.path.exists(logo_path): story.append(Image(logo_path,width=150,height=50))
-    story.append(Spacer(1,20))
-    story.append(Paragraph("FF TECH ELITE - Enterprise Web Audit Report",styles['TitleBold']))
-    story.append(Spacer(1,20))
-    story.append(Paragraph(f"<b>Target URL:</b> {data.get('url')}",styles['Normal']))
-    story.append(Paragraph(f"<b>Audit Date:</b> {data.get('audited_at')}",styles['Normal']))
-    story.append(Paragraph(f"<b>Overall Health Score:</b> {data.get('total_grade')}%",styles['Heading1']))
-    story.append(Paragraph(f"<b>Core Metrics Summary:</b> {data.get('summary')}",styles['Normal']))
-    story.append(Spacer(1,30))
+    try:
+        data = await request.json()
+        metrics = data.get("metrics", [])
+        pillar_avg = data.get("pillars", {})
+        total_grade = data.get("total_grade", 0)
+        summary = data.get("summary", "")
+        roadmap = data.get("roadmap", "")
 
-    # Pillar scores
-    story.append(Paragraph("Pillar Scores",styles['Section']))
-    pillar_data=[["Pillar","Score"]]
-    for cat,score in data.get("pillars",{}).items():
-        pillar_data.append([cat,f"{score}%"])
-    t = Table(pillar_data,colWidths=[300,100])
-    t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#0f172a")),
-                           ('TEXTCOLOR',(0,0),(-1,0),colors.white),
-                           ('GRID',(0,0),(-1,-1),1,colors.grey)]))
-    story.append(t)
-    story.append(Spacer(1,30))
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=60, bottomMargin=50)
+        styles = getSampleStyleSheet()
+        styles.add(ParagraphStyle(name='TitleBold', fontSize=18, leading=22, alignment=1, textColor=colors.HexColor("#0f766e")))
+        story = []
+        story.append(Paragraph("FF TECH ELITE - Web Audit Report", styles['TitleBold']))
+        story.append(Spacer(1, 15))
+        story.append(Paragraph(f"<b>URL:</b> {data.get('url','')}", styles['Normal']))
+        story.append(Paragraph(f"<b>Audit Date:</b> {data.get('audited_at','')}", styles['Normal']))
+        story.append(Paragraph(f"<b>Overall Health Score:</b> {total_grade}%", styles['Heading1']))
+        story.append(Paragraph(f"<b>Core Metrics:</b> {summary}", styles['Normal']))
+        story.append(Spacer(1, 15))
 
-    # Detailed metrics
-    story.append(Paragraph("Detailed Diagnostic Checkpoints",styles['Section']))
-    table_data=[["#","Checkpoint","Category","Score"]]
-    for m in metrics:
-        table_data.append([str(m['no']),m['name'],m['category'],f"{m['score']}%"])
-    dt = Table(table_data,colWidths=[40,250,100,80])
-    dt.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#10b981")),
-                            ('TEXTCOLOR',(0,0),(-1,0),colors.black),
-                            ('GRID',(0,0),(-1,-1),0.5,colors.grey),
-                            ('BACKGROUND',(0,1),(-1,-1),colors.HexColor("#1e293b")),
-                            ('TEXTCOLOR',(0,1),(-1,-1),colors.white)]))
-    story.append(dt)
-    story.append(PageBreak())
+        # Pillars table
+        pillar_table = [["Pillar", "Score"]]
+        for k,v in pillar_avg.items(): pillar_table.append([k,f"{v}%"])
+        t = Table(pillar_table, colWidths=[200,100])
+        t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#0f766e")),
+                               ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+                               ('GRID',(0,0),(-1,-1),0.5,colors.grey)]))
+        story.append(t)
+        story.append(Spacer(1,15))
 
-    # Roadmap
-    story.append(Paragraph("Improvement Roadmap",styles['TitleBold']))
-    story.append(Spacer(1,20))
-    story.append(Paragraph(audit_results["roadmap"],styles['Normal']))
+        # Metrics table
+        table_data = [["#", "Metric","Category","Score"]]
+        for m in metrics: table_data.append([str(m['no']), m['name'], m['category'], f"{m['score']}%"])
+        mt = Table(table_data, colWidths=[30,250,100,80])
+        mt.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#14b8a6")),
+                                ('TEXTCOLOR',(0,0),(-1,0),colors.black),
+                                ('GRID',(0,0),(-1,-1),0.5,colors.grey),
+                                ('BACKGROUND',(0,1),(-1,-1),colors.HexColor("#e0f2f1")),
+                                ('TEXTCOLOR',(0,1),(-1,-1),colors.black)]))
+        story.append(mt)
+        story.append(PageBreak())
 
-    doc.build(story)
-    buffer.seek(0)
-    filename=f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
-    return StreamingResponse(buffer,media_type="application/pdf",headers={"Content-Disposition":f"attachment; filename={filename}"})
+        story.append(Paragraph("Improvement Roadmap", styles['TitleBold']))
+        story.append(Spacer(1,15))
+        story.append(Paragraph(roadmap, styles['Normal']))
 
+        doc.build(story)
+        buffer.seek(0)
+        filename = f"FF_ELITE_Audit_{int(time.time())}.pdf"
+        return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
+    except Exception as e:
+        raise HTTPException(500,"PDF generation failed: "+str(e))
 
-if __name__=="__main__":
+if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app,host="0.0.0.0",port=int(os.environ.get("PORT",8080)))
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT",8080)))
