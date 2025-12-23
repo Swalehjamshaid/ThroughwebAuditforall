@@ -79,7 +79,6 @@ BASE_METRICS: List[Tuple[str, str]] = [
     ("No Mixed Content", "Security"),
 ]
 
-# Build exactly 66 metrics
 METRICS = list(BASE_METRICS)
 while len(METRICS) < 66:
     METRICS.append((f"Compliance Check {len(METRICS)+1}", "SEO"))
@@ -103,11 +102,14 @@ def score_percentage(covered: int, total: int) -> int:
 # ==================== BROWSER AUDIT ====================
 async def perform_browser_audit(url: str, mobile: bool = False) -> Tuple[float, Dict, str, Dict[str, str]]:
     if not PLAYWRIGHT_AVAILABLE:
-        # Generic fallback data
         return 800.0, {"fcp":2000,"lcp":2500,"cls":0.05,"tbt":100,"domCount":500}, "<html></html>", {}
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        # Added production flags for Railway/Linux
+        browser = await p.chromium.launch(
+            headless=True, 
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        )
         context = await browser.new_context(
             viewport={"width": 390, "height": 844} if mobile else {"width": 1366, "height": 768},
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" if mobile else None
@@ -118,8 +120,6 @@ async def perform_browser_audit(url: str, mobile: bool = False) -> Tuple[float, 
             start_time = time.time()
             response = await page.goto(url, wait_until="load", timeout=30000)
             ttfb = (time.time() - start_time) * 1000
-            
-            # Wait a bit for metrics to settle
             await asyncio.sleep(1)
             
             perf = await page.evaluate("""
@@ -168,7 +168,6 @@ async def audit(request: Request):
         
         ttfb, perf, html, headers = await perform_browser_audit(url, mode == "mobile")
         
-        # Analysis
         soup = BeautifulSoup(html, "html.parser")
         domain = urlparse(url).netloc
         imgs = soup.find_all("img")
@@ -177,7 +176,6 @@ async def audit(request: Request):
         resources = len(soup.find_all(["img", "script", "link"]))
         weight_kb = len(html.encode('utf-8')) / 1024
 
-        # Scoring Mapping
         score_map = {
             "First Contentful Paint (ms)": score_range(perf["fcp"], 1800, 3000),
             "Largest Contentful Paint (ms)": score_range(perf["lcp"], 2500, 4000),
@@ -196,7 +194,7 @@ async def audit(request: Request):
             "Heading Structure": score_bool(len(soup.find_all(["h1", "h2", "h3"])) > 3),
             "Image ALT Coverage %": score_percentage(alt_count, len(imgs)),
             "Internal Links Count": score_range(internal, 100, 50 if internal < 50 else 200),
-            "External Links Count": 100, # Placeholder
+            "External Links Count": 100, 
             "Structured Data": score_bool(bool(soup.find("script", type="application/ld+json"))),
             "Viewport Meta Tag": score_bool(bool(soup.find("meta", {"name": "viewport"}))),
             "Mobile Responsiveness": score_bool(bool(soup.find("meta", {"name": "viewport"}))),
@@ -216,7 +214,7 @@ async def audit(request: Request):
         results = []
         pillars = {c: [] for c in CATEGORIES}
         for i, (name, cat) in enumerate(METRICS, 1):
-            score = score_map.get(name, 70) # Default 70 for the 66+ generated metrics
+            score = score_map.get(name, 70) 
             results.append({"no": i, "name": name, "category": cat, "score": score})
             pillars[cat].append(score)
 
@@ -240,32 +238,23 @@ async def download_pdf(request: Request):
         data = await request.json()
         pdf = FPDF()
         pdf.add_page()
-        
-        # Title
         pdf.set_font("Arial", "B", 16)
         pdf.cell(0, 10, "Audit Report: " + data['url'], ln=True, align='C')
         pdf.ln(5)
-        
-        # Summary
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, f"Overall Score: {data['total_grade']}%", ln=True)
         pdf.set_font("Arial", "", 10)
         for p, s in data['pillars'].items():
             pdf.cell(0, 8, f"{p}: {s}%", ln=True)
-        
         pdf.ln(5)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, "Detailed Metrics", ln=True)
         pdf.set_font("Arial", "", 8)
-        
-        # Table Header
         pdf.cell(10, 8, "No", 1)
         pdf.cell(110, 8, "Metric", 1)
         pdf.cell(40, 8, "Category", 1)
         pdf.cell(20, 8, "Score", 1, ln=True)
-        
         for m in data['metrics']:
-            # Use latin-1 and ignore errors to prevent emoji crashes
             name = m['name'].encode('latin-1', 'ignore').decode('latin-1')
             pdf.cell(10, 6, str(m['no']), 1)
             pdf.cell(110, 6, name[:60], 1)
@@ -283,4 +272,6 @@ async def download_pdf(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Important: Railway uses the PORT env variable
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
