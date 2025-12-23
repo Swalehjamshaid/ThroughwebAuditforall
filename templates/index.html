@@ -14,55 +14,21 @@
 <style>
 :root { --p: 0deg; }
 body { scroll-behavior: smooth; overflow-x:hidden; font-family: 'Outfit', sans-serif; }
-.bg-grid {
-  background-size: 30px 30px;
-  background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), 
-                    linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
-  position: relative;
-}
-
-/* Particle Background */
-#particles {
-  position: fixed;
-  top:0; left:0; width:100%; height:100%;
-  z-index:0;
-  pointer-events:none;
-}
-
-/* Cinematic Glass Panels */
+.bg-grid { background-size: 30px 30px; background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); position: relative; }
+#particles { position: fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
 .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s; box-shadow: 0 20px 60px rgba(14,165,233,0.15); }
 .dark .glass { background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.05); }
-
-/* Gauge */
-.gauge {
-  width: 180px; height: 180px; border-radius: 50%;
-  background: conic-gradient(from 0deg, #0ea5e9 var(--p), #6366f1 var(--p), #f1f5f9 0);
-  position: relative; display: flex; align-items: center; justify-content: center;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
-  transition: background 1s ease;
-}
-.gauge::after { content: ''; position: absolute; inset: 12px; background: white; border-radius: 50%; z-index:1; }
+.gauge { width:180px; height:180px; border-radius:50%; background: conic-gradient(from 0deg, #0ea5e9 var(--p), #6366f1 var(--p), #f1f5f9 0); position: relative; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 0 20px rgba(0,0,0,0.05); transition: background 1s ease; }
+.gauge::after { content: ''; position:absolute; inset:12px; background:white; border-radius:50%; z-index:1; }
 .dark .gauge::after { background:#0f172a; }
 .gauge-label { z-index:2; font-weight:900; font-size:2.5rem; letter-spacing:-2px; text-shadow:0 0 10px rgba(0,0,0,0.1); }
-
-/* Premium Buttons */
 .btn-shimmer { position: relative; overflow: hidden; background: linear-gradient(90deg, #0ea5e9, #6366f1); color:white; font-weight:bold; text-transform:uppercase; border-radius:1rem; }
-.btn-shimmer::before {
-  content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
-  background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
-  transform: rotate(45deg); animation: shimmer 3s infinite;
-}
+.btn-shimmer::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent); transform: rotate(45deg); animation: shimmer 3s infinite; }
 @keyframes shimmer { 0% { left:-100%; } 100% { left:100%; } }
-
-/* Section transitions */
 section { scroll-margin-top:4rem; opacity:0; transform: translateY(20px); transition: all 1s ease; }
 section.visible { opacity:1; transform: translateY(0); }
-
-/* Hover Effects */
 tr:hover { background: rgba(14,165,233,0.05); transition:0.3s; }
 li:hover { transform: translateX(5px); transition:0.3s; }
-
-/* Roadmap animation */
 .roadmap-item { opacity:0; transform: translateX(-20px); transition: all 0.5s ease; }
 .roadmap-item.visible { opacity:1; transform: translateX(0); }
 </style>
@@ -102,30 +68,27 @@ li:hover { transform: translateX(5px); transition:0.3s; }
         Execute Scan
         <div id="loading" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
       </button>
-      <button id="downloadPdf" disabled class="px-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl hover:bg-slate-50 transition-all disabled:opacity-20">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-      </button>
     </div>
   </div>
-  <p id="status" class="mt-6 font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest"></p>
+  <p id="status" class="mt-6 font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waiting for audit...</p>
 </section>
 
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
   <div class="lg:col-span-4 glass rounded-[2.5rem] p-10 flex flex-col items-center text-center justify-center">
     <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Health Index</h3>
     <div id="gauge" class="gauge mb-10"><div class="gauge-label"><span id="overallScore">0%</span></div></div>
-    <p id="auditedAt" class="font-mono text-[10px] font-bold text-brand-600 mb-2"></p>
-    <p id="summaryText" class="text-sm font-medium text-slate-500 leading-relaxed italic"></p>
+    <p id="auditedAt" class="font-mono text-[10px] font-bold text-brand-600 mb-2">--</p>
+    <p id="summaryText" class="text-sm font-medium text-slate-500 leading-relaxed italic">Audit summary will appear here...</p>
   </div>
   <div class="lg:col-span-8 glass rounded-[2.5rem] p-10">
     <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Core Pillar Distribution</h3>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-      <div class="space-y-3"><p class="text-[10px] font-black text-emerald-500 uppercase">Performance</p><p id="pillPerfVal" class="text-3xl font-black">0%</p><div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div id="pillPerfBar" class="h-full bg-emerald-500 transition-all duration-1000" style="width:0%"></div></div></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-sky-500 uppercase">SEO Strength</p><p id="pillSeoVal" class="text-3xl font-black">0%</p><div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div id="pillSeoBar" class="h-full bg-sky-500 transition-all duration-1000" style="width:0%"></div></div></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-indigo-500 uppercase">UX Design</p><p id="pillUxVal" class="text-3xl font-black">0%</p><div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div id="pillUxBar" class="h-full bg-indigo-500 transition-all duration-1000" style="width:0%"></div></div></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-rose-500 uppercase">Security</p><p id="pillSecVal" class="text-3xl font-black">0%</p><div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div id="pillSecBar" class="h-full bg-rose-500 transition-all duration-1000" style="width:0%"></div></div></div>
+    <canvas id="pillarsChart" class="mb-6"></canvas>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div class="space-y-3"><p class="text-[10px] font-black text-emerald-500 uppercase">Performance</p><p id="pillPerfVal" class="text-3xl font-black">0%</p></div>
+      <div class="space-y-3"><p class="text-[10px] font-black text-sky-500 uppercase">SEO Strength</p><p id="pillSeoVal" class="text-3xl font-black">0%</p></div>
+      <div class="space-y-3"><p class="text-[10px] font-black text-indigo-500 uppercase">UX Design</p><p id="pillUxVal" class="text-3xl font-black">0%</p></div>
+      <div class="space-y-3"><p class="text-[10px] font-black text-rose-500 uppercase">Security</p><p id="pillSecVal" class="text-3xl font-black">0%</p></div>
     </div>
-    <div class="h-[250px]"><canvas id="pillarsChart"></canvas></div>
   </div>
 </div>
 
@@ -143,26 +106,88 @@ li:hover { transform: translateX(5px); transition:0.3s; }
 </section>
 
 <script>
-// Fade-in sections
-const sections=document.querySelectorAll('section');const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');})},{threshold:0.1});sections.forEach(s=>observer.observe(s));
-
 // Particle background
-const canvas=document.getElementById('particles');const ctx=canvas.getContext('2d');canvas.width=window.innerWidth;canvas.height=window.innerHeight;let particles=[];for(let i=0;i<150;i++){particles.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,dx:(Math.random()-0.5)*0.5,dy:(Math.random()-0.5)*0.5})}function animate(){ctx.clearRect(0,0,canvas.width,canvas.height);for(let p of particles){ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(14,165,233,0.15)';ctx.fill();p.x+=p.dx;p.y+=p.dy;if(p.x>canvas.width)p.x=0;if(p.x<0)p.x=canvas.width;if(p.y>canvas.height)p.y=0;if(p.y<0)p.y=canvas.height;}requestAnimationFrame(animate);}animate();window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
+const canvas=document.getElementById('particles');const ctx=canvas.getContext('2d');canvas.width=window.innerWidth;canvas.height=window.innerHeight;let particles=Array.from({length:150},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,dx:(Math.random()-0.5)*0.5,dy:(Math.random()-0.5)*0.5}));function animate(){ctx.clearRect(0,0,canvas.width,canvas.height);particles.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(14,165,233,0.15)';ctx.fill();p.x+=p.dx;p.y+=p.dy;if(p.x>canvas.width)p.x=0;if(p.x<0)p.x=canvas.width;if(p.y>canvas.height)p.y=0;if(p.y<0)p.y=canvas.height;});requestAnimationFrame(animate);}animate();
+window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
 
 // Dark mode toggle
 document.getElementById('toggleDark').addEventListener('click',()=>document.documentElement.classList.toggle('dark'));
 
-// Default URL
-document.getElementById('url').value='https://haier.com.pk';
+// Chart.js setup
+const ctxChart=document.getElementById('pillarsChart').getContext('2d');
+const pillarsChart=new Chart(ctxChart,{
+    type:'bar',
+    data:{labels:['Performance','SEO','UX','Security'], datasets:[{label:'Score %', data:[0,0,0,0], backgroundColor:['#10B981','#0EA5E9','#6366F1','#F43F5E'], borderRadius:6}]},
+    options:{indexAxis:'y', responsive:true, scales:{x:{max:100}}, animation:{duration:500}}
+});
 
-// Animate gauge
-function animateGauge(target){let deg=0;const g=document.getElementById('gauge');const lbl=document.getElementById('overallScore');const step=setInterval(()=>{if(deg>=target*3.6){clearInterval(step);lbl.textContent=`${target}%`}else{deg+=2;g.style.setProperty('--p',`${deg}deg`);lbl.textContent=`${Math.round(deg/3.6)}%`}},15);}
+// Animate gauge & bars progressively
+function animateValue(id,start,end,step=1,interval=15,callback=null){
+    let val=start;
+    const elem=document.getElementById(id);
+    const timer=setInterval(()=>{
+        if(val>=end){clearInterval(timer); elem.textContent=end+'%'; if(callback)callback();} 
+        else { val+=step; elem.textContent=val+'%'; }
+    },interval);
+}
 
-// Animate bar
-function animateBar(barId,valId,target){let val=0;const bar=document.getElementById(barId);const lbl=document.getElementById(valId);const step=setInterval(()=>{if(val>=target){clearInterval(step);lbl.textContent=`${target}%`}else{val++;bar.style.width=`${val}%`;lbl.textContent=`${val}%`}},15);}
+function animateGauge(target){ let deg=0; const g=document.getElementById('gauge'); const lbl=document.getElementById('overallScore'); const step=setInterval(()=>{ if(deg>=target*3.6){ clearInterval(step); lbl.textContent=`${target}%` } else { deg+=2; g.style.setProperty('--p',`${deg}deg`); lbl.textContent=`${Math.round(deg/3.6)}%` }},15);}
 
-// Animate roadmap items
-function animateRoadmap(){const items=document.querySelectorAll('.roadmap-item');items.forEach((it,i)=>{setTimeout(()=>{it.classList.add('visible')},i*200)})}
+// Animate chart bars progressively
+function animateChartBars(targets){
+    let current=[0,0,0,0];
+    const step=setInterval(()=>{
+        let done=true;
+        for(let i=0;i<4;i++){
+            if(current[i]<targets[i]){
+                current[i]+=1;
+                done=false;
+            }
+        }
+        pillarsChart.data.datasets[0].data=current;
+        pillarsChart.update();
+        if(done) clearInterval(step);
+    },20);
+}
+
+// Populate audit with progressive animation
+function populateAudit(data){
+  animateGauge(data.overallScore);
+  animateValue('pillPerfVal',0,data.performance);
+  animateValue('pillSeoVal',0,data.seo);
+  animateValue('pillUxVal',0,data.ux);
+  animateValue('pillSecVal',0,data.security);
+  animateChartBars([data.performance,data.seo,data.ux,data.security]);
+  document.getElementById('auditedAt').textContent=data.auditedAt;
+  document.getElementById('summaryText').textContent=data.summary;
+  const roadmapUl=document.getElementById('roadmapList'); roadmapUl.innerHTML='';
+  data.roadmap.forEach(step=>{ const li=document.createElement('li'); li.className='roadmap-item glass p-4 rounded-xl shadow'; li.textContent=step; roadmapUl.appendChild(li); });
+  document.querySelectorAll('.roadmap-item').forEach((it,i)=>{ setTimeout(()=>{it.classList.add('visible')},i*200) });
+}
+
+// Trigger audit
+document.getElementById('runAudit').addEventListener('click',()=>{
+  const url=document.getElementById('url').value;
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('status').textContent='Audit in progress...';
+
+  fetch(`/audit?url=${encodeURIComponent(url)}`)
+    .then(res=>res.json())
+    .then(data=>{
+      populateAudit(data);
+      document.getElementById('status').textContent='Audit completed!';
+      document.getElementById('loading').classList.add('hidden');
+    })
+    .catch(err=>{
+      console.error(err);
+      document.getElementById('status').textContent='Audit failed!';
+      document.getElementById('loading').classList.add('hidden');
+    });
+});
+
+// Fade-in sections
+document.querySelectorAll('section').forEach(s => new IntersectionObserver(entries => { entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); }) }, {threshold:0.1}).observe(s));
 </script>
+
 </body>
 </html>
