@@ -1,6 +1,5 @@
-fastapi==0.115.6
-uvicorn[standard]==0.22.0
-beautifulsoup4==4.12.3
-fpdf2==2.8.1
-playwright==1.42.1
-aiohttp==3.8.6
+fastapi
+uvicorn[standard]
+beautifulsoup4
+fpdf2
+playwright  # Installs the latest (currently 1.57.0)
