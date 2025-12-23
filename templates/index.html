@@ -3,702 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH ELITE v3 - Enterprise Web Audit</title>
+    <title>FF TECH ELITE v3 | Enterprise Audit Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
-        :root {
-            --color-bg: #0f172a;
-            --color-bg-light: #1e293b;
-            --color-bg-lighter: #334155;
-            --color-border: #475569;
-            --color-text: #e2e8f0;
-            --color-text-muted: #94a3b8;
-            --color-primary: #10b981;
-            --color-accent: #0ea5e9;
-            --color-red: #ef4444;
-            --color-yellow: #f59e0b;
-            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: var(--font-sans);
-            background-color: var(--color-bg);
-            color: var(--color-text);
-            line-height: 1.6;
-            font-size: 16px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem 1rem;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
-        header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: white;
-        }
-
-        header h1 span {
-            color: var(--color-primary);
-        }
-
-        header p {
-            font-size: 1.1rem;
-            color: var(--color-text-muted);
-            margin-top: 0.5rem;
-        }
-
-        .card {
-            background-color: var(--color-bg-light);
-            border-radius: 12px;
-            padding: 2rem;
-            border: 1px solid var(--color-border);
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .input-wrapper {
-            position: relative;
-            width: 100%;
-        }
-
-        .url-input {
-            width: 100%;
-            padding: 1rem 1rem 1rem 2.5rem;
-            background-color: var(--color-bg);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            color: var(--color-text);
-            font-size: 1rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .url-input:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
-        }
-
-        .input-wrapper svg {
-            position: absolute;
-            left: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 20px;
-            height: 20px;
-            color: var(--color-text-muted);
-        }
-
-        .form-controls {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .mode-selector {
-            display: flex;
-            gap: 1rem;
-            background-color: var(--color-bg);
-            padding: 0.5rem;
-            border-radius: 8px;
-            border: 1px solid var(--color-border);
-        }
-
-        .mode-selector label {
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background-color 0.2s, color 0.2s;
-            color: var(--color-text-muted);
-            font-weight: 500;
-        }
-
-        .mode-selector input[type="radio"] {
-            display: none;
-        }
-
-        .mode-selector input[type="radio"]:checked + label {
-            background-color: var(--color-primary);
-            color: white;
-        }
-
-        .btn {
-            padding: 0.8rem 1.8rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary {
-            background-color: var(--color-primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #0f9a74;
-        }
-        
-        .btn-secondary {
-            background-color: var(--color-accent);
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background-color: #0b8ac7;
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .loader {
-            text-align: center;
-            padding: 3rem;
-        }
-
-        .spinner {
-            border: 4px solid var(--color-bg-lighter);
-            border-top: 4px solid var(--color-primary);
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        #results {
-            display: grid;
-            gap: 2rem;
-        }
-
-        .grid-2 {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
-        .score-display {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        .score-circle {
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            display: grid;
-            place-items: center;
-            background: conic-gradient(var(--color-primary) 0deg, var(--color-bg-lighter) 0deg);
-            position: relative;
-            margin-bottom: 1rem;
-        }
-
-        .score-circle::before {
-            content: '';
-            position: absolute;
-            height: 85%;
-            width: 85%;
-            background: var(--color-bg-light);
-            border-radius: 50%;
-        }
-
-        .score-value {
-            position: relative;
-            font-size: 3.5rem;
-            font-weight: 700;
-        }
-
-        .score-label {
-            font-size: 1.2rem;
-            color: var(--color-text-muted);
-        }
-
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--color-border);
-            color: white;
-        }
-
-        .pillar-scores .pillar {
-            margin-bottom: 1rem;
-        }
-
-        .pillar-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-
-        .progress-bar {
-            height: 12px;
-            background-color: var(--color-bg-lighter);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        .progress-bar-inner {
-            height: 100%;
-            border-radius: 6px;
-            transition: width 0.5s ease-in-out;
-        }
-
-        .perf-metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1.5rem;
-        }
-
-        .perf-metric {
-            text-align: center;
-            background: var(--color-bg);
-            padding: 1rem;
-            border-radius: 8px;
-        }
-
-        .perf-metric .value {
-            font-size: 1.75rem;
-            font-weight: 600;
-        }
-
-        .perf-metric .label {
-            font-size: 0.9rem;
-            color: var(--color-text-muted);
-        }
-        
-        .roadmap ul {
-            list-style: none;
-        }
-        
-        .roadmap li {
-            background-color: var(--color-bg);
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-            border-left: 4px solid var(--color-accent);
-        }
-
-        .metrics-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .metrics-table th, .metrics-table td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--color-border);
-        }
-        
-        .metrics-table th {
-            font-weight: 600;
-            background-color: var(--color-bg-lighter);
-        }
-        
-        .metrics-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .score-badge {
-            padding: 0.25rem 0.6rem;
-            border-radius: 12px;
-            font-weight: 600;
-            color: white;
-            font-size: 0.9rem;
-        }
-        
-        .seo-audit-section .sub-section {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid var(--color-border);
-        }
-        
-        .seo-audit-section .sub-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--color-accent);
-            margin-bottom: 1rem;
-        }
-        
-        .seo-audit-section p {
-            margin-bottom: 1rem;
-            color: var(--color-text-muted);
-        }
-        
-        .seo-audit-section .issue-list li {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-start;
-            padding: 0.8rem;
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-        }
-        
-        .priority-tag {
-            flex-shrink: 0;
-            padding: 0.2rem 0.5rem;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: capitalize;
-        }
-        
-        .priority-red-flag { background-color: var(--color-red); color: white; }
-        .priority-pass { background-color: var(--color-primary); color: white; }
-        .priority-info { background-color: var(--color-accent); color: white; }
-
-        .hidden {
-            display: none;
-        }
-        
-        .results-header {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-        }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .score-radial { transition: stroke-dashoffset 0.5s ease; }
+        .loader { border-top-color: #10b981; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
 
-    <div class="container">
-        <header>
-            <h1>FF TECH ELITE v3 <span>//</span> Web Audit</h1>
-            <p>Enter a URL to generate a comprehensive performance, SEO, UX, and security report.</p>
-        </header>
+    <header class="glass sticky top-0 z-50 border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-emerald-500 p-2 rounded-lg">
+                    <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
+                </div>
+                <h1 class="font-bold text-xl tracking-tight text-slate-800">FF TECH <span class="text-emerald-500">ELITE</span></h1>
+            </div>
+            <div class="text-xs font-medium text-slate-500 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+                v3.0 Weighted Engine
+            </div>
+        </div>
+    </header>
 
-        <main>
-            <div class="card">
-                <form id="audit-form">
-                    <div class="form-group">
-                        <div class="input-wrapper">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                            </svg>
-                            <input type="url" id="url-input" class="url-input" placeholder="e.g., https://example.com" required>
-                        </div>
-                        <div class="form-controls">
-                            <div class="mode-selector">
-                                <input type="radio" id="desktop" name="mode" value="desktop" checked>
-                                <label for="desktop">Desktop</label>
-                                <input type="radio" id="mobile" name="mode" value="mobile">
-                                <label for="mobile">Mobile</label>
-                            </div>
-                            <button type="submit" class="btn btn-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="20" height="20">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                                </svg>
-                                Analyze
-                            </button>
-                        </div>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <section class="max-w-3xl mx-auto mb-12">
+            <div class="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-6 border border-slate-100">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="flex-grow relative">
+                        <i data-lucide="globe" class="absolute left-3 top-3.5 text-slate-400 w-5 h-5"></i>
+                        <input type="text" id="urlInput" placeholder="https://example.com" 
+                               class="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all">
                     </div>
-                </form>
+                    <select id="modeInput" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none">
+                        <option value="desktop">Desktop</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                    <button onclick="runAudit()" id="auditBtn" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3 rounded-xl transition-all flex items-center justify-center gap-2">
+                        <span>Run Audit</span>
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                    </button>
+                </div>
             </div>
+        </section>
 
-            <div id="loader" class="loader hidden">
-                <div class="spinner"></div>
-                <p>Running audit... This may take up to a minute.</p>
-            </div>
+        <div id="loading" class="hidden flex flex-col items-center py-20">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-200 h-16 w-16 mb-4"></div>
+            <p class="text-slate-600 font-medium">Analyzing core web vitals and security headers...</p>
+        </div>
+
+        <div id="results" class="hidden space-y-8">
             
-            <div id="error-message" class="card hidden" style="background-color: #4a1d1d; border-color: var(--color-red);">
-                <p><strong>Audit Failed:</strong> <span id="error-text"></span></p>
-            </div>
-
-            <div id="results" class="hidden"></div>
-        </main>
-    </div>
-
-    <script>
-        const form = document.getElementById('audit-form');
-        const loader = document.getElementById('loader');
-        const resultsContainer = document.getElementById('results');
-        const errorMessage = document.getElementById('error-message');
-        const errorText = document.getElementById('error-text');
-        
-        let auditDataStore = null;
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const url = document.getElementById('url-input').value;
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-
-            if (!url) {
-                alert('Please enter a valid URL.');
-                return;
-            }
-
-            // Reset UI
-            resultsContainer.classList.add('hidden');
-            resultsContainer.innerHTML = '';
-            errorMessage.classList.add('hidden');
-            loader.classList.remove('hidden');
-            auditDataStore = null;
-
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, mode })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `HTTP error! Status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                auditDataStore = data; // Store data for PDF download
-                displayResults(data);
-
-            } catch (error) {
-                errorText.textContent = error.message;
-                errorMessage.classList.remove('hidden');
-            } finally {
-                loader.classList.add('hidden');
-            }
-        });
-        
-        function getScoreColor(score) {
-            if (score >= 90) return 'var(--color-primary)';
-            if (score >= 50) return 'var(--color-yellow)';
-            return 'var(--color-red)';
-        }
-
-        function displayResults(data) {
-            resultsContainer.innerHTML = `
-                <div class="card">
-                    <div class="results-header">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center justify-between mb-8">
                         <div>
-                            <h2 class="section-title">Audit Report for ${data.url}</h2>
-                            <p class="text-muted">${data.audited_at}</p>
+                            <h2 class="text-2xl font-bold">Audit Summary</h2>
+                            <p id="resUrl" class="text-slate-500 truncate max-w-md"></p>
                         </div>
-                        <button id="download-pdf-btn" class="btn btn-secondary">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
-                            Download PDF
+                        <button onclick="downloadPDF()" class="flex items-center gap-2 text-emerald-600 font-semibold hover:bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg transition-all">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            Download PDF Report
                         </button>
                     </div>
-                </div>
 
-                <div class="grid-2">
-                    <div class="card score-display">
-                        <div class="score-circle" id="total-score-circle">
-                            <div class="score-value">${data.total_grade}</div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="pillarGrids">
                         </div>
-                        <div class="score-label">Overall Health Score</div>
-                    </div>
-                    <div class="card pillar-scores">
-                        <h3 class="section-title">Pillar Scores</h3>
-                        ${Object.entries(data.pillars).map(([pillar, score]) => `
-                            <div class="pillar">
-                                <div class="pillar-info">
-                                    <span>${pillar}</span>
-                                    <span>${score}%</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-bar-inner" style="width: ${score}%; background-color: ${getScoreColor(score)};"></div>
-                                </div>
-                            </div>
-                        `).join('')}
+                </div>
+
+                <div class="bg-slate-900 text-white p-8 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <h3 class="text-slate-400 uppercase tracking-widest text-xs mb-4">Overall Grade</h3>
+                    <div class="relative flex items-center justify-center">
+                        <svg class="w-32 h-32">
+                            <circle class="text-slate-800" stroke-width="8" stroke="currentColor" fill="transparent" r="58" cx="64" cy="64"/>
+                            <circle class="text-emerald-500 score-radial" id="scoreCircle" stroke-width="8" stroke-dasharray="364.4" stroke-dashoffset="364.4" stroke-linecap="round" stroke="currentColor" fill="transparent" r="58" cx="64" cy="64"/>
+                        </svg>
+                        <span id="totalScore" class="absolute text-4xl font-bold">0%</span>
                     </div>
                 </div>
-
-                <div class="card">
-                    <h3 class="section-title">Core Performance Metrics</h3>
-                    <div class="perf-metrics">
-                        ${Object.entries(data.perf).map(([key, value]) => `
-                            <div class="perf-metric">
-                                <div class="value" style="color: ${getScoreColor(data.metrics.find(m => m.name.toLowerCase().includes(key.split('_'),[object Object],)).score)}">${value !== null ? value : 'N/A'}<span style="font-size: 1rem; color: var(--color-text-muted);">${key.includes('ms') ? 'ms' : (key === 'cls' ? '' : (key.includes('kb') ? 'kb' : ''))}</span></div>
-                                <div class="label">${key.replace(/_/g, ' ').toUpperCase()}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div class="card roadmap">
-                    <h3 class="section-title">Improvement Roadmap</h3>
-                    ${data.roadmap.replace(/<b>.*?<\/b>/g, '').replace(/<br\/>/g, '')}
-                </div>
-                
-                ${data.seo_audit ? generateSeoAuditHtml(data.seo_audit) : ''}
-
-                <div class="card">
-                    <h3 class="section-title">All Metrics</h3>
-                    <div style="overflow-x:auto;">
-                        <table class="metrics-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Metric</th>
-                                    <th>Category</th>
-                                    <th>Weight</th>
-                                    <th>Score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.metrics.map(metric => `
-                                    <tr>
-                                        <td>${metric.no}</td>
-                                        <td>${metric.name}</td>
-                                        <td>${metric.category}</td>
-                                        <td>${metric.weight}</td>
-                                        <td><span class="score-badge" style="background-color: ${getScoreColor(metric.score)};">${metric.score}%</span></td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            
-            // Animate total score circle
-            const circle = document.getElementById('total-score-circle');
-            circle.style.background = `conic-gradient(${getScoreColor(data.total_grade)} ${data.total_grade * 3.6}deg, var(--color-bg-lighter) 0deg)`;
-            
-            // Add event listener for PDF download
-            document.getElementById('download-pdf-btn').addEventListener('click', downloadPdf);
-
-            resultsContainer.classList.remove('hidden');
-        }
-        
-        function generateSeoAuditHtml(seo) {
-            return `
-            <div class="card seo-audit-section">
-                <h2 class="section-title">Static SEO Audit for ${seo.domain}</h2>
-                <p>${seo.overview_text}</p>
-                
-                <div class="sub-section">
-                    <h3 class="sub-title">Critical & Minor Issues</h3>
-                    <ul class="issue-list">
-                    ${seo.issues.slice(0, 5).map(issue => `
-                        <li>
-                            <span class="priority-tag priority-${issue.priority.replace(' ', '-')}">${issue.priority}</span>
-                            <div><strong>${issue.element}:</strong> ${issue.message}</div>
-                        </li>
-                    `).join('')}
-                    ${seo.issues.length > 5 ? '<li>...and ' + (seo.issues.length - 5) + ' more.</li>' : ''}
-                    </ul>
-                </div>
-                
-                <div class="sub-section">
-                    <h3 class="sub-title">On-Page SEO Breakdown</h3>
-                     <table class="metrics-table">
-                        <tbody>
-                            <tr><td><strong>Title</strong></td> <td style="color:${seo.on_page.title.priority === 'red-flag' ? 'var(--color-red)' : 'inherit'}">${seo.on_page.title.note}</td></tr>
-                            <tr><td><strong>Meta Description</strong></td> <td style="color:${seo.on_page.meta_description.priority === 'red-flag' ? 'var(--color-red)' : 'inherit'}">${seo.on_page.meta_description.note}</td></tr>
-                            <tr><td><strong>H1 Tag</strong></td> <td style="color:${seo.on_page.h1.priority === 'red-flag' ? 'var(--color-red)' : 'inherit'}">${seo.on_page.h1.note}</td></tr>
-                            <tr><td><strong>Heading Structure</strong></td> <td style="color:${seo.on_page.headings.priority === 'red-flag' ? 'var(--color-red)' : 'inherit'}">${seo.on_page.headings.note}</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                ${seo.competitor_analysis ? `
-                <div class="sub-section">
-                    <h3 class="sub-title">Competitor Analysis</h3>
-                    ${seo.competitor_analysis.types.map(type => `
-                        <div>
-                            <h4>${type.type}</h4>
-                            <p>${type.description}</p>
-                            <ul>
-                                ${type.competitors.map(c => `<li>${c.label} (${c.domain})</li>`).join('')}
-                            </ul>
-                        </div>
-                    `).join('<br>')}
-                </div>
-                ` : ''}
-
             </div>
-            `;
-        }
-        
-        async function downloadPdf() {
-            if (!auditDataStore) {
-                alert('No audit data available to generate PDF.');
-                return;
-            }
-            
-            const btn = document.getElementById('download-pdf-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'Generating...';
+
+            <div class="bg-amber-50 border border-amber-100 p-6 rounded-2xl">
+                <div class="flex items-center gap-2 mb-4 text-amber-800">
+                    <i data-lucide="list-checks" class="w-6 h-6"></i>
+                    <h2 class="text-xl font-bold">Improvement Roadmap</h2>
+                </div>
+                <div id="roadmapContent" class="grid md:grid-cols-2 gap-4 text-sm text-amber-900">
+                    </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                            <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500">Metric</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500">Category</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500 text-center">Score</th>
+                            <th class="px-6 py-4 text-xs font-bold uppercase text-slate-500">Priority</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metricsBody" class="divide-y divide-slate-50">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+        let lastAuditData = null;
+
+        async function runAudit() {
+            const url = document.getElementById('urlInput').value;
+            const mode = document.getElementById('modeInput').value;
+            const btn = document.getElementById('auditBtn');
+
+            if(!url) return alert("Please enter a URL");
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
             btn.disabled = true;
 
             try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(auditDataStore)
-                });
-
-                if (!response.ok) {
-                    throw new Error('PDF generation failed on the server.');
-                }
-
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                // Extract filename from content-disposition header
-                const disposition = response.headers.get('content-disposition');
-                let filename = `FF_ELITE_Audit_Report_${Date.now()}.pdf`;
-                if (disposition && disposition.indexOf('attachment') !== -1) {
-                    const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                    const matches = filenameRegex.exec(disposition);
-                    if (matches != null && matches,[object Object],) {
-                        filename = matches,[object Object],replace(/['"]/g, '');
-                    }
-                }
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                
-            } catch (error) {
-                alert(`Error: ${error.message}`);
+                const response = await axios.post('/audit', { url, mode });
+                lastAuditData = response.data;
+                displayResults(response.data);
+            } catch (err) {
+                alert(err.response?.data?.detail || "Audit failed. Check console.");
             } finally {
-                btn.innerHTML = originalText;
+                document.getElementById('loading').classList.add('hidden');
                 btn.disabled = false;
             }
         }
 
+        function displayResults(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('resUrl').innerText = data.url;
+            
+            // Set Score
+            const score = data.total_grade;
+            document.getElementById('totalScore').innerText = `${score}%`;
+            const offset = 364.4 - (364.4 * score) / 100;
+            document.getElementById('scoreCircle').style.strokeDashoffset = offset;
+
+            // Display Pillars
+            const pillarGrid = document.getElementById('pillarGrids');
+            pillarGrid.innerHTML = Object.entries(data.pillars).map(([name, val]) => `
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <p class="text-xs text-slate-500 font-bold uppercase mb-1">${name}</p>
+                    <p class="text-2xl font-bold text-slate-800">${val}%</p>
+                </div>
+            `).join('');
+
+            // Roadmap
+            const roadmapDiv = document.getElementById('roadmapContent');
+            roadmapDiv.innerHTML = data.roadmap; // Contains HTML from backend
+
+            // Metrics Table
+            const body = document.getElementById('metricsBody');
+            body.innerHTML = data.metrics.map(m => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-medium text-slate-700">${m.name}</td>
+                    <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 rounded text-xs text-slate-600">${m.category}</span></td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-bold ${m.score > 85 ? 'text-emerald-500' : m.score > 60 ? 'text-amber-500' : 'text-rose-500'}">
+                            ${m.score}%
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-xs text-slate-400">Weight: ${m.weight}x</td>
+                </tr>
+            `).join('');
+            
+            lucide.createIcons();
+        }
+
+        async function downloadPDF() {
+            if(!lastAuditData) return;
+            try {
+                const response = await axios.post('/download', lastAuditData, { responseType: 'blob' });
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', `Audit_Report_${Date.now()}.pdf`);
+                document.body.appendChild(link);
+                link.click();
+            } catch (err) {
+                alert("PDF generation failed.");
+            }
+        }
     </script>
 </body>
 </html>
