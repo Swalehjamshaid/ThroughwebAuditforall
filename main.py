@@ -126,14 +126,17 @@ def clamp_score(v: float) -> int:
     return max(0, min(100, round(v)))
 
 def score_band(value: float, bands: List[Tuple[float, int]]) -> int:
-    """
-    Piecewise scoring: bands sorted by max_value ascending.
-    Each band: (max_value, score). Return first score where value <= max_value, else last.
-    """
     for max_v, s in bands:
         if value <= max_v:
             return s
     return bands[-1][1] if bands else 0
+
+def url_is_haier_pk(url: str) -> bool:
+    try:
+        host = urlparse(url).netloc.lower()
+        return host.endswith("haier.com.pk")
+    except Exception:
+        return False
 
 # ==================== REAL AUDIT ====================
 async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
@@ -156,7 +159,6 @@ async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
             await browser.close()
             raise HTTPException(status_code=502, detail=f"Page failed to load (status: {response.status if response else 'None'})")
 
-        # Lab TTFB approximation (nav start -> first byte observed)
         ttfb = int((time.time() - start_time) * 1000)
 
         metrics_js = await page.evaluate(
@@ -224,7 +226,6 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     console_errors: List[str] = audit.get("console_errors", [])
     cookies: List[Dict[str, Any]] = audit.get("cookies", [])
 
-    # SEO
     title_tag = soup.find("title")
     title_text = (title_tag.text or "").strip() if title_tag else ""
     meta_desc = soup.find("meta", attrs={"name": "description"})
@@ -238,7 +239,6 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     schema_present = bool(soup.find("script", attrs={"type": "application/ld+json"}))
     internal_links = [a for a in soup.find_all("a", href=True) if urlparse(a["href"]).netloc in ("", urlparse(final_url).netloc)]
 
-    # UX
     viewport_meta = soup.find("meta", attrs={"name": "viewport"})
     viewport_content = (viewport_meta.get("content", "") or "").lower() if viewport_meta else ""
     mobile_friendly = "width=device-width" in viewport_content
@@ -246,7 +246,6 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     touch_icons_present = bool(soup.find("link", rel=lambda x: x and "apple-touch-icon" in x.lower()))
     no_console_errors = len(console_errors) == 0
 
-    # Security
     is_https = final_url.startswith("https://")
     hsts = "strict-transport-security" in headers
     csp = "content-security-policy" in headers
@@ -263,11 +262,9 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
                 secure_cookies_ok = False
                 break
 
-    # Perf heuristics
     js_minified = any(".min.js" in u.lower() for u in res_names)
     font_display_swap = any(("display=swap" in u.lower()) for u in res_names)
 
-    # Image optimization
     img_optimized_count = 0
     for img in images:
         if img.has_attr("loading") and str(img["loading"]).lower() == "lazy":
@@ -311,32 +308,26 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
         "image_optimization_ratio": image_optimization_ratio,
     }
 
-# ==================== SCORING (INTERNATIONAL THRESHOLDS) ====================
+# ==================== SCORING (CWV & GLOBAL GUIDANCE) ====================
 def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts: Dict[str, Any]) -> int:
-    # ---- Performance (CWV-aligned thresholds) ----
     if name == "Largest Contentful Paint (LCP)":
         lcp = audit.get("lcp", 0)
-        # CWV: Good ≤2.5s; NI ≤4.0s; Poor >4.0s
         return score_band(lcp, [(2500, 100), (4000, 80), (10000, 60), (9999999, 40)])
 
     if name == "First Contentful Paint (FCP)":
         fcp = audit.get("fcp", 0)
-        # FCP guidance used broadly: Good ≤1.8s then soften
         return score_band(fcp, [(1800, 100), (3000, 85), (8000, 60), (9999999, 40)])
 
     if name == "Time to First Byte (TTFB)":
         ttfb = audit.get("ttfb", 0)
-        # Google guidance: Good ≲800ms; NI ≤1800ms; Poor >1800ms
         return score_band(ttfb, [(800, 100), (1800, 80), (4000, 60), (9999999, 40)])
 
     if name == "Cumulative Layout Shift (CLS)":
         cls = float(audit.get("cls", 0.0))
-        # CWV: Good ≤0.1; NI ≤0.25; Poor >0.25
         return score_band(cls, [(0.1, 100), (0.25, 80), (0.5, 60), (9999999, 40)])
 
     if name == "Total Blocking Time (TBT)":
         tbt = audit.get("tbt", 0)
-        # Lighthouse lab proxy for responsiveness
         return score_band(tbt, [(200, 100), (600, 80), (1200, 60), (9999999, 40)])
 
     if name == "Page Weight (KB)":
@@ -348,7 +339,7 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         return score_band(reqs, [(60, 100), (100, 85), (200, 60), (9999999, 40)])
 
     if name == "Image Optimization":
-        ratio = facts.get("image_optimization_ratio", 0.0)  # % optimized
+        ratio = facts.get("image_optimization_ratio", 0.0)
         return score_band(ratio, [(50, 60), (75, 80), (90, 95), (9999999, 100)])
 
     if name == "JavaScript Minification":
@@ -357,7 +348,7 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
     if name == "Font Display Strategy":
         return 100 if facts.get("font_display_swap") else 60
 
-    # ---- SEO ----
+    # SEO
     if name == "Page Title (Length & Quality)":
         tl = facts.get("title_length", 0)
         if 30 <= tl <= 65: return 100
@@ -399,7 +390,7 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         cnt = facts.get("internal_links_count", 0)
         return 100 if cnt >= 20 else (80 if cnt >= 10 else 60)
 
-    # ---- UX ----
+    # UX
     if name == "Viewport Meta Tag":
         return 100 if facts.get("viewport_present") else 60
 
@@ -417,9 +408,9 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         return score_band(tbt, [(200, 100), (600, 75), (1200, 50), (9999999, 30)])
 
     if name in ("Tap Target Spacing", "Readable Font Sizes", "Color Contrast Ratio", "Touch Icons", "Error Messages Clear"):
-        return 80  # neutral baseline
+        return 80
 
-    # ---- Security ----
+    # Security
     if name == "HTTPS Enforced":
         return 100 if facts.get("is_https") else 40
 
@@ -451,7 +442,6 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         libs = [u for u in (audit.get("resource_names") or []) if any(x in u.lower() for x in ["jquery", "angular", "react"])]
         return 80 if libs else 90
 
-    # Default for advanced checks
     return 80
 
 def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup) -> Dict[str, Any]:
@@ -470,19 +460,16 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup) -> Dict[s
             priority = "High" if score < 50 else "Medium"
             low_score_issues.append({"issue": name, "priority": priority, "recommendation": f"Improve {name} in {category}"})
 
-    # Weighted pillar scores by metric weights (your weight system already used)
     weighted_pillars: Dict[str, int] = {}
     for cat, vals in pillar_scores.items():
         total_weight = sum(w for _, w in vals)
         weighted = sum(s * w for s, w in vals) / total_weight if total_weight else 100
         weighted_pillars[cat] = clamp_score(weighted)
 
-    # Final grade by your pillar weights
     total_grade = clamp_score(sum(weighted_pillars[cat] * PILLAR_WEIGHTS[cat] for cat in CATEGORIES))
 
     roadmap_items = [f"{i+1}. {item['recommendation']}" for i, item in enumerate(low_score_issues[:20])]
     roadmap_html = "<b>Improvement Roadmap:</b><br/><br/>" + "<br/>".join(roadmap_items) if roadmap_items else "<b>Improvement Roadmap:</b><br/><br/>No critical issues found."
-
     summary = f"Weighted Scores by Pillar: {weighted_pillars}"
 
     return {
@@ -493,6 +480,146 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup) -> Dict[s
         "roadmap": roadmap_html,
     }
 
+# ==================== STATIC SEO AUDIT (haier.com.pk) ====================
+def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
+    if not url_is_haier_pk(url):
+        return None
+
+    return {
+        "domain": "www.haier.com.pk",
+        "seo_score": 17,
+        "critical_issues": 27,
+        "minor_issues": 2,
+        "overview_text": (
+            "This section summarizes your site's overall SEO performance, providing insights from on-page, "
+            "technical, off-page, site speed, and social signals, and highlights both strengths and "
+            "priority issues to address."
+        ),
+        "section_scores": {
+            "On-Page SEO": 30,
+            "Technical SEO": 40,
+            "Off-Page SEO": 0,
+            "Social Media": 0
+        },
+        "issues": [
+            # Page Speed block (as provided)
+            {"type": "Page Speed", "element": "DOM Size", "priority": "red-flag",
+             "message": "Unable to retrieve DOM Size metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Total Blocking Time (TBT)", "priority": "red-flag",
+             "message": "Unable to retrieve Total Blocking Time (TBT) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Speed Index", "priority": "red-flag",
+             "message": "Unable to retrieve Speed Index metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "First Contentful Paint (FCP)", "priority": "red-flag",
+             "message": "Unable to retrieve First Contentful Paint (FCP) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Time to First Byte (TTFB)", "priority": "red-flag",
+             "message": "Unable to retrieve Time to First Byte (TTFB) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Cumulative Layout Shift (CLS)", "priority": "red-flag",
+             "message": "Unable to retrieve Cumulative Layout Shift (CLS) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Interaction to Next Paint (INP)", "priority": "red-flag",
+             "message": "Unable to retrieve Interaction to Next Paint (INP) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Largest Contentful Paint (LCP)", "priority": "red-flag",
+             "message": "Unable to retrieve Largest Contentful Paint (LCP) metric. The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Mobile Friendliness", "priority": "red-flag",
+             "message": "Failed to check mobile friendliness: The page may be inaccessible or the API is unavailable."},
+            {"type": "Page Speed", "element": "Overall Performance", "priority": "red-flag",
+             "message": "Unable to retrieve performance score. The page may be inaccessible or the API is unavailable."},
+        ],
+        "on_page": {
+            "url": {"value": "www.haier.com.pk", "note": "The length of your URL is good (16 characters)."},
+            "title": {"priority": "red-flag", "value": "Background management system",
+                      "note": "Your title is too short (28 characters). Consider increasing its length to 50-60 characters."},
+            "meta_description": {"priority": "red-flag", "value": None,
+                                 "note": "Your meta description is missing! Add a compelling description. Aim for 100-130 characters."},
+            "h1": {"priority": "red-flag", "value": None,
+                   "note": "Your H1 is missing! Add a main H1 heading (10–70 chars)."},
+            "headings": {"priority": "red-flag",
+                         "structure": {"H2": 0, "H3": 0, "H4": 0, "H5": 0, "H6": 0},
+                         "note": "Page structure is an issue. Rebuild with proper H2/H3/H4 hierarchy."},
+            "image_alt": {"priority": "pass", "note": "Your images all have alt text."},
+            "content": [
+                {"priority": "red-flag", "note": "Text-to-code ratio is too low (0.14%). Reduce code bloat and add content."},
+                {"priority": "red-flag", "note": "Content is too thin (3 words). Aim for at least 500 words."}
+            ],
+            "keyword_density": {"value": "N/A"}
+        },
+        "keyword_rankings": [
+            {"keyword": "haier pakistan", "rank": 11, "traffic_pct": 0, "volume": 210, "kd_pct": 60, "cpc_usd": 0}
+        ],
+        "top_pages": [
+            {"url": "http://www.haier.com.pk/", "traffic_pct": 0, "keywords": 1, "ref_domains": 78, "backlinks": 240}
+        ],
+        "technical": [
+            {"element": "Favicon", "priority": "pass", "value": "favicon.ico", "note": "Your favicon is valid and accessible."},
+            {"element": "Noindex", "priority": "pass", "note": "Your page is properly configured for search engine indexing."},
+            {"element": "Sitemap", "priority": "red-flag", "note": "No XML sitemap found. Add sitemap.xml or declare in robots.txt."},
+            {"element": "Hreflang", "priority": "info", "note": "No hreflang tags found. Add if you have language/region variants."},
+            {"element": "Language", "priority": "pass", "value": "en", "note": "Website language is properly declared."},
+            {"element": "Canonical", "priority": "red-flag", "note": "Critical issues with canonical tag. Ensure single canonical to live URL."},
+            {"element": "Robots.txt", "priority": "red-flag", "value": "https://www.haier.com.pk/robots.txt",
+             "note": "Robots.txt missing or inaccessible. Add accessible robots.txt."},
+            {"element": "Structured Data", "priority": "info", "note": "Page is missing structured data. Add Schema.org markup."}
+        ],
+        "page_performance": [
+            {"element": "Performance Score", "priority": "red-flag", "note": "Unable to retrieve performance score."},
+            {"element": "Mobile Friendliness", "priority": "red-flag", "note": "Failed to check mobile friendliness."},
+            {"element": "Largest Contentful Paint (LCP)", "priority": "red-flag", "note": "Unable to retrieve LCP."},
+            {"element": "Interaction to Next Paint (INP)", "priority": "red-flag", "note": "Unable to retrieve INP."},
+            {"element": "Cumulative Layout Shift (CLS)", "priority": "red-flag", "note": "Unable to retrieve CLS."},
+            {"element": "Time to First Byte (TTFB)", "priority": "red-flag", "note": "Unable to retrieve TTFB."},
+            {"element": "First Contentful Paint (FCP)", "priority": "red-flag", "note": "Unable to retrieve FCP."},
+            {"element": "Speed Index", "priority": "red-flag", "note": "Unable to retrieve Speed Index."},
+            {"element": "Total Blocking Time (TBT)", "priority": "red-flag", "note": "Unable to retrieve TBT."},
+            {"element": "DOM Size", "priority": "red-flag", "note": "Unable to retrieve DOM Size."},
+        ],
+        "competitors": [
+            {"competitor": "electrozonepk.com", "common_keywords": 1, "competition_level": 1},
+            {"competitor": "haiermall.pk", "common_keywords": 1, "competition_level": 0.55},
+            {"competitor": "profiled.pk", "common_keywords": 1, "competition_level": 0.01},
+            {"competitor": "wikipedia.org", "common_keywords": 1, "competition_level": 0},
+            {"competitor": "linkedin.com", "common_keywords": 1, "competition_level": 0},
+        ],
+        "off_page": {"message": "Sorry, there are no results for this domain or website URL"},
+        "top_backlinks": [
+            {"page_as": 23, "source_title": "Haier Pakistan Careers and Employment | Indeed.com",
+             "source_url": "https://in.indeed.com/cmp/Haier-Pakistan",
+             "anchor": "Haier Pakistan website", "target_url": "https://www.haier.com.pk/", "rel": "Nofollow"},
+            {"page_as": 23, "source_title": "Haier Pakistan Careers and Employment | Indeed.com",
+             "source_url": "https://pk.indeed.com/cmp/Haier-Pakistan",
+             "anchor": "Haier Pakistan website", "target_url": "https://www.haier.com.pk/", "rel": "Nofollow"},
+            {"page_as": 18, "source_title": "Inverter Type AC in Pakistan ... - PakWheels Forums",
+             "source_url": "https://www.pakwheels.com/forums/t/inverter-type-ac-in-pakistan-inverter-non-inverter-dedicated-discussion/144358",
+             "anchor": "Haier Pakistan, Product Details", "target_url": "http://www.haier.com.pk/productdetails.asp?pcode=CY%20-%20Series", "rel": "Nofollow"},
+            {"page_as": 17, "source_title": "Haier HSU-13HFAB/013WUSDC(Grey)-T3-T3 Inverter-Haier Pakistan",
+             "source_url": "https://www.haier.com/pk/air-conditioners/hsu-13hfab013wusdc-grey--t3.shtml",
+             "anchor": "https://haier.com.pk/product/2339", "target_url": "https://haier.com.pk/product/2339", "rel": None},
+            {"page_as": 15, "source_title": "Haier receives “Brand of the Year Award 2024”",
+             "source_url": "https://arynews.tv/haier-receives-brand-of-the-year-award-2024/",
+             "anchor": "Haier", "target_url": "https://haier.com.pk/?utm_id=Eng%2BLinkclick", "rel": None},
+            {"page_as": 15, "source_title": "Haier receives “Brand of the Year Award 2024”",
+             "source_url": "https://arynews.tv/haier-receives-brand-of-the-year-award-2024/",
+             "anchor": "Haier’s", "target_url": "https://haier.com.pk/?utm_id=Eng%2BLinkclick", "rel": None},
+            {"page_as": 15, "source_title": "NADRA CNIC Card verification",
+             "source_url": "https://propakistani.pk/2009/09/07/verify-nadra-cnic-through-sms/",
+             "anchor": "Samad ur Rehman", "target_url": "http://www.haier.com.pk/", "rel": "Nofollow"},
+            {"page_as": 15, "source_title": "Haier HSU-13HFAB/013WUSDC(W)-T3-T3 Inverter-Haier Pakistan",
+             "source_url": "https://www.haier.com/pk/air-conditioners/hsu-13hfab013wusdc-w--t3.shtml",
+             "anchor": "https://haier.com.pk/product/2339", "target_url": "https://haier.com.pk/product/2339", "rel": None},
+            {"page_as": 15, "source_title": "Haier HSU-14HFTEX/013WUSDC(DG)-T3-T3 Plus Inverter-Haier Pakistan",
+             "source_url": "https://www.haier.com/pk/air-conditioners/hsu-14hftex013wusdc-dg--t3.shtml",
+             "anchor": "https://haier.com.pk/product/2339", "target_url": "https://haier.com.pk/product/2339", "rel": None},
+            {"page_as": 15, "source_title": "Haier HSU-14HFTEX/013WUSDC(OW)-T3-T3 Plus Inverter-Haier Pakistan",
+             "source_url": "https://www.haier.com/pk/air-conditioners/hsu-14hftex013wusdc-ow--t3.shtml",
+             "anchor": "https://haier.com.pk/product/2339", "target_url": "https://haier.com.pk/product/2339", "rel": None},
+        ],
+        "social_media": [
+            {"network": "Facebook", "priority": "red-flag", "note": "Add a working Facebook link."},
+            {"network": "YouTube", "priority": "red-flag", "note": "Add a working YouTube link."},
+            {"network": "Instagram", "priority": "red-flag", "note": "Add a working Instagram link."},
+            {"network": "X", "priority": "red-flag", "note": "Add a working X (Twitter) link."},
+            {"network": "LinkedIn", "priority": "red-flag", "note": "Add a working LinkedIn link."},
+        ],
+    }
+
 # ==================== PDF HELPERS ====================
 def _add_page_number(canvas, doc):
     canvas.saveState()
@@ -501,6 +628,17 @@ def _add_page_number(canvas, doc):
     canvas.setStrokeColor(colors.HexColor("#e5e7eb"))
     canvas.line(40, 35, A4[0] - 40, 35)
     canvas.restoreState()
+
+def _table(story, data, col_widths=None, header_bg="#0f172a"):
+    t = Table(data, colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor(header_bg)),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
+        ('ALIGN', (0,0), (-1,0), 'LEFT')
+    ]))
+    story.append(t)
 
 # ==================== ROUTES ====================
 @app.get("/", response_class=HTMLResponse)
@@ -529,6 +667,9 @@ async def audit(request: Request):
     soup = BeautifulSoup(audit_data["html"], "html.parser")
     results = generate_audit_results(audit_data, soup)
 
+    # Inject static SEO Audit for haier.com.pk
+    seo_audit = get_static_seo_audit(audit_data["final_url"])
+
     return {
         "url": audit_data["final_url"],
         "total_grade": results["total_grade"],
@@ -546,6 +687,8 @@ async def audit(request: Request):
             "request_count": audit_data.get("request_count"),
         },
         "roadmap": results["roadmap"],
+        # NEW: detailed SEO audit block, only for haier.com.pk
+        "seo_audit": seo_audit
     }
 
 @app.post("/download")
@@ -555,8 +698,8 @@ async def download_pdf(request: Request):
     pillars = data.get("pillars") or {}
     total_grade = data.get("total_grade")
     url = data.get("url", "")
+    seo_audit = data.get("seo_audit")
 
-    # Regenerate if minimal data
     if not metrics or not pillars or total_grade is None:
         results = generate_audit_results({"final_url": url, "html": ""}, BeautifulSoup("", "html.parser"))
         metrics = results["metrics"]
@@ -573,10 +716,12 @@ async def download_pdf(request: Request):
     styles.add(ParagraphStyle(name='TitleBold', fontSize=20, leading=24, alignment=1, textColor=colors.HexColor("#10b981")))
     styles.add(ParagraphStyle(name='Section', fontSize=14, leading=18, spaceBefore=20, textColor=colors.HexColor("#0f172a")))
     styles.add(ParagraphStyle(name='Muted', fontSize=9, textColor=colors.HexColor("#64748b")))
+    styles.add(ParagraphStyle(name='SubTitle', fontSize=12, leading=16, textColor=colors.HexColor("#0f172a")))
+    styles.add(ParagraphStyle(name='RedFlag', fontSize=10, textColor=colors.HexColor("#ef4444")))
+    styles.add(ParagraphStyle(name='Good', fontSize=10, textColor=colors.HexColor("#10b981")))
 
     story: List[Any] = []
 
-    # Optional logo
     logo_path = "logo.png"
     if os.path.exists(logo_path):
         try:
@@ -598,15 +743,7 @@ async def download_pdf(request: Request):
     for cat in CATEGORIES:
         sc = pillars.get(cat, "—")
         pillar_table.append([cat, f"{sc}%" if isinstance(sc, (int, float)) else sc])
-    t = Table(pillar_table, colWidths=[300, 100])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0f172a")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
-        ('ALIGN', (1,1), (-1,-1), 'RIGHT'),
-    ]))
-    story.append(t)
+    _table(story, pillar_table, col_widths=[300, 100])
     story.append(Spacer(1, 20))
 
     # Metrics
@@ -614,22 +751,138 @@ async def download_pdf(request: Request):
     table_data = [["#", "Metric", "Category", "Score", "Weight"]]
     for m in metrics:
         table_data.append([m.get('no', ''), m.get('name', ''), m.get('category', ''), f"{m.get('score', '')}%", m.get('weight', '')])
-    dt = Table(table_data, colWidths=[30, 220, 100, 50, 50])
-    dt.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#10b981")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
-        ('ALIGN', (3,1), (-1,-1), 'RIGHT'),
-    ]))
-    story.append(dt)
+    _table(story, table_data, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981")
     story.append(PageBreak())
 
+    # Improvement roadmap
     story.append(Paragraph("Improvement Roadmap", styles['TitleBold']))
     story.append(Spacer(1, 10))
     roadmap_html = data.get("roadmap") or "<b>Improvement Roadmap:</b><br/><br/>Prioritize critical items first."
     story.append(Paragraph(roadmap_html, styles['Normal']))
 
+    # ==================== SEO AUDIT: haier.com.pk ====================
+    if seo_audit:
+        story.append(PageBreak())
+        story.append(Paragraph(f"SEO Audit Results for {seo_audit.get('domain')}", styles['TitleBold']))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(
+            f"The SEO score for this website is <b>{seo_audit.get('seo_score')}</b> out of 100. "
+            f"We found <b>{seo_audit.get('critical_issues')}</b> critical issues and "
+            f"<b>{seo_audit.get('minor_issues')}</b> minor issues that should be addressed to improve Google "
+            f"rankings and AI visibility.", styles['Normal'])
+        )
+        story.append(Spacer(1, 10))
+
+        # Overview block
+        story.append(Paragraph("Overview", styles['Section']))
+        story.append(Paragraph(seo_audit.get("overview_text", ""), styles['Normal']))
+        scores = seo_audit.get("section_scores", {})
+        overview_table = [["Section", "Score"]]
+        for k in ["On-Page SEO", "Technical SEO", "Off-Page SEO", "Social Media"]:
+            overview_table.append([k, f"{scores.get(k, 0)}%"])
+        _table(story, overview_table, col_widths=[300, 100])
+        story.append(PageBreak())
+
+        # Issues & Recommendations
+        story.append(Paragraph("Issues and Recommendations", styles['Section']))
+        issues = seo_audit.get("issues", [])
+        issues_table = [["Type", "Element", "Priority", "Problem / Recommendation"]]
+        for item in issues:
+            issues_table.append([item["type"], item["element"], item["priority"], item["message"]])
+        _table(story, issues_table, col_widths=[90, 120, 70, 220], header_bg="#ef4444")
+        story.append(PageBreak())
+
+        # On-Page SEO
+        story.append(Paragraph("On-Page SEO", styles['Section']))
+        onp = seo_audit.get("on_page", {})
+        onpage_table = [["Element", "Value/Status", "Note"]]
+        onpage_table.append(["URL", onp.get("url", {}).get("value", ""), onp.get("url", {}).get("note", "")])
+        title = onp.get("title", {})
+        onpage_table.append(["Title", title.get("value", "—"), title.get("note", "")])
+        md = onp.get("meta_description", {})
+        onpage_table.append(["Meta Description", md.get("value", "Missing"), md.get("note", "")])
+        h1 = onp.get("h1", {})
+        onpage_table.append(["H1", h1.get("value", "Missing"), h1.get("note", "")])
+        heads = onp.get("headings", {}).get("structure", {})
+        onpage_table.append(["Heading Structure", f"H2:{heads.get('H2',0)} H3:{heads.get('H3',0)} H4:{heads.get('H4',0)} H5:{heads.get('H5',0)} H6:{heads.get('H6',0)}",
+                             onp.get("headings", {}).get("note","")])
+        imgalt = onp.get("image_alt", {})
+        onpage_table.append(["Image Alt", "All present", imgalt.get("note","")])
+        # Content notes
+        for c in onp.get("content", []):
+            onpage_table.append(["Content", "—", c.get("note","")])
+        onpage_table.append(["Keyword Density", onp.get("keyword_density","N/A"), "Analyze highest density words & phrases."])
+        _table(story, onpage_table, col_widths=[120, 150, 240])
+        story.append(PageBreak())
+
+        # Keyword Rankings
+        story.append(Paragraph("Keyword Rankings", styles['Section']))
+        kr = seo_audit.get("keyword_rankings", [])
+        kr_table = [["Keyword", "Rank", "Traffic %", "Volume", "KD %", "CPC (USD)"]]
+        for k in kr:
+            kr_table.append([k["keyword"], k["rank"], k["traffic_pct"], k["volume"], k["kd_pct"], k["cpc_usd"]])
+        _table(story, kr_table, col_widths=[160, 60, 80, 80, 60, 80])
+        story.append(Spacer(1, 10))
+
+        # Top Pages
+        story.append(Paragraph("Top Pages", styles['Section']))
+        tp = seo_audit.get("top_pages", [])
+        tp_table = [["URL", "Traffic %", "Keywords", "Ref Dom", "Backlinks"]]
+        for p in tp:
+            tp_table.append([p["url"], p["traffic_pct"], p["keywords"], p["ref_domains"], p["backlinks"]])
+        _table(story, tp_table, col_widths=[240, 80, 80, 80, 80])
+        story.append(PageBreak())
+
+        # Technical SEO
+        story.append(Paragraph("Technical SEO", styles['Section']))
+        tech = seo_audit.get("technical", [])
+        tech_table = [["Element", "Priority", "Value", "Recommendation"]]
+        for t in tech:
+            tech_table.append([t.get("element",""), t.get("priority",""), t.get("value","—"), t.get("note","")])
+        _table(story, tech_table, col_widths=[140, 90, 120, 210])
+        story.append(PageBreak())
+
+        # Page Performance & CWV
+        story.append(Paragraph("Page Performance & Core Web Vitals", styles['Section']))
+        pp = seo_audit.get("page_performance", [])
+        pp_table = [["Element", "Priority", "Note"]]
+        for p in pp:
+            pp_table.append([p.get("element",""), p.get("priority",""), p.get("note","")])
+        _table(story, pp_table, col_widths=[200, 80, 260], header_bg="#f59e0b")
+        story.append(PageBreak())
+
+        # Competitors
+        story.append(Paragraph("Competitors", styles['Section']))
+        comp = seo_audit.get("competitors", [])
+        comp_table = [["Competitor", "Common Keywords", "Competition Level"]]
+        for c in comp:
+            comp_table.append([c["competitor"], c["common_keywords"], c["competition_level"]])
+        _table(story, comp_table, col_widths=[240, 140, 160], header_bg="#64748b")
+        story.append(PageBreak())
+
+        # Off-Page
+        story.append(Paragraph("Off-Page SEO", styles['Section']))
+        story.append(Paragraph(seo_audit.get("off_page", {}).get("message",""), styles['Muted']))
+        story.append(Spacer(1, 10))
+
+        # Top Backlinks
+        story.append(Paragraph("Top Backlinks", styles['SubTitle']))
+        bl = seo_audit.get("top_backlinks", [])
+        bl_table = [["Page AS", "Source Title", "Source URL", "Anchor", "Target URL", "Rel"]]
+        for b in bl:
+            bl_table.append([b["page_as"], b["source_title"], b["source_url"], b.get("anchor",""), b.get("target_url",""), b.get("rel","")])
+        _table(story, bl_table, col_widths=[60, 160, 150, 120, 150, 40], header_bg="#0ea5e9")
+        story.append(PageBreak())
+
+        # Social Media
+        story.append(Paragraph("Social Media", styles['Section']))
+        sm = seo_audit.get("social_media", [])
+        sm_table = [["Network", "Priority", "Recommendation"]]
+        for s in sm:
+            sm_table.append([s["network"], s["priority"], s["note"]])
+        _table(story, sm_table, col_widths=[120, 80, 280], header_bg="#a855f7")
+
+    # Build document
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
     buffer.seek(0)
     filename = f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
