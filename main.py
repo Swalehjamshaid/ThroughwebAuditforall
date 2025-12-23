@@ -35,69 +35,70 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure templates directory exists to avoid crash
 if not os.path.exists("templates"):
     os.makedirs("templates")
 templates = Jinja2Templates(directory="templates")
 
-# ==================== CONFIGURATION ====================
+# ==================== STRICT CONFIGURATION ====================
 CATEGORIES = ["Performance", "SEO", "UX", "Security"]
-PILLAR_WEIGHTS = {"Performance": 0.40, "SEO": 0.30, "UX": 0.20, "Security": 0.10}
+PILLAR_WEIGHTS = {"Performance": 0.45, "SEO": 0.25, "UX": 0.15, "Security": 0.15}
 
-BASE_METRICS: List[Tuple[str, str]] = [
-    ("First Contentful Paint (ms)", "Performance"),
-    ("Largest Contentful Paint (ms)", "Performance"),
-    ("Total Blocking Time (ms)", "Performance"),
-    ("Cumulative Layout Shift", "Performance"),
-    ("Time to First Byte (ms)", "Performance"),
-    ("Time to Interactive (ms)", "Performance"),
-    ("Speed Index (ms)", "Performance"),
-    ("DOM Element Count", "Performance"),
-    ("Resource Count", "Performance"),
-    ("Page Weight (KB)", "Performance"),
-    ("Page Title Present", "SEO"),
-    ("Meta Description", "SEO"),
-    ("Canonical Tag", "SEO"),
-    ("Single H1 Tag", "SEO"),
-    ("Heading Structure", "SEO"),
-    ("Image ALT Coverage %", "SEO"),
-    ("Internal Links Count", "SEO"),
-    ("External Links Count", "SEO"),
-    ("Structured Data", "SEO"),
-    ("Viewport Meta Tag", "UX"),
-    ("Mobile Responsiveness", "UX"),
-    ("Navigation Present", "UX"),
-    ("Core Web Vitals Pass", "UX"),
-    ("HTTPS Enforced", "Security"),
-    ("HSTS Header", "Security"),
-    ("Content Security Policy", "Security"),
-    ("X-Frame-Options", "Security"),
-    ("X-Content-Type-Options", "Security"),
-    ("Referrer-Policy", "Security"),
-    ("Permissions-Policy", "Security"),
-    ("Secure Cookies Flag", "Security"),
-    ("No Mixed Content", "Security"),
+# Metric Name, Category, Weight (Impact within category)
+STRICT_METRICS: List[Tuple[str, str, float]] = [
+    ("Largest Contentful Paint (ms)", "Performance", 10.0), # High Weight
+    ("Cumulative Layout Shift", "Performance", 8.0),       # High Weight
+    ("Total Blocking Time (ms)", "Performance", 7.0),
+    ("First Contentful Paint (ms)", "Performance", 5.0),
+    ("Time to First Byte (ms)", "Performance", 5.0),
+    ("Speed Index (ms)", "Performance", 4.0),
+    ("Time to Interactive (ms)", "Performance", 4.0),
+    ("Page Weight (KB)", "Performance", 3.0),
+    ("DOM Element Count", "Performance", 2.0),
+    ("Resource Count", "Performance", 2.0),
+    
+    ("HTTPS Enforced", "Security", 10.0),                 # Critical
+    ("Content Security Policy", "Security", 8.0),
+    ("HSTS Header", "Security", 5.0),
+    ("X-Frame-Options", "Security", 5.0),
+    ("Secure Cookies Flag", "Security", 4.0),
+    
+    ("Page Title Present", "SEO", 10.0),                  # Critical
+    ("Single H1 Tag", "SEO", 8.0),
+    ("Meta Description", "SEO", 7.0),
+    ("Canonical Tag", "SEO", 6.0),
+    ("Structured Data", "SEO", 5.0),
+    ("Image ALT Coverage %", "SEO", 4.0),
+    
+    ("Viewport Meta Tag", "UX", 10.0),                    # Critical
+    ("Core Web Vitals Pass", "UX", 10.0),
+    ("Navigation Present", "UX", 5.0),
 ]
 
-METRICS = list(BASE_METRICS)
-while len(METRICS) < 66:
-    METRICS.append((f"Compliance Check {len(METRICS)+1}", "SEO"))
+# Fill to 66 metrics with low-weight compliance checks
+METRICS_DATA = list(STRICT_METRICS)
+while len(METRICS_DATA) < 66:
+    METRICS_DATA.append((f"Compliance Check {len(METRICS_DATA)+1}", "SEO", 1.0))
 
-# ==================== HELPERS ====================
-def score_range(val: float, good: float, acceptable: float) -> int:
+# Extract names for the results loop
+METRICS = [(m[0], m[1]) for m in METRICS_DATA]
+
+# ==================== STRICT HELPERS ====================
+def score_range_strict(val: float, perfect: float, acceptable: float) -> int:
     try:
-        if val <= good: return 100
-        if val <= acceptable: return 70
-        return 40
-    except: return 40
+        if val <= perfect: return 100
+        if val <= acceptable: return 50 # Dropped from 70 to 50 for strictness
+        return 0 # Fail
+    except: return 0
 
-def score_bool(cond: bool) -> int:
-    return 100 if cond else 40
+def score_bool_strict(cond: bool) -> int:
+    return 100 if cond else 0 # Pass or Absolute Fail
 
-def score_percentage(covered: int, total: int) -> int:
+def score_percentage_strict(covered: int, total: int) -> int:
     if total <= 0: return 100
     pct = (covered / total) * 100
-    return 100 if pct >= 90 else 70 if pct >= 70 else 40
+    if pct >= 98: return 100
+    if pct >= 80: return 60
+    return 0
 
 # ==================== BROWSER AUDIT ====================
 async def perform_browser_audit(url: str, mobile: bool = False) -> Tuple[float, Dict, str, Dict[str, str]]:
@@ -105,7 +106,6 @@ async def perform_browser_audit(url: str, mobile: bool = False) -> Tuple[float, 
         return 800.0, {"fcp":2000,"lcp":2500,"cls":0.05,"tbt":100,"domCount":500}, "<html></html>", {}
 
     async with async_playwright() as p:
-        # Added production flags for Railway/Linux
         browser = await p.chromium.launch(
             headless=True, 
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
@@ -172,53 +172,60 @@ async def audit(request: Request):
         domain = urlparse(url).netloc
         imgs = soup.find_all("img")
         alt_count = len([i for i in imgs if i.get("alt", "").strip()])
-        internal = len([a for a in soup.find_all("a", href=True) if domain in a["href"] or a["href"].startswith("/")])
         resources = len(soup.find_all(["img", "script", "link"]))
         weight_kb = len(html.encode('utf-8')) / 1024
 
+        # Strict Scoring Mapping
         score_map = {
-            "First Contentful Paint (ms)": score_range(perf["fcp"], 1800, 3000),
-            "Largest Contentful Paint (ms)": score_range(perf["lcp"], 2500, 4000),
-            "Total Blocking Time (ms)": score_range(perf["tbt"], 200, 600),
-            "Cumulative Layout Shift": score_range(perf["cls"], 0.1, 0.25),
-            "Time to First Byte (ms)": score_range(ttfb, 200, 600),
-            "Time to Interactive (ms)": score_range(perf["fcp"] + perf["tbt"], 3800, 7300),
-            "Speed Index (ms)": score_range(perf["fcp"], 1800, 3400),
-            "DOM Element Count": score_range(perf["domCount"], 1500, 3000),
-            "Resource Count": score_range(resources, 50, 100),
-            "Page Weight (KB)": score_range(weight_kb, 1500, 3000),
-            "Page Title Present": score_bool(bool(soup.title)),
-            "Meta Description": score_bool(bool(soup.find("meta", {"name": "description"}))),
-            "Canonical Tag": score_bool(bool(soup.find("link", rel="canonical"))),
-            "Single H1 Tag": score_bool(len(soup.find_all("h1")) == 1),
-            "Heading Structure": score_bool(len(soup.find_all(["h1", "h2", "h3"])) > 3),
-            "Image ALT Coverage %": score_percentage(alt_count, len(imgs)),
-            "Internal Links Count": score_range(internal, 100, 50 if internal < 50 else 200),
-            "External Links Count": 100, 
-            "Structured Data": score_bool(bool(soup.find("script", type="application/ld+json"))),
-            "Viewport Meta Tag": score_bool(bool(soup.find("meta", {"name": "viewport"}))),
-            "Mobile Responsiveness": score_bool(bool(soup.find("meta", {"name": "viewport"}))),
-            "Navigation Present": score_bool(bool(soup.find("nav") or soup.find(id="nav"))),
-            "Core Web Vitals Pass": 100 if perf["lcp"] < 2500 and perf["cls"] < 0.1 else 40,
-            "HTTPS Enforced": score_bool(url.startswith("https")),
-            "HSTS Header": score_bool("strict-transport-security" in headers),
-            "Content Security Policy": score_bool("content-security-policy" in headers),
-            "X-Frame-Options": score_bool("x-frame-options" in headers),
-            "X-Content-Type-Options": score_bool("x-content-type-options" in headers),
-            "Referrer-Policy": score_bool("referrer-policy" in headers),
-            "Permissions-Policy": score_bool("permissions-policy" in headers),
-            "Secure Cookies Flag": score_bool("set-cookie" in headers and "secure" in headers["set-cookie"].lower()),
-            "No Mixed Content": score_bool(url.startswith("https")),
+            "Largest Contentful Paint (ms)": score_range_strict(perf["lcp"], 1200, 2500),
+            "Cumulative Layout Shift": score_range_strict(perf["cls"], 0.05, 0.1),
+            "Total Blocking Time (ms)": score_range_strict(perf["tbt"], 100, 300),
+            "First Contentful Paint (ms)": score_range_strict(perf["fcp"], 1000, 2000),
+            "Time to First Byte (ms)": score_range_strict(ttfb, 100, 400),
+            "Time to Interactive (ms)": score_range_strict(perf["fcp"] + perf["tbt"], 2500, 4500),
+            "Speed Index (ms)": score_range_strict(perf["fcp"], 1000, 2500),
+            "DOM Element Count": score_range_strict(perf["domCount"], 800, 1500),
+            "Resource Count": score_range_strict(resources, 30, 70),
+            "Page Weight (KB)": score_range_strict(weight_kb, 1000, 2000),
+            
+            "HTTPS Enforced": score_bool_strict(url.startswith("https")),
+            "Content Security Policy": score_bool_strict("content-security-policy" in headers),
+            "HSTS Header": score_bool_strict("strict-transport-security" in headers),
+            "X-Frame-Options": score_bool_strict("x-frame-options" in headers),
+            "Secure Cookies Flag": score_bool_strict("set-cookie" in headers and "secure" in headers["set-cookie"].lower()),
+            
+            "Page Title Present": score_bool_strict(bool(soup.title)),
+            "Single H1 Tag": score_bool_strict(len(soup.find_all("h1")) == 1),
+            "Meta Description": score_bool_strict(bool(soup.find("meta", {"name": "description"}))),
+            "Canonical Tag": score_bool_strict(bool(soup.find("link", rel="canonical"))),
+            "Structured Data": score_bool_strict(bool(soup.find("script", type="application/ld+json"))),
+            "Image ALT Coverage %": score_percentage_strict(alt_count, len(imgs)),
+            
+            "Viewport Meta Tag": score_bool_strict(bool(soup.find("meta", {"name": "viewport"}))),
+            "Core Web Vitals Pass": 100 if perf["lcp"] < 2500 and perf["cls"] < 0.1 else 0,
+            "Navigation Present": score_bool_strict(bool(soup.find("nav") or soup.find(id="nav"))),
         }
 
+        # Calculate Weighted Category Scores
+        pillar_weighted_sums = {c: 0.0 for c in CATEGORIES}
+        pillar_weight_totals = {c: 0.0 for c in CATEGORIES}
+        
         results = []
-        pillars = {c: [] for c in CATEGORIES}
-        for i, (name, cat) in enumerate(METRICS, 1):
+        for i, (name, cat, weight) in enumerate(METRICS_DATA, 1):
             score = score_map.get(name, 70) 
             results.append({"no": i, "name": name, "category": cat, "score": score})
-            pillars[cat].append(score)
+            
+            pillar_weighted_sums[cat] += (score * weight)
+            pillar_weight_totals[cat] += weight
 
-        pillar_avg = {c: round(sum(p)/len(p)) if p else 0 for c, p in pillars.items()}
+        pillar_avg = {}
+        for c in CATEGORIES:
+            if pillar_weight_totals[c] > 0:
+                pillar_avg[c] = round(pillar_weighted_sums[c] / pillar_weight_totals[c])
+            else:
+                pillar_avg[c] = 0
+
+        # Overall Grade using Pillar Weights
         total_grade = round(sum(pillar_avg[c] * PILLAR_WEIGHTS[c] for c in CATEGORIES))
 
         return {
@@ -239,7 +246,7 @@ async def download_pdf(request: Request):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", "B", 16)
-        pdf.cell(0, 10, "Audit Report: " + data['url'], ln=True, align='C')
+        pdf.cell(0, 10, "STRICT Audit Report: " + data['url'], ln=True, align='C')
         pdf.ln(5)
         pdf.set_font("Arial", "B", 12)
         pdf.cell(0, 10, f"Overall Score: {data['total_grade']}%", ln=True)
@@ -248,7 +255,7 @@ async def download_pdf(request: Request):
             pdf.cell(0, 8, f"{p}: {s}%", ln=True)
         pdf.ln(5)
         pdf.set_font("Arial", "B", 12)
-        pdf.cell(0, 10, "Detailed Metrics", ln=True)
+        pdf.cell(0, 10, "Detailed Metrics (Weighted)", ln=True)
         pdf.set_font("Arial", "", 8)
         pdf.cell(10, 8, "No", 1)
         pdf.cell(110, 8, "Metric", 1)
@@ -272,6 +279,5 @@ async def download_pdf(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    # Important: Railway uses the PORT env variable
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
