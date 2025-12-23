@@ -40,6 +40,7 @@
     .table tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
     .table tr:hover { background-color: rgba(255,255,255,0.05); }
     .kbd { background:#111827; border:1px solid #1f2937; border-radius:6px; padding:2px 6px; font-family:monospace;}
+    .prose-invert a { color: #7dd3fc; }
   </style>
 </head>
 
@@ -754,7 +755,6 @@
 
         if (!res.ok) {
           const msg = await res.text();
-          // Handle Playwright not installed (501)
           if (res.status === 501) {
             throw new Error('Auditing is not available on this server (Playwright not installed). Please install Playwright and Chromium: `pip install playwright && playwright install chromium`.');
           }
@@ -764,7 +764,6 @@
         const result = await res.json();
         state.lastResult = result;
 
-        // Enable PDF button
         el('download-btn').disabled = false;
 
         renderSummary(result);
@@ -773,14 +772,12 @@
         renderRoadmap(result.roadmap || '');
         renderSEOAudit(result.seo_audit || null);
 
-        // Reveal blocks
         show('metrics-block', true);
         show('chart-block', true);
         show('perf-block', true);
         show('roadmap-block', true);
         show('seo-block', !!result.seo_audit);
 
-        // Apply filters once to sync UI
         applyFilters();
 
       } catch (err) {
@@ -819,7 +816,6 @@
 
         if (!res.ok) throw new Error('Failed to generate PDF.');
 
-        // Stream to blob and force download
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -840,3 +836,4 @@
   </script>
 </body>
 </html>
+``
