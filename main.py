@@ -97,15 +97,12 @@ def score_pct_strict(covered: int, total: int) -> int:
         return 60
     return 0
 
-def clamp(n: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, n))
-
 # ==================== PLAYWRIGHT AUDIT ====================
 async def fetch_aux(page, base_url: str) -> Dict[str, Any]:
     """
-    Try to fetch robots.txt and sitemap via Playwright's route/request to avoid external libs.
+    Fetch robots.txt and sitemap via Playwright's page.request to avoid external networking libs.
     """
-    out = {"robots_ok": False, "sitemap_ok": False}
+    out = {"robots_ok": False, "sitemap_ok": False, "has_sitemap_in_robots": False}
     try:
         parsed = urlparse(base_url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
@@ -118,7 +115,6 @@ async def fetch_aux(page, base_url: str) -> Dict[str, Any]:
             out["has_sitemap_in_robots"] = ("sitemap:" in robots_text.lower())
         except Exception:
             out["robots_ok"] = False
-            out["has_sitemap_in_robots"] = False
 
         # sitemap.xml (common location)
         try:
@@ -133,7 +129,11 @@ async def fetch_aux(page, base_url: str) -> Dict[str, Any]:
 
 async def browser_audit(url: str, mobile: bool = False):
     if not PLAYWRIGHT_AVAILABLE:
-        return 9999, {"fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,"domCount":9999,"speedIndex":9999,"tti":9999,"transferKB":0,"resCount":0}, "<html>Playwright unavailable</html>", {}
+        return 9999, {
+            "fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,
+            "domCount":9999,"speedIndex":9999,"tti":9999,
+            "transferKB":0,"resCount":0
+        }, "<html>Playwright unavailable</html>", {}
 
     try:
         async with async_playwright() as p:
@@ -174,7 +174,7 @@ async def browser_audit(url: str, mobile: bool = False):
 
             page = await context.new_page()
 
-            # Avoid tripping challenges; continue all by default (you can tune)
+            # Let all requests through (tune if needed)
             await page.route("**/*", lambda route: route.continue_())
 
             start = time.time()
@@ -185,7 +185,7 @@ async def browser_audit(url: str, mobile: bool = False):
                 pass
 
             ttfb = (time.time() - start) * 1000  # ms
-            # Wait more for paints, LCP, resource timings
+            # Wait a bit to let paints and LCP occur
             await asyncio.sleep(4)
 
             # Collect performance entries
@@ -204,17 +204,14 @@ async def browser_audit(url: str, mobile: bool = False):
 
                     const domCount = document.querySelectorAll('*').length;
 
-                    // Approx Speed Index: use FCP + some heuristic on paints
+                    // Approx Speed Index: use FCP + heuristic
                     const speedIndex = fcp + (lcp - fcp) * 0.5;
 
-                    // Time to interactive approximation: FCP + TBT
+                    // TTI approximation: FCP + TBT
                     const tti = fcp + tbt;
 
-                    // Transfer size if available; fallback to 0
-                    const transferBytes = resources.reduce((sum, r) => {
-                        // PerformanceResourceTiming has transferSize on some browsers
-                        return sum + (r.transferSize || 0);
-                    }, 0);
+                    // Transfer size if available
+                    const transferBytes = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
 
                     return {
                         fcp, lcp, cls, tbt, domCount,
@@ -234,7 +231,11 @@ async def browser_audit(url: str, mobile: bool = False):
             return ttfb, perf, html, headers | aux
 
     except Exception:
-        return 9999, {"fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,"domCount":9999,"speedIndex":9999,"tti":9999,"transferKB":0,"resCount":0}, "<html>Audit failed</html>", {}
+        return 9999, {
+            "fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,
+            "domCount":9999,"speedIndex":9999,"tti":9999,
+            "transferKB":0,"resCount":0
+        }, "<html>Audit failed</html>", {}
 
 # ==================== RECOMMENDATIONS ====================
 def recommendations(scores: Dict[str, int]) -> List[str]:
@@ -451,7 +452,7 @@ async def download_pdf(request: Request):
                 story.append(Paragraph(f"• {r}", styles['Normal']))
             story.append(Spacer(1, 12))
 
-        # Metrics (trim to reasonable page size)
+        # Metrics
         story.append(Paragraph("<b>DETAILED METRICS</b>", styles['Heading2']))
         metrics = data.get("metrics", [])
         table_data = [["#", "Metric", "Category", "Score", "Status"]]
@@ -482,4 +483,3 @@ async def download_pdf(request: Request):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
-``
