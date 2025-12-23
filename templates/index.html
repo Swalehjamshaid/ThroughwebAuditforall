@@ -1,193 +1,242 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full scroll-smooth">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FF TECH ELITE v3 | Global Audit Standard</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
-
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-:root { --p: 0deg; }
-body { scroll-behavior: smooth; overflow-x:hidden; font-family: 'Outfit', sans-serif; }
-.bg-grid { background-size: 30px 30px; background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px); position: relative; }
-#particles { position: fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
-.glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s; box-shadow: 0 20px 60px rgba(14,165,233,0.15); }
-.dark .glass { background: rgba(15,23,42,0.85); border: 1px solid rgba(255,255,255,0.05); }
-.gauge { width:180px; height:180px; border-radius:50%; background: conic-gradient(from 0deg, #0ea5e9 var(--p), #6366f1 var(--p), #f1f5f9 0); position: relative; display:flex; align-items:center; justify-content:center; box-shadow: inset 0 0 20px rgba(0,0,0,0.05); transition: background 1s ease; }
-.gauge::after { content: ''; position:absolute; inset:12px; background:white; border-radius:50%; z-index:1; }
-.dark .gauge::after { background:#0f172a; }
-.gauge-label { z-index:2; font-weight:900; font-size:2.5rem; letter-spacing:-2px; text-shadow:0 0 10px rgba(0,0,0,0.1); }
-.btn-shimmer { position: relative; overflow: hidden; background: linear-gradient(90deg, #0ea5e9, #6366f1); color:white; font-weight:bold; text-transform:uppercase; border-radius:1rem; }
-.btn-shimmer::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent); transform: rotate(45deg); animation: shimmer 3s infinite; }
-@keyframes shimmer { 0% { left:-100%; } 100% { left:100%; } }
-section { scroll-margin-top:4rem; opacity:0; transform: translateY(20px); transition: all 1s ease; }
-section.visible { opacity:1; transform: translateY(0); }
-tr:hover { background: rgba(14,165,233,0.05); transition:0.3s; }
-li:hover { transform: translateX(5px); transition:0.3s; }
-.roadmap-item { opacity:0; transform: translateX(-20px); transition: all 0.5s ease; }
-.roadmap-item.visible { opacity:1; transform: translateX(0); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH ELITE v3 | Enterprise Audit Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .grade-circle { transition: stroke-dashoffset 0.5s ease; transform: rotate(-90deg); transform-origin: 50% 50%; }
+        .loader { border-top-color: #10b981; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
+<body class="text-slate-900">
 
-<body class="h-full bg-white dark:bg-[#020617] text-slate-900 dark:text-slate-100">
+    <nav class="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="bg-emerald-500 p-1.5 rounded-lg">
+                    <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
+                </div>
+                <span class="text-xl font-bold tracking-tight">FF TECH <span class="text-emerald-500">ELITE</span></span>
+            </div>
+            <div class="flex gap-4 items-center">
+                <span class="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">v3.0 Weighted Engine</span>
+            </div>
+        </div>
+    </nav>
 
-<canvas id="particles"></canvas>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <div class="bg-slate-900 rounded-3xl p-8 mb-8 text-white shadow-2xl shadow-emerald-900/10">
+            <div class="max-w-3xl">
+                <h1 class="text-4xl font-bold mb-4">Enterprise Web Audit</h1>
+                <p class="text-slate-400 mb-8">Professional-grade performance, SEO, and security diagnostics with weighted scoring and automated roadmap generation.</p>
+                
+                <div class="flex flex-col md:flex-row gap-3">
+                    <div class="relative flex-grow">
+                        <i data-lucide="globe" class="absolute left-4 top-3.5 text-slate-400 w-5 h-5"></i>
+                        <input id="urlInput" type="text" placeholder="https://example.com" 
+                               class="w-full pl-12 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder:text-slate-500">
+                    </div>
+                    <select id="modeInput" class="bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 focus:outline-none">
+                        <option value="desktop" class="text-black">Desktop</option>
+                        <option value="mobile" class="text-black">Mobile</option>
+                    </select>
+                    <button onclick="runAudit()" id="auditBtn" class="bg-emerald-500 hover:bg-emerald-600 px-8 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                        <span>Analyze Site</span>
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
 
-<nav class="sticky top-4 z-50 mx-auto max-w-7xl px-4 no-print">
-  <div class="glass rounded-3xl px-8 py-4 flex items-center justify-between shadow-lg">
-    <div class="flex items-center gap-4">
-      <div class="w-12 h-12 bg-black dark:bg-brand-600 rounded-2xl flex items-center justify-center shadow-glow">
-        <svg class="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      </div>
-      <div>
-        <h1 class="text-2xl font-black tracking-tighter uppercase italic">FF TECH <span class="text-brand-600">ELITE</span></h1>
-        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Global SEO Protocol v3.0</p>
-      </div>
-    </div>
-    <button id="toggleDark" class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 transition-transform active:scale-90">
-       <svg id="themeIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-    </button>
-  </div>
-</nav>
+        <div id="loading" class="hidden py-20 text-center">
+            <div class="loader w-12 h-12 border-4 border-slate-200 rounded-full mx-auto mb-4"></div>
+            <p class="text-slate-500 animate-pulse">Running 66 diagnostic checks...</p>
+        </div>
 
-<main class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 space-y-12 relative z-10">
+        <div id="results" class="hidden space-y-8">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+                    <h3 class="text-slate-500 font-semibold mb-6">OVERALL SCORE</h3>
+                    <div class="relative flex items-center justify-center">
+                        <svg class="w-48 h-48">
+                            <circle cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-100"></circle>
+                            <circle id="scoreCircle" cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" 
+                                    stroke-dasharray="552.92" stroke-dashoffset="552.92" class="grade-circle text-emerald-500"></circle>
+                        </svg>
+                        <span id="totalGrade" class="absolute text-5xl font-black">0%</span>
+                    </div>
+                    <button onclick="downloadPDF()" class="mt-8 flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700">
+                        <i data-lucide="download-cloud" class="w-5 h-5"></i>
+                        Download PDF Report
+                    </button>
+                </div>
 
-<section class="glass rounded-[2rem] p-10 shadow-2xl relative overflow-hidden">
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
-    <div class="lg:col-span-7 space-y-4">
-      <label class="text-xs font-black uppercase tracking-[0.2em] text-brand-600">Target Environment</label>
-      <input id="url" type="url" placeholder="https://your-empire.com" class="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 focus:border-brand-500 rounded-2xl px-6 py-5 text-xl font-bold outline-none transition-all"/>
-    </div>
-    <div class="lg:col-span-5 flex gap-4">
-      <button id="runAudit" class="flex-1 btn-shimmer text-white font-black uppercase tracking-widest py-5 shadow-2xl flex items-center justify-center gap-3">
-        Execute Scan
-        <div id="loading" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-      </button>
-    </div>
-  </div>
-  <p id="status" class="mt-6 font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">Waiting for audit...</p>
-</section>
+                <div class="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                    <h3 class="text-slate-500 font-semibold mb-6 uppercase tracking-wider text-sm">Pillar Distribution</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6" id="pillarGrid">
+                        </div>
+                    <div class="mt-8 h-40">
+                        <canvas id="pillarChart"></canvas>
+                    </div>
+                </div>
+            </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-  <div class="lg:col-span-4 glass rounded-[2.5rem] p-10 flex flex-col items-center text-center justify-center">
-    <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Health Index</h3>
-    <div id="gauge" class="gauge mb-10"><div class="gauge-label"><span id="overallScore">0%</span></div></div>
-    <p id="auditedAt" class="font-mono text-[10px] font-bold text-brand-600 mb-2">--</p>
-    <p id="summaryText" class="text-sm font-medium text-slate-500 leading-relaxed italic">Audit summary will appear here...</p>
-  </div>
-  <div class="lg:col-span-8 glass rounded-[2.5rem] p-10">
-    <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Core Pillar Distribution</h3>
-    <canvas id="pillarsChart" class="mb-6"></canvas>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-      <div class="space-y-3"><p class="text-[10px] font-black text-emerald-500 uppercase">Performance</p><p id="pillPerfVal" class="text-3xl font-black">0%</p></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-sky-500 uppercase">SEO Strength</p><p id="pillSeoVal" class="text-3xl font-black">0%</p></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-indigo-500 uppercase">UX Design</p><p id="pillUxVal" class="text-3xl font-black">0%</p></div>
-      <div class="space-y-3"><p class="text-[10px] font-black text-rose-500 uppercase">Security</p><p id="pillSecVal" class="text-3xl font-black">0%</p></div>
-    </div>
-  </div>
-</div>
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <div class="bg-emerald-900 rounded-3xl p-8 text-emerald-50 shadow-xl">
+                    <div class="flex items-center gap-2 mb-6">
+                        <i data-lucide="list-checks" class="text-emerald-400"></i>
+                        <h3 class="font-bold text-xl text-white">Action Roadmap</h3>
+                    </div>
+                    <div id="roadmapContent" class="space-y-4 text-sm leading-relaxed">
+                        </div>
+                </div>
 
-<section class="glass rounded-[2.5rem] p-12">
-  <div class="flex items-center gap-6 mb-10">
-    <div class="w-14 h-14 rounded-3xl bg-brand-gold/10 flex items-center justify-center text-brand-gold shadow-inner">
-      <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-    </div>
-    <div>
-      <h3 class="text-2xl font-black tracking-tight uppercase italic">Strategic Roadmap</h3>
-      <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Prioritized Optimization Steps</p>
-    </div>
-  </div>
-  <ul id="roadmapList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></ul>
-</section>
+                <div class="xl:col-span-2 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-bold">Advanced Diagnostics</h3>
+                        <span class="text-xs text-slate-400">Sorted by Weight</span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                                <tr>
+                                    <th class="px-6 py-4">Metric</th>
+                                    <th class="px-6 py-4">Category</th>
+                                    <th class="px-6 py-4 text-right">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metricsTable" class="divide-y divide-slate-100 text-sm">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
-<script>
-// Particle background
-const canvas=document.getElementById('particles');const ctx=canvas.getContext('2d');canvas.width=window.innerWidth;canvas.height=window.innerHeight;let particles=Array.from({length:150},()=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2+1,dx:(Math.random()-0.5)*0.5,dy:(Math.random()-0.5)*0.5}));function animate(){ctx.clearRect(0,0,canvas.width,canvas.height);particles.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(14,165,233,0.15)';ctx.fill();p.x+=p.dx;p.y+=p.dy;if(p.x>canvas.width)p.x=0;if(p.x<0)p.x=canvas.width;if(p.y>canvas.height)p.y=0;if(p.y<0)p.y=canvas.height;});requestAnimationFrame(animate);}animate();
-window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
+    <script>
+        lucide.createIcons();
+        let currentAuditData = null;
+        let myChart = null;
 
-// Dark mode toggle
-document.getElementById('toggleDark').addEventListener('click',()=>document.documentElement.classList.toggle('dark'));
+        async function runAudit() {
+            const url = document.getElementById('urlInput').value;
+            const mode = document.getElementById('modeInput').value;
+            const btn = document.getElementById('auditBtn');
+            
+            if(!url) return alert("Please enter a URL");
 
-// Chart.js setup
-const ctxChart=document.getElementById('pillarsChart').getContext('2d');
-const pillarsChart=new Chart(ctxChart,{
-    type:'bar',
-    data:{labels:['Performance','SEO','UX','Security'], datasets:[{label:'Score %', data:[0,0,0,0], backgroundColor:['#10B981','#0EA5E9','#6366F1','#F43F5E'], borderRadius:6}]},
-    options:{indexAxis:'y', responsive:true, scales:{x:{max:100}}, animation:{duration:500}}
-});
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('loading').classList.remove('hidden');
+            btn.disabled = true;
 
-// Animate gauge & bars progressively
-function animateValue(id,start,end,step=1,interval=15,callback=null){
-    let val=start;
-    const elem=document.getElementById(id);
-    const timer=setInterval(()=>{
-        if(val>=end){clearInterval(timer); elem.textContent=end+'%'; if(callback)callback();} 
-        else { val+=step; elem.textContent=val+'%'; }
-    },interval);
-}
-
-function animateGauge(target){ let deg=0; const g=document.getElementById('gauge'); const lbl=document.getElementById('overallScore'); const step=setInterval(()=>{ if(deg>=target*3.6){ clearInterval(step); lbl.textContent=`${target}%` } else { deg+=2; g.style.setProperty('--p',`${deg}deg`); lbl.textContent=`${Math.round(deg/3.6)}%` }},15);}
-
-// Animate chart bars progressively
-function animateChartBars(targets){
-    let current=[0,0,0,0];
-    const step=setInterval(()=>{
-        let done=true;
-        for(let i=0;i<4;i++){
-            if(current[i]<targets[i]){
-                current[i]+=1;
-                done=false;
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, mode })
+                });
+                
+                if(!res.ok) throw new Error("Audit failed");
+                
+                const data = await res.json();
+                currentAuditData = data;
+                renderResults(data);
+            } catch (e) {
+                alert(e.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+                btn.disabled = false;
             }
         }
-        pillarsChart.data.datasets[0].data=current;
-        pillarsChart.update();
-        if(done) clearInterval(step);
-    },20);
-}
 
-// Populate audit with progressive animation
-function populateAudit(data){
-  animateGauge(data.overallScore);
-  animateValue('pillPerfVal',0,data.performance);
-  animateValue('pillSeoVal',0,data.seo);
-  animateValue('pillUxVal',0,data.ux);
-  animateValue('pillSecVal',0,data.security);
-  animateChartBars([data.performance,data.seo,data.ux,data.security]);
-  document.getElementById('auditedAt').textContent=data.auditedAt;
-  document.getElementById('summaryText').textContent=data.summary;
-  const roadmapUl=document.getElementById('roadmapList'); roadmapUl.innerHTML='';
-  data.roadmap.forEach(step=>{ const li=document.createElement('li'); li.className='roadmap-item glass p-4 rounded-xl shadow'; li.textContent=step; roadmapUl.appendChild(li); });
-  document.querySelectorAll('.roadmap-item').forEach((it,i)=>{ setTimeout(()=>{it.classList.add('visible')},i*200) });
-}
+        function renderResults(data) {
+            document.getElementById('results').classList.remove('hidden');
+            
+            // Score Animation
+            const grade = data.total_grade;
+            document.getElementById('totalGrade').innerText = grade + "%";
+            const circle = document.getElementById('scoreCircle');
+            const offset = 552.92 - (grade / 100 * 552.92);
+            circle.style.strokeDashoffset = offset;
 
-// Trigger audit
-document.getElementById('runAudit').addEventListener('click',()=>{
-  const url=document.getElementById('url').value;
-  document.getElementById('loading').classList.remove('hidden');
-  document.getElementById('status').textContent='Audit in progress...';
+            // Pillar Grid
+            const pillarGrid = document.getElementById('pillarGrid');
+            pillarGrid.innerHTML = '';
+            Object.entries(data.pillars).forEach(([name, score]) => {
+                const color = score > 85 ? 'emerald' : score > 60 ? 'amber' : 'red';
+                pillarGrid.innerHTML += `
+                    <div class="text-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div class="text-2xl font-bold text-${color}-600">${score}%</div>
+                        <div class="text-[10px] uppercase font-bold text-slate-400 mt-1">${name}</div>
+                    </div>
+                `;
+            });
 
-  fetch(`/audit?url=${encodeURIComponent(url)}`)
-    .then(res=>res.json())
-    .then(data=>{
-      populateAudit(data);
-      document.getElementById('status').textContent='Audit completed!';
-      document.getElementById('loading').classList.add('hidden');
-    })
-    .catch(err=>{
-      console.error(err);
-      document.getElementById('status').textContent='Audit failed!';
-      document.getElementById('loading').classList.add('hidden');
-    });
-});
+            // Roadmap
+            document.getElementById('roadmapContent').innerHTML = data.roadmap;
 
-// Fade-in sections
-document.querySelectorAll('section').forEach(s => new IntersectionObserver(entries => { entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); }) }, {threshold:0.1}).observe(s));
-</script>
+            // Table
+            const table = document.getElementById('metricsTable');
+            table.innerHTML = '';
+            data.metrics.sort((a,b) => b.weight - a.weight).forEach(m => {
+                const scoreColor = m.score > 85 ? 'text-emerald-600' : m.score > 60 ? 'text-amber-600' : 'text-red-600';
+                table.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-6 py-4 font-medium">${m.name}</td>
+                        <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">${m.category}</span></td>
+                        <td class="px-6 py-4 text-right font-bold ${scoreColor}">${m.score}%</td>
+                    </tr>
+                `;
+            });
 
+            // Chart
+            if(myChart) myChart.destroy();
+            const ctx = document.getElementById('pillarChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.pillars),
+                    datasets: [{
+                        label: 'Weighted Score',
+                        data: Object.values(data.pillars),
+                        backgroundColor: '#10b981',
+                        borderRadius: 8
+                    }]
+                },
+                options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            window.scrollTo({ top: document.getElementById('results').offsetTop - 100, behavior: 'smooth' });
+            lucide.createIcons();
+        }
+
+        async function downloadPDF() {
+            if(!currentAuditData) return;
+            const res = await fetch('/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentAuditData)
+            });
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Audit_Report_${Date.now()}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+    </script>
 </body>
 </html>
