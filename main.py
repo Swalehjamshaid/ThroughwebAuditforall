@@ -1,302 +1,282 @@
-import asyncio
-import time
-import io
-import os
-from typing import Dict, List, Tuple
+import time, io, json, math, re, subprocess, tempfile, os
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-
+import requests
 from bs4 import BeautifulSoup
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from playwright.async_api import async_playwright
 from fpdf import FPDF
 
-try:
-    from playwright.async_api import async_playwright
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
+# =====================================================
+# APP SETUP
+# =====================================================
 
-app = FastAPI(title="FF TECH ELITE – Real Audit Engine v2.0")
+app = FastAPI(title="FF TECH ELITE – Top 1% Real Audit Engine")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-templates = Jinja2Templates(directory="templates")
+# =====================================================
+# HELPERS
+# =====================================================
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+def normalize_url(url):
+    return url if url.startswith("http") else f"https://{url}"
 
-# ==================== CONFIGURATION ====================
-CATEGORIES = ["Performance", "SEO", "UX", "Security"]
-PILLAR_WEIGHTS = {"Performance": 0.40, "SEO": 0.30, "UX": 0.20, "Security": 0.10}
+def clamp(v):
+    return max(0, min(100, int(v)))
 
-METRICS: List[Tuple[str, str]] = [
-    ("Largest Contentful Paint (ms)", "Performance"),
-    ("Cumulative Layout Shift", "Performance"),
-    ("Total Blocking Time (ms)", "Performance"),
-    ("First Contentful Paint (ms)", "Performance"),
-    ("Time to First Byte (ms)", "Performance"),
-    ("Speed Index (ms)", "Performance"),
-    ("Time to Interactive (ms)", "Performance"),
-    ("Page Weight (KB)", "Performance"),
-    ("DOM Element Count", "Performance"),
-    ("Resource Count", "Performance"),
-    ("Page Title Present", "SEO"),
-    ("Meta Description Present", "SEO"),
-    ("Canonical Tag Present", "SEO"),
-    ("Single H1 Tag", "SEO"),
-    ("Structured Data Present", "SEO"),
-    ("Image ALT Coverage %", "SEO"),
-    ("Viewport Meta Tag Present", "UX"),
-    ("Core Web Vitals Pass", "UX"),
-    ("Navigation Present", "UX"),
-    ("HTTPS Enforced", "Security"),
-    ("HSTS Header Present", "Security"),
-    ("Content Security Policy Present", "Security"),
-    ("X-Frame-Options Present", "Security"),
-    ("X-Content-Type-Options Present", "Security"),
-    ("Referrer-Policy Present", "Security"),
-    ("Permissions-Policy Present", "Security"),
-]
+def score_bool(v):
+    return 100 if v else 0
 
-while len(METRICS) < 66:
-    METRICS.append((f"Advanced Compliance Check {len(METRICS)+1}", "SEO"))
+# ---------------- WCAG CONTRAST MATH ----------------
 
-# ==================== FAIR & ACCURATE SCORING ====================
-def score_strict(val: float, good: float, acceptable: float) -> int:
-    if val <= good: return 100
-    if val <= acceptable: return 70
-    return 40
+def _lin(c):
+    c = c / 255
+    return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
 
-def score_bool_strict(cond: bool) -> int:
-    return 100 if cond else 40
+def luminance(rgb):
+    r, g, b = rgb
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
 
-def score_pct_strict(covered: int, total: int) -> int:
-    if total == 0: return 100
-    pct = (covered / total) * 100
-    if pct >= 90: return 100
-    if pct >= 70: return 70
-    return 40
+def contrast_ratio(fg, bg):
+    L1 = luminance(fg) + 0.05
+    L2 = luminance(bg) + 0.05
+    return max(L1, L2) / min(L1, L2)
 
-# ==================== MAXIMUM STEALTH AUDIT ====================
-async def browser_audit(url: str, mobile: bool = False):
-    if not PLAYWRIGHT_AVAILABLE:
-        return 9999, {"fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,"domCount":9999}, "<html></html>", {}
+# ---------------- CVSS STYLE ----------------
 
-    for attempt in range(3):  # Retry 3 times
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-blink-features=AutomationControlled",
-                        "--ignore-certificate-errors",
-                        "--disable-web-security",
-                        "--allow-running-insecure-content"
-                    ]
-                )
-                context = await browser.new_context(
-                    viewport={"width": 390, "height": 844} if mobile else {"width": 1366, "height": 768},
-                    user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                    java_script_enabled=True,
-                    bypass_csp=True,
-                    ignore_https_errors=True,
-                    has_touch=mobile,
-                    is_mobile=mobile,
-                    locale="en-US",
-                    timezone_id="America/Los_Angeles"
-                )
+CVSS = {
+    "low": 2.0,
+    "medium": 5.0,
+    "high": 7.5,
+    "critical": 9.8
+}
 
-                await context.add_init_script("""
-                    () => {
-                        Object.defineProperty(navigator, 'webdriver', {get: () => false});
-                        Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-                        Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
-                        Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
-                        window.chrome = { runtime: {}, app: {}, csi: () => {}, loadTimes: () => {} };
-                    }
-                """)
+# =====================================================
+# LIGHTHOUSE JSON PARITY (REAL)
+# =====================================================
 
-                page = await context.new_page()
-                start = time.time()
+def run_lighthouse(url, mode):
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, "lh.json")
+        cmd = [
+            "lighthouse",
+            url,
+            "--output=json",
+            f"--output-path={out}",
+            "--quiet",
+            "--chrome-flags=--headless"
+        ]
+        if mode == "mobile":
+            cmd.append("--preset=mobile")
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return json.load(open(out))
 
-                await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                ttfb = (time.time() - start) * 1000
-                await asyncio.sleep(6)  # Extra time for Apple/Google dynamic content
+# =====================================================
+# CORE AUDIT ENGINE
+# =====================================================
 
-                perf = await page.evaluate("""
-                    () => {
-                        const p = performance.getEntriesByType('paint');
-                        const l = performance.getEntriesByType('largest-contentful-paint');
-                        const s = performance.getEntriesByType('layout-shift')
-                            .filter(e => !e.hadRecentInput)
-                            .reduce((a, e) => a + e.value, 0);
-                        const t = performance.getEntriesByType('longtask')
-                            .reduce((a, t) => a + Math.max(0, t.duration - 50), 0);
-                        const fcp = p.find(e => e.name === 'first-contentful-paint')?.startTime || 9999;
-                        const lcp = l[l.length - 1]?.startTime || 9999;
-                        return {fcp, lcp, cls: s, tbt: t, domCount: document.querySelectorAll('*').length};
-                    }
-                """)
+async def run_audit(url, mode):
+    metrics = []
+    issues = []
 
-                html = await page.content()
-                headers = {}
-                try:
-                    resp = await page.response()
-                    if resp:
-                        headers = {k.lower(): v for k, v in resp.headers.items()}
-                except:
-                    pass
+    # ---------------- REAL BROWSER ----------------
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        context = await browser.new_context(
+            viewport={"width": 375, "height": 812} if mode == "mobile" else {"width": 1440, "height": 900}
+        )
+        page = await context.new_page()
+        await page.goto(url, wait_until="networkidle", timeout=60000)
+        html = await page.content()
+        await browser.close()
 
-                await context.close()
-                await browser.close()
+    soup = BeautifulSoup(html, "html.parser")
 
-                # Success if content is substantial
-                if len(html) > 3000 and perf["lcp"] < 9000:
-                    return ttfb, perf, html, headers
+    # =================================================
+    # PERFORMANCE – LIGHTHOUSE PARITY
+    # =================================================
 
-        except Exception as e:
-            print(f"Attempt {attempt+1} failed: {e}")
-            await asyncio.sleep(3)
+    lh = run_lighthouse(url, mode)
+    audits = lh["audits"]
 
-    # Final fallback
-    return 9999, {"fcp":9999,"lcp":9999,"cls":0.5,"tbt":999,"domCount":9999}, "<html></html>", {}
+    perf_score = round(lh["categories"]["performance"]["score"] * 100)
 
-# ==================== AUDIT ENDPOINT ====================
+    def lh_metric(key, name):
+        val = audits[key].get("numericValue", 0)
+        score = clamp(100 - (val / 50))
+        metrics.append({"name": name, "category": "Performance", "score": score})
+
+    lh_metric("largest-contentful-paint", "Largest Contentful Paint")
+    lh_metric("cumulative-layout-shift", "Cumulative Layout Shift")
+    lh_metric("total-blocking-time", "Total Blocking Time")
+
+    # =================================================
+    # SEO + FIX SUGGESTIONS
+    # =================================================
+
+    def seo(cond, name, fix):
+        score = score_bool(cond)
+        if not cond:
+            issues.append({"type": "SEO", "issue": name, "fix": fix})
+        metrics.append({"name": name, "category": "SEO", "score": score})
+
+    seo(soup.title and 15 <= len(soup.title.text) <= 60,
+        "Title Tag Length",
+        "Use a unique 50–60 character <title>.")
+
+    seo(soup.find("meta", {"name": "description"}),
+        "Meta Description",
+        "Add a compelling meta description.")
+
+    seo(len(soup.find_all("h1")) == 1,
+        "Single H1",
+        "Ensure exactly one H1 per page.")
+
+    seo(requests.get(url + "/robots.txt", timeout=10).status_code == 200,
+        "robots.txt",
+        "Create a robots.txt file.")
+
+    seo(requests.get(url + "/sitemap.xml", timeout=10).status_code == 200,
+        "sitemap.xml",
+        "Generate and submit sitemap.xml.")
+
+    # =================================================
+    # ACCESSIBILITY – WCAG 2.1 AA / AAA
+    # =================================================
+
+    imgs = soup.find_all("img")
+    alt_ok = sum(1 for i in imgs if i.get("alt"))
+
+    metrics.append({
+        "name": "Image ALT Coverage",
+        "category": "Accessibility",
+        "score": clamp((alt_ok / len(imgs)) * 100 if imgs else 100)
+    })
+
+    contrast_fail = 0
+    for el in soup.find_all(text=True):
+        parent = el.parent
+        if parent.name in ["script", "style"]:
+            continue
+        style = parent.get("style", "")
+        fg = re.findall(r"color:\s*rgb\((\d+),(\d+),(\d+)\)", style)
+        bg = re.findall(r"background.*rgb\((\d+),(\d+),(\d+)\)", style)
+        if fg and bg:
+            ratio = contrast_ratio(tuple(map(int, fg[0])), tuple(map(int, bg[0])))
+            if ratio < 4.5:
+                contrast_fail += 1
+
+    if contrast_fail:
+        issues.append({
+            "type": "Accessibility",
+            "issue": "Low color contrast",
+            "fix": "Ensure text contrast ≥ 4.5:1 (WCAG AA)."
+        })
+
+    metrics.append({
+        "name": "Color Contrast (WCAG AA)",
+        "category": "Accessibility",
+        "score": clamp(100 - contrast_fail * 10)
+    })
+
+    # =================================================
+    # SECURITY – CVSS STYLE SCORING
+    # =================================================
+
+    headers = requests.get(url, timeout=10).headers
+    sec_risk = 0
+
+    def sec(cond, name, severity, fix):
+        nonlocal sec_risk
+        if not cond:
+            sec_risk += CVSS[severity]
+            issues.append({
+                "type": "Security",
+                "issue": name,
+                "severity": severity,
+                "fix": fix
+            })
+        metrics.append({"name": name, "category": "Security", "score": score_bool(cond)})
+
+    sec(urlparse(url).scheme == "https",
+        "HTTPS",
+        "critical",
+        "Force HTTPS site-wide.")
+
+    sec("strict-transport-security" in headers,
+        "HSTS Header",
+        "high",
+        "Add Strict-Transport-Security header.")
+
+    sec("content-security-policy" in headers,
+        "Content Security Policy",
+        "high",
+        "Define a strict Content-Security-Policy.")
+
+    security_score = clamp(100 - sec_risk * 5)
+
+    # =================================================
+    # PILLARS
+    # =================================================
+
+    def pillar(cat):
+        s = [m["score"] for m in metrics if m["category"] == cat]
+        return round(sum(s) / len(s)) if s else 100
+
+    pillars = {
+        "Performance": perf_score,
+        "SEO": pillar("SEO"),
+        "Accessibility": pillar("Accessibility"),
+        "Security": security_score,
+        "UX": round((perf_score + pillar("Accessibility")) / 2)
+    }
+
+    total = round(sum(pillars.values()) / len(pillars))
+
+    return {
+        "url": url,
+        "total_grade": total,
+        "pillars": pillars,
+        "metrics": metrics,
+        "issues": issues,
+        "summary": (
+            "Audit uses real Chromium, Google Lighthouse JSON parity, "
+            "WCAG 2.1 AA contrast math, SEO issue detection with fixes, "
+            "and CVSS-style security risk scoring."
+        )
+    }
+
+# =====================================================
+# API ENDPOINTS
+# =====================================================
+
 @app.post("/audit")
-async def audit(request: Request):
-    try:
-        data = await request.json()
-        raw_url = data.get("url", "").strip()
-        if not raw_url:
-            raise HTTPException(400, "URL required")
-        url = raw_url if raw_url.startswith(("http://", "https://")) else f"https://{raw_url}"
-        mobile = data.get("mode") == "mobile"
+async def audit(req: Request):
+    body = await req.json()
+    return await run_audit(normalize_url(body["url"]), body.get("mode", "desktop"))
 
-        ttfb, perf, html, headers = await browser_audit(url, mobile)
-
-        # Fair fallback only when clearly blocked
-        if perf["lcp"] > 8000 or len(html) < 2000 or "challenge" in html.lower() or "akamai" in html.lower():
-            return {
-                "url": url,
-                "total_grade": 75,
-                "pillars": {"Performance": 70, "SEO": 85, "UX": 80, "Security": 70},
-                "metrics": [{"no": i, "name": n, "category": c, "score": 80 if "Present" in n or "Enforced" in n else 60} for i, (n, c) in enumerate(METRICS, 1)],
-                "summary": "Audit partially limited by protection. Estimated realistic score.",
-                "audited_at": time.strftime("%Y-%m-%d %H:%M")
-            }
-
-        soup = BeautifulSoup(html, "html.parser")
-        imgs = soup.find_all("img")
-        alt_ok = len([i for i in imgs if i.get("alt", "").strip()])
-        resources = len(soup.find_all(["img", "script", "link", "style", "iframe"]))
-        weight_kb = len(html.encode()) / 1024
-
-        scores = {
-            "Largest Contentful Paint (ms)": score_strict(perf["lcp"], 2500, 4000),
-            "Cumulative Layout Shift": score_strict(perf["cls"], 0.1, 0.25),
-            "Total Blocking Time (ms)": score_strict(perf["tbt"], 200, 600),
-            "First Contentful Paint (ms)": score_strict(perf["fcp"], 1800, 3000),
-            "Time to First Byte (ms)": score_strict(ttfb, 800, 2000),
-            "Speed Index (ms)": score_strict(perf["fcp"], 1800, 3400),
-            "Time to Interactive (ms)": score_strict(perf["fcp"] + perf["tbt"], 3800, 7300),
-            "Page Weight (KB)": score_strict(weight_kb, 1600, 3000),
-            "DOM Element Count": score_strict(perf["domCount"], 1500, 3000),
-            "Resource Count": score_strict(resources, 80, 150),
-
-            "Page Title Present": score_bool_strict(bool(soup.title and soup.title.string.strip())),
-            "Meta Description Present": score_bool_strict(bool(soup.find("meta", attrs={"name": "description"}))),
-            "Canonical Tag Present": score_bool_strict(bool(soup.find("link", rel="canonical"))),
-            "Single H1 Tag": score_bool_strict(len(soup.find_all("h1")) == 1),
-            "Structured Data Present": score_bool_strict(bool(soup.find_all("script", type="application/ld+json"))),
-            "Image ALT Coverage %": score_pct_strict(alt_ok, len(imgs)),
-
-            "Viewport Meta Tag Present": score_bool_strict(bool(soup.find("meta", attrs={"name": "viewport"}))),
-            "Core Web Vitals Pass": 100 if perf["lcp"] <= 2500 and perf["cls"] <= 0.1 and perf["tbt"] <= 200 else 70 if perf["lcp"] <= 4000 and perf["cls"] <= 0.25 and perf["tbt"] <= 600 else 40,
-            "Navigation Present": score_bool_strict(bool(soup.find("nav"))),
-
-            "HTTPS Enforced": score_bool_strict(url.startswith("https://")),
-            "HSTS Header Present": score_bool_strict("strict-transport-security" in headers),
-            "Content Security Policy Present": score_bool_strict("content-security-policy" in headers),
-            "X-Frame-Options Present": score_bool_strict(headers.get("x-frame-options") in ("DENY", "SAMEORIGIN")),
-            "X-Content-Type-Options Present": score_bool_strict(headers.get("x-content-type-options") == "nosniff"),
-            "Referrer-Policy Present": score_bool_strict("referrer-policy" in headers),
-            "Permissions-Policy Present": score_bool_strict("permissions-policy" in headers),
-        }
-
-        results = []
-        pillar_sums = {c: [] for c in CATEGORIES}
-        for i, (name, cat) in enumerate(METRICS, 1):
-            score = scores.get(name, 70)
-            results.append({"no": i, "name": name, "category": cat, "score": score})
-            pillar_sums[cat].append(score)
-
-        pillar_avg = {c: round(sum(pillar_sums[c]) / len(pillar_sums[c])) if pillar_sums[c] else 0 for c in CATEGORIES}
-        total_grade = round(sum(pillar_avg[c] * PILLAR_WEIGHTS[c] for c in CATEGORIES))
-
-        summary = f"LCP {perf['lcp']:.0f}ms • CLS {perf['cls']:.2f} • TBT {perf['tbt']:.0f}ms • Weight {weight_kb:.0f}KB"
-
-        return {
-            "url": url,
-            "total_grade": total_grade,
-            "pillars": pillar_avg,
-            "metrics": results,
-            "summary": summary,
-            "audited_at": time.strftime("%Y-%m-%d %H:%M")
-        }
-
-    except Exception as e:
-        print(f"Audit error: {e}")
-        return {
-            "url": raw_url or "unknown",
-            "total_grade": 70,
-            "pillars": {"Performance": 65, "SEO": 80, "UX": 70, "Security": 70},
-            "metrics": [{"no": i, "name": n, "category": c, "score": 70} for i, (n, c) in enumerate(METRICS, 1)],
-            "summary": "Audit partially failed. Estimated realistic score.",
-            "audited_at": time.strftime("%Y-%m-%d %H:%M")
-        }
-
-# ==================== FULL 66 METRICS PDF ====================
 @app.post("/download")
-async def download_pdf(request: Request):
-    try:
-        data = await request.json()
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 20)
-        pdf.cell(0, 15, "FF TECH ELITE FULL AUDIT REPORT", ln=1, align="C")
-        pdf.ln(8)
-        pdf.set_font("Helvetica", "", 12)
-        pdf.cell(0, 10, f"URL: {data['url']}", ln=1)
-        pdf.cell(0, 10, f"Overall Score: {data['total_grade']}%", ln=1)
-        pdf.cell(0, 10, f"{data['summary']}", ln=1)
-        pdf.ln(8)
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, "PILLAR SCORES", ln=1)
-        pdf.set_font("Helvetica", "", 11)
-        for p, s in data["pillars"].items():
-            pdf.cell(0, 8, f"{p}: {s}%", ln=1)
-        pdf.ln(8)
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 10, "ALL 66 METRICS", ln=1)
-        pdf.set_font("Helvetica", "", 8)
-        for m in data["metrics"]:
-            status = "EXCELLENT" if m["score"] == 100 else "GOOD" if m["score"] >= 60 else "IMPROVE"
-            pdf.cell(0, 6, f"{m['no']:2}. {m['name'][:70]:70} ({m['category']}) {m['score']:3}% [{status}]", ln=1)
+async def download(data: dict):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=12)
 
-        return StreamingResponse(io.BytesIO(pdf.output(dest="S").encode("latin1")),
-                                 media_type="application/pdf",
-                                 headers={"Content-Disposition": "attachment; filename=FFTechElite_Full_Report.pdf"})
-    except Exception as e:
-        print(f"PDF error: {e}")
-        raise HTTPException(500, "PDF generation failed")
+    pdf.cell(0, 10, "FF TECH ELITE – Enterprise Audit Report", ln=True)
+    pdf.cell(0, 10, f"URL: {data['url']}", ln=True)
+    pdf.cell(0, 10, f"Overall Score: {data['total_grade']}%", ln=True)
+    pdf.ln(5)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    pdf.cell(0, 10, "Detected Issues & Fixes:", ln=True)
+    for i in data.get("issues", []):
+        pdf.multi_cell(0, 8, f"- [{i['type']}] {i['issue']} → FIX: {i['fix']}")
+
+    stream = io.BytesIO(pdf.output(dest="S").encode("latin1"))
+    return StreamingResponse(stream, media_type="application/pdf")
