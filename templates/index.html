@@ -1,839 +1,148 @@
-
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>FF TECH ELITE v3 — Weighted Audit Engine</title>
+  <meta charset="UTF-8">
+  <title>FF TECH ELITE v3 — Professional Website Audit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Tailwind CSS (CDN) -->
-  https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css
-  <!-- Chart.js (CDN) -->
-  https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
+  <!-- Tailwind -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
-    /* Minimal custom polish */
-    :root {
-      --bg: #0b1220;
-      --card: #0f172a;
-      --text: #e5e7eb;
-      --muted: #94a3b8;
-      --primary: #10b981; /* teal-500 */
-      --secondary: #0ea5e9; /* sky-500 */
-      --warn: #f59e0b; /* amber-500 */
-      --danger: #ef4444; /* red-500 */
-    }
-    html, body { background: var(--bg); color: var(--text); }
-    .card {
-      background: var(--card); border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 12px;
-    }
-    .chip { border-radius: 9999px; padding: 2px 8px; font-size: 12px; }
-    .chip-perf { background: #0ea5e933; color: #7dd3fc; border: 1px solid #0ea5e9; }
-    .chip-seo  { background: #10b98133; color: #6ee7b7; border: 1px solid #10b981; }
-    .chip-ux   { background: #f59e0b33; color: #fde68a; border: 1px solid #f59e0b; }
-    .chip-sec  { background: #ef444433; color: #fecaca; border: 1px solid #ef4444; }
-    .score-pill { height: 8px; border-radius: 6px; background: #1f2937; }
-    .score-bar  { height: 8px; border-radius: 6px; }
-    .grade-strong { color: var(--primary); }
-    .table th { background:#0f172a; color:#fff; font-weight:600; }
-    .table tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
-    .table tr:hover { background-color: rgba(255,255,255,0.05); }
-    .kbd { background:#111827; border:1px solid #1f2937; border-radius:6px; padding:2px 6px; font-family:monospace;}
-    .prose-invert a { color: #7dd3fc; }
+    body { font-family: 'Inter', sans-serif; background:#020617; color:#e5e7eb }
+    .card { background:#020617; border:1px solid #1e293b; border-radius:16px }
+    .glow { box-shadow:0 0 0 1px rgba(56,189,248,.15),0 20px 40px rgba(2,132,199,.15) }
+    .score-bar { height:10px; border-radius:999px }
   </style>
 </head>
 
-<body class="h-full">
-  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    <!-- Header -->
-    <header class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div aria-hidden="true" class="w-10 h-10 rounded bg-gradient-to-br from-teal-500 to-sky-500"></div>
-        <div>
-          <h1 class="text-xl font-semibold">FF TECH ELITE v3</h1>
-          <p class="text-sm text-gray-400">Weighted Audit Engine • FastAPI + Playwright</p>
-        </div>
-      </div>
-      <div class="text-right">
-        <p class="text-xs text-gray-400">Operational Dashboard</p>
-        <p class="text-sm">Hello, <span class="font-medium">Khan Roy Jamshaid</span></p>
-      </div>
-    </header>
-
-    <!-- Input Card -->
-    <section class="card p-4">
-      <form id="audit-form" class="space-y-3" aria-label="Run web audit">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div class="md:col-span-2">
-            <label for="url" class="block text-sm text-gray-300 mb-1">Target URL</label>
-            <input id="url" name="url" type="url" required
-                   placeholder="https://example.com"
-                   class="w-full rounded-md bg-gray-900 border border-gray-700 px-3 py-2 text-gray-100 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                   aria-describedby="urlHelp" />
-            <p id="urlHelp" class="text-xs text-gray-400 mt-1">
-              Tip: try <span class="kbd">https://www.haier.com.pk</span> to see SEO extras.
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-sm text-gray-300 mb-1">Mode</label>
-            <div class="flex items-center gap-2">
-              <input id="mode-mobile" name="mode" type="checkbox"
-                     class="h-4 w-4 text-teal-500 border-gray-700 bg-gray-900 rounded focus:ring-teal-500" />
-              <label for="mode-mobile" class="text-sm">Mobile (unchecked = Desktop)</label>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button type="submit"
-                  class="px-4 py-2 rounded-md bg-teal-600 hover:bg-teal-500 focus:ring-2 focus:ring-teal-400">
-            Run Audit
-          </button>
-          <button type="button" id="download-btn" disabled
-                  class="px-4 py-2 rounded-md bg-sky-600 hover:bg-sky-500 focus:ring-2 focus:ring-sky-400 disabled:opacity-50">
-            Download PDF Report
-          </button>
-
-          <span id="busy" class="hidden text-sm text-gray-300 flex items-center gap-2">
-            <svg class="animate-spin h-4 w-4 text-teal-400" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" opacity=".25"></circle>
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="4"></path>
-            </svg>
-            Auditing…
-          </span>
-        </div>
-
-        <div id="error" role="alert" class="hidden text-sm text-red-400"></div>
-      </form>
-    </section>
-
-    <!-- Summary Cards -->
-    <section id="summary" class="hidden grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="card p-4">
-        <p class="text-sm text-gray-400">Overall Health Score</p>
-        <p id="grade" class="text-3xl font-bold grade-strong">—</p>
-        <p id="audited-at" class="text-xs text-gray-400 mt-1">—</p>
-      </div>
-
-      <div class="card p-4">
-        <p class="text-sm text-gray-400">Performance</p>
-        <div class="score-pill mt-2">
-          <div id="bar-perf" class="score-bar bg-sky-500" style="width:0%"></div>
-        </div>
-        <p id="score-perf" class="text-sm mt-1">—</p>
-      </div>
-
-      <div class="card p-4">
-        <p class="text-sm text-gray-400">SEO</p>
-        <div class="score-pill mt-2">
-          <div id="bar-seo" class="score-bar bg-teal-500" style="width:0%"></div>
-        </div>
-        <p id="score-seo" class="text-sm mt-1">—</p>
-      </div>
-
-      <div class="card p-4">
-        <p class="text-sm text-gray-400">UX & Security</p>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <p class="text-xs text-gray-400">UX</p>
-            <div class="score-pill mt-1">
-              <div id="bar-ux" class="score-bar bg-amber-500" style="width:0%"></div>
-            </div>
-            <p id="score-ux" class="text-xs mt-1">—</p>
-          </div>
-          <div>
-            <p class="text-xs text-gray-400">Security</p>
-            <div class="score-pill mt-1">
-              <div id="bar-sec" class="score-bar bg-red-500" style="width:0%"></div>
-            </div>
-            <p id="score-sec" class="text-xs mt-1">—</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pillar Chart -->
-    <section id="chart-block" class="hidden card p-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">Pillar Scores</h2>
-        <div class="text-xs text-gray-400">Visualized via Chart.js</div>
-      </div>
-      <canvas id="pillarsChart" height="100"></canvas>
-    </section>
-
-    <!-- Perf Stats -->
-    <section id="perf-block" class="hidden card p-4">
-      <h2 class="text-lg font-semibold mb-2">Core Web Vitals & Performance</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">TTFB</p><p id="ttfb">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">FCP</p><p id="fcp">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">LCP</p><p id="lcp">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">CLS</p><p id="cls">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">TBT</p><p id="tbt">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">Page Weight</p><p id="pw">—</p>
-        </div>
-        <div class="p-3 rounded bg-gray-900">
-          <p class="text-gray-400">Requests</p><p id="reqs">—</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Metrics Table + Controls -->
-    <section id="metrics-block" class="hidden card p-4">
-      <div class="flex items-center gap-3 justify-between mb-3">
-        <h2 class="text-lg font-semibold">Advanced Diagnostics (66 metrics)</h2>
-        <div class="flex items-center gap-2">
-          <select id="filter-category" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm">
-            <option value="All">All Categories</option>
-            <option value="Performance">Performance</option>
-            <option value="SEO">SEO</option>
-            <option value="UX">UX</option>
-            <option value="Security">Security</option>
-          </select>
-          <input id="search" type="text" placeholder="Search metrics…"
-                 class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm" />
-          <button id="sort-score" class="px-2 py-1 rounded bg-gray-800 text-sm border border-gray-700">
-            Sort by Score
-          </button>
-        </div>
-      </div>
-
-      <div class="overflow-auto">
-        <table class="table w-full text-sm">
-          <thead>
-          <tr>
-            <th class="p-2 text-left">#</th>
-            <th class="p-2 text-left">Metric</th>
-            <th class="p-2 text-left">Category</th>
-            <th class="p-2 text-left">Score</th>
-            <th class="p-2 text-left">Weight</th>
-          </tr>
-          </thead>
-          <tbody id="metrics-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Roadmap -->
-    <section id="roadmap-block" class="hidden card p-4">
-      <h2 class="text-lg font-semibold mb-2">Improvement Roadmap</h2>
-      <div id="roadmap" class="prose prose-invert max-w-none text-sm"></div>
-    </section>
-
-    <!-- SEO Audit (conditional) -->
-    <section id="seo-block" class="hidden space-y-4">
-      <div class="card p-4">
-        <h2 class="text-lg font-semibold">SEO Audit Results</h2>
-        <p id="seo-overview" class="text-sm text-gray-300 mt-1">—</p>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-          <div class="p-3 rounded bg-gray-900">
-            <p class="text-gray-400 text-xs">On-Page SEO</p><p id="sc-onpage">—</p>
-          </div>
-          <div class="p-3 rounded bg-gray-900">
-            <p class="text-gray-400 text-xs">Technical SEO</p><p id="sc-tech">—</p>
-          </div>
-          <div class="p-3 rounded bg-gray-900">
-            <p class="text-gray-400 text-xs">Off-Page SEO</p><p id="sc-off">—</p>
-          </div>
-          <div class="p-3 rounded bg-gray-900">
-            <p class="text-gray-400 text-xs">Social Media</p><p id="sc-social">—</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Issues & Recommendations</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Type</th>
-              <th class="p-2 text-left">Element</th>
-              <th class="p-2 text-left">Priority</th>
-              <th class="p-2 text-left">Message</th>
-            </tr>
-            </thead>
-            <tbody id="seo-issues"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Keyword Rankings</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Keyword</th>
-              <th class="p-2 text-left">Rank</th>
-              <th class="p-2 text-left">Traffic %</th>
-              <th class="p-2 text-left">Volume</th>
-              <th class="p-2 text-left">KD %</th>
-              <th class="p-2 text-left">CPC</th>
-            </tr>
-            </thead>
-            <tbody id="seo-kr"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Top Pages</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">URL</th>
-              <th class="p-2 text-left">Traffic %</th>
-              <th class="p-2 text-left">Keywords</th>
-              <th class="p-2 text-left">Ref Dom</th>
-              <th class="p-2 text-left">Backlinks</th>
-            </tr>
-            </thead>
-            <tbody id="seo-top-pages"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Technical SEO</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Element</th>
-              <th class="p-2 text-left">Priority</th>
-              <th class="p-2 text-left">Value</th>
-              <th class="p-2 text-left">Recommendation</th>
-            </tr>
-            </thead>
-            <tbody id="seo-tech"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Page Performance & CWV</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Element</th>
-              <th class="p-2 text-left">Priority</th>
-              <th class="p-2 text-left">Note</th>
-            </tr>
-            </thead>
-            <tbody id="seo-pp"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Competitors</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Competitor</th>
-              <th class="p-2 text-left">Common Keywords</th>
-              <th class="p-2 text-left">Competition Level</th>
-            </tr>
-            </thead>
-            <tbody id="seo-competitors"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Competitor Analysis (4 Types)</h3>
-        <div id="seo-ca" class="space-y-4 text-sm"></div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Top Backlinks</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Page AS</th>
-              <th class="p-2 text-left">Source Title</th>
-              <th class="p-2 text-left">Source URL</th>
-              <th class="p-2 text-left">Anchor</th>
-              <th class="p-2 text-left">Target URL</th>
-              <th class="p-2 text-left">Rel</th>
-            </tr>
-            </thead>
-            <tbody id="seo-backlinks"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <h3 class="font-semibold mb-2">Social Media</h3>
-        <div class="overflow-auto">
-          <table class="table w-full text-sm">
-            <thead>
-            <tr>
-              <th class="p-2 text-left">Network</th>
-              <th class="p-2 text-left">Priority</th>
-              <th class="p-2 text-left">Recommendation</th>
-            </tr>
-            </thead>
-            <tbody id="seo-social"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="text-xs text-gray-500 text-center py-6">
-      FF TECH ELITE v3 • FastAPI • © <span id="year"></span>
-    </footer>
-  </main>
-
-  <script>
-    const el = (id) => document.getElementById(id);
-
-    const state = {
-      lastResult: null,
-      metricsSortAsc: true,
-      chart: null
-    };
-
-    const categoryChip = (cat) => {
-      const map = {
-        'Performance': 'chip chip-perf',
-        'SEO': 'chip chip-seo',
-        'UX': 'chip chip-ux',
-        'Security': 'chip chip-sec'
-      };
-      return `<span class="${map[cat] || 'chip'}">${cat}</span>`;
-    };
-
-    const scoreColor = (score) => {
-      if (score >= 85) return 'text-teal-300';
-      if (score >= 70) return 'text-amber-300';
-      return 'text-red-300';
-    };
-
-    const bandColor = (score) => {
-      if (score >= 85) return 'bg-teal-500';
-      if (score >= 70) return 'bg-amber-500';
-      return 'bg-red-500';
-    };
-
-    const fmt = {
-      ms: (v) => (v ?? v === 0) ? `${v} ms` : '—',
-      pct: (v) => (v ?? v === 0) ? `${v}%` : '—',
-      kb: (v) => (v ?? v === 0) ? `${v} KB` : '—',
-      num: (v) => (v ?? v === 0) ? String(v) : '—'
-    };
-
-    const show = (id, on = true) => {
-      const node = el(id);
-      if (!node) return;
-      node.classList.toggle('hidden', !on);
-    };
-
-    const renderSummary = (r) => {
-      show('summary', true);
-      el('grade').textContent = `${r.total_grade}%`;
-      el('audited-at').textContent = r.audited_at || '';
-
-      const p = r.pillars || {};
-      const PERF = p['Performance'] || 0;
-      const SEO  = p['SEO'] || 0;
-      const UX   = p['UX'] || 0;
-      const SEC  = p['Security'] || 0;
-
-      el('bar-perf').style.width = PERF + '%';
-      el('bar-seo').style.width  = SEO  + '%';
-      el('bar-ux').style.width   = UX   + '%';
-      el('bar-sec').style.width  = SEC  + '%';
-
-      el('bar-perf').className = `score-bar ${bandColor(PERF)}`;
-      el('bar-seo').className  = `score-bar ${bandColor(SEO)}`;
-      el('bar-ux').className   = `score-bar ${bandColor(UX)}`;
-      el('bar-sec').className  = `score-bar ${bandColor(SEC)}`;
-
-      el('score-perf').textContent = fmt.pct(PERF);
-      el('score-seo').textContent  = fmt.pct(SEO);
-      el('score-ux').textContent   = fmt.pct(UX);
-      el('score-sec').textContent  = fmt.pct(SEC);
-
-      // Chart
-      show('chart-block', true);
-      const ctx = document.getElementById('pillarsChart');
-      if (state.chart) state.chart.destroy();
-      state.chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Performance', 'SEO', 'UX', 'Security'],
-          datasets: [{
-            label: 'Score (%)',
-            data: [PERF, SEO, UX, SEC],
-            backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444'],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.06)' } },
-            x: { grid: { display: false } }
-          }
-        }
-      });
-    };
-
-    const renderPerf = (r) => {
-      show('perf-block', true);
-      const p = r.perf || {};
-      el('ttfb').textContent = fmt.ms(p.ttfb_ms);
-      el('fcp').textContent  = fmt.ms(p.fcp_ms);
-      el('lcp').textContent  = fmt.ms(p.lcp_ms);
-      el('cls').textContent  = (p.cls ?? p.cls === 0) ? String(p.cls) : '—';
-      el('tbt').textContent  = fmt.ms(p.tbt_ms);
-      el('pw').textContent   = fmt.kb(p.page_weight_kb);
-      el('reqs').textContent = fmt.num(p.request_count);
-    };
-
-    const renderMetrics = (metrics) => {
-      show('metrics-block', true);
-      const body = el('metrics-body');
-      body.innerHTML = '';
-
-      metrics.forEach(m => {
-        const row = document.createElement('tr');
-        const colorCls = scoreColor(m.score);
-        row.innerHTML = `
-          <td class="p-2">${m.no}</td>
-          <td class="p-2">
-            <div class="flex items-center justify-between">
-              <span>${m.name}</span>
-              <span>${categoryChip(m.category)}</span>
-            </div>
-          </td>
-          <td class="p-2">${m.category}</td>
-          <td class="p-2 ${colorCls} font-semibold">${m.score}%</td>
-          <td class="p-2">${m.weight}</td>
-        `;
-        body.appendChild(row);
-      });
-    };
-
-    const renderRoadmap = (html) => {
-      show('roadmap-block', true);
-      // The backend sends HTML with &lt;br/&gt; — render safely
-      const container = el('roadmap');
-      container.innerHTML = html
-        .replace(/&lt;br\/&gt;/g, '<br/>')
-        .replace(/&lt;b&gt;/g, '<b>').replace(/&lt;\/b&gt;/g, '</b>');
-    };
-
-    const renderSEOAudit = (seo) => {
-      if (!seo) { show('seo-block', false); return; }
-      show('seo-block', true);
-
-      const overview = `Domain: ${seo.domain} • Score: ${seo.seo_score}/100 • Critical: ${seo.critical_issues} • Minor: ${seo.minor_issues}`;
-      el('seo-overview').textContent = overview;
-
-      const s = seo.section_scores || {};
-      el('sc-onpage').textContent = `${s['On-Page SEO'] ?? 0}%`;
-      el('sc-tech').textContent   = `${s['Technical SEO'] ?? 0}%`;
-      el('sc-off').textContent    = `${s['Off-Page SEO'] ?? 0}%`;
-      el('sc-social').textContent = `${s['Social Media'] ?? 0}%`;
-
-      // Issues
-      const issuesBody = el('seo-issues');
-      issuesBody.innerHTML = '';
-      (seo.issues || []).forEach(i => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${i.type || ''}</td>
-          <td class="p-2">${i.element || ''}</td>
-          <td class="p-2">${i.priority || ''}</td>
-          <td class="p-2">${i.message || ''}</td>
-        `;
-        issuesBody.appendChild(tr);
-      });
-
-      // Keyword Rankings
-      const krBody = el('seo-kr');
-      krBody.innerHTML = '';
-      (seo.keyword_rankings || []).forEach(k => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${k.keyword || ''}</td>
-          <td class="p-2">${k.rank ?? ''}</td>
-          <td class="p-2">${k.traffic_pct ?? ''}</td>
-          <td class="p-2">${k.volume ?? ''}</td>
-          <td class="p-2">${k.kd_pct ?? ''}</td>
-          <td class="p-2">${k.cpc_usd ?? ''}</td>
-        `;
-        krBody.appendChild(tr);
-      });
-
-      // Top Pages
-      const tpBody = el('seo-top-pages');
-      tpBody.innerHTML = '';
-      (seo.top_pages || []).forEach(p => {
-        const url = p.url || '';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${url}${url}</a></td>
-          <td class="p-2">${p.traffic_pct ?? ''}</td>
-          <td class="p-2">${p.keywords ?? ''}</td>
-          <td class="p-2">${p.ref_domains ?? ''}</td>
-          <td class="p-2">${p.backlinks ?? ''}</td>
-        `;
-        tpBody.appendChild(tr);
-      });
-
-      // Technical SEO
-      const techBody = el('seo-tech');
-      techBody.innerHTML = '';
-      (seo.technical || []).forEach(t => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${t.element || ''}</td>
-          <td class="p-2">${t.priority || ''}</td>
-          <td class="p-2">${t.value ?? '—'}</td>
-          <td class="p-2">${t.note || ''}</td>
-        `;
-        techBody.appendChild(tr);
-      });
-
-      // Page Performance
-      const ppBody = el('seo-pp');
-      ppBody.innerHTML = '';
-      (seo.page_performance || []).forEach(p => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${p.element || ''}</td>
-          <td class="p-2">${p.priority || ''}</td>
-          <td class="p-2">${p.note || ''}</td>
-        `;
-        ppBody.appendChild(tr);
-      });
-
-      // Competitors
-      const compBody = el('seo-competitors');
-      compBody.innerHTML = '';
-      (seo.competitors || []).forEach(c => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${c.competitor || ''}</td>
-          <td class="p-2">${c.common_keywords ?? ''}</td>
-          <td class="p-2">${c.competition_level ?? ''}</td>
-        `;
-        compBody.appendChild(tr);
-      });
-
-      // Competitor Analysis (4 Types)
-      const ca = seo.competitor_analysis || seo.competator_analysis || null;
-      const caWrap = el('seo-ca');
-      caWrap.innerHTML = '';
-      if (ca && Array.isArray(ca.types)) {
-        ca.types.forEach(t => {
-          const card = document.createElement('div');
-          card.innerHTML = `
-            <div class="p-3 rounded bg-gray-900">
-              <p class="font-semibold">${t.type || 'Type'}</p>
-              <p class="text-xs text-gray-400">${t.description || ''}</p>
-            </div>
-          `;
-          const table = document.createElement('div');
-          table.className = 'overflow-auto mt-2';
-          table.innerHTML = `
-            <table class="table w-full text-sm">
-              <thead>
-                <tr>
-                  <th class="p-2 text-left">Domain</th>
-                  <th class="p-2 text-left">Label</th>
-                  <th class="p-2 text-left">Channel</th>
-                  <th class="p-2 text-left">Common Keywords</th>
-                  <th class="p-2 text-left">Competition Level</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${(t.competitors || []).map(x => `
-                  <tr>
-                    <td class="p-2">https://${x.domain}${x.domain}</a></td>
-                    <td class="p-2">${x.label || ''}</td>
-                    <td class="p-2">${x.channel || ''}</td>
-                    <td class="p-2">${x.common_keywords ?? ''}</td>
-                    <td class="p-2">${x.competition_level ?? ''}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
-          caWrap.appendChild(card);
-          caWrap.appendChild(table);
-        });
-      }
-
-      // Backlinks
-      const blBody = el('seo-backlinks');
-      blBody.innerHTML = '';
-      (seo.top_backlinks || []).forEach(b => {
-        const src = b.source_url || '';
-        const tgt = b.target_url || '';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${b.page_as ?? ''}</td>
-          <td class="p-2">${b.source_title || ''}</td>
-          <td class="p-2">${src}${src}</a></td>
-          <td class="p-2">${b.anchor || ''}</td>
-          <td class="p-2">${tgt}${tgt}</a></td>
-          <td class="p-2">${b.rel ?? ''}</td>
-        `;
-        blBody.appendChild(tr);
-      });
-
-      // Social
-      const smBody = el('seo-social');
-      smBody.innerHTML = '';
-      (seo.social_media || []).forEach(s => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="p-2">${s.network || ''}</td>
-          <td class="p-2">${s.priority || ''}</td>
-          <td class="p-2">${s.note || ''}</td>
-        `;
-        smBody.appendChild(tr);
-      });
-    };
-
-    const applyFilters = () => {
-      const q = (el('search').value || '').toLowerCase();
-      const cat = el('filter-category').value;
-
-      const metrics = (state.lastResult?.metrics || []).slice(0);
-      const filtered = metrics.filter(m => {
-        const matchesText = !q || m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q);
-        const matchesCat = cat === 'All' || m.category === cat;
-        return matchesText && matchesCat;
-      });
-
-      // Apply current sort
-      filtered.sort((a, b) => state.metricsSortAsc ? (a.score - b.score) : (b.score - a.score));
-      renderMetrics(filtered);
-    };
-
-    document.getElementById('audit-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      show('error', false);
-      show('busy', true);
-
-      const url = el('url').value.trim();
-      const mobile = el('mode-mobile').checked;
-      el('download-btn').disabled = true;
-
-      try {
-        const res = await fetch('/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, mode: mobile ? 'mobile' : 'desktop' })
-        });
-
-        if (!res.ok) {
-          const msg = await res.text();
-          if (res.status === 501) {
-            throw new Error('Auditing is not available on this server (Playwright not installed). Please install Playwright and Chromium: `pip install playwright && playwright install chromium`.');
-          }
-          throw new Error(msg || `Request failed (${res.status}).`);
-        }
-
-        const result = await res.json();
-        state.lastResult = result;
-
-        el('download-btn').disabled = false;
-
-        renderSummary(result);
-        renderPerf(result);
-        renderMetrics(result.metrics || []);
-        renderRoadmap(result.roadmap || '');
-        renderSEOAudit(result.seo_audit || null);
-
-        show('metrics-block', true);
-        show('chart-block', true);
-        show('perf-block', true);
-        show('roadmap-block', true);
-        show('seo-block', !!result.seo_audit);
-
-        applyFilters();
-
-      } catch (err) {
-        show('error', true);
-        el('error').textContent = err.message || String(err);
-      } finally {
-        show('busy', false);
-      }
-    });
-
-    // Filters & Sort
-    el('filter-category').addEventListener('change', applyFilters);
-    el('search').addEventListener('input', applyFilters);
-    el('sort-score').addEventListener('click', () => {
-      state.metricsSortAsc = !state.metricsSortAsc;
-      applyFilters();
-    });
-
-    // Download PDF
-    el('download-btn').addEventListener('click', async () => {
-      const r = state.lastResult;
-      if (!r) return;
-      try {
-        const res = await fetch('/download', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: r.url,
-            metrics: r.metrics,
-            pillars: r.pillars,
-            total_grade: r.total_grade,
-            seo_audit: r.seo_audit,
-            roadmap: r.roadmap
-          })
-        });
-
-        if (!res.ok) throw new Error('Failed to generate PDF.');
-
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `FF_ELITE_Audit_Report_${Date.now()}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-      } catch (err) {
-        show('error', true);
-        el('error').textContent = err.message || String(err);
-      }
-    });
-
-    // Footer year
-    el('year').textContent = new Date().getFullYear();
-  </script>
+<body>
+<main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+<!-- HEADER -->
+<header class="flex items-center justify-between">
+  <div class="flex items-center gap-4">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-teal-500"></div>
+    <div>
+      <h1 class="text-2xl font-bold">FF TECH ELITE</h1>
+      <p class="text-sm text-gray-400">Enterprise Website Audit Engine</p>
+    </div>
+  </div>
+  <div class="text-right">
+    <p class="text-xs text-gray-500">Operational Dashboard</p>
+    <p class="text-sm font-medium">Jamshaid Khan</p>
+  </div>
+</header>
+
+<!-- INPUT -->
+<section class="card p-6 glow">
+<form id="audit-form" class="grid md:grid-cols-4 gap-4">
+  <input id="url" required type="url" placeholder="https://example.com"
+    class="md:col-span-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-sky-500">
+  <button class="bg-gradient-to-r from-sky-500 to-teal-500 rounded-lg text-sm font-semibold px-6">
+    Run Professional Audit
+  </button>
+</form>
+</section>
+
+<!-- SCORE -->
+<section id="summary" class="hidden grid md:grid-cols-4 gap-6">
+  <div class="card p-6">
+    <p class="text-sm text-gray-400">Overall Score</p>
+    <p id="grade" class="text-5xl font-extrabold text-teal-400">—</p>
+  </div>
+
+  <div class="card p-6">
+    <p class="text-sm">Performance</p>
+    <div class="bg-slate-800 rounded-full mt-3">
+      <div id="bar-performance" class="score-bar bg-sky-500"></div>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <p class="text-sm">SEO</p>
+    <div class="bg-slate-800 rounded-full mt-3">
+      <div id="bar-seo" class="score-bar bg-teal-500"></div>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <p class="text-sm">UX & Security</p>
+    <div class="bg-slate-800 rounded-full mt-3">
+      <div id="bar-ux" class="score-bar bg-amber-500"></div>
+    </div>
+  </div>
+</section>
+
+<!-- CHART -->
+<section id="chart-block" class="hidden card p-6">
+  <h2 class="font-semibold mb-3">Audit Pillars</h2>
+  <canvas id="pillarChart" height="100"></canvas>
+</section>
+
+<!-- METRICS -->
+<section id="metrics-block" class="hidden card p-6">
+  <h2 class="font-semibold mb-4">Detailed Metrics</h2>
+  <div class="overflow-auto">
+    <table class="w-full text-sm">
+      <thead class="text-gray-400">
+        <tr><th>#</th><th>Metric</th><th>Category</th><th>Score</th><th>Weight</th></tr>
+      </thead>
+      <tbody id="metrics-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="text-center text-xs text-gray-500 pt-6">
+  FF TECH ELITE © <span id="year"></span>
+</footer>
+
+</main>
+
+<script>
+const el=id=>document.getElementById(id);
+let chart;
+
+document.getElementById("audit-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const url=el("url").value;
+
+  const res=await fetch("/audit",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+  const r=await res.json();
+
+  el("summary").classList.remove("hidden");
+  el("chart-block").classList.remove("hidden");
+  el("metrics-block").classList.remove("hidden");
+
+  el("grade").textContent=r.total_grade+"%";
+  el("bar-performance").style.width=r.pillars.Performance+"%";
+  el("bar-seo").style.width=r.pillars.SEO+"%";
+  el("bar-ux").style.width=r.pillars.UX+"%";
+
+  const ctx=document.getElementById("pillarChart");
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{
+    type:"bar",
+    data:{labels:Object.keys(r.pillars),datasets:[{data:Object.values(r.pillars),backgroundColor:["#38bdf8","#10b981","#f59e0b","#ef4444"]}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{max:100}}}
+  });
+
+  const body=el("metrics-body"); body.innerHTML="";
+  r.metrics.forEach(m=>{
+    body.innerHTML+=`<tr class="border-b border-slate-800">
+      <td>${m.no}</td><td>${m.name}</td><td>${m.category}</td>
+      <td class="font-semibold">${m.score}%</td><td>${m.weight}</td>
+    </tr>`;
+  });
+});
+
+el("year").textContent=new Date().getFullYear();
+</script>
 </body>
 </html>
-``
