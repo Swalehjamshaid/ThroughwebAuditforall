@@ -4,7 +4,7 @@ import time
 import io
 import os
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from urllib.parse import urlparse, urlunparse
 
 from fastapi import FastAPI, Request, HTTPException
@@ -17,7 +17,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 )
-    # reportlab imports
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
@@ -482,7 +481,7 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup) -> Dict[s
     }
 
 # ==================== STATIC SEO AUDIT (haier.com.pk) ====================
-def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
+def get_static_seo_audit(url: str) -> Optional[Dict[str, Any]]:
     if not url_is_haier_pk(url):
         return None
 
@@ -503,7 +502,6 @@ def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
             "Social Media": 0
         },
         "issues": [
-            # Page Speed block
             {"type": "Page Speed", "element": "DOM Size", "priority": "red-flag",
              "message": "Unable to retrieve DOM Size metric. The page may be inaccessible or the API is unavailable."},
             {"type": "Page Speed", "element": "Total Blocking Time (TBT)", "priority": "red-flag",
@@ -623,10 +621,6 @@ def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
 
 # ==================== COMPETITOR ANALYSIS (4 TYPES) FOR haier.com.pk ====================
 def get_competitor_analysis_for_haier() -> Dict[str, Any]:
-    """
-    Static competitor analysis grouped into 4 types of similar websites.
-    Values are illustrative to guide audit actions (no external API calls).
-    """
     return {
         "types": [
             {
@@ -672,7 +666,40 @@ def get_competitor_analysis_for_haier() -> Dict[str, Any]:
         ]
     }
 
-# ==================== PDF HELPERS ====================
+# ==================== PDF HELPERS (AUTO-FIT COLUMNS) ====================
+def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Optional[List[float]]:
+    """Scale col_widths proportionally to fit the available max_width."""
+    if not col_widths:
+        return None
+    total = sum(col_widths)
+    if total <= max_width:
+        return col_widths
+    scale = max_width / float(total)
+    return [w * scale for w in col_widths]
+
+def _table(story: List[Any], data: List[List[Any]], col_widths: Optional[List[float]] = None,
+           header_bg: str = "#0f172a", doc: Optional[SimpleDocTemplate] = None):
+    # Compute inner page width from doc margins if doc is provided; else assume 50pt margins.
+    if doc is not None:
+        max_width = A4[0] - doc.leftMargin - doc.rightMargin
+    else:
+        max_width = A4[0] - 50 - 50  # fallback to your defaults
+
+    col_widths = _fit_col_widths(col_widths, max_width)
+
+    t = Table(data, colWidths=col_widths)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor(header_bg)),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
+        ('ALIGN', (0,0), (-1,0), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(t)
+
 def _add_page_number(canvas, doc):
     canvas.saveState()
     canvas.setFont("Helvetica", 9)
@@ -680,17 +707,6 @@ def _add_page_number(canvas, doc):
     canvas.setStrokeColor(colors.HexColor("#e5e7eb"))
     canvas.line(40, 35, A4[0] - 40, 35)
     canvas.restoreState()
-
-def _table(story, data, col_widths=None, header_bg="#0f172a"):
-    t = Table(data, colWidths=col_widths)
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor(header_bg)),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
-        ('ALIGN', (0,0), (-1,0), 'LEFT')
-    ]))
-    story.append(t)
 
 # ==================== ROUTES ====================
 @app.get("/", response_class=HTMLResponse)
@@ -719,7 +735,7 @@ async def audit(request: Request):
     soup = BeautifulSoup(audit_data["html"], "html.parser")
     results = generate_audit_results(audit_data, soup)
 
-    # Inject static SEO Audit for haier.com.pk
+    # Inject static SEO Audit for haier.com.pk + competitor analysis
     seo_audit = get_static_seo_audit(audit_data["final_url"])
     if seo_audit:
         seo_audit["competitor_analysis"] = get_competitor_analysis_for_haier()
@@ -741,7 +757,7 @@ async def audit(request: Request):
             "request_count": audit_data.get("request_count"),
         },
         "roadmap": results["roadmap"],
-        # NEW: detailed SEO audit + competitor analysis
+        # detailed SEO audit block, only for haier.com.pk
         "seo_audit": seo_audit
     }
 
@@ -797,7 +813,7 @@ async def download_pdf(request: Request):
     for cat in CATEGORIES:
         sc = pillars.get(cat, "—")
         pillar_table.append([cat, f"{sc}%" if isinstance(sc, (int, float)) else sc])
-    _table(story, pillar_table, col_widths=[300, 100])
+    _table(story, pillar_table, col_widths=[300, 100], doc=doc)
     story.append(Spacer(1, 20))
 
     # Metrics
@@ -805,7 +821,7 @@ async def download_pdf(request: Request):
     table_data = [["#", "Metric", "Category", "Score", "Weight"]]
     for m in metrics:
         table_data.append([m.get('no', ''), m.get('name', ''), m.get('category', ''), f"{m.get('score', '')}%", m.get('weight', '')])
-    _table(story, table_data, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981")
+    _table(story, table_data, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981", doc=doc)
     story.append(PageBreak())
 
     # Improvement roadmap
@@ -833,7 +849,7 @@ async def download_pdf(request: Request):
         overview_table = [["Section", "Score"]]
         for k in ["On-Page SEO", "Technical SEO", "Off-Page SEO", "Social Media"]:
             overview_table.append([k, f"{scores.get(k, 0)}%"])
-        _table(story, overview_table, col_widths=[300, 100])
+        _table(story, overview_table, col_widths=[300, 100], doc=doc)
         story.append(PageBreak())
 
         # Issues
@@ -842,7 +858,7 @@ async def download_pdf(request: Request):
         issues_table = [["Type", "Element", "Priority", "Problem / Recommendation"]]
         for item in issues:
             issues_table.append([item["type"], item["element"], item["priority"], item["message"]])
-        _table(story, issues_table, col_widths=[90, 120, 70, 220], header_bg="#ef4444")
+        _table(story, issues_table, col_widths=[85, 110, 60, 240], header_bg="#ef4444", doc=doc)
         story.append(PageBreak())
 
         # On-Page
@@ -864,7 +880,7 @@ async def download_pdf(request: Request):
         for c in onp.get("content", []):
             onpage_table.append(["Content", "—", c.get("note","")])
         onpage_table.append(["Keyword Density", onp.get("keyword_density","N/A"), "Analyze highest density words & phrases."])
-        _table(story, onpage_table, col_widths=[120, 150, 240])
+        _table(story, onpage_table, col_widths=[110, 140, 245], doc=doc)
         story.append(PageBreak())
 
         # Keyword Rankings
@@ -873,7 +889,7 @@ async def download_pdf(request: Request):
         kr_table = [["Keyword", "Rank", "Traffic %", "Volume", "KD %", "CPC (USD)"]]
         for k in kr:
             kr_table.append([k["keyword"], k["rank"], k["traffic_pct"], k["volume"], k["kd_pct"], k["cpc_usd"]])
-        _table(story, kr_table, col_widths=[160, 60, 80, 80, 60, 80])
+        _table(story, kr_table, col_widths=[150, 50, 70, 70, 60, 80], doc=doc)
         story.append(Spacer(1, 10))
 
         # Top Pages
@@ -882,7 +898,7 @@ async def download_pdf(request: Request):
         tp_table = [["URL", "Traffic %", "Keywords", "Ref Dom", "Backlinks"]]
         for p in tp:
             tp_table.append([p["url"], p["traffic_pct"], p["keywords"], p["ref_domains"], p["backlinks"]])
-        _table(story, tp_table, col_widths=[240, 80, 80, 80, 80])
+        _table(story, tp_table, col_widths=[220, 60, 60, 75, 80], doc=doc)
         story.append(PageBreak())
 
         # Technical
@@ -891,7 +907,7 @@ async def download_pdf(request: Request):
         tech_table = [["Element", "Priority", "Value", "Recommendation"]]
         for t in tech:
             tech_table.append([t.get("element",""), t.get("priority",""), t.get("value","—"), t.get("note","")])
-        _table(story, tech_table, col_widths=[140, 90, 120, 210])
+        _table(story, tech_table, col_widths=[120, 80, 90, 205], doc=doc)
         story.append(PageBreak())
 
         # Page Performance
@@ -900,21 +916,23 @@ async def download_pdf(request: Request):
         pp_table = [["Element", "Priority", "Note"]]
         for p in pp:
             pp_table.append([p.get("element",""), p.get("priority",""), p.get("note","")])
-        _table(story, pp_table, col_widths=[200, 80, 260], header_bg="#f59e0b")
+        _table(story, pp_table, col_widths=[180, 70, 245], header_bg="#f59e0b", doc=doc)
         story.append(PageBreak())
 
-        # Basic Competitors
+        # Competitors (Basic List)
         story.append(Paragraph("Competitors (Basic List)", styles['Section']))
         comp = seo_audit.get("competitors", [])
         comp_table = [["Competitor", "Common Keywords", "Competition Level"]]
         for c in comp:
             comp_table.append([c["competitor"], c["common_keywords"], c["competition_level"]])
-        _table(story, comp_table, col_widths=[240, 140, 160], header_bg="#64748b")
+        _table(story, comp_table, col_widths=[220, 140, 120], header_bg="#64748b", doc=doc)
         story.append(PageBreak())
 
-        # ===== NEW: Competitor Analysis (4 Types) =====
-        ca = seo_audit.get("competitor_analysis", {})
-        types = ca.get("types", [])
+        # ===== Competitor Analysis (4 Types) =====
+        ca = None
+        if seo_audit:
+            ca = seo_audit.get("competitor_analysis") or seo_audit.get("competator_analysis")
+        types = (ca or {}).get("types", [])
         if types:
             story.append(Paragraph("Competitor Analysis (4 Types)", styles['TitleBold']))
             story.append(Spacer(1, 10))
@@ -923,8 +941,14 @@ async def download_pdf(request: Request):
                 story.append(Paragraph(t.get("description", ""), styles['Muted']))
                 ca_table = [["Domain", "Label", "Channel", "Common Keywords", "Competition Level"]]
                 for x in t.get("competitors", []):
-                    ca_table.append([x["domain"], x["label"], x.get("channel",""), x["common_keywords"], x["competition_level"]])
-                _table(story, ca_table, col_widths=[160, 120, 120, 120, 100], header_bg="#0ea5e9")
+                    ca_table.append([
+                        x.get("domain",""),
+                        x.get("label",""),
+                        x.get("channel",""),
+                        x.get("common_keywords",""),
+                        x.get("competition_level","")
+                    ])
+                _table(story, ca_table, col_widths=[120, 100, 80, 80, 80], header_bg="#0ea5e9", doc=doc)
                 story.append(Spacer(1, 10))
             story.append(PageBreak())
 
@@ -939,7 +963,7 @@ async def download_pdf(request: Request):
         bl_table = [["Page AS", "Source Title", "Source URL", "Anchor", "Target URL", "Rel"]]
         for b in bl:
             bl_table.append([b["page_as"], b["source_title"], b["source_url"], b.get("anchor",""), b.get("target_url",""), b.get("rel","")])
-        _table(story, bl_table, col_widths=[60, 160, 150, 120, 150, 40], header_bg="#0ea5e9")
+        _table(story, bl_table, col_widths=[40, 140, 120, 70, 95, 30], header_bg="#0ea5e9", doc=doc)
         story.append(PageBreak())
 
         # Social Media
@@ -948,7 +972,7 @@ async def download_pdf(request: Request):
         sm_table = [["Network", "Priority", "Recommendation"]]
         for s in sm:
             sm_table.append([s["network"], s["priority"], s["note"]])
-        _table(story, sm_table, col_widths=[120, 80, 280], header_bg="#a855f7")
+        _table(story, sm_table, col_widths=[120, 80, 280], header_bg="#a855f7", doc=doc)
 
     # Build doc
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
