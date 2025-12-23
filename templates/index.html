@@ -1,268 +1,418 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH ELITE | Enterprise Web Auditor</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
-        
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            background: radial-gradient(circle at top right, #0f172a, #020617);
-            color: #f8fafc;
-        }
-
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .gauge-animation {
-            transition: stroke-dashoffset 1.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .loading-shimmer {
-            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
-            background-size: 200% 100%;
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-    </style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FF TECH ELITE | Enterprise Web Auditor</title>
+  https://cdn.tailwindcss.com</script>
+  https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: radial-gradient(circle at top right, #0f172a, #020617); color: #f8fafc; }
+    .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .gauge-animation { transition: stroke-dashoffset 1.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .loading-shimmer { background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent); background-size: 200% 100%; animation: shimmer 2s infinite; }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .rotate-180 { transform: rotate(180deg); }
+  </style>
 </head>
 <body class="min-h-screen">
-
-    <nav class="glass-panel sticky top-0 z-50 border-b border-white/5 px-8 py-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                    <i class="fa-solid fa-shield-halved text-slate-950 text-xl"></i>
-                </div>
-                <h1 class="text-2xl font-extrabold tracking-tight">FF TECH <span class="text-emerald-400">ELITE</span></h1>
-            </div>
-            <div id="engineStatus" class="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/5">
-                <span class="relative flex h-3 w-3">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                </span>
-                <span class="text-xs font-bold tracking-widest opacity-80 uppercase">Chromium Engine Active</span>
-            </div>
+  <!-- NAV -->
+  <nav class="glass-panel sticky top-0 z-50 border-b border-white/5 px-8 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap gap-4 justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i class="fa-solid fa-shield-halved text-slate-950 text-xl"></i>
         </div>
-    </nav>
+        <h1 class="text-2xl font-extrabold tracking-tight">FF TECH <span class="text-emerald-400">ELITE</span></h1>
+        <span class="ml-3 text-xs font-bold uppercase bg-white/10 px-2 py-1 rounded">v3</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="sampleDomain" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold">Use Sample: haier.com.pk</button>
+        <button id="copyLink" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold">Copy Share Link</button>
+      </div>
+      <div id="engineStatus" class="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+        <span class="relative flex h-3 w-3">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+        </span>
+        <span class="text-xs font-bold tracking-widest opacity-80 uppercase">Chromium Engine Active</span>
+      </div>
+    </div>
+  </nav>
 
-    <main class="max-w-7xl mx-auto px-6 py-12">
-        <section class="max-w-4xl mx-auto mb-16">
-            <div class="glass-panel rounded-[2rem] p-8 lg:p-12">
-                <div class="mb-8">
-                    <h2 class="text-4xl font-extrabold mb-2">Deep Scan Auditor</h2>
-                    <p class="text-slate-400">Perform comprehensive SEO, Performance, and Security analysis using real-browser simulation.</p>
-                </div>
-                
-                <form id="auditForm" class="space-y-6">
-                    <div class="grid md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2 relative">
-                            <i class="fa-solid fa-link absolute left-5 top-1/2 -translate-y-1/2 text-emerald-500/50"></i>
-                            <input type="url" id="url" placeholder="https://your-website.com" required
-                                class="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-6 py-5 outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition-all text-lg">
-                        </div>
-                        <select id="mode" class="bg-slate-900/50 border border-white/10 rounded-2xl px-6 py-5 outline-none focus:border-emerald-500/50 transition-all font-semibold">
-                            <option value="desktop">Desktop Engine</option>
-                            <option value="mobile">Mobile Engine</option>
-                        </select>
-                    </div>
-                    <button type="submit" id="submitBtn" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 text-lg">
-                        <i class="fa-solid fa-magnifying-glass-chart"></i>
-                        EXECUTE FULL AUDIT
-                    </button>
-                </form>
-            </div>
-        </section>
-
-        <div id="loader" class="hidden py-20 text-center animate-pulse">
-            <div class="w-24 h-24 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-8"></div>
-            <h3 class="text-2xl font-bold text-white">Simulating User Behavior...</h3>
-            <p class="text-slate-400 mt-2">Extracting Core Web Vitals via Playwright CDP</p>
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-6 py-12">
+    <!-- HERO -->
+    <section class="max-w-4xl mx-auto mb-16">
+      <div class="glass-panel rounded-[2rem] p-8 lg:p-12">
+        <div class="mb-8">
+          <h2 class="text-4xl font-extrabold mb-2">Deep Scan Auditor</h2>
+          <p class="text-slate-400">Perform comprehensive SEO, Performance, and Security analysis using real-browser simulation.</p>
         </div>
 
-        <div id="results" class="hidden space-y-10">
-            
-            <div class="grid lg:grid-cols-4 gap-6">
-                <div class="lg:col-span-1 glass-panel rounded-[2rem] p-10 flex flex-col items-center justify-center relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-full h-1 loading-shimmer"></div>
-                    <h3 class="text-xs font-black uppercase tracking-widest opacity-40 mb-6">Health Score</h3>
-                    <div class="relative w-40 h-40">
-                        <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle>
-                            <circle id="scoreCircle" cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8"
-                                    stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" class="gauge-animation"></circle>
-                        </svg>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span id="scoreVal" class="text-5xl font-black">0</span>
-                            <span class="text-xs font-bold opacity-40 uppercase">Percent</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="glass-panel rounded-3xl p-6 border-b-4 border-emerald-500">
-                        <i class="fa-solid fa-bolt text-emerald-400 mb-4"></i>
-                        <p class="text-xs font-bold opacity-40 uppercase">Performance</p>
-                        <div id="perfPillar" class="text-3xl font-black mt-1">0%</div>
-                    </div>
-                    <div class="glass-panel rounded-3xl p-6 border-b-4 border-blue-500">
-                        <i class="fa-solid fa-search text-blue-400 mb-4"></i>
-                        <p class="text-xs font-bold opacity-40 uppercase">SEO</p>
-                        <div id="seoPillar" class="text-3xl font-black mt-1">0%</div>
-                    </div>
-                    <div class="glass-panel rounded-3xl p-6 border-b-4 border-purple-500">
-                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400 mb-4"></i>
-                        <p class="text-xs font-bold opacity-40 uppercase">UX</p>
-                        <div id="uxPillar" class="text-3xl font-black mt-1">0%</div>
-                    </div>
-                    <div class="glass-panel rounded-3xl p-6 border-b-4 border-red-500">
-                        <i class="fa-solid fa-lock text-red-400 mb-4"></i>
-                        <p class="text-xs font-bold opacity-40 uppercase">Security</p>
-                        <div id="secPillar" class="text-3xl font-black mt-1">0%</div>
-                    </div>
-                </div>
+        <form id="auditForm" class="space-y-6">
+          <div class="grid md:grid-cols-3 gap-4">
+            <div class="md:col-span-2 relative">
+              <i class="fa-solid fa-link absolute left-5 top-1/2 -translate-y-1/2 text-emerald-500/50"></i>
+              <input type="url" id="url" placeholder="https://your-website.com" required
+                     class="w-full bg-slate-900/50 border border-white/10 rounded-2xl pl-12 pr-6 py-5 outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition-all text-lg">
             </div>
+            <select id="mode" class="bg-slate-900/50 border border-white/10 rounded-2xl px-6 py-5 outline-none focus:border-emerald-500/50 transition-all font-semibold">
+              <option value="desktop">Desktop Engine</option>
+              <option value="mobile">Mobile Engine</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <button type="submit" id="submitBtn"
+              class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-5 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3 text-lg">
+              <i class="fa-solid fa-magnifying-glass-chart"></i> EXECUTE FULL AUDIT
+            </button>
+            <button type="button" id="resetBtn"
+              class="w-full bg-white/10 hover:bg-white/20 text-white font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg">
+              <i class="fa-solid fa-broom"></i> RESET
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
 
-            <div class="glass-panel rounded-[2rem] overflow-hidden shadow-2xl">
-                <div class="px-10 py-8 border-b border-white/5 flex justify-between items-center bg-white/5">
-                    <div>
-                        <h3 class="text-xl font-extrabold text-white">Advanced Diagnostics</h3>
-                        <p id="summaryDisplay" class="text-sm text-emerald-400 font-semibold mt-1"></p>
-                    </div>
-                    <button id="downloadPdf" class="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
-                        <i class="fa-solid fa-file-export"></i> EXPORT REPORT
-                    </button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="text-left text-[10px] font-black uppercase tracking-[0.2em] opacity-30 border-b border-white/5">
-                                <th class="px-10 py-6 text-center">No</th>
-                                <th class="px-6 py-6">Diagnostic Checkpoint</th>
-                                <th class="px-6 py-6">Category</th>
-                                <th class="px-6 py-6">Health</th>
-                                <th class="px-6 py-6 text-right">Impact</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metricBody" class="divide-y divide-white/5 font-medium"></tbody>
-                    </table>
-                </div>
+    <!-- LOADER -->
+    <div id="loader" class="hidden py-20 text-center animate-pulse">
+      <div class="w-24 h-24 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-8"></div>
+      <h3 class="text-2xl font-bold text-white">Simulating User Behavior...</h3>
+      <p class="text-slate-400 mt-2">Extracting Core Web Vitals via Playwright CDP</p>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="results" class="hidden space-y-10">
+      <!-- Gauges + Pillars -->
+      <div class="grid lg:grid-cols-4 gap-6">
+        <div class="lg:col-span-1 glass-panel rounded-[2rem] p-10 flex flex-col items-center justify-center relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-full h-1 loading-shimmer"></div>
+          <h3 class="text-xs font-black uppercase tracking-widest opacity-40 mb-6">Health Score</h3>
+          <div class="relative w-40 h-40">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"></circle>
+              <circle id="scoreCircle" cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8"
+                      stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" class="gauge-animation"></circle>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span id="scoreVal" class="text-5xl font-black">0</span>
+              <span class="text-xs font-bold opacity-40 uppercase">Percent</span>
             </div>
+          </div>
         </div>
-    </main>
 
-    <script>
-        const form = document.getElementById('auditForm');
-        const results = document.getElementById('results');
-        const loader = document.getElementById('loader');
+        <div class="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="glass-panel rounded-3xl p-6 border-b-4 border-emerald-500">
+            <i class="fa-solid fa-bolt text-emerald-400 mb-4"></i>
+            <p class="text-xs font-bold opacity-40 uppercase">Performance</p>
+            <div id="perfPillar" class="text-3xl font-black mt-1">0%</div>
+          </div>
+          <div class="glass-panel rounded-3xl p-6 border-b-4 border-blue-500">
+            <i class="fa-solid fa-search text-blue-400 mb-4"></i>
+            <p class="text-xs font-bold opacity-40 uppercase">SEO</p>
+            <div id="seoPillar" class="text-3xl font-black mt-1">0%</div>
+          </div>
+          <div class="glass-panel rounded-3xl p-6 border-b-4 border-purple-500">
+            <i class="fa-solid fa-wand-magic-sparkles text-purple-400 mb-4"></i>
+            <p class="text-xs font-bold opacity-40 uppercase">UX</p>
+            <div id="uxPillar" class="text-3xl font-black mt-1">0%</div>
+          </div>
+          <div class="glass-panel rounded-3xl p-6 border-b-4 border-red-500">
+            <i class="fa-solid fa-lock text-red-400 mb-4"></i>
+            <p class="text-xs font-bold opacity-40 uppercase">Security</p>
+            <div id="secPillar" class="text-3xl font-black mt-1">0%</div>
+          </div>
+        </div>
+      </div>
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const url = document.getElementById('url').value;
-            const mode = document.getElementById('mode').value;
+      <!-- Diagnostics + Export -->
+      <div class="glass-panel rounded-[2rem] overflow-hidden shadow-2xl">
+        <div class="px-10 py-8 border-b border-white/5 flex flex-wrap gap-4 justify-between items-center bg-white/5">
+          <div>
+            <h3 class="text-xl font-extrabold text-white">Advanced Diagnostics</h3>
+            <p id="summaryDisplay" class="text-sm text-emerald-400 font-semibold mt-1"></p>
+          </div>
+          <div class="flex gap-3">
+            <button id="downloadPdf" class="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+              <i class="fa-solid fa-file-export"></i> EXPORT REPORT
+            </button>
+            <button id="expandAll" class="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+              <i class="fa-solid fa-chevron-down"></i> EXPAND ALL
+            </button>
+            <button id="collapseAll" class="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2">
+              <i class="fa-solid fa-chevron-up"></i> COLLAPSE ALL
+            </button>
+          </div>
+        </div>
 
-            loader.classList.remove('hidden');
-            results.classList.add('hidden');
-            window.scrollTo({ top: loader.offsetTop - 100, behavior: 'smooth' });
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <tr class="text-left text-[10px] font-black uppercase tracking-[0.2em] opacity-30 border-b border-white/5">
+                <th class="px-10 py-6 text-center">No</th>
+                <th class="px-6 py-6">Diagnostic Checkpoint</th>
+                <th class="px-6 py-6">Category</th>
+                <th class="px-6 py-6">Health</th>
+                <th class="px-6 py-6 text-right">Impact</th>
+              </tr>
+            </thead>
+            <tbody id="metricBody" class="divide-y divide-white/5 font-medium"></tbody>
+          </table>
+        </div>
+      </div>
 
-            try {
-                const response = await fetch('/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, mode })
-                });
-                
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Audit process failed');
+      <!-- SEO Audit Section -->
+      <div id="seoAuditSection" class="hidden glass-panel rounded-[2rem] p-8">
+        <div class="flex flex-wrap gap-4 items-center justify-between">
+          <h3 class="text-2xl font-extrabold">SEO Audit Results</h3>
+          <div id="seoScoreBadge" class="px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold">SEO Score: 0/100</div>
+        </div>
 
-                renderUI(data);
-                window.currentAuditData = data;
-            } catch (err) {
-                alert("Critical Engine Error: " + err.message);
-            } finally {
-                loader.classList.add('hidden');
-            }
-        });
+        <!-- Section scores -->
+        <div id="sectionScores" class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <!-- Score cards are populated dynamically -->
+        </div>
 
-        function renderUI(data) {
-            results.classList.remove('hidden');
-            
-            // Score Animation
-            document.getElementById('scoreVal').innerText = data.total_grade;
-            const offset = 283 - (283 * data.total_grade / 100);
-            document.getElementById('scoreCircle').style.strokeDashoffset = offset;
-            
-            // Pillar Updates
-            document.getElementById('perfPillar').innerText = `${data.pillars.Performance}%`;
-            document.getElementById('seoPillar').innerText = `${data.pillars.SEO}%`;
-            document.getElementById('uxPillar').innerText = `${data.pillars.UX}%`;
-            document.getElementById('secPillar').innerText = `${data.pillars.Security}%`;
-            document.getElementById('summaryDisplay').innerText = data.summary;
+        <!-- Overview -->
+        <div id="seoOverview" class="text-slate-300 mt-6"></div>
 
-            // Table Injection
-            const tbody = document.getElementById('metricBody');
-            tbody.innerHTML = '';
-            data.metrics.forEach(m => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-white/[0.02] transition-colors';
-                
-                let healthColor = 'text-emerald-400';
-                let statusIcon = 'fa-circle-check';
-                if(m.score < 100) { healthColor = 'text-amber-400'; statusIcon = 'fa-circle-exclamation'; }
-                if(m.score < 50) { healthColor = 'text-rose-500'; statusIcon = 'fa-circle-xmark'; }
+        <!-- Competitor Analysis (Collapsible) -->
+        <div id="competitorAnalysis" class="mt-8">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xl font-bold">Competitor Analysis</h4>
+            <div class="flex gap-2">
+              <button id="expandCompetitors" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold">
+                Expand All
+              </button>
+              <button id="collapseCompetitors" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold">
+                Collapse All
+              </button>
+            </div>
+          </div>
+          <!-- Panels appended here -->
+        </div>
+      </div>
+    </div>
+  </main>
 
-                tr.innerHTML = `
-                    <td class="px-10 py-6 text-center text-xs opacity-30 font-bold">${m.no}</td>
-                    <td class="px-6 py-6 text-white font-semibold">${m.name}</td>
-                    <td class="px-6 py-6"><span class="bg-white/5 px-3 py-1 rounded-lg text-[10px] uppercase font-black opacity-60 border border-white/5">${m.category}</span></td>
-                    <td class="px-6 py-6 font-black ${healthColor}">${m.score}%</td>
-                    <td class="px-6 py-6 text-right"><i class="fa-solid ${statusIcon} ${healthColor} text-lg"></i></td>
-                `;
-                tbody.appendChild(tr);
-            });
-            
-            window.scrollTo({ top: results.offsetTop - 50, behavior: 'smooth' });
+  <script>
+    const form = document.getElementById('auditForm');
+    const results = document.getElementById('results');
+    const loader = document.getElementById('loader');
+    const seoAuditSection = document.getElementById('seoAuditSection');
+
+    const sampleDomainBtn = document.getElementById('sampleDomain');
+    sampleDomainBtn.addEventListener('click', () => {
+      document.getElementById('url').value = 'https://www.haier.com.pk';
+    });
+
+    const resetBtn = document.getElementById('resetBtn');
+    resetBtn.addEventListener('click', () => {
+      document.getElementById('url').value = '';
+      document.getElementById('mode').value = 'desktop';
+      results.classList.add('hidden');
+      seoAuditSection.classList.add('hidden');
+      window.currentAuditData = null;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.getElementById('copyLink').addEventListener('click', async () => {
+      try {
+        const url = new URL(window.location.href);
+        if (window.currentAuditData?.url) {
+          url.searchParams.set('target', window.currentAuditData.url);
         }
+        await navigator.clipboard.writeText(url.toString());
+        alert('Share link copied!');
+      } catch { alert('Unable to copy link'); }
+    });
 
-        document.getElementById('downloadPdf').addEventListener('click', async () => {
-            if(!window.currentAuditData) return;
-            const btn = document.getElementById('downloadPdf');
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> PROCESSING';
-            
-            try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(window.currentAuditData)
-                });
-                
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `FF_Elite_Audit_${new Date().getTime()}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } catch (err) {
-                alert("PDF Engine Failure");
-            } finally {
-                btn.innerHTML = originalHtml;
-            }
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = document.getElementById('url').value;
+      const mode = document.getElementById('mode').value;
+
+      loader.classList.remove('hidden');
+      results.classList.add('hidden');
+      seoAuditSection.classList.add('hidden');
+      window.scrollTo({ top: loader.offsetTop - 100, behavior: 'smooth' });
+
+      try {
+        const response = await fetch('/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, mode })
         });
-    </script>
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Audit process failed');
+
+        renderUI(data);
+        window.currentAuditData = data;
+      } catch (err) {
+        alert("Critical Engine Error: " + err.message);
+      } finally {
+        loader.classList.add('hidden');
+      }
+    });
+
+    function renderUI(data) {
+      results.classList.remove('hidden');
+
+      // Score animation
+      document.getElementById('scoreVal').innerText = data.total_grade;
+      const offset = 283 - (283 * data.total_grade / 100);
+      document.getElementById('scoreCircle').style.strokeDashoffset = offset;
+
+      // Pillars
+      document.getElementById('perfPillar').innerText = `${data.pillars.Performance}%`;
+      document.getElementById('seoPillar').innerText = `${data.pillars.SEO}%`;
+      document.getElementById('uxPillar').innerText = `${data.pillars.UX}%`;
+      document.getElementById('secPillar').innerText = `${data.pillars.Security}%`;
+      document.getElementById('summaryDisplay').innerText = data.summary;
+
+      // Metrics table
+      const tbody = document.getElementById('metricBody');
+      tbody.innerHTML = '';
+      data.metrics.forEach(m => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-white/[0.02] transition-colors';
+
+        let healthColor = 'text-emerald-400';
+        let statusIcon = 'fa-circle-check';
+        if(m.score < 100) { healthColor = 'text-amber-400'; statusIcon = 'fa-circle-exclamation'; }
+        if(m.score < 50) { healthColor = 'text-rose-500'; statusIcon = 'fa-circle-xmark'; }
+
+        tr.innerHTML = `
+          <td class="px-10 py-6 text-center text-xs opacity-30 font-bold">${m.no}</td>
+          <td class="px-6 py-6 text-white font-semibold">${m.name}</td>
+          <td class="px-6 py-6"><span class="bg-white/5 px-3 py-1 rounded-lg text-[10px] uppercase font-black opacity-60 border border-white/5">${m.category}</span></td>
+          <td class="px-6 py-6 font-black ${healthColor}">${m.score}%</td>
+          <td class="px-6 py-6 text-right"><i class="fa-solid ${statusIcon} ${healthColor} text-lg"></i></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // SEO Audit (if provided)
+      if (data.seo_audit) {
+        seoAuditSection.classList.remove('hidden');
+
+        // Score badge
+        document.getElementById('seoScoreBadge').innerText = `SEO Score: ${data.seo_audit.seo_score}/100`;
+
+        // Section scores cards
+        const scores = data.seo_audit.section_scores || {};
+        const cards = [
+          { label: 'On-Page SEO', value: scores['On-Page SEO'] || 0, color: 'emerald' },
+          { label: 'Technical SEO', value: scores['Technical SEO'] || 0, color: 'sky' },
+          { label: 'Off-Page SEO', value: scores['Off-Page SEO'] || 0, color: 'fuchsia' },
+          { label: 'Social Media', value: scores['Social Media'] || 0, color: 'rose' },
+        ];
+        const ss = document.getElementById('sectionScores');
+        ss.innerHTML = '';
+        cards.forEach(c => {
+          const div = document.createElement('div');
+          div.className = `glass-panel rounded-2xl p-6 border-b-4 border-${c.color}-500`;
+          div.innerHTML = `
+            <p class="text-xs font-bold opacity-40 uppercase">${c.label}</p>
+            <div class="text-3xl font-black mt-1">${c.value}%</div>
+          `;
+          ss.appendChild(div);
+        });
+
+        // Overview text
+        document.getElementById('seoOverview').innerText = data.seo_audit.overview_text;
+
+        // Competitor analysis (collapsible)
+        const compDiv = document.getElementById('competitorAnalysis');
+        compDiv.querySelectorAll('.panel').forEach(el => el.remove());
+        const analysis = data.seo_audit.competitor_analysis || data.seo_audit.competator_analysis;
+        if (analysis?.types) {
+          analysis.types.forEach((type, idx) => {
+            const panel = document.createElement('div');
+            panel.className = 'panel mb-3 border border-white/10 rounded-xl overflow-hidden';
+
+            const header = document.createElement('button');
+            header.type = 'button';
+            header.className = 'w-full flex justify-between items-center bg-white/5 px-4 py-3';
+            header.innerHTML = `
+              <span class="font-semibold text-emerald-400">${type.type}</span>
+              <i class="fa-solid fa-chevron-down text-slate-400"></i>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'hidden px-4 py-3';
+            body.innerHTML = `<p class="text-slate-400 text-sm mb-2">${type.description}</p>`;
+
+            const list = document.createElement('ul');
+            list.className = 'list-disc pl-6 text-slate-300';
+            type.competitors.forEach(c => {
+              const li = document.createElement('li');
+              li.innerText = `${c.label} (${c.domain}) — Common Keywords: ${c.common_keywords}, Competition Level: ${c.competition_level}`;
+              list.appendChild(li);
+            });
+            body.appendChild(list);
+
+            header.addEventListener('click', () => {
+              body.classList.toggle('hidden');
+              header.querySelector('i').classList.toggle('rotate-180');
+            });
+
+            panel.appendChild(header);
+            panel.appendChild(body);
+            compDiv.appendChild(panel);
+          });
+
+          // Expand/Collapse all
+          document.getElementById('expandCompetitors').onclick = () => {
+            compDiv.querySelectorAll('.panel > div').forEach(b => b.classList.remove('hidden'));
+            compDiv.querySelectorAll('.panel button i').forEach(i => i.classList.add('rotate-180'));
+          };
+          document.getElementById('collapseCompetitors').onclick = () => {
+            compDiv.querySelectorAll('.panel > div').forEach(b => b.classList.add('hidden'));
+            compDiv.querySelectorAll('.panel button i').forEach(i => i.classList.remove('rotate-180'));
+          };
+        }
+      }
+
+      // Expand/Collapse all panels in diagnostics section (if needed later)
+      document.getElementById('expandAll').onclick = () => window.scrollTo({ top: results.offsetTop, behavior: 'smooth' });
+      document.getElementById('collapseAll').onclick = () => window.scrollTo({ top: results.offsetTop, behavior: 'smooth' });
+
+      window.scrollTo({ top: results.offsetTop - 50, behavior: 'smooth' });
+    }
+
+    document.getElementById('downloadPdf').addEventListener('click', async () => {
+      if (!window.currentAuditData) return;
+      const btn = document.getElementById('downloadPdf');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> PROCESSING';
+
+      try {
+        const response = await fetch('/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(window.currentAuditData)
+        });
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FF_Elite_Audit_${new Date().getTime()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        alert("PDF Engine Failure");
+      } finally {
+        btn.innerHTML = originalHtml;
+      }
+    });
+  </script>
 </body>
 </html>
