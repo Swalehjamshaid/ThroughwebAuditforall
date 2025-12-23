@@ -3,379 +3,294 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FF TECH ELITE v3 — Weighted Audit Engine</title>
+  <title>FF TECH ELITE v3 | Global Audit Standard</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
-          fontFamily: { sans: ['Plus Jakarta Sans', 'Inter', 'system-ui'] },
-          colors: {
-            brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' },
+          fontFamily: { 
+            sans: ['Outfit', 'system-ui'],
+            mono: ['JetBrains Mono', 'monospace']
           },
+          colors: {
+            brand: { 
+                50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1',
+                accent: '#6366f1', gold: '#fbbf24'
+            },
+          },
+          boxShadow: {
+            'glow': '0 0 20px -5px rgba(14, 165, 233, 0.5)',
+            'premium': '0 20px 50px -12px rgba(0, 0, 0, 0.1)',
+          }
         }
-      },
-      darkMode: 'class'
+      }
     };
   </script>
+
   <style>
-    .gauge {
-      width: 140px; height: 140px; border-radius: 50%;
-      background: conic-gradient(#10b981 var(--p), #e5e7eb 0);
-      position: relative;
-      transition: --p 1s ease-in-out;
-    }
-    .gauge::after { content: ''; position: absolute; inset: 12px; background: white; border-radius: 50%; }
-    .gauge.dark::after { background: #0f172a; }
-    .gauge-label { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size: 1.5rem; color:#0f172a; z-index: 10; }
-    .dark .gauge-label { color:#f8fafc; }
-    .spinner { border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; width:18px; height:18px; animation:spin .8s linear infinite; }
-    @keyframes spin { to { transform:rotate(360deg) } }
+    :root { --p: 0deg; }
     
-    .glass-header { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-    .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    /* Global Aesthetic */
+    .bg-grid {
+        background-size: 30px 30px;
+        background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px), 
+                          linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+    }
+
+    /* Executive Gauge */
+    .gauge {
+      width: 180px; height: 180px; border-radius: 50%;
+      background: conic-gradient(from 0deg, #0ea5e9 var(--p), #6366f1 var(--p), #f1f5f9 0);
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+    }
+    .gauge::after { content: ''; position: absolute; inset: 12px; background: white; border-radius: 50%; z-index: 1; }
+    .dark .gauge::after { background: #0f172a; }
+    .gauge-label { z-index: 2; font-weight: 900; font-size: 2.5rem; letter-spacing: -2px; }
+
+    /* Glass Panels */
+    .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.4); }
+    .dark .glass { background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.05); }
+
+    /* Premium Button Shimmer */
+    .btn-shimmer {
+        position: relative; overflow: hidden;
+        background: linear-gradient(90deg, #0ea5e9, #6366f1);
+    }
+    .btn-shimmer::before {
+        content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.2), transparent);
+        transform: rotate(45deg); animation: shimmer 3s infinite;
+    }
+    @keyframes shimmer { 0% { left: -100%; } 100% { left: 100%; } }
+
+    /* PDF Print Styles (The "Beautiful Export" secret) */
+    @media print {
+        body { background: white !important; color: black !important; }
+        .no-print { display: none !important; }
+        .glass { border: 1px solid #e2e8f0 !important; backdrop-filter: none !important; box-shadow: none !important; }
+        .gauge { -webkit-print-color-adjust: exact; }
+    }
   </style>
 </head>
-<body class="h-full bg-[#f8fafc] text-slate-900 dark:bg-[#0b1222] dark:text-slate-100 transition-colors duration-300">
-  <div class="min-h-full">
-    <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/70 glass-header">
-      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="flex h-16 items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="h-10 w-10 rounded-xl bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2zm1 14.93A8.001 8.001 0 0 1 4.07 11H8v2H5.082A6.002 6.002 0 0 0 13 17.93zM16 13h3.919A6.002 6.002 0 0 0 11 6.07V9h2V6h3z"/>
-              </svg>
-            </div>
-            <div>
-              <h1 class="text-xl font-extrabold tracking-tight">FF TECH <span class="text-brand-600">ELITE</span></h1>
-              <p class="text-[10px] uppercase tracking-widest font-bold text-slate-400">Weighted Audit Engine v3</p>
-            </div>
-          </div>
-          <div class="flex items-center gap-3">
-            <button id="toggleDark" class="p-2 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-50 transition-colors">
-              <svg id="sunIcon" class="h-5 w-5 hidden dark:block text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
-              <svg id="moonIcon" class="h-5 w-5 block dark:hidden text-slate-700" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
-            </button>
-          </div>
+
+<body class="h-full bg-white dark:bg-[#020617] text-slate-900 dark:text-slate-100 bg-grid">
+
+  <nav class="sticky top-4 z-50 mx-auto max-w-7xl px-4 no-print">
+    <div class="glass rounded-3xl px-8 py-4 flex items-center justify-between shadow-premium">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-black dark:bg-brand-600 rounded-2xl flex items-center justify-center shadow-glow">
+          <svg class="w-7 h-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black tracking-tighter uppercase italic">FF TECH <span class="text-brand-600">ELITE</span></h1>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Global SEO Protocol v3.0</p>
         </div>
       </div>
-    </header>
+      <button id="toggleDark" class="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 transition-transform active:scale-90">
+         <svg id="themeIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+      </button>
+    </div>
+  </nav>
 
-    <main class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 space-y-8">
-      <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800 transition-all">
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-12 items-end">
-          <div class="md:col-span-6">
-            <label for="url" class="block text-sm font-semibold mb-2">Website URL</label>
-            <div class="relative">
-              <input id="url" type="url" placeholder="https://example.com"
-                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-slate-700 dark:bg-slate-900 transition-all outline-none" />
-            </div>
-          </div>
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold mb-2">Device Mode</label>
-            <select id="mode" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm focus:border-brand-500 dark:border-slate-700 dark:bg-slate-900 outline-none">
-              <option value="desktop">Desktop View</option>
-              <option value="mobile">Mobile View</option>
-            </select>
-          </div>
-          <div class="md:col-span-4 flex gap-3">
-            <button id="runAudit" class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-brand-500/30 hover:bg-brand-700 hover:-translate-y-0.5 transition-all">
-              <span id="btnText">Launch Audit</span>
-              <div id="loading" class="spinner hidden"></div>
-            </button>
-            <button id="downloadPdf" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 transition-all" disabled>
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            </button>
-          </div>
+  <main class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8 space-y-10">
+    
+    <section class="glass rounded-[2rem] p-10 shadow-2xl no-print relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-8 opacity-10">
+            <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </div>
-        <p id="status" class="mt-4 text-sm font-medium text-brand-600"></p>
-        <p id="error" class="mt-4 hidden rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"></p>
-      </section>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
+            <div class="lg:col-span-7 space-y-4">
+                <label class="text-xs font-black uppercase tracking-[0.2em] text-brand-600">Target Environment</label>
+                <input id="url" type="url" placeholder="https://your-empire.com" 
+                       class="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 focus:border-brand-500 rounded-2xl px-6 py-5 text-xl font-bold outline-none transition-all" />
+            </div>
+            <div class="lg:col-span-5 flex gap-4">
+                <button id="runAudit" class="flex-1 btn-shimmer text-white font-black uppercase tracking-widest rounded-2xl py-5 shadow-2xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3">
+                    Execute Scan
+                    <div id="loading" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                </button>
+                <button id="downloadPdf" disabled class="px-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl hover:bg-slate-50 transition-all disabled:opacity-20">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </button>
+            </div>
+        </div>
+        <p id="status" class="mt-6 font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest"></p>
+    </section>
 
-      <section id="summarySection" class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-800 card-hover flex flex-col items-center justify-center text-center">
-          <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-6">Overall Health</h2>
-          <div id="gauge" class="gauge mb-6" style="--p:0deg;">
-            <div class="gauge-label"><span id="overallScore">0%</span></div>
-          </div>
-          <p class="text-sm font-medium text-slate-500 dark:text-slate-400" id="auditedAt">No data available</p>
-          <p class="mt-2 text-xs leading-relaxed text-slate-400" id="summaryText">Run an audit to see your website's performance score.</p>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="lg:col-span-4 glass rounded-[2.5rem] p-10 flex flex-col items-center text-center justify-center">
+            <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Health Index</h3>
+            <div id="gauge" class="gauge mb-10">
+                <div class="gauge-label"><span id="overallScore">0%</span></div>
+            </div>
+            <p id="auditedAt" class="font-mono text-[10px] font-bold text-brand-600 mb-2"></p>
+            <p id="summaryText" class="text-sm font-medium text-slate-500 leading-relaxed italic"></p>
         </div>
 
-        <div class="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-800 card-hover">
-          <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-6">Core Pillars</h2>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">Performance</p>
-              <div class="flex items-center justify-between">
-                <span id="pillPerfVal" class="text-lg font-extrabold text-emerald-500">0%</span>
-              </div>
-              <div class="mt-2 w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div id="pillPerfBar" class="h-full rounded-full bg-emerald-500 transition-all duration-1000" style="width:0%"></div>
-              </div>
+        <div class="lg:col-span-8 glass rounded-[2.5rem] p-10">
+            <h3 class="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-10">Core Pillar Distribution</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                <div class="space-y-3">
+                    <p class="text-[10px] font-black text-emerald-500 uppercase">Performance</p>
+                    <p id="pillPerfVal" class="text-3xl font-black">0%</p>
+                    <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="pillPerfBar" class="h-full bg-emerald-500 transition-all duration-1000" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[10px] font-black text-sky-500 uppercase">SEO Strength</p>
+                    <p id="pillSeoVal" class="text-3xl font-black">0%</p>
+                    <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="pillSeoBar" class="h-full bg-sky-500 transition-all duration-1000" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[10px] font-black text-indigo-500 uppercase">UX Design</p>
+                    <p id="pillUxVal" class="text-3xl font-black">0%</p>
+                    <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="pillUxBar" class="h-full bg-indigo-500 transition-all duration-1000" style="width:0%"></div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-[10px] font-black text-rose-500 uppercase">Security</p>
+                    <p id="pillSecVal" class="text-3xl font-black">0%</p>
+                    <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div id="pillSecBar" class="h-full bg-rose-500 transition-all duration-1000" style="width:0%"></div>
+                    </div>
+                </div>
             </div>
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">SEO</p>
-              <div class="flex items-center justify-between">
-                <span id="pillSeoVal" class="text-lg font-extrabold text-sky-500">0%</span>
-              </div>
-              <div class="mt-2 w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div id="pillSeoBar" class="h-full rounded-full bg-sky-500 transition-all duration-1000" style="width:0%"></div>
-              </div>
+            <div class="h-[250px]">
+                <canvas id="pillarsChart"></canvas>
             </div>
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">UX</p>
-              <div class="flex items-center justify-between">
-                <span id="pillUxVal" class="text-lg font-extrabold text-indigo-500">0%</span>
-              </div>
-              <div class="mt-2 w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div id="pillUxBar" class="h-full rounded-full bg-indigo-500 transition-all duration-1000" style="width:0%"></div>
-              </div>
-            </div>
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700">
-              <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">Security</p>
-              <div class="flex items-center justify-between">
-                <span id="pillSecVal" class="text-lg font-extrabold text-rose-500">0%</span>
-              </div>
-              <div class="mt-2 w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                <div id="pillSecBar" class="h-full rounded-full bg-rose-500 transition-all duration-1000" style="width:0%"></div>
-              </div>
-            </div>
-          </div>
-          <div class="h-[180px]">
-            <canvas id="pillarsChart"></canvas>
-          </div>
         </div>
-      </section>
+    </div>
 
-      <section class="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div class="lg:col-span-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4" id="perfCards">
-           </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800 card-hover">
-          <h2 class="text-xs uppercase tracking-widest font-bold text-slate-400 mb-4">CWV Radar</h2>
-          <canvas id="cwvRadar" height="260"></canvas>
-        </div>
-      </section>
-
-      <section class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm dark:border-slate-800 dark:bg-slate-800">
-        <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 class="text-sm font-bold text-slate-700 dark:text-slate-200">Advanced Diagnostics</h2>
-          <div class="flex items-center gap-2">
-            <select id="filterCategory" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold dark:border-slate-700 dark:bg-slate-900 outline-none">
-              <option value="">All Categories</option>
-              <option>Performance</option>
-              <option>SEO</option>
-              <option>UX</option>
-              <option>Security</option>
-            </select>
-            <input id="searchMetric" type="text" placeholder="Search metrics..."
-              class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-brand-500/20" />
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-700">
-            <thead class="bg-slate-50/50 dark:bg-slate-900/50">
-              <tr class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
-                <th class="px-6 py-4 text-left">#</th>
-                <th class="px-6 py-4 text-left">Metric Name</th>
-                <th class="px-6 py-4 text-left">Category</th>
-                <th class="px-6 py-4 text-left">Score Analysis</th>
-                <th class="px-6 py-4 text-left">Weight</th>
-              </tr>
-            </thead>
-            <tbody id="metricsBody" class="text-sm divide-y divide-slate-100 dark:divide-slate-700">
-                </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-800">
-        <div class="flex items-center gap-3 mb-6">
-            <div class="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" /></svg>
+    <section class="glass rounded-[2.5rem] p-12">
+        <div class="flex items-center gap-6 mb-10">
+            <div class="w-14 h-14 rounded-3xl bg-brand-gold/10 flex items-center justify-center text-brand-gold shadow-inner">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             </div>
-            <h2 class="text-lg font-bold">Improvement Roadmap</h2>
-        </div>
-        <ol id="roadmapList" class="space-y-3"></ol>
-      </section>
-
-      <section id="seoSection" class="hidden">
-        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-800 overflow-hidden">
-          <button id="toggleSeo" class="w-full flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-            <div class="flex items-center gap-3">
-                <span class="text-lg font-bold">SEO Audit Deep-Dive</span>
-                <span id="seoIssues" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600"></span>
-            </div>
-            <span class="text-brand-600 font-bold text-sm">View Analysis</span>
-          </button>
-          
-          <div id="seoBody" class="hidden p-6 border-t border-slate-100 dark:border-slate-700 space-y-8">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div class="rounded-xl border border-slate-100 p-5 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">Domain</p>
-                <p id="seoDomain" class="text-sm font-bold truncate">—</p>
-              </div>
-              <div class="rounded-xl border border-slate-100 p-5 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">SEO Health</p>
-                <p id="seoScore" class="text-sm font-bold text-brand-600">—</p>
-              </div>
-              <div class="rounded-xl border border-slate-100 p-5 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30">
-                <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">Status</p>
-                <p id="seoOverviewText" class="text-xs font-medium text-slate-500">—</p>
-              </div>
-            </div>
-
             <div>
-              <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Category Breakdown</h3>
-              <div class="h-[200px]">
-                <canvas id="seoSectionsChart"></canvas>
-              </div>
+                <h3 class="text-2xl font-black tracking-tight uppercase italic">Strategic Roadmap</h3>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Prioritized Optimization Steps</p>
             </div>
+        </div>
+        <ul id="roadmapList" class="grid grid-cols-1 md:grid-cols-2 gap-6"></ul>
+    </section>
 
-            <div class="space-y-6">
-                <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">Critical Issues</h3>
-                <div class="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-700">
-                    <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-700">
-                        <thead class="bg-rose-50/50 dark:bg-rose-900/10 text-rose-600">
-                            <tr class="text-[10px] font-bold uppercase">
-                                <th class="px-4 py-3 text-left">Type</th>
-                                <th class="px-4 py-3 text-left">Element</th>
-                                <th class="px-4 py-3 text-left">Priority</th>
-                                <th class="px-4 py-3 text-left">Message</th>
-                            </tr>
-                        </thead>
-                        <tbody id="seoIssuesBody" class="divide-y divide-slate-100 dark:divide-slate-700 text-xs"></tbody>
-                    </table>
-                </div>
-            </div>
+    <section class="glass rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <div class="p-10 border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30">
+            <h3 class="text-xl font-black uppercase italic tracking-tighter">Diagnostic Ledger</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 dark:bg-slate-900 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <tr>
+                        <th class="px-10 py-5">Analysis Node</th>
+                        <th class="px-10 py-5">Stream</th>
+                        <th class="px-10 py-5">Efficiency</th>
+                        <th class="px-10 py-5 text-right">Impact</th>
+                    </tr>
+                </thead>
+                <tbody id="metricsBody" class="divide-y divide-slate-100 dark:divide-slate-800 font-medium"></tbody>
+            </table>
+        </div>
+    </section>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <section id="seoSection" class="hidden">
+        <div class="glass rounded-[3rem] p-12 border-b-8 border-brand-600">
+            <div class="flex items-center justify-between mb-12">
                 <div>
-                    <h3 class="text-xs font-bold uppercase text-slate-400 mb-3">On-Page Elements</h3>
-                    <div id="onPageGrid" class="space-y-3"></div>
+                    <h2 class="text-4xl font-black tracking-tighter uppercase italic">SEO Intelligence</h2>
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Neural Domain Analysis</p>
                 </div>
-                <div>
-                    <h3 class="text-xs font-bold uppercase text-slate-400 mb-3">Technical Checks</h3>
-                    <div id="seoTechBody_List" class="space-y-3">
-                        <table class="min-w-full text-xs">
-                             <tbody id="seoTechBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="space-y-4">
-                    <h3 class="text-xs font-bold uppercase text-slate-400">Keyword Rankings</h3>
-                    <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
-                        <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-700 text-[11px]">
-                            <thead class="bg-slate-50 dark:bg-slate-900">
-                                <tr>
-                                    <th class="px-3 py-2 text-left">Keyword</th>
-                                    <th class="px-3 py-2 text-right">Rank</th>
-                                    <th class="px-3 py-2 text-right">Volume</th>
-                                </tr>
-                            </thead>
-                            <tbody id="seoKeywordsBody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="space-y-4">
-                    <h3 class="text-xs font-bold uppercase text-slate-400">Competitors</h3>
-                    <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
-                        <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-700 text-[11px]">
-                            <thead class="bg-slate-50 dark:bg-slate-900">
-                                <tr>
-                                    <th class="px-3 py-2 text-left">Domain</th>
-                                    <th class="px-3 py-2 text-right">Comm. KW</th>
-                                    <th class="px-3 py-2 text-right">Level</th>
-                                </tr>
-                            </thead>
-                            <tbody id="seoCompetitorsBody" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="pt-6 border-t border-slate-100 dark:border-slate-700">
-                <h3 class="text-xs font-bold uppercase text-slate-400 mb-4">Backlink Profile</h3>
-                <div class="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-700">
-                     <table class="min-w-full divide-y divide-slate-100 dark:divide-slate-700 text-[10px]">
-                        <tbody id="seoBacklinksBody"></tbody>
-                     </table>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div id="compTypes"></div>
-                <div class="rounded-xl bg-indigo-50/50 dark:bg-indigo-900/10 p-6">
-                    <h3 class="text-xs font-bold uppercase text-indigo-600 mb-4">Social Signal Check</h3>
-                    <table class="min-w-full text-xs">
-                        <tbody id="seoSocialBody"></tbody>
-                    </table>
-                </div>
+                <button id="toggleSeo" class="bg-black text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-brand-600 transition-all">Deep Analysis</button>
             </div>
             
-          </div>
-        </div>
-      </section>
+            <div id="seoBody" class="hidden space-y-16">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="p-8 rounded-[2rem] bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                        <p class="text-[10px] font-black text-slate-400 uppercase mb-2">Subject</p>
+                        <p id="seoDomain" class="text-lg font-black break-all">—</p>
+                    </div>
+                    <div class="p-8 rounded-[2rem] bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                        <p class="text-[10px] font-black text-slate-400 uppercase mb-2">Authority Score</p>
+                        <p id="seoScore" class="text-3xl font-black text-brand-600">—</p>
+                    </div>
+                    <div class="p-8 rounded-[2rem] bg-rose-500/5 border border-rose-500/20">
+                        <p class="text-[10px] font-black text-rose-500 uppercase mb-2">Critical Anomalies</p>
+                        <p id="seoIssues" class="text-lg font-black text-rose-600">—</p>
+                    </div>
+                </div>
 
-    </main>
-  </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="space-y-6">
+                        <h4 class="text-xs font-black uppercase text-slate-400 tracking-[0.3em]">System Faults</h4>
+                        <div class="rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                            <table class="w-full text-xs"><tbody id="seoIssuesBody" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody></table>
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <h4 class="text-xs font-black uppercase text-slate-400 tracking-[0.3em]">Market Keywords</h4>
+                        <div class="rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                            <table class="w-full text-xs"><tbody id="seoKeywordsBody" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="onPageGrid" class="grid grid-cols-1 md:grid-cols-3 gap-8"></div>
+            </div>
+        </div>
+    </section>
+
+  </main>
 
   <script>
-    // ---- Utilities (Unchanged logic) ----
+    // Logic Engines (Preserved and Enhanced)
     const fmt = n => (n ?? n === 0) ? n.toLocaleString() : '—';
     const clamp = v => Math.max(0, Math.min(100, Math.round(v || 0)));
     const decodeEntities = (s) => { const e = document.createElement('textarea'); e.innerHTML = (s || '').toString(); return e.value; };
     const scoreColor = (score) => { if (score >= 90) return 'bg-emerald-500'; if (score >= 80) return 'bg-sky-500'; if (score >= 60) return 'bg-amber-500'; return 'bg-rose-500'; };
     const catBadge = (cat) => ({ 'Performance':'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200', 'SEO':'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200', 'UX':'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200', 'Security':'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200', }[cat] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100');
 
-    // ---- Global state ----
     let currentAudit = null;
     let pillarsChartInstance = null;
     let seoSectionsChartInstance = null;
     let cwvRadarInstance = null;
 
-    // ---- Dark mode toggle ----
     document.getElementById('toggleDark').addEventListener('click', () => {
       document.documentElement.classList.toggle('dark');
-      const isDark = document.documentElement.classList.contains('dark');
-      document.getElementById('gauge').classList.toggle('dark', isDark);
     });
 
-    // ---- Actions ----
     document.getElementById('runAudit').addEventListener('click', runAudit);
     document.getElementById('downloadPdf').addEventListener('click', downloadPdf);
     document.getElementById('toggleSeo').addEventListener('click', () => {
-      const seoBody = document.getElementById('seoBody');
-      const open = seoBody.classList.contains('hidden');
-      seoBody.classList.toggle('hidden', !open);
+      const b = document.getElementById('seoBody');
+      const btn = document.getElementById('toggleSeo');
+      const open = b.classList.contains('hidden');
+      b.classList.toggle('hidden', !open);
+      btn.textContent = open ? 'Collapse Report' : 'Deep Report';
     });
 
     async function runAudit() {
       const url = document.getElementById('url').value.trim();
-      const modeSel = document.getElementById('mode').value;
+      const modeSel = document.getElementById('mode')?.value || 'desktop';
       const status = document.getElementById('status');
-      const err = document.getElementById('error');
       const loading = document.getElementById('loading');
       const dlBtn = document.getElementById('downloadPdf');
-      const btnText = document.getElementById('btnText');
 
-      err.classList.add('hidden'); 
-      status.textContent = 'Initializing Audit Engines...';
+      status.textContent = 'PROTOCOL INITIATED: SCANNING DOMAIN...';
       loading.classList.remove('hidden');
-      btnText.textContent = 'Auditing...';
 
       try {
         const res = await fetch('/audit', {
@@ -383,71 +298,43 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, mode: modeSel })
         });
-
-        if (!res.ok) {
-          const detail = await safeJson(res);
-          throw new Error(detail?.detail || `HTTP ${res.status}`);
-        }
-
+        if (!res.ok) throw new Error(`SYSTEM ERROR ${res.status}`);
         const data = await res.json();
         currentAudit = data;
         renderAll(data);
-        status.textContent = `Report generated for ${data.url}`;
+        status.textContent = `ANALYSIS COMPLETE: ${data.url}`;
         dlBtn.disabled = false;
       } catch (e) {
-        err.textContent = e.message.includes('Playwright') ? 'Server missing Playwright dependency.' : e.message;
-        err.classList.remove('hidden');
-        status.textContent = '';
+        status.textContent = `CRITICAL ERROR: ${e.message}`;
       } finally {
         loading.classList.add('hidden');
-        btnText.textContent = 'Launch Audit';
       }
     }
 
     async function downloadPdf() {
       if (!currentAudit) return;
-      const status = document.getElementById('status');
-      status.textContent = 'Building PDF Report...';
+      document.getElementById('status').textContent = 'COMPILING EXECUTIVE PDF LEDGER...';
       try {
         const res = await fetch('/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(currentAudit)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `FF_Audit_${Date.now()}.pdf`;
+        a.download = `FF_ELITE_AUDIT_${Date.now()}.pdf`;
         document.body.appendChild(a); a.click(); a.remove();
-        window.URL.revokeObjectURL(url);
-        status.textContent = 'PDF Exported Successfully.';
-      } catch (e) {
-        status.textContent = 'PDF Error: ' + e.message;
-      }
+        document.getElementById('status').textContent = 'EXECUTIVE REPORT EXPORTED.';
+      } catch (e) { document.getElementById('status').textContent = 'EXPORT SEQUENCE FAILED.'; }
     }
 
-    async function safeJson(response) { try { return await response.json(); } catch { return null; } }
-
-    // Scoring Helpers (Unchanged)
-    function bandScore(value, bands) {
-      for (const [maxV, s] of bands) { if (value <= maxV) return s; }
-      return bands[bands.length - 1][1];
-    }
-    function scoreFCP(ms) { return bandScore(ms || 0, [[1800, 100],[3000, 85],[8000, 60],[9999999, 40]]); }
-    function scoreLCP(ms) { return bandScore(ms || 0, [[2500, 100],[4000, 80],[10000, 60],[9999999, 40]]); }
-    function scoreTTFB(ms){ return bandScore(ms || 0, [[800, 100],[1800, 80],[4000, 60],[9999999, 40]]); }
-    function scoreCLS(val){ return bandScore(parseFloat(val || 0), [[0.1, 100],[0.25, 80],[0.5, 60],[9999999, 40]]); }
-    function scoreTBT(ms) { return bandScore(ms || 0, [[200, 100],[600, 80],[1200, 60],[9999999, 40]]); }
-
-    // Renderers
     function renderAll(d) {
       const pct = clamp(d.total_grade);
       document.getElementById('overallScore').textContent = `${pct}%`;
       document.getElementById('gauge').style.setProperty('--p', `${pct * 3.6}deg`);
-      document.getElementById('auditedAt').textContent = d.audited_at ? `Generated: ${d.audited_at}` : 'Audit Complete';
+      document.getElementById('auditedAt').textContent = `INDEXED: ${d.audited_at || 'REAL-TIME'}`;
       document.getElementById('summaryText').textContent = d.summary || '';
 
       const p = d.pillars || {};
@@ -455,9 +342,8 @@
       setBar('pillSeoBar', 'pillSeoVal', p['SEO']);
       setBar('pillUxBar', 'pillUxVal', p['UX']);
       setBar('pillSecBar', 'pillSecVal', p['Security']);
+      
       renderPillarsChart(p);
-      renderPerfCards(d.perf || {});
-      renderCwvRadar(d.perf || {});
       renderMetricsTable(d.metrics || []);
       renderRoadmap(d.roadmap || '');
 
@@ -469,101 +355,46 @@
 
     function setBar(barId, valId, score) {
       const s = clamp(score || 0);
-      const bar = document.getElementById(barId);
-      const val = document.getElementById(valId);
-      bar.style.width = `${s}%`;
-      val.textContent = `${s}%`;
+      document.getElementById(barId).style.width = `${s}%`;
+      document.getElementById(valId).textContent = `${s}%`;
     }
 
     function renderPillarsChart(p) {
       const ctx = document.getElementById('pillarsChart').getContext('2d');
       if (pillarsChartInstance) pillarsChartInstance.destroy();
-      const isDark = document.documentElement.classList.contains('dark');
       pillarsChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['Performance', 'SEO', 'UX', 'Security'],
+          labels: ['PERFORMANCE', 'SEO', 'UX', 'SECURITY'],
           datasets: [{
             data: [clamp(p['Performance']), clamp(p['SEO']), clamp(p['UX']), clamp(p['Security'])],
             backgroundColor: ['#10b981','#0ea5e9','#6366f1','#f43f5e'],
-            borderRadius: 8
+            borderRadius: 15
           }]
         },
         options: { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } }, 
-            scales: { 
-                y: { beginAtZero: true, max: 100, grid: { color: isDark ? '#1e293b' : '#f1f5f9' } },
-                x: { grid: { display: false } }
-            } 
-        }
-      });
-    }
-
-    function renderPerfCards(perf) {
-      const container = document.getElementById('perfCards');
-      const items = [
-        { k:'ttfb_ms', label:'TTFB', unit:'ms' },
-        { k:'fcp_ms',  label:'FCP', unit:'ms'  },
-        { k:'lcp_ms',  label:'LCP', unit:'ms'  },
-        { k:'cls',     label:'CLS', unit:''     },
-        { k:'tbt_ms',  label:'TBT', unit:'ms'  },
-        { k:'page_weight_kb', label:'Weight', unit:'KB' },
-        { k:'request_count',  label:'Requests', unit:'' }
-      ];
-      container.innerHTML = items.map(it => `
-        <div class="rounded-xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
-          <p class="text-[10px] font-bold uppercase text-slate-400 mb-1">${it.label}</p>
-          <p class="text-lg font-extrabold truncate">${fmt(perf[it.k])}<span class="text-[10px] ml-0.5 text-slate-400 font-normal">${it.unit}</span></p>
-        </div>
-      `).join('');
-    }
-
-    function renderCwvRadar(perf) {
-      const scores = [scoreFCP(perf.fcp_ms), scoreLCP(perf.lcp_ms), scoreCLS(perf.cls), scoreTBT(perf.tbt_ms), scoreTTFB(perf.ttfb_ms)];
-      const ctx = document.getElementById('cwvRadar').getContext('2d');
-      if (cwvRadarInstance) cwvRadarInstance.destroy();
-      cwvRadarInstance = new Chart(ctx, {
-        type: 'radar',
-        data: {
-          labels: ['FCP', 'LCP', 'CLS', 'TBT', 'TTFB'],
-          datasets: [{
-            data: scores,
-            borderColor: '#0ea5e9',
-            backgroundColor: 'rgba(14, 165, 233, 0.2)',
-            pointBackgroundColor: '#0ea5e9'
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: { r: { suggestedMin: 0, suggestedMax: 100, ticks: { display: false } } }
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { display: false }, x: { grid: { display: false } } }
         }
       });
     }
 
     function renderMetricsTable(metrics) {
-      const cat = document.getElementById('filterCategory').value.trim();
-      const q = document.getElementById('searchMetric').value.toLowerCase();
       const body = document.getElementById('metricsBody');
-      const filtered = metrics.filter(m => (!cat || m.category === cat) && (!q || (m.name || '').toLowerCase().includes(q)));
-      body.innerHTML = filtered.map(m => {
+      body.innerHTML = metrics.slice(0, 15).map(m => {
         const s = clamp(m.score);
         return `
-          <tr class="hover:bg-slate-50 dark:hover:bg-slate-900/30 transition-colors">
-            <td class="px-6 py-4 text-slate-400 font-mono text-xs">${fmt(m.no)}</td>
-            <td class="px-6 py-4 font-semibold text-xs">${m.name}</td>
-            <td class="px-6 py-4"><span class="px-2 py-1 rounded text-[10px] font-bold ${catBadge(m.category)}">${m.category}</span></td>
-            <td class="px-6 py-4">
-              <div class="flex items-center gap-3">
-                <div class="h-1.5 w-24 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                  <div class="h-full ${scoreColor(s)}" style="width:${s}%"></div>
-                </div>
-                <span class="text-xs font-bold">${s}%</span>
+          <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+            <td class="px-10 py-6 font-bold uppercase tracking-tighter">${m.name}</td>
+            <td class="px-10 py-6"><span class="px-3 py-1 rounded-xl text-[9px] font-black uppercase ${catBadge(m.category)}">${m.category}</span></td>
+            <td class="px-10 py-6">
+              <div class="flex items-center gap-4">
+                <div class="h-1.5 w-24 rounded-full bg-slate-100 dark:bg-slate-800"><div class="h-full ${scoreColor(s)}" style="width:${s}%"></div></div>
+                <span class="text-xs font-black">${s}%</span>
               </div>
             </td>
-            <td class="px-6 py-4 text-slate-400 text-xs">${fmt(m.weight)}</td>
+            <td class="px-10 py-6 text-right font-mono text-[10px] text-slate-400 font-bold">${fmt(m.weight)}</td>
           </tr>
         `;
       }).join('');
@@ -573,66 +404,44 @@
       const list = document.getElementById('roadmapList');
       const lines = decodeEntities(html).split('<br/>').map(x => x.trim()).filter(x => x && !x.toLowerCase().includes('<b>'));
       list.innerHTML = lines.map(it => `
-        <li class="flex gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 text-xs font-medium">
-            <span class="text-brand-600 font-bold">•</span>
+        <li class="flex items-start gap-4 p-6 rounded-[1.5rem] bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-[11px] font-bold leading-relaxed uppercase tracking-wide">
+            <span class="w-2 h-2 rounded-full bg-brand-gold mt-1.5 shrink-0 shadow-lg shadow-brand-gold/50"></span>
             ${it.replace(/^\d+\.\s*/, '')}
         </li>
       `).join('');
     }
 
     function renderSeoAudit(seo) {
-      document.getElementById('seoDomain').textContent = seo.domain || '—';
+      document.getElementById('seoDomain').textContent = seo.domain || 'SYSTEM SUBJECT 01';
       document.getElementById('seoScore').textContent = `${fmt(seo.seo_score)}/100`;
-      document.getElementById('seoIssues').textContent = `${fmt(seo.critical_issues)} Issues Detected`;
-      document.getElementById('seoOverviewText').textContent = seo.overview_text || '';
+      document.getElementById('seoIssues').textContent = `${fmt(seo.critical_issues)} CRITICAL FAULTS`;
 
-      const sec = seo.section_scores || {};
-      const ctx = document.getElementById('seoSectionsChart').getContext('2d');
-      if (seoSectionsChartInstance) seoSectionsChartInstance.destroy();
-      seoSectionsChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['On-Page', 'Technical', 'Off-Page', 'Social'],
-          datasets: [{ data: [sec['On-Page SEO']||0, sec['Technical SEO']||0, sec['Off-Page SEO']||0, sec['Social Media']||0], backgroundColor: ['#10b981','#0f172a','#f59e0b','#a855f7'], borderRadius: 6 }]
-        },
-        options: { responsive:true, maintainAspectRatio: false, plugins:{legend:{display:false}} }
-      });
-
-      const issuesBody = document.getElementById('seoIssuesBody');
-      issuesBody.innerHTML = (seo.issues || []).map(i => `
-        <tr>
-          <td class="px-4 py-3 font-bold text-rose-500">${i.type || ''}</td>
-          <td class="px-4 py-3">${i.element || ''}</td>
-          <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800">${i.priority || ''}</span></td>
-          <td class="px-4 py-3 text-slate-500">${i.message || ''}</td>
+      document.getElementById('seoIssuesBody').innerHTML = (seo.issues || []).map(i => `
+        <tr class="hover:bg-rose-500/5">
+          <td class="px-6 py-4 font-black uppercase text-rose-500">${i.type}</td>
+          <td class="px-6 py-4 font-mono font-bold text-slate-400">${i.priority}</td>
+          <td class="px-6 py-4 text-slate-500 font-medium">${i.message}</td>
         </tr>
       `).join('');
 
-      const onp = seo.on_page || {};
-      const onGrid = document.getElementById('onPageGrid');
-      const onPageCards = [
-        {label:'Meta Title', value:onp.title?.value ?? 'Missing'},
-        {label:'H1 Header', value:onp.h1?.value ?? 'Missing'},
-        {label:'Density', value:onp.keyword_density ?? 'N/A'}
-      ];
-      onGrid.innerHTML = onPageCards.map(c => `
-        <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-          <p class="text-[9px] font-bold uppercase text-slate-400">${c.label}</p>
-          <p class="text-xs font-bold truncate">${c.value}</p>
+      document.getElementById('seoKeywordsBody').innerHTML = (seo.keyword_rankings || []).slice(0,8).map(k => `
+        <tr><td class="px-6 py-4 font-black uppercase tracking-tighter">${k.keyword}</td><td class="px-6 py-4 text-right font-mono text-brand-600 font-black">#${k.rank}</td><td class="px-6 py-4 text-right font-bold text-slate-400">${fmt(k.volume)}</td></tr>
+      `).join('');
+
+      document.getElementById('onPageGrid').innerHTML = [
+        {l:'Protocol Title', v:seo.on_page?.title?.value},
+        {l:'Primary Header', v:seo.on_page?.h1?.value},
+        {l:'Endpoint URL', v:seo.on_page?.url?.value}
+      ].map(x => `
+        <div class="p-8 rounded-[2rem] bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+          <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">${x.l}</p>
+          <p class="font-bold text-sm break-all leading-tight">${x.v || 'NONE DETECTED'}</p>
         </div>
-      `).join('');
-
-      document.getElementById('seoKeywordsBody').innerHTML = (seo.keyword_rankings || []).slice(0,5).map(k => `
-        <tr><td class="px-3 py-2 font-medium">${k.keyword}</td><td class="px-3 py-2 text-right">#${k.rank}</td><td class="px-3 py-2 text-right">${fmt(k.volume)}</td></tr>
-      `).join('');
-
-      document.getElementById('seoCompetitorsBody').innerHTML = (seo.competitors || []).slice(0,5).map(c => `
-        <tr><td class="px-3 py-2 font-medium">${c.competitor}</td><td class="px-3 py-2 text-right">${fmt(c.common_keywords)}</td><td class="px-3 py-2 text-right">${c.competition_level}</td></tr>
       `).join('');
     }
 
-    // Default URL
-    document.getElementById('url').value = 'https://google.com';
+    // Default target
+    document.getElementById('url').value = 'https://haier.com.pk';
   </script>
 </body>
 </html>
