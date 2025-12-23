@@ -1,5 +1,5 @@
+playwright>=1.57.0
 fastapi
 uvicorn[standard]
 beautifulsoup4
 fpdf2
-playwright  # Installs the latest (currently 1.57.0)
