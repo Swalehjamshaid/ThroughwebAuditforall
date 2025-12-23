@@ -1,240 +1,850 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
-<meta charset="UTF-8">
-<title>FF TECH ELITE — Website Audit</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF TECH ELITE v3 — Weighted Audit Engine</title>
 
-<!-- Tailwind -->
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">  
+  <!-- Google Font -->
+  https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap
+  <!-- Tailwind CSS CDN -->
+  https://cdn.tailwindcss.com</script>
+  <!-- Chart.js CDN -->
+  https://cdn.jsdelivr.net/npm/chart.js</script>
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-<!-- Font -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
-<style>
-body{
-  font-family:'Inter',sans-serif;
-  background:#020617;
-  color:#e5e7eb
-}
-.card{
-  background:#020617;
-  border:1px solid #1e293b;
-  border-radius:16px
-}
-.badge{
-  padding:6px 14px;
-  border-radius:999px;
-  font-weight:800
-}
-.grade-A{background:#10b981;color:#022c22}
-.grade-B{background:#38bdf8;color:#020617}
-.grade-C{background:#f59e0b;color:#020617}
-.grade-D{background:#ef4444;color:#020617}
-.progress{
-  height:10px;border-radius:999px;background:#0f172a
-}
-.progress > div{
-  height:10px;border-radius:999px
-}
-
-/* Loading / Audit in Progress */
-@keyframes spin-slow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.animate-spin-slow { animation: spin-slow 3s linear infinite; }
-.delay-150 { animation-delay: 0.15s; }
-.delay-300 { animation-delay: 0.3s; }
-.animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
-</style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'Arial'] },
+          colors: {
+            brand: { 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1' },
+          },
+        }
+      },
+      darkMode: 'class'
+    };
+  </script>
+  <style>
+    .gauge {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: conic-gradient(#10b981 var(--p), #e5e7eb 0);
+      position: relative;
+    }
+    .gauge::after { content: ''; position: absolute; inset: 12px; background: white; border-radius: 50%; }
+    .gauge.dark::after { background: #0b1220; }
+    .gauge-label { position: absolute; inset: 0; display:flex; align-items:center; justify-content:center; font-weight:700; color:#0f172a; }
+    .dark .gauge-label { color:#e5e7eb; }
+    .spinner{ border:3px solid #e5e7eb; border-top-color:#0ea5e9; border-radius:50%; width:20px; height:20px; animation:spin .8s linear infinite; }
+    @keyframes spin{ to{ transform:rotate(360deg) } }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    .dark ::-webkit-scrollbar-track { background: #0f172a; }
+    .dark ::-webkit-scrollbar-thumb { background: #475569; }
+  </style>
 </head>
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+  <div class="min-h-full">
+    <!-- Header -->
+    <header class="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/70 backdrop-blur">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="flex h-16 items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded bg-brand-500/10 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-brand-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2zm1 14.93A8.001 8.001 0 0 1 4.07 11H8v2H5.082A6.002 6.002 0 0 0 13 17.93zM16 13h3.919A6.002 6.002 0 0 0 11 6.07V9h2V6h3z"/>
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-lg font-semibold">FF TECH ELITE v3</h1>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Weighted Audit Engine • Performance • SEO • UX • Security</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="toggleDark"
+              class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+              <span>Dark mode</span>
+              <svg id="darkIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M21.64 13A9 9 0 1 1 11 2.36 7 7 0 0 0 21.64 13z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
 
-<body>
-<main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+    <!-- Main -->
+    <main class="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+      <!-- Form -->
+      <section class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div class="flex-1">
+            <label for="url" class="block text-sm font-medium">Website URL</label>
+            <input id="url" type="url" placeholder="https://example.com"
+                   class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Mode</label>
+            <select id="mode" class="mt-1 w-40 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900">
+              <option value="desktop" selected>Desktop</option>
+              <option value="mobile">Mobile</option>
+            </select>
+          </div>
+          <div class="flex gap-2">
+            <button id="runAudit" class="inline-flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700">
+              <span>Run Audit</span>
+              <div id="loading" class="spinner hidden"></div>
+            </button>
+            <button id="downloadPdf" class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" disabled>
+              Download PDF
+            </button>
+          </div>
+        </div>
+        <p id="status" class="mt-3 text-sm text-slate-500"></p>
+        <p id="error" class="mt-2 hidden rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"></p>
+      </section>
 
-<!-- HEADER -->
-<header class="flex justify-between items-center">
-  <div class="flex items-center gap-4">
-    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-emerald-500"></div>
-    <div>
-      <h1 class="text-2xl font-extrabold">FF TECH ELITE</h1>
-      <p class="text-sm text-gray-400">Enterprise Website Audit Platform</p>
-    </div>
+      <!-- Summary -->
+      <section id="summarySection" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <!-- Overall Gauge -->
+        <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Overall Health Score</h2>
+          <div class="mt-4 flex items-center gap-6">
+            <div id="gauge" class="gauge" style="--p:0deg;">
+              <div class="gauge-label"><span id="overallScore">0%</span></div>
+            </div>
+            <div>
+              <p class="text-sm text-slate-500 dark:text-slate-400" id="auditedAt">Audited: —</p>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400" id="summaryText"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pillars -->
+        <div class="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Pillars</h2>
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="p-4 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <p class="text-xs font-medium text-slate-500">Performance</p>
+              <div class="mt-2 flex items-center justify-between">
+                <div class="w-full h-2 rounded bg-slate-200 dark:bg-slate-700">
+                  <div id="pillPerfBar" class="h-2 rounded bg-emerald-500" style="width:0%"></div>
+                </div>
+                <span id="pillPerfVal" class="ml-2 text-sm font-semibold">0%</span>
+              </div>
+            </div>
+            <div class="p-4 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <p class="text-xs font-medium text-slate-500">SEO</p>
+              <div class="mt-2 flex items-center justify-between">
+                <div class="w-full h-2 rounded bg-slate-200 dark:bg-slate-700">
+                  <div id="pillSeoBar" class="h-2 rounded bg-sky-500" style="width:0%"></div>
+                </div>
+                <span id="pillSeoVal" class="ml-2 text-sm font-semibold">0%</span>
+              </div>
+            </div>
+            <div class="p-4 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <p class="text-xs font-medium text-slate-500">UX</p>
+              <div class="mt-2 flex items-center justify-between">
+                <div class="w-full h-2 rounded bg-slate-200 dark:bg-slate-700">
+                  <div id="pillUxBar" class="h-2 rounded bg-indigo-500" style="width:0%"></div>
+                </div>
+                <span id="pillUxVal" class="ml-2 text-sm font-semibold">0%</span>
+              </div>
+            </div>
+            <div class="p-4 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+              <p class="text-xs font-medium text-slate-500">Security</p>
+              <div class="mt-2 flex items-center justify-between">
+                <div class="w-full h-2 rounded bg-slate-200 dark:bg-slate-700">
+                  <div id="pillSecBar" class="h-2 rounded bg-rose-500" style="width:0%"></div>
+                </div>
+                <span id="pillSecVal" class="ml-2 text-sm font-semibold">0%</span>
+              </div>
+            </div>
+          </div>
+          <canvas id="pillarsChart" class="mt-4" height="120"></canvas>
+        </div>
+      </section>
+
+      <!-- Performance KPIs + CWV Radar -->
+      <section class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <!-- KPI cards container (spans 3 columns on large screens) -->
+        <div class="lg:col-span-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" id="perfCards">
+          <!-- cards injected by JS -->
+        </div>
+
+        <!-- Radar chart card -->
+        <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">CWV Radar</h2>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Scores (0–100) using the same thresholds as backend.</p>
+          <canvas id="cwvRadar" class="mt-3" height="260"></canvas>
+        </div>
+      </section>
+
+      <!-- Metrics Table -->
+      <section class="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Advanced Diagnostics (Metrics)</h2>
+          <div class="flex items-center gap-2">
+            <select id="filterCategory" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900">
+              <option value="">All Categories</option>
+              <option>Performance</option>
+              <option>SEO</option>
+              <option>UX</option>
+              <option>Security</option>
+            </select>
+            <input id="searchMetric" type="text" placeholder="Search metrics..."
+              class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900" />
+          </div>
+        </div>
+
+        <div class="mt-4 overflow-auto">
+          <table class="min-w-full border-collapse">
+            <thead>
+              <tr class="bg-slate-100 dark:bg-slate-700 text-xs text-slate-600 dark:text-slate-200">
+                <th class="px-3 py-2 text-left w-12">#</th>
+                <th class="px-3 py-2 text-left">Metric</th>
+                <th class="px-3 py-2 text-left w-40">Category</th>
+                <th class="px-3 py-2 text-left w-32">Score</th>
+                <th class="px-3 py-2 text-left w-20">Weight</th>
+              </tr>
+            </thead>
+            <tbody id="metricsBody" class="text-sm"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Roadmap -->
+      <section class="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+        <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">Improvement Roadmap</h2>
+        <ol id="roadmapList" class="mt-3 list-decimal pl-5 text-sm space-y-1"></ol>
+      </section>
+
+      <!-- SEO Audit (accordion) -->
+      <section id="seoSection" class="mt-6 hidden">
+        <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-slate-700 dark:text-slate-200">SEO Audit (Domain-specific)</h2>
+            <button id="toggleSeo" class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Expand</button>
+          </div>
+
+          <div id="seoBody" class="mt-4 hidden space-y-6">
+            <!-- (unchanged SEO blocks...) -->
+            <!-- Overview, Section Scores, Issues, On-Page, Keywords, Top Pages, Technical, CWV notes, Competitors, Backlinks, Social -->
+            <!-- The code below remains the same as in the previous version -->
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div class="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+                <p class="text-xs text-slate-500">Domain</p>
+                <p id="seoDomain" class="text-sm font-semibold">—</p>
+              </div>
+              <div class="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+                <p class="text-xs text-slate-500">SEO Score</p>
+                <p id="seoScore" class="text-sm font-semibold">—</p>
+              </div>
+              <div class="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+                <p class="text-xs text-slate-500">Issues</p>
+                <p id="seoIssues" class="text-sm font-semibold">—</p>
+              </div>
+            </div>
+            <p id="seoOverviewText" class="text-sm text-slate-600 dark:text-slate-300"></p>
+
+            <div>
+              <h3 class="text-sm font-semibold">Section Scores</h3>
+              <canvas id="seoSectionsChart" height="120" class="mt-2"></canvas>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Issues & Recommendations</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-rose-100 dark:bg-rose-900/30">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-40">Type</th>
+                      <th class="px-3 py-2 text-left w-40">Element</th>
+                      <th class="px-3 py-2 text-left w-32">Priority</th>
+                      <th class="px-3 py-2 text-left">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoIssuesBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">On-Page SEO</h3>
+              <div id="onPageGrid" class="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2"></div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <h3 class="text-sm font-semibold">Keyword Rankings</h3>
+                <div class="mt-2 overflow-auto">
+                  <table class="min-w-full border-collapse text-sm">
+                    <thead class="bg-emerald-100 dark:bg-emerald-900/30">
+                      <tr>
+                        <th class="px-3 py-2 text-left">Keyword</th>
+                        <th class="px-3 py-2 text-right w-16">Rank</th>
+                        <th class="px-3 py-2 text-right w-24">Traffic %</th>
+                        <th class="px-3 py-2 text-right w-24">Volume</th>
+                        <th class="px-3 py-2 text-right w-20">KD %</th>
+                        <th class="px-3 py-2 text-right w-28">CPC (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="seoKeywordsBody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <h3 class="text-sm font-semibold">Top Pages</h3>
+                <div class="mt-2 overflow-auto">
+                  <table class="min-w-full border-collapse text-sm">
+                    <thead class="bg-sky-100 dark:bg-sky-900/30">
+                      <tr>
+                        <th class="px-3 py-2 text-left">URL</th>
+                        <th class="px-3 py-2 text-right w-24">Traffic %</th>
+                        <th class="px-3 py-2 text-right w-24">Keywords</th>
+                        <th class="px-3 py-2 text-right w-24">Ref Dom</th>
+                        <th class="px-3 py-2 text-right w-24">Backlinks</th>
+                      </tr>
+                    </thead>
+                    <tbody id="seoTopPagesBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Technical SEO</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-slate-100 dark:bg-slate-700">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-40">Element</th>
+                      <th class="px-3 py-2 text-left w-24">Priority</th>
+                      <th class="px-3 py-2 text-left w-32">Value</th>
+                      <th class="px-3 py-2 text-left">Recommendation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoTechBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Page Performance & Core Web Vitals</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-amber-100 dark:bg-amber-900/30">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-60">Element</th>
+                      <th class="px-3 py-2 text-left w-24">Priority</th>
+                      <th class="px-3 py-2 text-left">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoPerfBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Competitors</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-violet-100 dark:bg-violet-900/30">
+                    <tr>
+                      <th class="px-3 py-2 text-left">Competitor</th>
+                      <th class="px-3 py-2 text-right w-32">Common Keywords</th>
+                      <th class="px-3 py-2 text-right w-32">Competition Level</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoCompetitorsBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Competitor Analysis (4 Types)</h3>
+              <div id="compTypes" class="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2"></div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Top Backlinks</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-cyan-100 dark:bg-cyan-900/30">
+                    <tr>
+                      <th class="px-3 py-2 text-right w-24">Page AS</th>
+                      <th class="px-3 py-2 text-left w-60">Source Title</th>
+                      <th class="px-3 py-2 text-left w-60">Source URL</th>
+                      <th class="px-3 py-2 text-left w-48">Anchor</th>
+                      <th class="px-3 py-2 text-left w-60">Target URL</th>
+                      <th class="px-3 py-2 text-left w-24">Rel</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoBacklinksBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-sm font-semibold">Social Media</h3>
+              <div class="mt-2 overflow-auto">
+                <table class="min-w-full border-collapse text-sm">
+                  <thead class="bg-fuchsia-100 dark:bg-fuchsia-900/30">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-32">Network</th>
+                      <th class="px-3 py-2 text-left w-24">Priority</th>
+                      <th class="px-3 py-2 text-left">Recommendation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="seoSocialBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
   </div>
-  <div class="text-right">
-    <p class="text-xs text-gray-500">Logged in as</p>
-    <p class="font-medium">Jamshaid Khan</p>
-  </div>
-</header>
 
-<!-- INPUT -->
-<section class="card p-6">
-<form id="auditForm" class="grid md:grid-cols-4 gap-4">
-  <input id="url" required type="url" placeholder="https://example.com"
-    class="md:col-span-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-sky-500">
-  <button id="runBtn" class="bg-gradient-to-r from-sky-500 to-emerald-500 rounded-lg font-semibold py-3">
-    Run Audit
-  </button>
-</form>
-</section>
+  <script>
+    // ---- Utilities ----
+    const fmt = n => (n ?? n === 0) ? n.toLocaleString() : '—';
+    const clamp = v => Math.max(0, Math.min(100, Math.round(v || 0)));
+    const decodeEntities = (s) => { const e = document.createElement('textarea'); e.innerHTML = (s || '').toString(); return e.value; };
+    const scoreColor = (score) => { if (score >= 90) return 'bg-emerald-500'; if (score >= 80) return 'bg-sky-500'; if (score >= 60) return 'bg-amber-500'; return 'bg-rose-500'; };
+    const catBadge = (cat) => ({ 'Performance':'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200', 'SEO':'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200', 'UX':'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200', 'Security':'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200', }[cat] || 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-100');
 
-<!-- LOADING / REAL-TIME PROGRESS -->
-<section id="loadingBlock" class="hidden card p-10 text-center relative overflow-hidden">
-  <div class="flex flex-col items-center gap-6">
-    <!-- Animated Gradient Spinner -->
-    <div class="w-20 h-20 relative">
-      <div class="absolute inset-0 rounded-full border-4 border-slate-700 border-t-transparent border-r-transparent animate-spin-slow"></div>
-      <div class="absolute inset-0 rounded-full border-4 border-slate-700 border-t-sky-500 border-r-emerald-500 animate-spin"></div>
-    </div>
+    // ---- Global state ----
+    let currentAudit = null;
+    let pillarsChartInstance = null;
+    let seoSectionsChartInstance = null;
+    let cwvRadarInstance = null;
 
-    <!-- Pulse text -->
-    <h3 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-emerald-400 to-purple-500 animate-pulse">
-      Audit in Progress
-    </h3>
+    // ---- Dark mode toggle ----
+    document.getElementById('toggleDark').addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      document.getElementById('gauge').classList.toggle('dark', document.documentElement.classList.contains('dark'));
+    });
 
-    <!-- Real-time Steps -->
-    <p class="text-sm text-gray-400 max-w-md" id="progressSteps">
-      Connecting to server...
-    </p>
+    // ---- Actions ----
+    document.getElementById('runAudit').addEventListener('click', runAudit);
+    document.getElementById('downloadPdf').addEventListener('click', downloadPdf);
+    document.getElementById('toggleSeo').addEventListener('click', () => {
+      const seoBody = document.getElementById('seoBody');
+      const btn = document.getElementById('toggleSeo');
+      const open = seoBody.classList.contains('hidden');
+      seoBody.classList.toggle('hidden', !open);
+      btn.textContent = open ? 'Collapse' : 'Expand';
+    });
 
-    <!-- Floating Dots Animation -->
-    <div class="flex gap-2 mt-4">
-      <span class="w-3 h-3 bg-sky-500 rounded-full animate-bounce"></span>
-      <span class="w-3 h-3 bg-emerald-500 rounded-full animate-bounce delay-150"></span>
-      <span class="w-3 h-3 bg-purple-500 rounded-full animate-bounce delay-300"></span>
-    </div>
-  </div>
-</section>
+    async function runAudit() {
+      const url = document.getElementById('url').value.trim();
+      const modeSel = document.getElementById('mode').value;
+      const status = document.getElementById('status');
+      const err = document.getElementById('error');
+      const loading = document.getElementById('loading');
+      const dlBtn = document.getElementById('downloadPdf');
 
-<!-- SUMMARY -->
-<section id="summary" class="hidden grid md:grid-cols-4 gap-6">
+      err.classList.add('hidden'); err.textContent = '';
+      status.textContent = 'Submitting audit…';
+      loading.classList.remove('hidden');
 
-<div class="card p-6">
-  <p class="text-sm text-gray-400">Overall Grade</p>
-  <div id="gradeBadge" class="badge grade-A text-4xl mt-3">A</div>
-</div>
+      try {
+        const res = await fetch('/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, mode: modeSel })
+        });
 
-<div class="card p-6">
-  <p>Performance</p>
-  <div class="progress mt-3"><div id="perfBar" class="bg-sky-500"></div></div>
-</div>
+        if (!res.ok) {
+          const detail = await safeJson(res);
+          throw new Error(detail?.detail || `HTTP ${res.status}`);
+        }
 
-<div class="card p-6">
-  <p>SEO</p>
-  <div class="progress mt-3"><div id="seoBar" class="bg-emerald-500"></div></div>
-</div>
+        const data = await res.json();
+        currentAudit = data;
+        renderAll(data);
+        status.textContent = `Audit completed for ${data.url}`;
+        dlBtn.disabled = false;
+      } catch (e) {
+        err.textContent = e.message.includes('Playwright')
+          ? 'Playwright not installed on server. Please install to enable auditing.'
+          : e.message;
+        err.classList.remove('hidden');
+        status.textContent = '';
+      } finally {
+        loading.classList.add('hidden');
+      }
+    }
 
-<div class="card p-6">
-  <p>UX & Security</p>
-  <div class="progress mt-3"><div id="uxBar" class="bg-amber-500"></div></div>
-</div>
+    async function downloadPdf() {
+      if (!currentAudit) return;
+      const status = document.getElementById('status');
+      status.textContent = 'Generating PDF…';
+      try {
+        const res = await fetch('/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentAudit)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-</section>
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const ts = Math.floor(Date.now()/1000);
+        a.download = `FF_ELITE_Audit_Report_${ts}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+        status.textContent = 'PDF downloaded.';
+      } catch (e) {
+        status.textContent = 'Failed to download PDF: ' + e.message;
+      }
+    }
 
-<!-- CHART -->
-<section id="chartBlock" class="hidden card p-6">
-  <h2 class="font-semibold mb-3">Audit Pillars</h2>
-  <canvas id="pillarChart"></canvas>
-</section>
+    async function safeJson(response) { try { return await response.json(); } catch { return null; } }
 
-<!-- METRICS -->
-<section id="metricsBlock" class="hidden card p-6">
-  <h2 class="font-semibold mb-4">Detailed Metrics</h2>
-  <table class="w-full text-sm">
-    <thead class="text-gray-400">
-      <tr>
-        <th>#</th><th>Metric</th><th>Category</th><th>Score</th><th>Weight</th>
-      </tr>
-    </thead>
-    <tbody id="metricsBody"></tbody>
-  </table>
-</section>
+    // ---- Scoring helpers (same bands as backend) ----
+    function bandScore(value, bands) {
+      for (const [maxV, s] of bands) { if (value <= maxV) return s; }
+      return bands[bands.length - 1][1];
+    }
 
-<footer class="text-center text-xs text-gray-500 pt-6">
-  © <span id="year"></span> FF TECH ELITE — All Rights Reserved
-</footer>
+    function scoreFCP(ms) { return bandScore(ms || 0, [[1800, 100],[3000, 85],[8000, 60],[9999999, 40]]); }
+    function scoreLCP(ms) { return bandScore(ms || 0, [[2500, 100],[4000, 80],[10000, 60],[9999999, 40]]); }
+    function scoreTTFB(ms){ return bandScore(ms || 0, [[800, 100],[1800, 80],[4000, 60],[9999999, 40]]); }
+    function scoreCLS(val){ return bandScore(parseFloat(val || 0), [[0.1, 100],[0.25, 80],[0.5, 60],[9999999, 40]]); }
+    function scoreTBT(ms) { return bandScore(ms || 0, [[200, 100],[600, 80],[1200, 60],[9999999, 40]]); }
 
-</main>
+    // ---- Renderers ----
+    function renderAll(d) {
+      // Overall
+      const pct = clamp(d.total_grade);
+      document.getElementById('overallScore').textContent = `${pct}%`;
+      document.getElementById('gauge').style.setProperty('--p', `${pct * 3.6}deg`);
+      document.getElementById('auditedAt').textContent = `Audited: ${d.audited_at || '—'}`;
+      document.getElementById('summaryText').textContent = d.summary || '';
 
-<script>
-const el=id=>document.getElementById(id);
-let chart;
+      // Pillars
+      const p = d.pillars || {};
+      setBar('pillPerfBar', 'pillPerfVal', p['Performance']);
+      setBar('pillSeoBar', 'pillSeoVal', p['SEO']);
+      setBar('pillUxBar', 'pillUxVal', p['UX']);
+      setBar('pillSecBar', 'pillSecVal', p['Security']);
+      renderPillarsChart(p);
 
-// Grade mapping
-function grade(score){
-  if(score>=90) return ["A","grade-A"];
-  if(score>=80) return ["B","grade-B"];
-  if(score>=70) return ["C","grade-C"];
-  return ["D","grade-D"];
-}
+      // Performance KPIs
+      renderPerfCards(d.perf || {});
 
-// Real-time step updates from backend SSE
-function setupSSE(){
-  const url=el("url").value;
-  const evtSource=new EventSource(`/audit_stream?url=${encodeURIComponent(url)}`);
-  const stepsEl=el("progressSteps");
+      // CWV Radar (NEW)
+      renderCwvRadar(d.perf || {});
 
-  evtSource.onmessage=e=>{
-    const data=JSON.parse(e.data);
-    if(data.step) stepsEl.textContent=data.step;
-    if(data.completed){
-      evtSource.close();
-      el("loadingBlock").classList.add("hidden");
-      el("summary").classList.remove("hidden");
-      el("chartBlock").classList.remove("hidden");
-      el("metricsBlock").classList.remove("hidden");
+      // Metrics table
+      renderMetricsTable(d.metrics || []);
 
-      // Update data
-      const r=data.result;
-      const [g,cls]=grade(r.total_grade);
-      const badge=el("gradeBadge");
-      badge.textContent=g;
-      badge.className="badge "+cls+" text-4xl mt-3";
+      // Roadmap
+      renderRoadmap(d.roadmap || '');
 
-      el("perfBar").style.width=r.pillars.Performance+"%";
-      el("seoBar").style.width=r.pillars.SEO+"%";
-      el("uxBar").style.width=r.pillars.UX+"%";
+      // SEO AUDIT (conditional)
+      if (d.seo_audit) {
+        renderSeoAudit(d.seo_audit);
+        document.getElementById('seoSection').classList.remove('hidden');
+      } else {
+        document.getElementById('seoSection').classList.add('hidden');
+      }
+    }
 
-      if(chart) chart.destroy();
-      chart=new Chart(el("pillarChart"),{
-        type:"bar",
-        data:{
-          labels:Object.keys(r.pillars),
-          datasets:[{data:Object.values(r.pillars),backgroundColor:["#38bdf8","#10b981","#f59e0b","#ef4444"]}]
+    function setBar(barId, valId, score) {
+      const s = clamp(score || 0);
+      const bar = document.getElementById(barId);
+      const val = document.getElementById(valId);
+      bar.style.width = `${s}%`;
+      bar.className = `h-2 rounded ${scoreColor(s)}`;
+      val.textContent = `${s}%`;
+    }
+
+    function renderPillarsChart(p) {
+      const ctx = document.getElementById('pillarsChart').getContext('2d');
+      if (pillarsChartInstance) pillarsChartInstance.destroy();
+      pillarsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Performance', 'SEO', 'UX', 'Security'],
+          datasets: [{
+            label: 'Pillar Scores',
+            data: [clamp(p['Performance']), clamp(p['SEO']), clamp(p['UX']), clamp(p['Security'])],
+            backgroundColor: ['#10b981','#0ea5e9','#6366f1','#f43f5e']
+          }]
         },
-        options:{plugins:{legend:{display:false}},scales:{y:{max:100}}}
-      });
-
-      const body=el("metricsBody"); body.innerHTML="";
-      r.metrics.forEach(m=>{
-        body.innerHTML+=`
-        <tr class="border-b border-slate-800">
-          <td>${m.no}</td>
-          <td>${m.name}</td>
-          <td>${m.category}</td>
-          <td class="font-semibold">${m.score}%</td>
-          <td>${m.weight}</td>
-        </tr>`;
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100 } } }
       });
     }
-  };
-}
 
-document.getElementById("auditForm").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const btn=el("runBtn");
-  el("loadingBlock").classList.remove("hidden");
-  el("summary").classList.add("hidden");
-  el("chartBlock").classList.add("hidden");
-  el("metricsBlock").classList.add("hidden");
-  btn.disabled=true;
-  btn.textContent="Auditing...";
-  setupSSE();
-});
+    function renderPerfCards(perf) {
+      const container = document.getElementById('perfCards');
+      const items = [
+        { k:'ttfb_ms', label:'TTFB (ms)' },
+        { k:'fcp_ms',  label:'FCP (ms)'  },
+        { k:'lcp_ms',  label:'LCP (ms)'  },
+        { k:'cls',     label:'CLS'       },
+        { k:'tbt_ms',  label:'TBT (ms)'  },
+        { k:'page_weight_kb', label:'Page Weight (KB)' },
+        { k:'request_count',  label:'Requests' }
+      ];
+      container.innerHTML = items.map(it => `
+        <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-800">
+          <p class="text-xs text-slate-500 dark:text-slate-400">${it.label}</p>
+          <p class="mt-1 text-2xl font-semibold">${fmt(perf[it.k])}</p>
+        </div>
+      `).join('');
+    }
 
-el("year").textContent=new Date().getFullYear();
-</script>
+    // ---- CWV Radar (NEW) ----
+    function renderCwvRadar(perf) {
+      const scores = [
+        scoreFCP(perf.fcp_ms),
+        scoreLCP(perf.lcp_ms),
+        scoreCLS(perf.cls),
+        scoreTBT(perf.tbt_ms),
+        scoreTTFB(perf.ttfb_ms),
+      ];
+      const labels = ['FCP', 'LCP', 'CLS', 'TBT', 'TTFB'];
+      const ctx = document.getElementById('cwvRadar').getContext('2d');
+      if (cwvRadarInstance) cwvRadarInstance.destroy();
 
+      cwvRadarInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'CWV & Timings (Score 0–100)',
+            data: scores,
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14, 165, 233, 0.2)',
+            pointBackgroundColor: '#0ea5e9',
+            pointBorderColor: '#0284c7'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: {
+            r: {
+              suggestedMin: 0,
+              suggestedMax: 100,
+              grid: { color: 'rgba(100,116,139,0.2)' },
+              angleLines: { color: 'rgba(100,116,139,0.2)' },
+              ticks: { showLabelBackdrop: false, stepSize: 20 }
+            }
+          }
+        }
+      });
+    }
+
+    // Metrics filters
+    document.getElementById('filterCategory').addEventListener('change', () => {
+      renderMetricsTable(currentAudit?.metrics || []);
+    });
+    document.getElementById('searchMetric').addEventListener('input', () => {
+      renderMetricsTable(currentAudit?.metrics || []);
+    });
+
+    function renderMetricsTable(metrics) {
+      const cat = document.getElementById('filterCategory').value.trim();
+      const q = document.getElementById('searchMetric').value.toLowerCase();
+      const body = document.getElementById('metricsBody');
+      const filtered = metrics.filter(m => (!cat || m.category === cat) && (!q || (m.name || '').toLowerCase().includes(q)));
+      body.innerHTML = filtered.map(m => {
+        const s = clamp(m.score);
+        return `
+          <tr class="border-t border-slate-100 dark:border-slate-700">
+            <td class="px-3 py-2">${fmt(m.no)}</td>
+            <td class="px-3 py-2">${m.name}</td>
+            <td class="px-3 py-2">
+              <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${catBadge(m.category)}">${m.category}</span>
+            </td>
+            <td class="px-3 py-2">
+              <div class="flex items-center gap-2">
+                <div class="h-2 w-full rounded bg-slate-200 dark:bg-slate-700">
+                  <div class="h-2 rounded ${scoreColor(s)}" style="width:${s}%"></div>
+                </div>
+                <span class="text-xs font-semibold">${s}%</span>
+              </div>
+            </td>
+            <td class="px-3 py-2">${fmt(m.weight)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderRoadmap(html) {
+      const list = document.getElementById('roadmapList');
+      const decoded = decodeEntities(html);
+      const lines = decoded.split('<br/>').map(x => x.trim()).filter(x => x && !x.toLowerCase().includes('<b>'));
+      list.innerHTML = lines.map(it => `<li>${it.replace(/^\d+\.\s*/, '')}</li>`).join('');
+    }
+
+    function renderSeoAudit(seo) {
+      document.getElementById('seoDomain').textContent = seo.domain || '—';
+      document.getElementById('seoScore').textContent = fmt(seo.seo_score);
+      document.getElementById('seoIssues').textContent = `${fmt(seo.critical_issues)} critical, ${fmt(seo.minor_issues)} minor`;
+      document.getElementById('seoOverviewText').textContent = seo.overview_text || '';
+
+      const sec = seo.section_scores || {};
+      const ctx = document.getElementById('seoSectionsChart').getContext('2d');
+      if (seoSectionsChartInstance) seoSectionsChartInstance.destroy();
+      seoSectionsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['On-Page SEO', 'Technical SEO', 'Off-Page SEO', 'Social Media'],
+          datasets: [{ data: [sec['On-Page SEO']||0, sec['Technical SEO']||0, sec['Off-Page SEO']||0, sec['Social Media']||0], backgroundColor: ['#10b981','#0f172a','#f59e0b','#a855f7'] }]
+        },
+        options: { responsive:true, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true, max:100 } } }
+      });
+
+      const issuesBody = document.getElementById('seoIssuesBody');
+      issuesBody.innerHTML = (seo.issues || []).map(i => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${i.type || ''}</td>
+          <td class="px-3 py-2">${i.element || ''}</td>
+          <td class="px-3 py-2">${i.priority || ''}</td>
+          <td class="px-3 py-2">${i.message || ''}</td>
+        </tr>
+      `).join('');
+
+      const onp = seo.on_page || {};
+      const onGrid = document.getElementById('onPageGrid');
+      const heads = (onp.headings?.structure) || {};
+      const contentNotes = (onp.content || []).map(c => c.note).filter(Boolean);
+      const onPageCards = [
+        {label:'URL', value:onp.url?.value, note:onp.url?.note},
+        {label:'Title', value:onp.title?.value ?? '—', note:onp.title?.note},
+        {label:'Meta Description', value:onp.meta_description?.value ?? 'Missing', note:onp.meta_description?.note},
+        {label:'H1', value:onp.h1?.value ?? 'Missing', note:onp.h1?.note},
+        {label:'Heading Structure', value:`H2:${heads.H2||0} H3:${heads.H3||0} H4:${heads.H4||0} H5:${heads.H5||0} H6:${heads.H6||0}`, note:onp.headings?.note},
+        {label:'Image Alt', value:onp.image_alt?.note?.includes('alt') ? 'All present' : '—', note:onp.image_alt?.note},
+        ...contentNotes.map(n => ({label:'Content', value:'—', note:n})),
+        {label:'Keyword Density', value:onp.keyword_density ?? 'N/A', note:'Analyze highest density words & phrases.'}
+      ];
+      onGrid.innerHTML = onPageCards.map(c => `
+        <div class="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+          <p class="text-xs text-slate-500">${c.label}</p>
+          <p class="mt-1 text-sm font-semibold">${c.value ?? '—'}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">${c.note ?? ''}</p>
+        </div>
+      `).join('');
+
+      const kwBody = document.getElementById('seoKeywordsBody');
+      kwBody.innerHTML = (seo.keyword_rankings || []).map(k => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${k.keyword || ''}</td>
+          <td class="px-3 py-2 text-right">${fmt(k.rank)}</td>
+          <td class="px-3 py-2 text-right">${fmt(k.traffic_pct)}</td>
+          <td class="px-3 py-2 text-right">${fmt(k.volume)}</td>
+          <td class="px-3 py-2 text-right">${fmt(k.kd_pct)}</td>
+          <td class="px-3 py-2 text-right">${fmt(k.cpc_usd)}</td>
+        </tr>
+      `).join('');
+
+      const tpBody = document.getElementById('seoTopPagesBody');
+      tpBody.innerHTML = (seo.top_pages || []).map(p => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${p.url}${p.url}</a></td>
+          <td class="px-3 py-2 text-right">${fmt(p.traffic_pct)}</td>
+          <td class="px-3 py-2 text-right">${fmt(p.keywords)}</td>
+          <td class="px-3 py-2 text-right">${fmt(p.ref_domains)}</td>
+          <td class="px-3 py-2 text-right">${fmt(p.backlinks)}</td>
+        </tr>
+      `).join('');
+
+      const techBody = document.getElementById('seoTechBody');
+      techBody.innerHTML = (seo.technical || []).map(t => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${t.element || ''}</td>
+          <td class="px-3 py-2">${t.priority || ''}</td>
+          <td class="px-3 py-2">${t.value ?? '—'}</td>
+          <td class="px-3 py-2">${t.note || ''}</td>
+        </tr>
+      `).join('');
+
+      const perfBody = document.getElementById('seoPerfBody');
+      perfBody.innerHTML = (seo.page_performance || []).map(p => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${p.element || ''}</td>
+          <td class="px-3 py-2">${p.priority || ''}</td>
+          <td class="px-3 py-2">${p.note || ''}</td>
+        </tr>
+      `).join('');
+
+      const compBody = document.getElementById('seoCompetitorsBody');
+      compBody.innerHTML = (seo.competitors || []).map(c => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${c.competitor || ''}</td>
+          <td class="px-3 py-2 text-right">${fmt(c.common_keywords)}</td>
+          <td class="px-3 py-2 text-right">${fmt(c.competition_level)}</td>
+        </tr>
+      `).join('');
+
+      const types = (seo.competitor_analysis || seo.competator_analysis || {}).types || [];
+      const compTypes = document.getElementById('compTypes');
+      compTypes.innerHTML = types.map(t => `
+        <div class="rounded-md border border-slate-200 p-4 dark:border-slate-700">
+          <p class="text-sm font-semibold">${t.type || 'Type'}</p>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">${t.description || ''}</p>
+          <div class="mt-3 overflow-auto">
+            <table class="min-w-full border-collapse text-sm">
+              <thead class="bg-cyan-100 dark:bg-cyan-900/30">
+                <tr>
+                  <th class="px-3 py-2 text-left w-40">Domain</th>
+                  <th class="px-3 py-2 text-left w-32">Label</th>
+                  <th class="px-3 py-2 text-left w-28">Channel</th>
+                  <th class="px-3 py-2 text-right w-32">Common Keywords</th>
+                  <th class="px-3 py-2 text-right w-32">Competition Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${(t.competitors || []).map(x => `
+                  <tr class="border-t border-slate-100 dark:border-slate-700">
+                    <td class="px-3 py-2"><a href="https://${x.domain}" target="_blank" class         <td class="px-3 py-2">${x.label || ''}</td>
+                    <td class="px-3 py-2">${x.channel || ''}</td>
+                    <td class="px-3 py-2 text-right">${fmt(x.common_keywords)}</td>
+                    <td class="px-3 py-2 text-right">${fmt(x.competition_level)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `).join('');
+
+      const blBody = document.getElementById('seoBacklinksBody');
+      blBody.innerHTML = (seo.top_backlinks || []).map(b => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2 text-right">${fmt(b.page_as)}</td>
+          <td class="px-3 py-2">${b.source_title || ''}</td>
+          <td class="px-3 py-2">${b.source_url}${b.source_url}</a></td>
+          <td class="px-3 py-2">${b.anchor || ''}</td>
+          <td class="px-3 py-2">${b.target_url}${b.target_url}</a></td>
+          <td class="px-3 py-2">${b.rel ?? ''}</td>
+        </tr>
+      `).join('');
+
+      const smBody = document.getElementById('seoSocialBody');
+      smBody.innerHTML = (seo.social_media || []).map(s => `
+        <tr class="border-t border-slate-100 dark:border-slate-700">
+          <td class="px-3 py-2">${s.network || ''}</td>
+          <td class="px-3 py-2">${s.priority || ''}</td>
+          <td class="px-3 py-2">${s.note || ''}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Initial hint
+    document.getElementById('url').value = 'https://example.com';
+  </script>
 </body>
 </html>
