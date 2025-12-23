@@ -3,118 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH ELITE | Enterprise Auditor</title>
+    <title>FF TECH ELITE – Real Audit Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#020617',
+                        accent: '#34d399',
+                        secondary: '#60a5fa',
+                        excellent: '#10b981',
+                        good: '#f59e0b',
+                        poor: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #020617; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .gauge-path { transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        .metric-row:hover { background: rgba(255,255,255,0.03); }
-        .status-pill { padding: 2px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; }
+        .gauge { transition: stroke-dashoffset 1.5s ease-in-out; }
+        .status-excellent { @apply bg-excellent text-white; }
+        .status-good { @apply bg-good text-black; }
+        .status-poor { @apply bg-poor text-white; }
     </style>
 </head>
-<body class="text-slate-200">
-
-    <nav class="border-b border-slate-800 p-6 glass sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-extrabold tracking-tighter text-white">
-                FF TECH <span class="text-emerald-400">ELITE</span>
+<body class="bg-primary text-white min-h-screen font-sans">
+    <header class="bg-gradient-to-r from-slate-900 via-purple-900 to-primary py-12 shadow-2xl">
+        <div class="max-w-7xl mx-auto text-center px-6">
+            <h1 class="text-6xl font-extrabold bg-gradient-to-r from-secondary via-accent to-pink-500 bg-clip-text text-transparent">
+                FF TECH ELITE – REAL AUDIT ENGINE
             </h1>
-            <div class="flex gap-4 text-sm font-medium opacity-70">
-                <span>V2.0 STABLE</span>
-                <span class="text-emerald-400">● ENGINE ONLINE</span>
-            </div>
+            <p class="mt-6 text-2xl opacity-90 text-slate-300">Enterprise-Grade Chromium-Powered Website Health Auditor</p>
+            <p class="mt-2 text-lg opacity-70 text-slate-400">66+ Metrics • Core Web Vitals • SEO • UX • Security • PDF Reports</p>
         </div>
-    </nav>
-
+    </header>
     <main class="max-w-7xl mx-auto px-6 py-12">
-        <section class="mb-12">
-            <div class="glass rounded-3xl p-8 lg:p-12 shadow-2xl">
-                <h2 class="text-3xl font-bold mb-8 text-white">Real-Browser Website Audit</h2>
-                <form id="auditForm" class="grid lg:grid-cols-4 gap-6 items-end">
-                    <div class="lg:col-span-2">
-                        <label class="block text-sm font-semibold mb-3 opacity-60">WEBSITE URL</label>
-                        <input type="text" id="url" placeholder="https://example.com" required
-                               class="w-full bg-slate-900 border border-slate-700 rounded-xl px-6 py-4 outline-none focus:border-emerald-500 transition-all">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold mb-3 opacity-60">DEVICE ENGINE</label>
-                        <select id="mode" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-6 py-4 outline-none">
-                            <option value="desktop">Chromium Desktop</option>
-                            <option value="mobile">Chromium Mobile</option>
-                        </select>
-                    </div>
-                    <button type="submit" id="btnText" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl transition-all transform hover:scale-105 active:scale-95">
-                        RUN ANALYSIS
+        <div class="bg-slate-900/80 backdrop-blur rounded-3xl shadow-2xl p-10 mb-16 border border-slate-800">
+            <form id="auditForm" class="grid lg:grid-cols-3 gap-8 items-end">
+                <div class="lg:col-span-2">
+                    <label for="url" class="block text-lg font-semibold mb-3">Enter Website URL</label>
+                    <input type="text" id="url" required placeholder="https://example.com"
+                           class="w-full px-6 py-4 bg-slate-800/70 rounded-xl text-lg focus:ring-4 focus:ring-accent outline-none transition-all border border-slate-700">
+                </div>
+                <div>
+                    <label for="mode" class="block text-lg font-semibold mb-3">Device Mode</label>
+                    <select id="mode" class="w-full px-6 py-4 bg-slate-800/70 rounded-xl text-lg focus:ring-4 focus:ring-accent outline-none border border-slate-700">
+                        <option value="desktop">Desktop</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                </div>
+                <div class="lg:col-span-3 text-center">
+                    <button type="submit" id="submitBtn" class="px-16 py-5 bg-gradient-to-r from-accent to-secondary text-primary font-bold text-xl rounded-2xl hover:scale-105 transition transform shadow-xl flex items-center justify-center gap-4 mx-auto">
+                        <i class="fas fa-rocket text-2xl"></i>
+                        RUN FULL AUDIT
                     </button>
-                </form>
+                </div>
+            </form>
+            <div id="loading" class="hidden mt-12 text-center">
+                <i class="fas fa-circle-notch fa-spin text-6xl text-accent mb-6"></i>
+                <p class="text-2xl font-bold">Initializing Chromium Instance...</p>
+                <p class="text-lg opacity-70 mt-4">Checking 66+ data points. This may take 30-60 seconds.</p>
             </div>
-        </section>
-
-        <div id="loader" class="hidden text-center py-20">
-            <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-emerald-500 mb-6"></div>
-            <p class="text-xl font-semibold">Simulating Real Browser Interaction...</p>
-            <p class="opacity-50 mt-2">Extracting Core Web Vitals & Security Headers</p>
         </div>
 
-        <div id="results" class="hidden space-y-12">
-            
-            <div class="grid lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-1 glass rounded-3xl p-10 flex flex-col items-center justify-center text-center">
-                    <h3 class="text-lg font-bold opacity-60 mb-8 uppercase tracking-widest">Global Health</h3>
-                    <div class="relative w-48 h-48">
-                        <svg class="w-full h-full" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="45" fill="none" stroke="#1e293b" stroke-width="8"></circle>
-                            <circle id="scoreCircle" cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8"
-                                    stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round" class="gauge-path"></circle>
-                        </svg>
-                        <div class="absolute inset-0 flex items-center justify-center">
-                            <span id="scoreVal" class="text-5xl font-black text-white">0</span><span class="text-2xl font-bold opacity-50">%</span>
-                        </div>
+        <div id="results" class="hidden space-y-16">
+            <div class="bg-slate-900/90 backdrop-blur rounded-3xl shadow-2xl p-12 text-center border border-slate-700">
+                <h2 class="text-4xl font-bold mb-8">Overall Website Health Score</h2>
+                <div class="relative inline-block mb-10">
+                    <svg class="w-80 h-80 transform -rotate-90">
+                        <circle cx="160" cy="160" r="140" stroke="#1e293b" stroke-width="35" fill="none"/>
+                        <circle id="overallGauge" cx="160" cy="160" r="140" stroke="url(#scoreGradient)" stroke-width="35" fill="none"
+                                stroke-dasharray="880" stroke-dashoffset="880" class="gauge" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#60a5fa"/>
+                                <stop offset="50%" stop-color="#34d399"/>
+                                <stop offset="100%" stop-color="#c084fc"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span id="overallScore" class="text-8xl font-extrabold">0</span>
+                        <span class="text-4xl opacity-80">%</span>
                     </div>
-                    <p id="summaryDisplay" class="mt-8 text-sm opacity-60 font-medium"></p>
                 </div>
+                <p id="urlDisplay" class="text-2xl font-semibold mb-2 text-accent"></p>
+                <p id="summaryText" class="text-lg max-w-4xl mx-auto opacity-90 leading-relaxed text-slate-300 mt-4"></p>
+                <button id="downloadPdf" class="mt-10 px-10 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-xl rounded-xl hover:scale-110 transition transform shadow-2xl flex items-center gap-4 mx-auto">
+                    <i class="fas fa-file-pdf text-2xl"></i>
+                    DOWNLOAD PDF REPORT
+                </button>
+            </div>
 
-                <div class="lg:col-span-2 grid grid-cols-2 gap-4">
-                    <div class="glass rounded-3xl p-8 border-l-4 border-blue-500">
-                        <p class="text-xs font-bold opacity-50 uppercase mb-2">Performance</p>
-                        <div id="perfPillar" class="text-4xl font-black text-white">0%</div>
-                    </div>
-                    <div class="glass rounded-3xl p-8 border-l-4 border-emerald-500">
-                        <p class="text-xs font-bold opacity-50 uppercase mb-2">SEO</p>
-                        <div id="seoPillar" class="text-4xl font-black text-white">0%</div>
-                    </div>
-                    <div class="glass rounded-3xl p-8 border-l-4 border-purple-500">
-                        <p class="text-xs font-bold opacity-50 uppercase mb-2">UX</p>
-                        <div id="uxPillar" class="text-4xl font-black text-white">0%</div>
-                    </div>
-                    <div class="glass rounded-3xl p-8 border-l-4 border-red-500">
-                        <p class="text-xs font-bold opacity-50 uppercase mb-2">Security</p>
-                        <div id="secPillar" class="text-4xl font-black text-white">0%</div>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-blue-500/30">
+                    <h3 class="text-xl font-bold text-blue-400 mb-2">Performance</h3>
+                    <div id="pillarPerformance" class="text-5xl font-black">0%</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-green-500/30">
+                    <h3 class="text-xl font-bold text-green-400 mb-2">SEO</h3>
+                    <div id="pillarSEO" class="text-5xl font-black">0%</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-purple-500/30">
+                    <h3 class="text-xl font-bold text-purple-400 mb-2">UX</h3>
+                    <div id="pillarUX" class="text-5xl font-black">0%</div>
+                </div>
+                <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-red-500/30">
+                    <h3 class="text-xl font-bold text-red-400 mb-2">Security</h3>
+                    <div id="pillarSecurity" class="text-5xl font-black">0%</div>
                 </div>
             </div>
 
-            <div class="glass rounded-3xl overflow-hidden shadow-2xl">
-                <div class="p-8 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-                    <h3 class="text-xl font-bold">100+ Health Checkpoints</h3>
-                    <button id="downloadPdf" class="bg-white/10 hover:bg-white/20 px-6 py-2 rounded-lg text-sm font-bold transition-all">
-                        <i class="fa-solid fa-file-pdf mr-2"></i> EXPORT PDF
-                    </button>
-                </div>
+            <div class="bg-slate-900/90 rounded-3xl p-8 border border-slate-700 overflow-hidden">
+                <h2 class="text-3xl font-bold mb-8 flex items-center gap-4">
+                    <i class="fas fa-list-check text-accent"></i> 66+ Health Checkpoints
+                </h2>
                 <div class="overflow-x-auto">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="text-left text-xs font-black uppercase opacity-40 border-b border-slate-800">
-                                <th class="p-6">Checkpoint</th>
-                                <th class="p-6">Pillar</th>
-                                <th class="p-6">Score</th>
-                                <th class="p-6">Status</th>
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-800/80">
+                            <tr>
+                                <th class="py-4 px-6 rounded-l-xl">Metric</th>
+                                <th class="py-4 px-6">Category</th>
+                                <th class="py-4 px-6">Score</th>
+                                <th class="py-4 px-6 rounded-r-xl text-center">Status</th>
                             </tr>
                         </thead>
-                        <tbody id="metricBody" class="divide-y divide-slate-800"></tbody>
+                        <tbody id="metricsTable" class="divide-y divide-slate-800"></tbody>
                     </table>
                 </div>
             </div>
@@ -123,16 +139,19 @@
 
     <script>
         const form = document.getElementById('auditForm');
+        const loading = document.getElementById('loading');
         const results = document.getElementById('results');
-        const loader = document.getElementById('loader');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const url = document.getElementById('url').value;
+            const url = document.getElementById('url').value.trim();
             const mode = document.getElementById('mode').value;
 
-            loader.classList.remove('hidden');
+            if (!url) return alert('Please enter a URL');
+
+            loading.classList.remove('hidden');
             results.classList.add('hidden');
+            document.getElementById('submitBtn').disabled = true;
 
             try {
                 const response = await fetch('/audit', {
@@ -140,74 +159,85 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, mode })
                 });
-                
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail);
 
-                renderUI(data);
-                window.currentAuditData = data;
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.summary || 'Audit failed');
+
+                renderResults(data);
+                window.lastAuditData = data;
             } catch (err) {
-                alert("Audit Error: " + err.message);
+                alert('Error: ' + err.message);
             } finally {
-                loader.classList.add('hidden');
+                loading.classList.add('hidden');
+                document.getElementById('submitBtn').disabled = false;
             }
         });
 
-        function renderUI(data) {
+        function renderResults(data) {
             results.classList.remove('hidden');
-            
-            // Score Circle
-            document.getElementById('scoreVal').innerText = data.total_grade;
-            const offset = 283 - (283 * data.total_grade / 100);
-            document.getElementById('scoreCircle').style.strokeDashoffset = offset;
-            
-            // Pillars
-            document.getElementById('perfPillar').innerText = `${data.pillars.Performance}%`;
-            document.getElementById('seoPillar').innerText = `${data.pillars.SEO}%`;
-            document.getElementById('uxPillar').innerText = `${data.pillars.UX}%`;
-            document.getElementById('secPillar').innerText = `${data.pillars.Security}%`;
-            document.getElementById('summaryDisplay').innerText = data.summary;
 
-            // Table
-            const tbody = document.getElementById('metricBody');
+            document.getElementById('overallScore').textContent = data.total_grade;
+            document.getElementById('urlDisplay').textContent = data.url;
+            document.getElementById('summaryText').textContent = data.summary;
+
+            const circumference = 880;
+            const offset = circumference - (data.total_grade / 100) * circumference;
+            document.getElementById('overallGauge').style.strokeDashoffset = offset;
+
+            document.getElementById('pillarPerformance').textContent = data.pillars.Performance + '%';
+            document.getElementById('pillarSEO').textContent = data.pillars.SEO + '%';
+            document.getElementById('pillarUX').textContent = data.pillars.UX + '%';
+            document.getElementById('pillarSecurity').textContent = data.pillars.Security + '%';
+
+            const tbody = document.getElementById('metricsTable');
             tbody.innerHTML = '';
-            data.metrics.forEach(m => {
-                const tr = document.createElement('tr');
-                tr.className = 'metric-row transition-all';
-                
-                let statusColor = 'bg-emerald-500/20 text-emerald-400';
-                let statusText = 'PASSED';
-                if(m.score < 100) { statusColor = 'bg-amber-500/20 text-amber-400'; statusText = 'OPTIMIZABLE'; }
-                if(m.score < 50) { statusColor = 'bg-red-500/20 text-red-400'; statusText = 'CRITICAL'; }
 
+            data.metrics.forEach(m => {
+                const statusClass = m.score === 100 ? 'status-excellent' : m.score >= 60 ? 'status-good' : 'status-poor';
+                const statusText = m.score === 100 ? 'EXCELLENT' : m.score >= 60 ? 'GOOD' : 'IMPROVE';
+
+                const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="p-6 font-semibold text-white">${m.name}</td>
-                    <td class="p-6 text-sm opacity-50">${m.category}</td>
-                    <td class="p-6 font-black">${m.score}%</td>
-                    <td class="p-6"><span class="status-pill ${statusColor}">${statusText}</span></td>
+                    <td class="py-4 px-6 font-medium">${m.name}</td>
+                    <td class="py-4 px-6 text-slate-400">${m.category}</td>
+                    <td class="py-4 px-6 font-bold text-xl">${m.score}%</td>
+                    <td class="py-4 px-6 text-center">
+                        <span class="px-5 py-2 rounded-full font-bold ${statusClass}">${statusText}</span>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+
+            results.scrollIntoView({ behavior: 'smooth' });
         }
 
         document.getElementById('downloadPdf').addEventListener('click', async () => {
+            if (!window.lastAuditData) return;
+
             const btn = document.getElementById('downloadPdf');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> GENERATING';
-            
-            const response = await fetch('/download', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(window.currentAuditData)
-            });
-            
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `FF_Audit_Report.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            btn.innerHTML = '<i class="fa-solid fa-file-pdf mr-2"></i> EXPORT PDF';
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING...';
+
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(window.lastAuditData)
+                });
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'FFTechElite_Report.pdf';
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } catch {
+                alert('PDF generation failed');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-file-pdf text-2xl"></i> DOWNLOAD PDF REPORT';
+            }
         });
     </script>
 </body>
