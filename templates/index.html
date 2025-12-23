@@ -3,121 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH ELITE v3 | Enterprise Audit Engine</title>
+    <title>FF TECH ELITE v3 | Enterprise Audit Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-        .grade-circle { transition: stroke-dashoffset 0.5s ease; transform: rotate(-90deg); transform-origin: 50% 50%; }
-        .loader { border-top-color: #10b981; animation: spinner 1.5s linear infinite; }
-        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        
+        :root {
+            --emerald-main: #10b981;
+            --slate-deep: #0f172a;
+        }
+
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #f8fafc;
+            color: var(--slate-deep);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.03);
+        }
+
+        .hero-gradient {
+            background: radial-gradient(circle at top right, #065f46, #0f172a);
+        }
+
+        .score-circle {
+            transition: stroke-dashoffset 1.5s ease-in-out;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        .tab-active { border-bottom: 2px solid var(--emerald-main); color: var(--emerald-main); }
     </style>
 </head>
-<body class="text-slate-900">
+<body class="antialiased">
 
-    <nav class="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="bg-emerald-500 p-1.5 rounded-lg">
+    <nav class="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/70 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-200">
                     <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
                 </div>
-                <span class="text-xl font-bold tracking-tight">FF TECH <span class="text-emerald-500">ELITE</span></span>
+                <span class="text-2xl font-extrabold tracking-tight">FF TECH <span class="text-emerald-500">ELITE</span></span>
             </div>
-            <div class="flex gap-4 items-center">
-                <span class="text-xs font-medium px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full">v3.0 Weighted Engine</span>
+            <div class="flex items-center gap-4">
+                <span id="statusIndicator" class="hidden flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> SYSTEM READY
+                </span>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 py-8">
+    <main class="max-w-7xl mx-auto px-6 py-10">
         
-        <div class="bg-slate-900 rounded-3xl p-8 mb-8 text-white shadow-2xl shadow-emerald-900/10">
-            <div class="max-w-3xl">
-                <h1 class="text-4xl font-bold mb-4">Enterprise Web Audit</h1>
-                <p class="text-slate-400 mb-8">Professional-grade performance, SEO, and security diagnostics with weighted scoring and automated roadmap generation.</p>
+        <section class="hero-gradient rounded-[2.5rem] p-10 md:p-16 mb-12 text-white relative overflow-hidden shadow-2xl shadow-emerald-900/20">
+            <div class="relative z-10 max-w-3xl">
+                <h1 class="text-5xl font-extrabold mb-6 leading-tight italic">Analyze. Optimize. <br><span class="text-emerald-400">Dominate.</span></h1>
+                <p class="text-slate-300 text-lg mb-10 leading-relaxed font-light">Execute 66 critical diagnostics across Performance, SEO, Security, and UX using our proprietary weighted engine.</p>
                 
-                <div class="flex flex-col md:flex-row gap-3">
-                    <div class="relative flex-grow">
-                        <i data-lucide="globe" class="absolute left-4 top-3.5 text-slate-400 w-5 h-5"></i>
-                        <input id="urlInput" type="text" placeholder="https://example.com" 
-                               class="w-full pl-12 pr-4 py-3.5 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder:text-slate-500">
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="relative flex-grow group">
+                        <i data-lucide="globe" class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input id="urlInput" type="text" placeholder="https://www.haier.com.pk" 
+                               class="w-full pl-14 pr-6 py-5 bg-white/10 border border-white/20 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/30 text-white placeholder:text-slate-500 transition-all text-lg font-medium">
                     </div>
-                    <select id="modeInput" class="bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 focus:outline-none">
-                        <option value="desktop" class="text-black">Desktop</option>
-                        <option value="mobile" class="text-black">Mobile</option>
+                    <select id="modeInput" class="bg-slate-800 border border-white/10 rounded-2xl px-6 py-5 focus:outline-none cursor-pointer font-bold">
+                        <option value="desktop">Desktop</option>
+                        <option value="mobile">Mobile</option>
                     </select>
-                    <button onclick="runAudit()" id="auditBtn" class="bg-emerald-500 hover:bg-emerald-600 px-8 py-3.5 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                        <span>Analyze Site</span>
+                    <button onclick="runAudit()" id="auditBtn" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-10 py-5 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl">
+                        <span>AUDIT NOW</span>
                         <i data-lucide="zap" class="w-5 h-5"></i>
                     </button>
                 </div>
             </div>
+            <div class="absolute -right-20 -bottom-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-[100px]"></div>
+        </section>
+
+        <div id="loading" class="hidden py-24 text-center">
+            <div class="flex flex-col items-center">
+                <div class="w-16 h-16 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-6"></div>
+                <h2 class="text-2xl font-black text-slate-800 tracking-tight">CRAWLING ARCHITECTURE</h2>
+                <p class="text-slate-500 mt-2 font-medium">Evaluating weighted pillars and Core Web Vitals...</p>
+            </div>
         </div>
 
-        <div id="loading" class="hidden py-20 text-center">
-            <div class="loader w-12 h-12 border-4 border-slate-200 rounded-full mx-auto mb-4"></div>
-            <p class="text-slate-500 animate-pulse">Running 66 diagnostic checks...</p>
-        </div>
-
-        <div id="results" class="hidden space-y-8">
+        <div id="results" class="hidden space-y-10">
             
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
-                    <h3 class="text-slate-500 font-semibold mb-6">OVERALL SCORE</h3>
-                    <div class="relative flex items-center justify-center">
-                        <svg class="w-48 h-48">
-                            <circle cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-100"></circle>
-                            <circle id="scoreCircle" cx="96" cy="96" r="88" stroke="currentColor" stroke-width="12" fill="transparent" 
-                                    stroke-dasharray="552.92" stroke-dashoffset="552.92" class="grade-circle text-emerald-500"></circle>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div class="lg:col-span-4 glass-card p-10 rounded-[2.5rem] flex flex-col items-center justify-center relative">
+                    <h3 class="text-slate-400 font-extrabold text-[10px] uppercase tracking-[0.3em] mb-8">System Health Grade</h3>
+                    <div class="relative">
+                        <svg class="w-56 h-56">
+                            <circle cx="112" cy="112" r="100" stroke="#f1f5f9" stroke-width="12" fill="transparent"></circle>
+                            <circle id="scoreCircle" cx="112" cy="112" r="100" stroke="#10b981" stroke-width="12" fill="transparent" 
+                                    stroke-dasharray="628.3" stroke-dashoffset="628.3" stroke-linecap="round" class="score-circle"></circle>
                         </svg>
-                        <span id="totalGrade" class="absolute text-5xl font-black">0%</span>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="totalGrade" class="text-6xl font-black tracking-tighter text-slate-800">0%</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Weighted Avg</span>
+                        </div>
                     </div>
-                    <button onclick="downloadPDF()" class="mt-8 flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700">
-                        <i data-lucide="download-cloud" class="w-5 h-5"></i>
-                        Download PDF Report
+                    <button onclick="downloadPDF()" class="mt-10 w-full py-4 bg-slate-950 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-600 transition-all group">
+                        <i data-lucide="file-down" class="w-5 h-5 group-hover:animate-bounce"></i> DOWNLOAD ENTERPRISE REPORT
                     </button>
                 </div>
 
-                <div class="lg:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                    <h3 class="text-slate-500 font-semibold mb-6 uppercase tracking-wider text-sm">Pillar Distribution</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6" id="pillarGrid">
+                <div class="lg:col-span-8 glass-card p-10 rounded-[2.5rem]">
+                    <div class="flex items-center justify-between mb-8">
+                        <h3 class="font-black text-xl text-slate-800 italic uppercase">Pillar Performance</h3>
+                        <span id="auditedAt" class="text-[10px] font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-md"></span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10" id="pillarContainer">
                         </div>
-                    <div class="mt-8 h-40">
+                    <div class="h-[220px]">
                         <canvas id="pillarChart"></canvas>
                     </div>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                <div class="bg-emerald-900 rounded-3xl p-8 text-emerald-50 shadow-xl">
-                    <div class="flex items-center gap-2 mb-6">
-                        <i data-lucide="list-checks" class="text-emerald-400"></i>
-                        <h3 class="font-bold text-xl text-white">Action Roadmap</h3>
+                
+                <div class="bg-slate-950 rounded-[2.5rem] p-10 text-white shadow-2xl">
+                    <div class="flex items-center gap-3 mb-8">
+                        <div class="p-2 bg-emerald-500 rounded-lg">
+                            <i data-lucide="trending-up" class="text-slate-950 w-5 h-5"></i>
+                        </div>
+                        <h3 class="font-extrabold text-xl">Actionable Roadmap</h3>
                     </div>
-                    <div id="roadmapContent" class="space-y-4 text-sm leading-relaxed">
+                    <div id="roadmapContent" class="space-y-4 text-slate-400 text-sm leading-relaxed">
                         </div>
                 </div>
 
-                <div class="xl:col-span-2 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
-                        <h3 class="font-bold">Advanced Diagnostics</h3>
-                        <span class="text-xs text-slate-400">Sorted by Weight</span>
+                <div class="xl:col-span-2 glass-card rounded-[2.5rem] overflow-hidden">
+                    <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-white/50">
+                        <h3 class="font-black text-xl text-slate-800 uppercase italic">Diagnostic Log (66 Checks)</h3>
+                        <div class="flex gap-2">
+                             <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                             <div class="w-3 h-3 rounded-full bg-amber-400"></div>
+                             <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        </div>
                     </div>
                     <div class="overflow-x-auto max-h-[600px]">
                         <table class="w-full text-left">
-                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                            <thead class="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-4">Metric</th>
-                                    <th class="px-6 py-4">Category</th>
-                                    <th class="px-6 py-4 text-right">Score</th>
+                                    <th class="px-8 py-4">Metric</th>
+                                    <th class="px-8 py-4">Pillar</th>
+                                    <th class="px-8 py-4 text-right">Score</th>
                                 </tr>
                             </thead>
-                            <tbody id="metricsTable" class="divide-y divide-slate-100 text-sm">
+                            <tbody id="metricsBody" class="divide-y divide-slate-100 text-sm">
                                 </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="haierSection" class="hidden animate-in slide-in-from-bottom duration-700">
+                <div class="flex items-center gap-4 mb-10">
+                    <div class="h-px flex-grow bg-slate-200"></div>
+                    <span class="text-xs font-black text-slate-400 uppercase tracking-[0.5em]">Market Intelligence</span>
+                    <div class="h-px flex-grow bg-slate-200"></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="glass-card p-10 rounded-[2.5rem]">
+                        <h4 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                            <i data-lucide="users" class="text-emerald-500"></i> SHARE OF SEARCH
+                        </h4>
+                        <div id="competitorList" class="space-y-4">
+                            </div>
+                    </div>
+                    
+                    <div class="bg-emerald-50 border border-emerald-100 p-10 rounded-[2.5rem]">
+                        <h4 class="text-xl font-black text-slate-800 mb-2 italic">TECHNICAL OVERVIEW</h4>
+                        <p id="seoSummary" class="text-emerald-700 text-sm font-medium mb-8 leading-relaxed"></p>
+                        
+                        <div class="grid grid-cols-2 gap-4" id="seoSectionScores">
+                            </div>
                     </div>
                 </div>
             </div>
@@ -126,82 +200,92 @@
 
     <script>
         lucide.createIcons();
-        let currentAuditData = null;
         let myChart = null;
+        let lastData = null;
 
         async function runAudit() {
-            const url = document.getElementById('urlInput').value;
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
             const mode = document.getElementById('modeInput').value;
-            const btn = document.getElementById('auditBtn');
-            
-            if(!url) return alert("Please enter a URL");
+
+            if (!url) {
+                urlInput.classList.add('border-red-500');
+                return;
+            }
 
             document.getElementById('results').classList.add('hidden');
             document.getElementById('loading').classList.remove('hidden');
-            btn.disabled = true;
+            document.getElementById('statusIndicator').classList.remove('hidden');
 
             try {
-                const res = await fetch('/audit', {
+                const response = await fetch('/audit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, mode })
                 });
-                
-                if(!res.ok) throw new Error("Audit failed");
-                
-                const data = await res.json();
-                currentAuditData = data;
-                renderResults(data);
-            } catch (e) {
-                alert(e.message);
+
+                if (!response.ok) throw new Error("Audit Failed");
+
+                const data = await response.json();
+                lastData = data;
+                renderDashboard(data);
+            } catch (err) {
+                alert("Audit failed: " + err.message);
             } finally {
                 document.getElementById('loading').classList.add('hidden');
-                btn.disabled = false;
             }
         }
 
-        function renderResults(data) {
+        function renderDashboard(data) {
             document.getElementById('results').classList.remove('hidden');
-            
-            // Score Animation
+            document.getElementById('auditedAt').innerText = data.audited_at;
+
+            // 1. Grade Wheel
             const grade = data.total_grade;
             document.getElementById('totalGrade').innerText = grade + "%";
             const circle = document.getElementById('scoreCircle');
-            const offset = 552.92 - (grade / 100 * 552.92);
-            circle.style.strokeDashoffset = offset;
+            const circumference = 628.3; // 2 * pi * 100
+            circle.style.strokeDashoffset = circumference - (grade / 100 * circumference);
 
-            // Pillar Grid
-            const pillarGrid = document.getElementById('pillarGrid');
-            pillarGrid.innerHTML = '';
-            Object.entries(data.pillars).forEach(([name, score]) => {
-                const color = score > 85 ? 'emerald' : score > 60 ? 'amber' : 'red';
-                pillarGrid.innerHTML += `
-                    <div class="text-center p-4 rounded-2xl bg-slate-50 border border-slate-100">
-                        <div class="text-2xl font-bold text-${color}-600">${score}%</div>
-                        <div class="text-[10px] uppercase font-bold text-slate-400 mt-1">${name}</div>
+            // 2. Pillars
+            const pillarContainer = document.getElementById('pillarContainer');
+            pillarContainer.innerHTML = '';
+            Object.entries(data.pillars).forEach(([key, val]) => {
+                const colorClass = val >= 80 ? 'text-emerald-500' : val >= 50 ? 'text-amber-500' : 'text-red-500';
+                pillarContainer.innerHTML += `
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100 text-center">
+                        <div class="text-2xl font-black ${colorClass}">${val}%</div>
+                        <div class="text-[9px] font-black text-slate-400 uppercase mt-1 tracking-widest">${key}</div>
                     </div>
                 `;
             });
 
-            // Roadmap
+            // 3. Roadmap
             document.getElementById('roadmapContent').innerHTML = data.roadmap;
 
-            // Table
-            const table = document.getElementById('metricsTable');
-            table.innerHTML = '';
-            data.metrics.sort((a,b) => b.weight - a.weight).forEach(m => {
-                const scoreColor = m.score > 85 ? 'text-emerald-600' : m.score > 60 ? 'text-amber-600' : 'text-red-600';
-                table.innerHTML += `
+            // 4. Metrics Table
+            const metricsBody = document.getElementById('metricsBody');
+            metricsBody.innerHTML = '';
+            data.metrics.forEach(m => {
+                const statusColor = m.score >= 80 ? 'bg-emerald-500' : m.score >= 50 ? 'bg-amber-400' : 'bg-red-500';
+                metricsBody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="px-6 py-4 font-medium">${m.name}</td>
-                        <td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">${m.category}</span></td>
-                        <td class="px-6 py-4 text-right font-bold ${scoreColor}">${m.score}%</td>
+                        <td class="px-8 py-5 font-bold text-slate-700">
+                            <div class="flex items-center gap-3">
+                                <div class="w-1.5 h-1.5 rounded-full ${statusColor}"></div>
+                                ${m.name}
+                            </div>
+                        </td>
+                        <td class="px-8 py-5">
+                            <span class="px-3 py-1 bg-slate-100 text-slate-500 rounded text-[9px] font-black uppercase tracking-tighter">${m.category}</span>
+                        </td>
+                        <td class="px-8 py-5 text-right font-black text-slate-800">${m.score}%</td>
                     </tr>
                 `;
             });
 
-            // Chart
-            if(myChart) myChart.destroy();
+            // 5. Chart
+            if (myChart) myChart.destroy();
             const ctx = document.getElementById('pillarChart').getContext('2d');
             myChart = new Chart(ctx, {
                 type: 'bar',
@@ -211,31 +295,78 @@
                         label: 'Weighted Score',
                         data: Object.values(data.pillars),
                         backgroundColor: '#10b981',
-                        borderRadius: 8
+                        borderRadius: 8,
+                        barThickness: 50
                     }]
                 },
-                options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { display: false, max: 100 },
+                        x: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 10 } } }
+                    }
+                }
             });
 
-            window.scrollTo({ top: document.getElementById('results').offsetTop - 100, behavior: 'smooth' });
+            // 6. Haier Competitor Intelligence
+            const haierDiv = document.getElementById('haierSection');
+            if (data.seo_audit) {
+                haierDiv.classList.remove('hidden');
+                document.getElementById('seoSummary').innerText = data.seo_audit.overview_text;
+                
+                // Render Competitors
+                const compList = document.getElementById('competitorList');
+                compList.innerHTML = '';
+                // Combine direct competitors and overall
+                const comps = data.seo_audit.competitor_analysis.types[0].competitors;
+                comps.forEach(c => {
+                    const width = c.competition_level * 100;
+                    compList.innerHTML += `
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                                <span>${c.label} (${c.domain})</span>
+                                <span>${width.toFixed(0)}% Intensity</span>
+                            </div>
+                            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <div class="h-full bg-emerald-400" style="width: ${width}%"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                // Render SEO Sub-scores
+                const seoScores = document.getElementById('seoSectionScores');
+                seoScores.innerHTML = '';
+                Object.entries(data.seo_audit.section_scores).forEach(([name, score]) => {
+                    seoScores.innerHTML += `
+                        <div class="bg-white p-4 rounded-2xl border border-emerald-100">
+                            <div class="text-[9px] font-black text-emerald-600 uppercase mb-1">${name}</div>
+                            <div class="text-xl font-black text-slate-800">${score}%</div>
+                        </div>
+                    `;
+                });
+            } else {
+                haierDiv.classList.add('hidden');
+            }
+
             lucide.createIcons();
+            window.scrollTo({ top: document.getElementById('results').offsetTop - 100, behavior: 'smooth' });
         }
 
         async function downloadPDF() {
-            if(!currentAuditData) return;
+            if (!lastData) return;
             const res = await fetch('/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(currentAuditData)
+                body: JSON.stringify(lastData)
             });
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Audit_Report_${Date.now()}.pdf`;
-            document.body.appendChild(a);
+            a.download = `FF_ELITE_Report_${Date.now()}.pdf`;
             a.click();
-            a.remove();
         }
     </script>
 </body>
