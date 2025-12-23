@@ -24,13 +24,12 @@
     </script>
     <style>
         .gauge { transition: stroke-dashoffset 1.5s ease-in-out; }
-        .status-excellent { background-color: #10b981; color: white; }
-        .status-good { background-color: #f59e0b; color: black; }
-        .status-poor { background-color: #ef4444; color: white; }
+        .status-excellent { @apply bg-excellent text-white; }
+        .status-good { @apply bg-good text-black; }
+        .status-poor { @apply bg-poor text-white; }
     </style>
 </head>
 <body class="bg-primary text-white min-h-screen font-sans">
-
     <header class="bg-gradient-to-r from-slate-900 via-purple-900 to-primary py-12 shadow-2xl">
         <div class="max-w-7xl mx-auto text-center px-6">
             <h1 class="text-6xl font-extrabold bg-gradient-to-r from-secondary via-accent to-pink-500 bg-clip-text text-transparent">
@@ -40,14 +39,12 @@
             <p class="mt-2 text-lg opacity-70 text-slate-400">66+ Metrics • Core Web Vitals • SEO • UX • Security • PDF Reports</p>
         </div>
     </header>
-
     <main class="max-w-7xl mx-auto px-6 py-12">
-
         <div class="bg-slate-900/80 backdrop-blur rounded-3xl shadow-2xl p-10 mb-16 border border-slate-800">
             <form id="auditForm" class="grid lg:grid-cols-3 gap-8 items-end">
                 <div class="lg:col-span-2">
                     <label for="url" class="block text-lg font-semibold mb-3">Enter Website URL</label>
-                    <input type="text" id="url" required placeholder="https://example.com" 
+                    <input type="text" id="url" required placeholder="https://example.com or example.com"
                            class="w-full px-6 py-4 bg-slate-800/70 rounded-xl text-lg focus:ring-4 focus:ring-accent outline-none transition-all border border-slate-700">
                 </div>
                 <div>
@@ -64,16 +61,15 @@
                     </button>
                 </div>
             </form>
-
             <div id="loading" class="hidden mt-12 text-center">
                 <i class="fas fa-circle-notch fa-spin text-6xl text-accent mb-6"></i>
                 <p class="text-2xl font-bold">Initializing Chromium Instance...</p>
-                <p class="text-lg opacity-70 mt-4">We are checking 66+ data points. This may take 30-45 seconds.</p>
+                <p class="text-lg opacity-70 mt-4">Checking 66+ data points. This may take 30-60 seconds.</p>
             </div>
         </div>
 
         <div id="results" class="hidden space-y-16">
-
+            <!-- Overall Score -->
             <div class="bg-slate-900/90 backdrop-blur rounded-3xl shadow-2xl p-12 text-center border border-slate-700">
                 <h2 class="text-4xl font-bold mb-8">Overall Website Health Score</h2>
                 <div class="relative inline-block mb-10">
@@ -95,14 +91,14 @@
                     </div>
                 </div>
                 <p id="urlDisplay" class="text-2xl font-semibold mb-2 text-accent"></p>
-                <p id="summaryText" class="text-lg max-w-4xl mx-auto opacity-90 leading-relaxed text-slate-300"></p>
-
+                <p id="summaryText" class="text-lg max-w-4xl mx-auto opacity-90 leading-relaxed text-slate-300 mt-4"></p>
                 <button id="downloadPdf" class="mt-10 px-10 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-xl rounded-xl hover:scale-110 transition transform shadow-2xl flex items-center gap-4 mx-auto">
                     <i class="fas fa-file-pdf text-2xl"></i>
                     DOWNLOAD PDF REPORT
                 </button>
             </div>
 
+            <!-- Pillar Scores -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-blue-500/30">
                     <h3 class="text-xl font-bold text-blue-400 mb-2">Performance</h3>
@@ -122,6 +118,7 @@
                 </div>
             </div>
 
+            <!-- Detailed Metrics Table -->
             <div class="bg-slate-900/90 rounded-3xl p-8 border border-slate-700 overflow-hidden">
                 <h2 class="text-3xl font-bold mb-8 flex items-center gap-4">
                     <i class="fas fa-list-check text-accent"></i> 66+ Health Checkpoints
@@ -136,8 +133,7 @@
                                 <th class="py-4 px-6 rounded-r-xl text-center">Status</th>
                             </tr>
                         </thead>
-                        <tbody id="metricsTable" class="divide-y divide-slate-800">
-                            </tbody>
+                        <tbody id="metricsTable" class="divide-y divide-slate-800"></tbody>
                     </table>
                 </div>
             </div>
@@ -151,10 +147,11 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const url = document.getElementById('url').value;
+            const url = document.getElementById('url').value.trim();
             const mode = document.getElementById('mode').value;
 
-            // Reset UI
+            if (!url) return alert('Please enter a URL');
+
             loading.classList.remove('hidden');
             results.classList.add('hidden');
             document.getElementById('submitBtn').disabled = true;
@@ -162,17 +159,20 @@
             try {
                 const response = await fetch('/audit', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, mode })
                 });
 
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Audit Failed');
+                if (!response.ok) {
+                    const err = await response.text();
+                    throw new Error(err || 'Audit failed');
+                }
 
+                const data = await response.json();
                 renderResults(data);
                 window.lastAuditData = data;
             } catch (err) {
-                alert("Error: " + err.message);
+                alert('Error: ' + err.message);
             } finally {
                 loading.classList.add('hidden');
                 document.getElementById('submitBtn').disabled = false;
@@ -181,69 +181,77 @@
 
         function renderResults(data) {
             results.classList.remove('hidden');
-            
+
             // Overall Score & Gauge
             document.getElementById('overallScore').textContent = data.total_grade;
             document.getElementById('urlDisplay').textContent = data.url;
-            document.getElementById('summaryText').textContent = data.summary;
-            
+            document.getElementById('summaryText').textContent = data.summary || '';
+
             const circumference = 880;
             const offset = circumference - (data.total_grade / 100) * circumference;
             document.getElementById('overallGauge').style.strokeDashoffset = offset;
 
             // Pillar Scores
-            document.getElementById('pillarPerformance').textContent = `${data.pillars.Performance}%`;
-            document.getElementById('pillarSEO').textContent = `${data.pillars.SEO}%`;
-            document.getElementById('pillarUX').textContent = `${data.pillars.UX}%`;
-            document.getElementById('pillarSecurity').textContent = `${data.pillars.Security}%`;
+            document.getElementById('pillarPerformance').textContent = data.pillars.Performance + '%';
+            document.getElementById('pillarSEO').textContent = data.pillars.SEO + '%';
+            document.getElementById('pillarUX').textContent = data.pillars.UX + '%';
+            document.getElementById('pillarSecurity').textContent = data.pillars.Security + '%';
 
-            // Table
+            // Metrics Table
             const tbody = document.getElementById('metricsTable');
             tbody.innerHTML = '';
-            
-            data.metrics.forEach(m => {
-                const row = document.createElement('tr');
-                const statusClass = m.score === 100 ? 'status-excellent' : m.score >= 70 ? 'status-good' : 'status-poor';
-                const statusText = m.score === 100 ? 'EXCELLENT' : m.score >= 70 ? 'GOOD' : 'IMPROVE';
 
-                row.innerHTML = `
+            data.metrics.forEach(m => {
+                const statusClass = m.score === 100 ? 'status-excellent' : m.score >= 60 ? 'status-good' : 'status-poor';
+                const statusText = m.score === 100 ? 'EXCELLENT' : m.score >= 60 ? 'GOOD' : 'IMPROVE';
+
+                const tr = document.createElement('tr');
+                tr.classList.add('hover:bg-slate-800/50', 'transition');
+                tr.innerHTML = `
                     <td class="py-4 px-6 font-medium">${m.name}</td>
                     <td class="py-4 px-6 text-slate-400">${m.category}</td>
                     <td class="py-4 px-6 font-bold text-xl">${m.score}%</td>
                     <td class="py-4 px-6 text-center">
-                        <span class="px-4 py-1 rounded-full text-xs font-black ${statusClass}">${statusText}</span>
+                        <span class="inline-block px-5 py-2 rounded-full font-bold ${statusClass}">${statusText}</span>
                     </td>
                 `;
-                tbody.appendChild(row);
+                tbody.appendChild(tr);
             });
-            
-            window.scrollTo({ top: results.offsetTop - 50, behavior: 'smooth' });
+
+            // Smooth scroll to results
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        // PDF Download
         document.getElementById('downloadPdf').addEventListener('click', async () => {
-            if (!window.lastAuditData) return;
+            if (!window.lastAuditData) return alert('Run an audit first!');
+
             const btn = document.getElementById('downloadPdf');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING...';
-            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING PDF...';
+            btn.disabled = true;
+
             try {
                 const response = await fetch('/download', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(window.lastAuditData)
                 });
-                
+
+                if (!response.ok) throw new Error('PDF generation failed');
+
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `Audit_Report_${new Date().getTime()}.pdf`;
-                document.body.appendChild(a);
+                a.download = `FFTechElite_Audit_${window.lastAuditData.url.replace(/[^a-z0-9]/gi, '_')}.pdf`;
                 a.click();
-                a.remove();
+                window.URL.revokeObjectURL(url);
             } catch (err) {
-                alert("PDF generation failed");
+                alert('PDF Error: ' + err.message);
             } finally {
-                btn.innerHTML = '<i class="fas fa-file-pdf text-2xl"></i> DOWNLOAD PDF REPORT';
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         });
     </script>
