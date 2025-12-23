@@ -1,273 +1,172 @@
-import io, time, asyncio, hashlib, os
-from typing import List, Dict
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fpdf import FPDF
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse
-import aiohttp
-from playwright.async_api import async_playwright
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH ELITE | Forensic Audit Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono&display=swap');
+        body { background: #020617; color: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+        .neon-border { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        @keyframes scan { 0% { transform: translateY(-100%); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(100%); opacity: 0; } }
+        .scan-line { animation: scan 2s infinite linear; }
+    </style>
+</head>
+<body class="p-4 md:p-10 min-h-screen">
+    <div class="max-w-7xl mx-auto space-y-10">
+        
+        <header class="text-center space-y-4">
+            <div class="inline-block px-4 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold tracking-widest uppercase">
+                Forensic Engine v6.0
+            </div>
+            <h1 class="text-6xl md:text-8xl font-extrabold tracking-tighter italic text-white uppercase">
+                FF TECH <span class="text-blue-500">ELITE</span>
+            </h1>
+            <div class="max-w-2xl mx-auto pt-6">
+                <div class="glass neon-border p-2 rounded-2xl flex flex-col md:flex-row gap-2">
+                    <input id="urlInput" type="text" placeholder="https://www.apple.com" 
+                           class="flex-1 bg-transparent px-6 py-4 outline-none text-white text-lg placeholder:opacity-30">
+                    <button onclick="runAudit()" id="auditBtn" 
+                            class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-xl font-bold uppercase tracking-widest transition-all active:scale-95">
+                        Start Sweep
+                    </button>
+                </div>
+            </div>
+        </header>
 
-# ---------------- FastAPI App ----------------
-app = FastAPI(title="FF TECH ELITE | Real Forensic Engine v6.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+        <div id="results" class="hidden space-y-8 animate-in fade-in duration-700">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-4 glass rounded-[40px] p-10 flex flex-col items-center justify-center text-center">
+                    <div class="text-xs font-bold opacity-40 uppercase tracking-widest mb-4">Overall Health Index</div>
+                    <div id="gradeValue" class="text-9xl font-black italic text-blue-500 leading-none">0%</div>
+                    <div class="mt-4 px-4 py-1 rounded-lg bg-blue-500/20 text-blue-400 font-bold text-sm uppercase tracking-widest">Forensic Verified</div>
+                    <p id="summaryText" class="mt-8 text-sm opacity-60 leading-relaxed italic"></p>
+                </div>
 
-# ---------------- Metric Descriptions ----------------
-METRIC_DESCRIPTIONS = {
-    "Performance": "Evaluates server response times, asset delivery speed, and rendering efficiency.",
-    "Technical SEO": "Analyzes crawlability, indexing signals, and architecture semantic integrity.",
-    "On-Page SEO": "Probes keyword relevance, content depth, and internal linking structures.",
-    "Security": "Inspects SSL validity, encryption headers, and vulnerability mitigation.",
-    "User Experience": "Measures visual stability, interactivity, and mobile-first design compliance."
-}
+                <div class="lg:col-span-5 glass rounded-[40px] p-8 flex items-center justify-center">
+                    <canvas id="radarChart"></canvas>
+                </div>
 
-RAW_METRICS = [(i+1, name, cat) for i, (name, cat) in enumerate([
-    # Performance
-    ("Largest Contentful Paint (LCP)","Performance"),
-    ("First Input Delay (FID)","Performance"),
-    ("Cumulative Layout Shift (CLS)","Performance"),
-    ("First Contentful Paint (FCP)","Performance"),
-    ("Time to First Byte (TTFB)","Performance"),
-    ("Total Blocking Time (TBT)","Performance"),
-    ("Speed Index","Performance"),
-    ("Time to Interactive (TTI)","Performance"),
-    ("Total Page Size","Performance"),
-    ("HTTP Requests Count","Performance"),
-    ("Image Optimization","Performance"),
-    ("CSS Minification","Performance"),
-    ("JavaScript Minification","Performance"),
-    ("GZIP/Brotli Compression","Performance"),
-    ("Browser Caching","Performance"),
-    # Technical SEO
-    ("Mobile Responsiveness","Technical SEO"),
-    ("Viewport Configuration","Technical SEO"),
-    ("Structured Data Markup","Technical SEO"),
-    ("Canonical Tags","Technical SEO"),
-    ("Robots.txt Configuration","Technical SEO"),
-    ("XML Sitemap","Technical SEO"),
-    ("URL Structure","Technical SEO"),
-    ("Breadcrumb Navigation","Technical SEO"),
-    ("Title Tag Optimization","Technical SEO"),
-    ("Meta Description","Technical SEO"),
-    ("Heading Structure (H1-H6)","Technical SEO"),
-    ("Internal Linking","Technical SEO"),
-    ("External Linking Quality","Technical SEO"),
-    ("Schema.org Implementation","Technical SEO"),
-    ("AMP Compatibility","Technical SEO"),
-    # On-Page SEO
-    ("Content Quality Score","On-Page SEO"),
-    ("Keyword Density Analysis","On-Page SEO"),
-    ("Content Readability","On-Page SEO"),
-    ("Content Freshness","On-Page SEO"),
-    ("Content Length Adequacy","On-Page SEO"),
-    ("Image Alt Text","On-Page SEO"),
-    ("Video Optimization","On-Page SEO"),
-    ("Content Uniqueness","On-Page SEO"),
-    ("LSI Keywords","On-Page SEO"),
-    ("Content Engagement Signals","On-Page SEO"),
-    ("Content Hierarchy","On-Page SEO"),
-    # Security
-    ("HTTPS Full Implementation","Security"),
-    ("Security Headers","Security"),
-    ("Cross-Site Scripting Protection","Security"),
-    ("SQL Injection Protection","Security"),
-    ("Mixed Content Detection","Security"),
-    ("TLS/SSL Certificate Validity","Security"),
-    ("Cookie Security","Security"),
-    ("HTTP Strict Transport Security","Security"),
-    ("Content Security Policy","Security"),
-    ("Clickjacking Protection","Security"),
-    ("Referrer Policy","Security"),
-    ("Permissions Policy","Security"),
-    ("X-Content-Type-Options","Security"),
-    ("Frame Options","Security"),
-    # User Experience
-    ("Core Web Vitals Compliance","User Experience"),
-    ("Mobile-First Design","User Experience"),
-    ("Accessibility Compliance","User Experience"),
-    ("Page Load Animation","User Experience"),
-    ("Navigation Usability","User Experience"),
-    ("Form Optimization","User Experience"),
-    ("404 Error Page","User Experience"),
-    ("Search Functionality","User Experience"),
-    ("Social Media Integration","User Experience"),
-    ("Multilingual Support","User Experience"),
-    ("Progressive Web App Features","User Experience"),
-])]
+                <div class="lg:col-span-3 space-y-4">
+                    <div class="glass p-6 rounded-3xl space-y-4">
+                        <h3 class="text-xs font-bold opacity-40 uppercase tracking-widest text-blue-400">Executive Suggestion</h3>
+                        <p id="execSummary" class="text-xs leading-relaxed opacity-80 italic">
+                            Infrastructure hardening and Core Web Vital optimization are required to reach elite status. Asset delivery pipelines show significant bottlenecks.
+                        </p>
+                    </div>
+                    <button onclick="downloadPDF()" class="w-full py-6 glass hover:bg-green-600 hover:text-white transition-all rounded-3xl font-black uppercase tracking-widest text-sm border-white/10 flex items-center justify-center gap-2">
+                        Download Executive PDF
+                    </button>
+                </div>
+            </div>
 
-# ---------------- Helper Functions ----------------
-def score_bool(cond, ok=100, fail=30):
-    return ok if cond else fail
+            <div class="space-y-6">
+                <div class="flex justify-between items-end">
+                    <div class="space-y-1">
+                        <h2 class="text-2xl font-bold uppercase italic">Forensic Matrix</h2>
+                        <p class="text-xs opacity-40 uppercase tracking-widest">66+ Comprehensive Data Points</p>
+                    </div>
+                </div>
+                <div id="matrixGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                </div>
+            </div>
+        </div>
+    </div>
 
-def score_range(val, rules):
-    for lim, sc in rules:
-        if val <= lim:
-            return sc
-    return rules[-1][1]
+    <script>
+        let radar = null;
+        let currentData = null;
 
-# ---------------- Auditor ----------------
-class ForensicAuditor:
-    def __init__(self, url):
-        self.url = url if url.startswith("http") else "https://" + url
-        self.domain = urlparse(self.url).netloc
-        self.soup = None
-        self.headers = {}
-        self.ttfb = 0
-        self.page_size = 0
-        self.requests_count = 0
-        self.images_missing_alt = 0
-        self.metrics = {}
+        async function runAudit() {
+            const btn = document.getElementById('auditBtn');
+            const url = document.getElementById('urlInput').value;
+            if(!url) return alert("Enter URL");
 
-    async def fetch_basic(self):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(self.url, ssl=False, timeout=15,
-                                       headers={"User-Agent":"FFTECH-ForensicBot/6.0"}) as r:
-                    self.ttfb = r.headers.get('x-response-time', 0) or 0
-                    html = await r.text()
-                    self.soup = BeautifulSoup(html,"html.parser")
-                    self.headers = dict(r.headers)
-                    self.page_size = len(html.encode()) / 1024
-                    self.requests_count = len(self.soup.find_all("img")) + len(self.soup.find_all("script")) + len(self.soup.find_all("link"))
-                    self.images_missing_alt = len([img for img in self.soup.find_all("img") if not img.get("alt")])
-                    return True
-        except:
-            return False
+            btn.innerText = "SCANNING...";
+            btn.classList.add('opacity-50');
 
-    async def fetch_cwv(self):
-        # Playwright headless browser for Core Web Vitals
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            start = time.time()
-            try:
-                await page.goto(self.url, wait_until='networkidle')
-                metrics = await page.evaluate("""() => {
-                    const perf = window.performance.timing;
-                    const lcp = window.performance.getEntriesByType('largest-contentful-paint');
-                    const cls = window.performance.getEntriesByType('layout-shift');
-                    return {
-                        LCP: lcp.length ? lcp[lcp.length-1].renderTime || lcp[lcp.length-1].loadTime : 0,
-                        CLS: cls.length ? cls.map(c=>c.value).reduce((a,b)=>a+b,0) : 0,
-                        FCP: perf.responseStart ? perf.responseStart-perf.requestStart : 0,
-                        TTI: 0,
-                        TBT: 0
-                    };
-                }""")
-                self.metrics.update(metrics)
-            finally:
-                await browser.close()
+            try {
+                const res = await fetch('/audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                currentData = await res.json();
+                renderResults(currentData);
+                btn.innerText = "START SWEEP";
+                btn.classList.remove('opacity-50');
+            } catch (err) {
+                alert("Audit failed. Check server connection.");
+                btn.innerText = "START SWEEP";
+            }
+        }
 
-# ---------------- PDF ----------------
-class ExecutivePDF(FPDF):
-    def __init__(self, url, grade):
-        super().__init__()
-        self.url = url
-        self.grade = grade
-    def header(self):
-        self.set_fill_color(15,23,42)
-        self.rect(0,0,210,40,"F")
-        self.set_font("Helvetica","B",20)
-        self.set_text_color(255,255,255)
-        self.cell(0,15,"FF TECH ELITE | EXECUTIVE FORENSIC REPORT",0,1,"C")
-        self.set_font("Helvetica","",10)
-        self.cell(0,6,self.url,0,1,"C")
-        self.ln(10)
+        function renderResults(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('gradeValue').innerText = data.total_grade + '%';
+            document.getElementById('summaryText').innerText = data.summary;
+            document.getElementById('execSummary').innerText = "Audit complete. Focus on improving Performance & SEO pillars for elite status.";
 
-# ---------------- Audit Endpoint ----------------
-@app.post("/audit")
-async def audit(request: Request):
-    data = await request.json()
-    url = data.get("url", "").strip()
-    auditor = ForensicAuditor(url)
-    ok = await auditor.fetch_basic()
-    if not ok:
-        return JSONResponse({"total_grade":1,"summary":"Site Unreachable"})
+            // Metrics Grid
+            const grid = document.getElementById('matrixGrid');
+            grid.innerHTML = data.metrics.map(m => `
+                <div class="glass p-4 rounded-2xl border-l-2 ${m.score > 80 ? 'border-green-500' : 'border-blue-500/50'}">
+                    <div class="text-[8px] opacity-30 font-bold uppercase truncate">${m.category}</div>
+                    <div class="text-[10px] font-bold mt-1 h-8 line-clamp-2">${m.name}</div>
+                    <div class="text-xl font-black mt-1 ${m.score > 80 ? 'text-green-400' : 'text-blue-400'}">${m.score}%</div>
+                </div>
+            `).join('');
 
-    await auditor.fetch_cwv()
+            // Radar Chart
+            const ctx = document.getElementById('radarChart');
+            if(radar) radar.destroy();
+            radar = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(data.pillars),
+                    datasets: [{
+                        label: 'Efficiency',
+                        data: Object.values(data.pillars),
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            min: 0, max: 100, ticks: { display: false },
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            pointLabels: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: 'bold' } }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
 
-    # ---------------- Scoring ----------------
-    results = []
-    pillars = {k:[] for k in METRIC_DESCRIPTIONS}
-    s = auditor.soup
-    h = auditor.headers
-
-    for i, name, cat in RAW_METRICS:
-        if name=="Largest Contentful Paint (LCP)":
-            val = auditor.metrics.get("LCP",0)
-            sc = score_range(val,[(2500,100),(4000,70),(10000,40)])
-        elif name=="Cumulative Layout Shift (CLS)":
-            val = auditor.metrics.get("CLS",0)
-            sc = score_range(val,[(0.1,100),(0.25,70),(1,40)])
-        elif name=="First Contentful Paint (FCP)":
-            val = auditor.metrics.get("FCP",0)
-            sc = score_range(val,[(2000,100),(4000,70),(10000,40)])
-        elif name=="Time to First Byte (TTFB)":
-            val = auditor.ttfb
-            sc = score_range(val,[(200,100),(600,70),(1500,40)])
-        elif name=="Total Page Size":
-            val = auditor.page_size
-            sc = score_range(val,[(800,100),(2000,70),(5000,40)])
-        elif name=="HTTP Requests Count":
-            val = auditor.requests_count
-            sc = score_range(val,[(50,100),(120,70),(300,40)])
-        elif name=="Image Optimization":
-            val = auditor.images_missing_alt
-            sc = score_range(val,[(0,100),(5,70),(20,40)])
-        elif name=="Title Tag Optimization":
-            sc = score_bool(s.title and 10<=len(s.title.text)<=60)
-        elif name=="Meta Description":
-            m = s.find("meta", attrs={"name":"description"})
-            sc = score_bool(m and 50<=len(m.get("content",""))<=160)
-        elif name=="Heading Structure (H1-H6)":
-            sc = score_bool(len(s.find_all("h1"))==1)
-        elif name=="HTTPS Full Implementation":
-            sc = score_bool(auditor.url.startswith("https"))
-        elif name=="HTTP Strict Transport Security":
-            sc = score_bool("strict-transport-security" in h)
-        elif name=="Content Security Policy":
-            sc = score_bool("content-security-policy" in h)
-        elif name=="X-Content-Type-Options":
-            sc = score_bool("x-content-type-options" in h)
-        elif name=="Frame Options":
-            sc = score_bool("x-frame-options" in h)
-        elif name=="Mobile-First Design":
-            sc = score_bool(s.find("meta", attrs={"name":"viewport"}))
-        elif name=="Navigation Usability":
-            sc = score_bool(s.find("nav"))
-        else:
-            sc = 70
-        sc = max(1,min(100,sc))
-        results.append({"no":i,"name":name,"category":cat,"score":sc})
-        pillars[cat].append(sc)
-
-    pillar_avg = {k: round(sum(v)/len(v)) for k,v in pillars.items()}
-    total = round(sum(pillar_avg.values())/5)
-
-    return {"url":auditor.url,"total_grade":total,"pillars":pillar_avg,"metrics":results,
-            "summary":f"Real forensic audit completed. Health Index {total}%."}
-
-# ---------------- Download PDF ----------------
-@app.post("/download")
-async def download(request: Request):
-    d = await request.json()
-    pdf = ExecutivePDF(d["url"], d["total_grade"])
-    pdf.add_page()
-    pdf.set_font("Helvetica","B",40)
-    pdf.set_text_color(59,130,246)
-    pdf.cell(0,30,f'{d["total_grade"]}%',1,1,"C")
-    out = pdf.output(dest="S").encode("latin1")
-    return StreamingResponse(io.BytesIO(out),
-                             media_type="application/pdf",
-                             headers={"Content-Disposition":"attachment; filename=Audit_Report.pdf"})
-
-# ---------------- UI ----------------
-@app.get("/", response_class=HTMLResponse)
-async def ui():
-    with open("dashboard.html","r", encoding="utf-8") as f:
-        return f.read()
-
-if __name__=="__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        async function downloadPDF() {
+            if(!currentData) return;
+            const res = await fetch('/download', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(currentData)
+            });
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `FF_TECH_Audit_${currentData.total_grade}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+</body>
+</html>
