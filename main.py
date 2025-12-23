@@ -17,6 +17,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
 )
+    # reportlab imports
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
@@ -502,7 +503,7 @@ def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
             "Social Media": 0
         },
         "issues": [
-            # Page Speed block (as provided)
+            # Page Speed block
             {"type": "Page Speed", "element": "DOM Size", "priority": "red-flag",
              "message": "Unable to retrieve DOM Size metric. The page may be inaccessible or the API is unavailable."},
             {"type": "Page Speed", "element": "Total Blocking Time (TBT)", "priority": "red-flag",
@@ -620,6 +621,57 @@ def get_static_seo_audit(url: str) -> Dict[str, Any] | None:
         ],
     }
 
+# ==================== COMPETITOR ANALYSIS (4 TYPES) FOR haier.com.pk ====================
+def get_competitor_analysis_for_haier() -> Dict[str, Any]:
+    """
+    Static competitor analysis grouped into 4 types of similar websites.
+    Values are illustrative to guide audit actions (no external API calls).
+    """
+    return {
+        "types": [
+            {
+                "type": "Direct Appliance Brands",
+                "description": "Manufacturers competing with similar product lines in Pakistan.",
+                "competitors": [
+                    {"domain": "dawlance.com.pk", "label": "Dawlance", "common_keywords": 12, "competition_level": 0.72, "channel": "Brand"},
+                    {"domain": "orient.com.pk", "label": "Orient", "common_keywords": 9, "competition_level": 0.65, "channel": "Brand"},
+                    {"domain": "pel.com.pk", "label": "PEL", "common_keywords": 7, "competition_level": 0.58, "channel": "Brand"},
+                    {"domain": "changhongruba.com.pk", "label": "Changhong Ruba", "common_keywords": 6, "competition_level": 0.52, "channel": "Brand"},
+                ]
+            },
+            {
+                "type": "Retailers & Marketplaces",
+                "description": "E‑commerce platforms driving category traffic and conversions.",
+                "competitors": [
+                    {"domain": "daraz.pk", "label": "Daraz", "common_keywords": 15, "competition_level": 0.80, "channel": "Marketplace"},
+                    {"domain": "homeshopping.pk", "label": "HomeShopping", "common_keywords": 8, "competition_level": 0.55, "channel": "Retailer"},
+                    {"domain": "mega.pk", "label": "Mega", "common_keywords": 7, "competition_level": 0.50, "channel": "Retailer"},
+                    {"domain": "telemart.pk", "label": "Telemart", "common_keywords": 6, "competition_level": 0.45, "channel": "Retailer"},
+                ]
+            },
+            {
+                "type": "Brand Store / Owned Commerce",
+                "description": "Brand‑owned online stores and direct sales portals.",
+                "competitors": [
+                    {"domain": "haiermall.pk", "label": "Haier Mall", "common_keywords": 5, "competition_level": 0.55, "channel": "Owned Store"},
+                    {"domain": "dawlance.com.pk", "label": "Dawlance Store", "common_keywords": 4, "competition_level": 0.48, "channel": "Owned Store"},
+                    {"domain": "orient.com.pk", "label": "Orient Store", "common_keywords": 3, "competition_level": 0.42, "channel": "Owned Store"},
+                    {"domain": "pel.com.pk", "label": "PEL Store", "common_keywords": 3, "competition_level": 0.40, "channel": "Owned Store"},
+                ]
+            },
+            {
+                "type": "Content & Reference Sites",
+                "description": "Editorial and informational sites influencing discovery and brand perception.",
+                "competitors": [
+                    {"domain": "propakistani.pk", "label": "ProPakistani", "common_keywords": 4, "competition_level": 0.30, "channel": "Editorial"},
+                    {"domain": "techjuice.pk", "label": "TechJuice", "common_keywords": 3, "competition_level": 0.25, "channel": "Editorial"},
+                    {"domain": "wikipedia.org", "label": "Wikipedia", "common_keywords": 2, "competition_level": 0.10, "channel": "Reference"},
+                    {"domain": "linkedin.com", "label": "LinkedIn", "common_keywords": 2, "competition_level": 0.08, "channel": "Corporate"},
+                ]
+            }
+        ]
+    }
+
 # ==================== PDF HELPERS ====================
 def _add_page_number(canvas, doc):
     canvas.saveState()
@@ -669,6 +721,8 @@ async def audit(request: Request):
 
     # Inject static SEO Audit for haier.com.pk
     seo_audit = get_static_seo_audit(audit_data["final_url"])
+    if seo_audit:
+        seo_audit["competitor_analysis"] = get_competitor_analysis_for_haier()
 
     return {
         "url": audit_data["final_url"],
@@ -687,7 +741,7 @@ async def audit(request: Request):
             "request_count": audit_data.get("request_count"),
         },
         "roadmap": results["roadmap"],
-        # NEW: detailed SEO audit block, only for haier.com.pk
+        # NEW: detailed SEO audit + competitor analysis
         "seo_audit": seo_audit
     }
 
@@ -760,7 +814,7 @@ async def download_pdf(request: Request):
     roadmap_html = data.get("roadmap") or "<b>Improvement Roadmap:</b><br/><br/>Prioritize critical items first."
     story.append(Paragraph(roadmap_html, styles['Normal']))
 
-    # ==================== SEO AUDIT: haier.com.pk ====================
+    # ==================== SEO AUDIT ====================
     if seo_audit:
         story.append(PageBreak())
         story.append(Paragraph(f"SEO Audit Results for {seo_audit.get('domain')}", styles['TitleBold']))
@@ -768,12 +822,11 @@ async def download_pdf(request: Request):
         story.append(Paragraph(
             f"The SEO score for this website is <b>{seo_audit.get('seo_score')}</b> out of 100. "
             f"We found <b>{seo_audit.get('critical_issues')}</b> critical issues and "
-            f"<b>{seo_audit.get('minor_issues')}</b> minor issues that should be addressed to improve Google "
-            f"rankings and AI visibility.", styles['Normal'])
+            f"<b>{seo_audit.get('minor_issues')}</b> minor issues.", styles['Normal'])
         )
         story.append(Spacer(1, 10))
 
-        # Overview block
+        # Overview
         story.append(Paragraph("Overview", styles['Section']))
         story.append(Paragraph(seo_audit.get("overview_text", ""), styles['Normal']))
         scores = seo_audit.get("section_scores", {})
@@ -783,7 +836,7 @@ async def download_pdf(request: Request):
         _table(story, overview_table, col_widths=[300, 100])
         story.append(PageBreak())
 
-        # Issues & Recommendations
+        # Issues
         story.append(Paragraph("Issues and Recommendations", styles['Section']))
         issues = seo_audit.get("issues", [])
         issues_table = [["Type", "Element", "Priority", "Problem / Recommendation"]]
@@ -792,7 +845,7 @@ async def download_pdf(request: Request):
         _table(story, issues_table, col_widths=[90, 120, 70, 220], header_bg="#ef4444")
         story.append(PageBreak())
 
-        # On-Page SEO
+        # On-Page
         story.append(Paragraph("On-Page SEO", styles['Section']))
         onp = seo_audit.get("on_page", {})
         onpage_table = [["Element", "Value/Status", "Note"]]
@@ -808,7 +861,6 @@ async def download_pdf(request: Request):
                              onp.get("headings", {}).get("note","")])
         imgalt = onp.get("image_alt", {})
         onpage_table.append(["Image Alt", "All present", imgalt.get("note","")])
-        # Content notes
         for c in onp.get("content", []):
             onpage_table.append(["Content", "—", c.get("note","")])
         onpage_table.append(["Keyword Density", onp.get("keyword_density","N/A"), "Analyze highest density words & phrases."])
@@ -833,7 +885,7 @@ async def download_pdf(request: Request):
         _table(story, tp_table, col_widths=[240, 80, 80, 80, 80])
         story.append(PageBreak())
 
-        # Technical SEO
+        # Technical
         story.append(Paragraph("Technical SEO", styles['Section']))
         tech = seo_audit.get("technical", [])
         tech_table = [["Element", "Priority", "Value", "Recommendation"]]
@@ -842,7 +894,7 @@ async def download_pdf(request: Request):
         _table(story, tech_table, col_widths=[140, 90, 120, 210])
         story.append(PageBreak())
 
-        # Page Performance & CWV
+        # Page Performance
         story.append(Paragraph("Page Performance & Core Web Vitals", styles['Section']))
         pp = seo_audit.get("page_performance", [])
         pp_table = [["Element", "Priority", "Note"]]
@@ -851,14 +903,30 @@ async def download_pdf(request: Request):
         _table(story, pp_table, col_widths=[200, 80, 260], header_bg="#f59e0b")
         story.append(PageBreak())
 
-        # Competitors
-        story.append(Paragraph("Competitors", styles['Section']))
+        # Basic Competitors
+        story.append(Paragraph("Competitors (Basic List)", styles['Section']))
         comp = seo_audit.get("competitors", [])
         comp_table = [["Competitor", "Common Keywords", "Competition Level"]]
         for c in comp:
             comp_table.append([c["competitor"], c["common_keywords"], c["competition_level"]])
         _table(story, comp_table, col_widths=[240, 140, 160], header_bg="#64748b")
         story.append(PageBreak())
+
+        # ===== NEW: Competitor Analysis (4 Types) =====
+        ca = seo_audit.get("competitor_analysis", {})
+        types = ca.get("types", [])
+        if types:
+            story.append(Paragraph("Competitor Analysis (4 Types)", styles['TitleBold']))
+            story.append(Spacer(1, 10))
+            for t in types:
+                story.append(Paragraph(t.get("type", "Type"), styles['Section']))
+                story.append(Paragraph(t.get("description", ""), styles['Muted']))
+                ca_table = [["Domain", "Label", "Channel", "Common Keywords", "Competition Level"]]
+                for x in t.get("competitors", []):
+                    ca_table.append([x["domain"], x["label"], x.get("channel",""), x["common_keywords"], x["competition_level"]])
+                _table(story, ca_table, col_widths=[160, 120, 120, 120, 100], header_bg="#0ea5e9")
+                story.append(Spacer(1, 10))
+            story.append(PageBreak())
 
         # Off-Page
         story.append(Paragraph("Off-Page SEO", styles['Section']))
@@ -882,7 +950,7 @@ async def download_pdf(request: Request):
             sm_table.append([s["network"], s["priority"], s["note"]])
         _table(story, sm_table, col_widths=[120, 80, 280], header_bg="#a855f7")
 
-    # Build document
+    # Build doc
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
     buffer.seek(0)
     filename = f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
