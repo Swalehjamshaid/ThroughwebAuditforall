@@ -1,197 +1,267 @@
-# fftech_elite_audit.py
-import asyncio
-import requests
-from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
-from fpdf import FPDF
-import re
-from urllib.parse import urlparse
-
-# ------------------------
-# Helper Functions
-# ------------------------
-def normalize_url(url: str) -> str:
-    if not url.startswith("http"):
-        url = "https://" + url
-    return url
-
-def check_https(url):
-    return urlparse(url).scheme == "https"
-
-def fetch_html(url):
-    try:
-        r = requests.get(url, timeout=15)
-        return r.text, r.status_code, r.headers
-    except:
-        return "", 0, {}
-
-def check_meta_tags(soup, tag_name):
-    tag = soup.find(tag_name)
-    if tag and tag.get("content"):
-        return True, tag.get("content")
-    return False, ""
-
-def check_h_tags(soup, tag="h1"):
-    tags = soup.find_all(tag)
-    return len(tags), [t.get_text(strip=True) for t in tags]
-
-def check_robots_txt(url):
-    try:
-        r = requests.get(url.rstrip('/') + "/robots.txt", timeout=10)
-        return r.status_code == 200
-    except:
-        return False
-
-def check_sitemap(url):
-    try:
-        r = requests.get(url.rstrip('/') + "/sitemap.xml", timeout=10)
-        return r.status_code == 200
-    except:
-        return False
-
-def analyze_images(soup):
-    imgs = soup.find_all("img")
-    alt_missing = sum(1 for i in imgs if not i.get("alt"))
-    return len(imgs), alt_missing
-
-def security_headers(headers):
-    results = {
-        "HSTS": "strict-transport-security" in headers,
-        "CSP": "content-security-policy" in headers,
-        "X-Frame-Options": "x-frame-options" in headers,
-        "X-XSS-Protection": "x-xss-protection" in headers,
-        "X-Content-Type-Options": "x-content-type-options" in headers,
-        "Referrer-Policy": "referrer-policy" in headers,
-    }
-    return results
-
-# ------------------------
-# Core Web Vitals / Performance
-# ------------------------
-async def get_performance_metrics(url, device="desktop"):
-    async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        context = await browser.new_context(
-            viewport={"width": 1920, "height": 1080} if device=="desktop" else {"width": 375, "height": 812}
-        )
-        page = await context.new_page()
-        try:
-            await page.goto(url, wait_until="networkidle")
-            perf = await page.evaluate("""() => JSON.stringify(window.performance.timing)""")
-            metrics = eval(perf)
-            # Simplified calculations for example
-            fcp = metrics['responseStart'] - metrics['navigationStart']
-            ttfb = metrics['responseStart'] - metrics['requestStart']
-            dom_load = metrics['domContentLoadedEventEnd'] - metrics['navigationStart']
-            return {
-                "FCP": min(int(fcp/10),100),
-                "TTFB": min(int(ttfb/10),100),
-                "DOM Load": min(int(dom_load/10),100)
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH ELITE – Real Audit Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#020617',
+                        accent: '#34d399',
+                        secondary: '#60a5fa',
+                        excellent: '#10b981',
+                        good: '#f59e0b',
+                        poor: '#ef4444'
+                    }
+                }
             }
-        except:
-            return {"FCP":0, "TTFB":0, "DOM Load":0}
-        finally:
-            await browser.close()
+        }
+    </script>
+    <style>
+        .gauge { transition: stroke-dashoffset 1.5s ease-in-out; }
+        .status-excellent { @apply bg-excellent text-white; }
+        .status-good { @apply bg-good text-black; }
+        .status-poor { @apply bg-poor text-white; }
+    </style>
+</head>
+<body class="bg-primary text-white min-h-screen font-sans">
 
-# ------------------------
-# Full Audit Function
-# ------------------------
-async def full_audit(url, device="desktop"):
-    url = normalize_url(url)
-    html, status_code, headers = fetch_html(url)
-    soup = BeautifulSoup(html, "html.parser")
+<header class="bg-gradient-to-r from-slate-900 via-purple-900 to-primary py-12 shadow-2xl">
+    <div class="max-w-7xl mx-auto text-center px-6">
+        <h1 class="text-6xl font-extrabold bg-gradient-to-r from-secondary via-accent to-pink-500 bg-clip-text text-transparent">
+            FF TECH ELITE – REAL AUDIT ENGINE
+        </h1>
+        <p class="mt-6 text-2xl opacity-90 text-slate-300">Enterprise-Grade Chromium-Powered Website Health Auditor</p>
+        <p class="mt-2 text-lg opacity-70 text-slate-400">100+ Metrics • Core Web Vitals • SEO • UX • Security • PDF Reports</p>
+    </div>
+</header>
 
-    metrics = []
+<main class="max-w-7xl mx-auto px-6 py-12">
+    <!-- Audit Form -->
+    <div class="bg-slate-900/80 backdrop-blur rounded-3xl shadow-2xl p-10 mb-16 border border-slate-800">
+        <form id="auditForm" class="grid lg:grid-cols-3 gap-8 items-end">
+            <div class="lg:col-span-2">
+                <label for="url" class="block text-lg font-semibold mb-3">Enter Website URL</label>
+                <input type="text" id="url" required placeholder="https://example.com or example.com"
+                       class="w-full px-6 py-4 bg-slate-800/70 rounded-xl text-lg focus:ring-4 focus:ring-accent outline-none transition-all border border-slate-700">
+            </div>
+            <div>
+                <label for="mode" class="block text-lg font-semibold mb-3">Device Mode</label>
+                <select id="mode" class="w-full px-6 py-4 bg-slate-800/70 rounded-xl text-lg focus:ring-4 focus:ring-accent outline-none border border-slate-700">
+                    <option value="desktop">Desktop</option>
+                    <option value="mobile">Mobile</option>
+                </select>
+            </div>
+            <div class="lg:col-span-3 text-center">
+                <button type="submit" id="submitBtn" class="px-16 py-5 bg-gradient-to-r from-accent to-secondary text-primary font-bold text-xl rounded-2xl hover:scale-105 transition transform shadow-xl flex items-center justify-center gap-4 mx-auto">
+                    <i class="fas fa-rocket text-2xl"></i>
+                    RUN FULL AUDIT
+                </button>
+            </div>
+        </form>
 
-    # --- SEO Checks ---
-    # Title
-    title_present = bool(soup.title)
-    title_text = soup.title.string if title_present else ""
-    metrics.append({"name":"Title Present","category":"SEO","score":100 if title_present else 0})
-    metrics.append({"name":"Title Length","category":"SEO","score":min(len(title_text), 60)})
+        <div id="loading" class="hidden mt-12 text-center">
+            <i class="fas fa-circle-notch fa-spin text-6xl text-accent mb-6"></i>
+            <p class="text-2xl font-bold">Initializing Chromium Instance...</p>
+            <p class="text-lg opacity-70 mt-4">Checking 100+ data points. This may take 30-60 seconds.</p>
+        </div>
+    </div>
 
-    # Meta Description
-    desc_present, desc_text = check_meta_tags(soup,"meta",)
-    metrics.append({"name":"Meta Description Present","category":"SEO","score":100 if desc_present else 0})
-    metrics.append({"name":"Meta Description Length","category":"SEO","score":min(len(desc_text),160)})
+    <!-- Results -->
+    <div id="results" class="hidden space-y-16">
 
-    # H1 Tags
-    h1_count, h1_texts = check_h_tags(soup,"h1")
-    metrics.append({"name":"H1 Tags Count","category":"SEO","score":100 if h1_count==1 else max(0,100-abs(h1_count-1)*50)})
+        <!-- Overall Score -->
+        <div class="bg-slate-900/90 backdrop-blur rounded-3xl shadow-2xl p-12 text-center border border-slate-700">
+            <h2 class="text-4xl font-bold mb-8">Overall Website Health Score</h2>
+            <div class="relative inline-block mb-10">
+                <svg class="w-80 h-80 transform -rotate-90">
+                    <circle cx="160" cy="160" r="140" stroke="#1e293b" stroke-width="35" fill="none"/>
+                    <circle id="overallGauge" cx="160" cy="160" r="140" stroke="url(#scoreGradient)" stroke-width="35" fill="none"
+                            stroke-dasharray="880" stroke-dashoffset="880" class="gauge" stroke-linecap="round"/>
+                    <defs>
+                        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#60a5fa"/>
+                            <stop offset="50%" stop-color="#34d399"/>
+                            <stop offset="100%" stop-color="#c084fc"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="overallScore" class="text-8xl font-extrabold">0</span>
+                    <span class="text-4xl opacity-80">%</span>
+                </div>
+            </div>
+            <p id="urlDisplay" class="text-2xl font-semibold mb-2 text-accent"></p>
+            <p id="summaryText" class="text-lg max-w-4xl mx-auto opacity-90 leading-relaxed text-slate-300 mt-4"></p>
+            <button id="downloadPdf" class="mt-10 px-10 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white font-bold text-xl rounded-xl hover:scale-110 transition transform shadow-2xl flex items-center gap-4 mx-auto">
+                <i class="fas fa-file-pdf text-2xl"></i>
+                DOWNLOAD PDF REPORT
+            </button>
+        </div>
 
-    # Robots.txt & Sitemap
-    metrics.append({"name":"Robots.txt","category":"SEO","score":100 if check_robots_txt(url) else 0})
-    metrics.append({"name":"Sitemap.xml","category":"SEO","score":100 if check_sitemap(url) else 0})
+        <!-- Pillar Scores -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-blue-500/30">
+                <h3 class="text-xl font-bold text-blue-400 mb-2">Performance</h3>
+                <div id="pillarPerformance" class="text-5xl font-black">0%</div>
+            </div>
+            <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-green-500/30">
+                <h3 class="text-xl font-bold text-green-400 mb-2">SEO</h3>
+                <div id="pillarSEO" class="text-5xl font-black">0%</div>
+            </div>
+            <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-purple-500/30">
+                <h3 class="text-xl font-bold text-purple-400 mb-2">UX</h3>
+                <div id="pillarUX" class="text-5xl font-black">0%</div>
+            </div>
+            <div class="bg-slate-800/50 rounded-2xl p-8 text-center border border-red-500/30">
+                <h3 class="text-xl font-bold text-red-400 mb-2">Security</h3>
+                <div id="pillarSecurity" class="text-5xl font-black">0%</div>
+            </div>
+        </div>
 
-    # Image alt tags
-    total_imgs, missing_alt = analyze_images(soup)
-    score = 100 if total_imgs==0 else max(0, int((total_imgs-missing_alt)/total_imgs*100))
-    metrics.append({"name":"Images with alt text","category":"SEO","score":score})
+        <!-- Detailed Metrics Table -->
+        <div class="bg-slate-900/90 rounded-3xl p-8 border border-slate-700 overflow-hidden">
+            <h2 class="text-3xl font-bold mb-8 flex items-center gap-4">
+                <i class="fas fa-list-check text-accent"></i> 100+ Health Checkpoints
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-slate-800/80">
+                        <tr>
+                            <th class="py-4 px-6 rounded-l-xl">Metric</th>
+                            <th class="py-4 px-6">Category</th>
+                            <th class="py-4 px-6">Score</th>
+                            <th class="py-4 px-6 rounded-r-xl text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="metricsTable" class="divide-y divide-slate-800"></tbody>
+                </table>
+            </div>
+        </div>
 
-    # --- Security Checks ---
-    sec_headers = security_headers(headers)
-    for h, v in sec_headers.items():
-        metrics.append({"name":h,"category":"Security","score":100 if v else 0})
+    </div>
+</main>
 
-    metrics.append({"name":"HTTPS Enabled","category":"Security","score":100 if check_https(url) else 0})
+<script>
+const form = document.getElementById('auditForm');
+const loading = document.getElementById('loading');
+const results = document.getElementById('results');
 
-    # --- UX Checks (simplified) ---
-    # Mobile friendly: check viewport
-    viewport = soup.find("meta", attrs={"name":"viewport"})
-    metrics.append({"name":"Viewport Meta","category":"UX","score":100 if viewport else 0})
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = document.getElementById('url').value.trim();
+    const mode = document.getElementById('mode').value;
 
-    # --- Core Web Vitals / Performance ---
-    perf_metrics = await get_performance_metrics(url, device)
-    for k,v in perf_metrics.items():
-        metrics.append({"name":k,"category":"Performance","score":v})
+    if (!url) return alert('Please enter a URL');
 
-    # --- Aggregate Scores ---
-    pillars = {
-        "Performance": int(sum(m["score"] for m in metrics if m["category"]=="Performance")/max(1,len([m for m in metrics if m["category"]=="Performance"]))),
-        "SEO": int(sum(m["score"] for m in metrics if m["category"]=="SEO")/max(1,len([m for m in metrics if m["category"]=="SEO"]))),
-        "UX": int(sum(m["score"] for m in metrics if m["category"]=="UX")/max(1,len([m for m in metrics if m["category"]=="UX"]))),
-        "Security": int(sum(m["score"] for m in metrics if m["category"]=="Security")/max(1,len([m for m in metrics if m["category"]=="Security"]))),
+    loading.classList.remove('hidden');
+    results.classList.add('hidden');
+    document.getElementById('submitBtn').disabled = true;
+
+    try {
+        const response = await fetch('/audit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, mode })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(err || 'Audit failed');
+        }
+
+        const data = await response.json();
+        renderResults(data);
+        window.lastAuditData = data;
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        loading.classList.add('hidden');
+        document.getElementById('submitBtn').disabled = false;
     }
+});
 
-    total_grade = int(sum(pillars.values())/4)
+function renderResults(data) {
+    results.classList.remove('hidden');
 
-    summary = "Website audit completed successfully."
+    // Overall Score & Gauge
+    document.getElementById('overallScore').textContent = data.total_grade;
+    document.getElementById('urlDisplay').textContent = data.url;
+    document.getElementById('summaryText').textContent = data.summary || '';
 
-    return {
-        "url": url,
-        "total_grade": total_grade,
-        "summary": summary,
-        "pillars": pillars,
-        "metrics": metrics
+    const circumference = 880;
+    const offset = circumference - (data.total_grade / 100) * circumference;
+    document.getElementById('overallGauge').style.strokeDashoffset = offset;
+
+    // Pillar Scores
+    document.getElementById('pillarPerformance').textContent = data.pillars.Performance + '%';
+    document.getElementById('pillarSEO').textContent = data.pillars.SEO + '%';
+    document.getElementById('pillarUX').textContent = data.pillars.UX + '%';
+    document.getElementById('pillarSecurity').textContent = data.pillars.Security + '%';
+
+    // Metrics Table
+    const tbody = document.getElementById('metricsTable');
+    tbody.innerHTML = '';
+
+    data.metrics.forEach(m => {
+        const statusClass = m.score === 100 ? 'status-excellent' : m.score >= 60 ? 'status-good' : 'status-poor';
+        const statusText = m.score === 100 ? 'EXCELLENT' : m.score >= 60 ? 'GOOD' : 'IMPROVE';
+
+        const tr = document.createElement('tr');
+        tr.classList.add('hover:bg-slate-800/50', 'transition');
+        tr.innerHTML = `
+            <td class="py-4 px-6 font-medium">${m.name}</td>
+            <td class="py-4 px-6 text-slate-400">${m.category}</td>
+            <td class="py-4 px-6 font-bold text-xl">${m.score}%</td>
+            <td class="py-4 px-6 text-center">
+                <span class="inline-block px-5 py-2 rounded-full font-bold ${statusClass}">${statusText}</span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Smooth scroll to results
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// PDF Download
+document.getElementById('downloadPdf').addEventListener('click', async () => {
+    if (!window.lastAuditData) return alert('Run an audit first!');
+
+    const btn = document.getElementById('downloadPdf');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> GENERATING PDF...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(window.lastAuditData)
+        });
+
+        if (!response.ok) throw new Error('PDF generation failed');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FFTechElite_Audit_${window.lastAuditData.url.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('PDF Error: ' + err.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
+});
+</script>
 
-# ------------------------
-# PDF Generation
-# ------------------------
-def generate_pdf(audit_data, filename="audit_report.pdf"):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, f"Website Audit Report: {audit_data['url']}", ln=True)
-    pdf.ln(5)
-    pdf.set_font("Arial","",12)
-    pdf.cell(0,10,f"Total Score: {audit_data['total_grade']}%", ln=True)
-    pdf.ln(10)
-
-    for pillar, score in audit_data['pillars'].items():
-        pdf.cell(0,10,f"{pillar}: {score}%", ln=True)
-    pdf.ln(10)
-
-    for m in audit_data['metrics']:
-        pdf.cell(0,8,f"{m['category']} - {m['name']}: {m['score']}%", ln=True)
-
-    pdf.output(filename)
-
-# ------------------------
-# Run Example
-# ------------------------
-if __name__ == "__main__":
-    url_to_test = "https://example.com"
-    data = asyncio.run(full_audit(url_to_test))
-    print(data)
-    generate_pdf(data, "audit_example.pdf")
+</body>
+</html>
