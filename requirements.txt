@@ -1,6 +1,6 @@
-jinja2
-playwright>=1.57.0
 fastapi
-uvicorn[standard]
+uvicorn
+jinja2
+playwright
 beautifulsoup4
 fpdf2
