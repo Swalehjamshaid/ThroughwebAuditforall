@@ -7,5 +7,4 @@ httpx
 reportlab
 sqlalchemy
 playwright
-pydantic
-pydantic-settings
+jinja2
