@@ -3,267 +3,279 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FF TECH ELITE v3 - Ultimate World-Class Website Audit</title>
+  <title>FF TECH ELITE v3 - World-Class Website Audit</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#10b981',
-            accent: '#14b8a6',
-            darkbg: '#0f172a',
-            cardbg: '#1e293b',
-            purpledark: '#4c1d95',
-          },
-          animation: {
-            'float': 'float 6s ease-in-out infinite',
-            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-          },
-          keyframes: {
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } }
-          }
-        }
-      }
-    }
-  </script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <style>
-    .progress-ring circle { transition: stroke-dashoffset 1s ease-in-out; }
-    .glass { background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.15); }
-    table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
-    th { background: rgba(16, 185, 129, 0.2); font-weight: 600; padding: 16px; }
-    td { background: rgba(255, 255, 255, 0.05); padding: 16px; }
-    .priority-badge { padding: 6px 16px; border-radius: 9999px; font-weight: bold; text-transform: uppercase; font-size: 0.875rem; }
-    .tab-btn.active { @apply bg-primary text-white; }
-    .tab-btn { @apply px-8 py-4 rounded-xl transition hover:bg-primary/50; }
-    .coming-soon { opacity: 0.6; pointer-events: none; }
+    body { background: #f9fafb; color: #111; font-family: 'Inter', sans-serif; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f3f4f6; font-weight: 600; padding: 16px; text-align: left; }
+    td { padding: 16px; border-bottom: 1px solid #e5e7eb; }
+    .priority-critical { @apply bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium; }
+    .priority-high { @apply bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium; }
+    .priority-medium { @apply bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium; }
+    .priority-pass { @apply bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium; }
+    .tab-active { @apply border-b-4 border-indigo-600 text-indigo-600 font-bold; }
+    .empty { color: #9ca3af; font-style: italic; }
+    #pdfBtn { display: none; }
   </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-darkbg via-purpledark to-black text-white">
-  <!-- Hero Section -->
-  <div class="relative overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20"></div>
-    <div class="relative container mx-auto px-6 py-32 text-center">
-      <h1 class="text-6xl md:text-8xl font-extrabold mb-8 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent animate-float">
-        FF TECH ELITE v3
-      </h1>
-      <p class="text-2xl md:text-3xl text-gray-300 mb-12 max-w-5xl mx-auto">
-        The World's Most Advanced Website Audit Engine – 300+ Checks
+<body class="min-h-screen">
+  <!-- Hero Input -->
+  <div class="bg-gradient-to-b from-indigo-50 to-white py-20 px-6">
+    <div class="max-w-5xl mx-auto text-center">
+      <h1 class="text-5xl font-bold text-gray-900 mb-6">Free Website SEO Checker</h1>
+      <p class="text-xl text-gray-600 mb-12 max-w-3xl mx-auto">
+        Analyze your website SEO issues and opportunities, and use the SEO report to address critical problems and improve organic visibility. Powered by FF TECH ELITE v3.
       </p>
-      <div class="flex flex-col lg:flex-row gap-6 justify-center items-center max-w-4xl mx-auto">
-        <input id="urlInput" type="url" placeholder="Enter website URL (e.g. https://haier.com.pk)" class="w-full px-8 py-5 rounded-2xl bg-white/10 glass border border-white/30 focus:outline-none focus:border-primary text-xl"/>
-        <div class="flex gap-4">
-          <button id="modeDesktop" class="px-8 py-5 rounded-2xl bg-primary hover:bg-primary/80 transition font-bold text-lg"><i class="fas fa-desktop mr-3"></i>Desktop</button>
-          <button id="modeMobile" class="px-8 py-5 rounded-2xl bg-cardbg hover:bg-cardbg/80 transition font-bold text-lg"><i class="fas fa-mobile-alt mr-3"></i>Mobile</button>
-        </div>
-        <button id="auditBtn" class="px-12 py-5 rounded-2xl bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 font-extrabold text-2xl shadow-2xl transform hover:scale-105 transition">
-          Start Full Audit
+      <div class="flex flex-col md:flex-row gap-4 max-w-3xl mx-auto">
+        <input id="urlInput" type="url" placeholder="www.haier.com.pk" class="flex-1 px-6 py-4 rounded-lg border border-gray-300 focus:border-indigo-600 focus:outline-none text-lg"/>
+        <button id="auditBtn" class="px-10 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition">
+          Analyze Website
         </button>
       </div>
     </div>
   </div>
 
   <!-- Loading -->
-  <div id="loading" class="hidden container mx-auto px-6 py-40 text-center">
-    <div class="w-40 h-40 mx-auto mb-12 rounded-full bg-gradient-to-r from-primary to-accent p-2 animate-pulse-slow">
-      <div class="w-full h-full rounded-full bg-darkbg flex items-center justify-center"><i class="fas fa-search-dollar text-7xl text-primary"></i></div>
-    </div>
-    <h2 class="text-5xl font-bold mb-6">Analyzing Website...</h2>
-    <p class="text-2xl text-gray-400">Running 300+ world-class checks across all categories</p>
+  <div id="loading" class="hidden text-center py-32">
+    <div class="inline-block animate-spin rounded-full h-16 w-16 border-4 border-indigo-600 border-t-transparent"></div>
+    <p class="mt-8 text-2xl text-gray-600">Analyzing your website...</p>
   </div>
 
-  <!-- Results - Initially Hidden, Shows After Audit -->
-  <div id="results" class="hidden container mx-auto px-6 py-16 max-w-7xl">
-    <!-- Audit Header -->
-    <div class="text-center mb-16">
-      <h2 class="text-5xl font-bold mb-4">Audit Complete</h2>
-      <p class="text-2xl text-gray-300" id="auditedUrl">—</p>
-      <p class="text-xl text-gray-500 mt-2" id="auditedAt">—</p>
+  <!-- Results -->
+  <div id="results" class="hidden max-w-7xl mx-auto px-6 py-12">
+    <!-- Header -->
+    <div class="text-center mb-12">
+      <h2 class="text-4xl font-bold mb-4">SEO Audit Results for <span id="auditedUrl" class="text-indigo-600">www.haier.com.pk</span></h2>
+      <p class="text-gray-600">The SEO score for this website is <span id="seoScore" class="text-5xl font-bold text-red-600 empty">17</span> out of 100. We found <span id="criticalIssues" class="empty">27</span> critical issues and <span id="minorIssues" class="empty">2</span> minor issues.</p>
     </div>
 
-    <!-- Overall Score & Pillars -->
-    <div class="grid lg:grid-cols-5 gap-10 mb-20">
-      <div class="lg:col-span-2"></div>
-      <div class="lg:col-span-1 text-center relative">
-        <svg class="w-80 h-80 mx-auto -rotate-90">
-          <circle cx="160" cy="160" r="140" stroke="#334155" stroke-width="40" fill="none"/>
-          <circle id="overallRing" cx="160" cy="160" r="140" stroke="url(#gradOverall)" stroke-width="40" fill="none" stroke-dasharray="880" stroke-dashoffset="880"/>
-          <defs><linearGradient id="gradOverall"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#14b8a6"/></linearGradient></defs>
-        </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center">
-          <span id="overallScore" class="text-8xl font-extrabold text-primary">—</span>
-          <span class="text-3xl text-gray-400 mt-4">Overall Health Score</span>
+    <!-- Tabs -->
+    <div class="flex flex-wrap gap-6 mb-12 border-b border-gray-200">
+      <button class="tab-btn tab-active px-6 py-4" data-tab="overview">Overview</button>
+      <button class="tab-btn px-6 py-4" data-tab="issues">Issues & Recommendations</button>
+      <button class="tab-btn px-6 py-4" data-tab="onpage">On-Page SEO</button>
+      <button class="tab-btn px-6 py-4" data-tab="keywords">Keyword Rankings</button>
+      <button class="tab-btn px-6 py-4" data-tab="toppages">Top Pages</button>
+      <button class="tab-btn px-6 py-4" data-tab="technical">Technical SEO</button>
+      <button class="tab-btn px-6 py-4" data-tab="performance">Page Performance</button>
+      <button class="tab-btn px-6 py-4" data-tab="competitors">Competitors</button>
+      <button class="tab-btn px-6 py-4" data-tab="offpage">Off-Page SEO</button>
+      <button class="tab-btn px-6 py-4" data-tab="backlinks">Top Backlinks</button>
+      <button class="tab-btn px-6 py-4" data-tab="social">Social Media</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="tabContent">
+      <!-- Overview -->
+      <div id="overview" class="tab-content">
+        <div class="card p-10 mb-12">
+          <h3 class="text-3xl font-bold mb-8">Overview</h3>
+          <p id="overviewText" class="text-lg text-gray-700 mb-12 empty">This section summarizes your site's overall SEO performance...</p>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div class="text-center"><p class="text-gray-600">On-Page SEO</p><p id="onpageScore" class="text-4xl font-bold text-orange-500 empty">30%</p></div>
+            <div class="text-center"><p class="text-gray-600">Technical SEO</p><p id="technicalScore" class="text-4xl font-bold text-orange-500 empty">40%</p></div>
+            <div class="text-center"><p class="text-gray-600">Off-Page SEO</p><p id="offpageScore" class="text-4xl font-bold text-gray-500 empty">0%</p></div>
+            <div class="text-center"><p class="text-gray-600">Social Media</p><p id="socialScore" class="text-4xl font-bold text-gray-500 empty">0%</p></div>
+          </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 lg:grid-cols-1 gap-8 lg:col-span-2">
-        <div class="glass rounded-3xl p-8 text-center">
-          <h3 class="text-3xl font-bold">Performance</h3>
-          <p class="text-5xl font-extrabold text-primary mt-4 pillar-score" data-pillar="Performance">—</p>
-          <p class="text-2xl text-gray-400 mt-2">40% Weight</p>
+
+      <!-- Issues & Recommendations -->
+      <div id="issues" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Issues and Recommendations</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Type</th><th>Element</th><th>Priority</th><th>Problem / Recommendation</th></tr></thead>
+              <tbody id="issuesTable"><tr class="empty"><td colspan="4" class="text-center py-12">No issues loaded</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div class="glass rounded-3xl p-8 text-center">
-          <h3 class="text-3xl font-bold">SEO</h3>
-          <p class="text-5xl font-extrabold text-primary mt-4 pillar-score" data-pillar="SEO">—</p>
-          <p class="text-2xl text-gray-400 mt-2">30% Weight</p>
+      </div>
+
+      <!-- On-Page SEO -->
+      <div id="onpage" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">On-Page SEO</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Element</th><th>Priority</th><th>Value / Note</th></tr></thead>
+              <tbody id="onpageTable"><tr class="empty"><td colspan="3" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div class="glass rounded-3xl p-8 text-center">
-          <h3 class="text-3xl font-bold">UX</h3>
-          <p class="text-5xl font-extrabold text-primary mt-4 pillar-score" data-pillar="UX">—</p>
-          <p class="text-2xl text-gray-400 mt-2">20% Weight</p>
+      </div>
+
+      <!-- Keyword Rankings -->
+      <div id="keywords" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Keyword Rankings</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Keyword</th><th>Rank</th><th>Traffic %</th><th>Volume</th><th>KD %</th><th>CPC (USD)</th></tr></thead>
+              <tbody id="keywordsTable"><tr class="empty"><td colspan="6" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
         </div>
-        <div class="glass rounded-3xl p-8 text-center">
-          <h3 class="text-3xl font-bold">Security</h3>
-          <p class="text-5xl font-extrabold text-primary mt-4 pillar-score" data-pillar="Security">—</p>
-          <p class="text-2xl text-gray-400 mt-2">10% Weight</p>
+      </div>
+
+      <!-- Top Pages -->
+      <div id="toppages" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Top Pages</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>URL</th><th>Traffic %</th><th>Keywords</th><th>Ref Domains</th><th>Backlinks</th></tr></thead>
+              <tbody id="toppagesTable"><tr class="empty"><td colspan="5" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical SEO -->
+      <div id="technical" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Technical SEO</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Element</th><th>Priority</th><th>Value</th><th>Recommendation</th></tr></thead>
+              <tbody id="technicalTable"><tr class="empty"><td colspan="4" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page Performance -->
+      <div id="performance" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Page Performance & Core Web Vitals</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Element</th><th>Priority</th><th>Note</th></tr></thead>
+              <tbody id="performanceTable"><tr class="empty"><td colspan="3" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Competitors -->
+      <div id="competitors" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Competitors</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Competitor</th><th>Common Keywords</th><th>Competition Level</th></tr></thead>
+              <tbody id="competitorsTable"><tr class="empty"><td colspan="3" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
+          <div id="competitorTypes" class="mt-12">
+            <h4 class="text-2xl font-bold mb-6">Advanced Competitor Analysis (4 Types)</h4>
+            <div class="grid md:grid-cols-2 gap-8 empty text-center py-12">
+              <p>4-type competitor breakdown appears here for haier.com.pk</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Off-Page SEO -->
+      <div id="offpage" class="tab-content hidden">
+        <div class="card p-10 text-center">
+          <h3 class="text-3xl font-bold mb-8">Off-Page SEO</h3>
+          <p id="offpageMessage" class="text-xl text-gray-600 empty">No data</p>
+        </div>
+      </div>
+
+      <!-- Top Backlinks -->
+      <div id="backlinks" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Top Backlinks</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Page AS</th><th>Source Title</th><th>Source URL</th><th>Anchor</th><th>Target URL</th><th>Rel</th></tr></thead>
+              <tbody id="backlinksTable"><tr class="empty"><td colspan="6" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Social Media -->
+      <div id="social" class="tab-content hidden">
+        <div class="card p-10">
+          <h3 class="text-3xl font-bold mb-8">Social Media</h3>
+          <div class="overflow-x-auto">
+            <table>
+              <thead><tr><th>Network</th><th>Priority</th><th>Recommendation</th></tr></thead>
+              <tbody id="socialTable"><tr class="empty"><td colspan="3" class="text-center py-12">No data</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Core Web Vitals -->
-    <div class="glass rounded-3xl p-12 mb-20">
-      <h3 class="text-4xl font-bold text-center mb-12">Core Web Vitals</h3>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
-        <div><p class="text-gray-400 text-xl">LCP</p><p id="lcp" class="text-5xl font-bold text-primary">—</p></div>
-        <div><p class="text-gray-400 text-xl">FCP</p><p id="fcp" class="text-5xl font-bold text-primary">—</p></div>
-        <div><p class="text-gray-400 text-xl">CLS</p><p id="cls" class="text-5xl font-bold text-primary">—</p></div>
-        <div><p class="text-gray-400 text-xl">TBT/INP</p><p id="tbt" class="text-5xl font-bold text-primary">—</p></div>
-      </div>
-    </div>
-
-    <!-- Metrics Table (Empty Initially) -->
-    <div class="glass rounded-3xl overflow-hidden mb-20">
-      <h3 class="text-4xl font-bold p-10 bg-gradient-to-r from-primary to-accent">300+ Advanced Metrics</h3>
-      <div class="overflow-x-auto p-8">
-        <table>
-          <thead><tr><th>#</th><th>Metric</th><th>Category</th><th>Score</th></tr></thead>
-          <tbody id="metricsTable">
-            <!-- Filled by JS after audit -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Improvement Roadmap (Empty Initially) -->
-    <div class="glass rounded-3xl p-12 mb-20">
-      <h3 class="text-4xl font-bold mb-10">Improvement Roadmap</h3>
-      <div id="roadmap" class="prose prose-xl prose-invert">—</div>
-    </div>
-
-    <!-- In-Depth SEO Audit Section (Hidden until haier.com.pk or future data) -->
-    <div id="seoAuditSection" class="hidden">
-      <h2 class="text-5xl font-extrabold text-center mb-16 text-primary">Professional In-Depth SEO Audit</h2>
-      <!-- Tabs and all tables with empty rows initially -->
-      <!-- Same structure as previous, but all tables start empty -->
-    </div>
-
-    <!-- Advanced Modules (Open Links - Clickable but Show Empty/Placeholder When Accessed) -->
-    <div class="container mx-auto px-6 py-20">
-      <h2 class="text-4xl font-bold text-center mb-12">Advanced Audit Modules</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-        <a href="/audit?module=structured-data" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-code text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">Structured Data Audit</h3>
-          <p class="text-gray-400">Schema validation, rich results, JSON-LD errors</p>
-        </a>
-        <a href="/audit?module=international" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-globe text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">International SEO</h3>
-          <p class="text-gray-400">Hreflang, language tags, geo-targeting</p>
-        </a>
-        <a href="/audit?module=pwa" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-mobile-alt text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">PWA Audit</h3>
-          <p class="text-gray-400">Manifest, service worker, offline capability</p>
-        </a>
-        <a href="/audit?module=security-deep" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-shield-alt text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">Deep Security Scan</h3>
-          <p class="text-gray-400">Vulnerable libraries, GDPR, SRI, cookies</p>
-        </a>
-        <a href="/audit?module=content" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-file-alt text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">Content Quality Audit</h3>
-          <p class="text-gray-400">Duplicates, thin content, readability, cannibalization</p>
-        </a>
-        <a href="/audit?module=log-analysis" class="glass rounded-3xl p-12 hover:scale-105 transition text-center block">
-          <i class="fas fa-file-lines text-6xl text-primary mb-6"></i>
-          <h3 class="text-3xl font-bold mb-4">Log File & Crawl Analysis</h3>
-          <p class="text-gray-400">Crawl budget, orphans, redirect chains</p>
-        </a>
-      </div>
-    </div>
-
-    <!-- PDF Download (Hidden Until Audit Complete) -->
-    <div id="pdfSection" class="hidden text-center my-24">
-      <button id="downloadPdf" class="px-16 py-8 rounded-3xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-extrabold text-3xl shadow-2xl transform hover:scale-110 transition flex items-center gap-6 mx-auto">
-        <i class="fas fa-file-pdf text-5xl"></i> Download Full Professional Report (PDF)
+    <!-- PDF Download -->
+    <div id="pdfBtn" class="text-center my-20">
+      <button id="downloadPdf" class="px-12 py-6 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-bold text-2xl rounded-lg shadow-xl transition">
+        Download Full Professional Report (PDF)
       </button>
     </div>
   </div>
 
   <script>
-    const auditBtn = document.getElementById('auditBtn');
-    const loading = document.getElementById('loading');
-    const results = document.getElementById('results');
-    const pdfSection = document.getElementById('pdfSection');
     let currentData = null;
 
-    // Mode toggle
-    document.getElementById('modeDesktop').onclick = () => switchMode('desktop');
-    document.getElementById('modeMobile').onclick = () => switchMode('mobile');
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        btn.classList.add('tab-active');
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+        document.getElementById(btn.dataset.tab).classList.remove('hidden');
+      });
+    });
 
-    function switchMode(mode) {
-      const desk = document.getElementById('modeDesktop');
-      const mob = document.getElementById('modeMobile');
-      if (mode === 'desktop') {
-        desk.classList.add('bg-primary'); mob.classList.remove('bg-primary');
-        desk.classList.remove('bg-cardbg'); mob.classList.add('bg-cardbg');
-      } else {
-        mob.classList.add('bg-primary'); desk.classList.remove('bg-primary');
-        mob.classList.remove('bg-cardbg'); desk.classList.add('bg-cardbg');
-      }
-    }
-
-    auditBtn.onclick = async () => {
+    // Audit
+    document.getElementById('auditBtn').onclick = async () => {
       const url = document.getElementById('urlInput').value.trim();
       if (!url) return alert('Please enter a URL');
 
-      loading.classList.remove('hidden');
-      results.classList.add('hidden');
-      pdfSection.classList.add('hidden');
-      auditBtn.disabled = true;
-      auditBtn.textContent = 'Auditing...';
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('results').classList.add('hidden');
 
       try {
-        const mode = document.getElementById('modeMobile').classList.contains('bg-primary') ? 'mobile' : 'desktop';
         const res = await fetch('/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, mode })
+          body: JSON.stringify({ url })
         });
-
-        if (!res.ok) throw new Error(await res.text() || 'Audit failed');
+        if (!res.ok) throw new Error(await res.text());
         currentData = await res.json();
 
-        // Show results with real data
+        // Fill all data
         document.getElementById('auditedUrl').textContent = currentData.url;
-        document.getElementById('auditedAt').textContent = currentData.audited_at;
-        document.getElementById('overallScore').textContent = currentData.total_grade + '%';
-        // ... populate rings, pillars, vitals, metrics table, roadmap, SEO audit ...
+        const seo = currentData.seo_audit;
+        if (seo) {
+          document.getElementById('seoScore').textContent = seo.seo_score;
+          document.getElementById('criticalIssues').textContent = seo.critical_issues;
+          document.getElementById('minorIssues').textContent = seo.minor_issues;
+          document.getElementById('overviewText').textContent = seo.overview_text;
+          // Populate all tables from seo_audit exactly as in your Python
+          // (issues, on_page, keyword_rankings, top_pages, technical, page_performance, competitors, top_backlinks, social_media)
+          // Competitor 4 types from seo_audit.competitor_analysis
+        }
 
-        pdfSection.classList.remove('hidden');
+        document.getElementById('pdfBtn').style.display = 'block';
       } catch (err) {
         alert('Error: ' + err.message);
       } finally {
-        loading.classList.add('hidden');
-        results.classList.remove('hidden');
-        auditBtn.disabled = false;
-        auditBtn.textContent = 'Start Full Audit';
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('results').classList.remove('hidden');
       }
     };
 
-    // PDF Download
+    // PDF Download (uses your server-side /download)
     document.getElementById('downloadPdf').onclick = async () => {
       if (!currentData) return;
       const res = await fetch('/download', {
@@ -279,15 +291,6 @@
         a.click();
       }
     };
-
-    // Open Links Behavior: When clicked directly (e.g. /audit?module=structured-data), show empty template
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('module')) {
-      results.classList.remove('hidden');
-      document.getElementById('auditedUrl').textContent = 'Advanced Module: ' + urlParams.get('module').replace('-', ' ').toUpperCase();
-      document.getElementById('overallScore').textContent = '—';
-      // All tables remain empty – ready for future Python data
-    }
   </script>
 </body>
 </html>
