@@ -35,7 +35,7 @@
         <div class="card rounded-3xl p-12 glow">
           <div class="grid md:grid-cols-3 gap-8 items-end">
             <div class="md:col-span-2">
-              <input id="urlInput" type="url" placeholder="https://example.com"
+              <input id="urlInput" type="url" placeholder="https://example.com or haier.pk"
                      class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/60 text-xl focus:outline-none focus:border-white"/>
             </div>
             <div>
@@ -95,7 +95,6 @@
 
   <!-- Results -->
   <div id="results" class="hidden max-w-7xl mx-auto px-6 py-20 space-y-20">
-    <!-- Header -->
     <div class="text-center">
       <h2 class="text-6xl font-black mb-6">Audit Complete</h2>
       <p class="text-3xl text-slate-400 mb-2">Report generated for</p>
@@ -103,7 +102,6 @@
       <p id="auditedAt" class="text-xl text-slate-500">—</p>
     </div>
 
-    <!-- Overall Score -->
     <div class="max-w-4xl mx-auto">
       <div class="card rounded-3xl p-20 text-center glow">
         <div id="overallScore" class="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
@@ -113,7 +111,6 @@
       </div>
     </div>
 
-    <!-- Pillar Scores -->
     <div class="max-w-6xl mx-auto">
       <div class="card rounded-3xl p-12">
         <h3 class="text-4xl font-bold mb-12 text-center">Pillar Scores</h3>
@@ -121,7 +118,6 @@
       </div>
     </div>
 
-    <!-- Core Web Vitals & Performance -->
     <div class="max-w-6xl mx-auto">
       <div class="card rounded-3xl p-12">
         <h3 class="text-4xl font-bold mb-12 text-center">Core Web Vitals & Performance</h3>
@@ -129,7 +125,6 @@
       </div>
     </div>
 
-    <!-- Improvement Roadmap -->
     <div class="max-w-6xl mx-auto">
       <div class="card rounded-3xl p-12">
         <h3 class="text-4xl font-bold mb-12 text-center">Improvement Roadmap</h3>
@@ -137,7 +132,6 @@
       </div>
     </div>
 
-    <!-- Advanced Diagnostics -->
     <div class="max-w-7xl mx-auto">
       <div class="card rounded-3xl p-12 overflow-x-auto">
         <h3 class="text-4xl font-bold mb-12 text-center">Advanced Diagnostics (300+ Metrics)</h3>
@@ -156,7 +150,6 @@
       </div>
     </div>
 
-    <!-- PDF Download -->
     <div class="text-center py-20">
       <button onclick="downloadPDF()" class="px-20 py-10 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-black text-4xl rounded-3xl shadow-2xl transform hover:scale-110 transition flex items-center gap-8 mx-auto">
         <i class="fas fa-file-pdf text-5xl"></i>
@@ -169,8 +162,14 @@
     let auditData = null;
 
     async function runAudit() {
-      const url = document.getElementById("urlInput").value.trim();
+      let url = document.getElementById("urlInput").value.trim();
       const mode = document.getElementById("modeInput").value;
+
+      // Auto-add https:// if missing
+      if (url && !/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+
       if (!url) return alert("Please enter a valid URL");
 
       document.getElementById("results").classList.add("hidden");
@@ -224,7 +223,7 @@
           </div>`;
       });
 
-      document.getElementById("roadmap").innerHTML = (data.roadmap || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+      document.getElementById("roadmap").innerHTML = (data.roadmap || "No recommendations available.").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
       const tbody = document.getElementById("metricsTable");
       tbody.innerHTML = "";
