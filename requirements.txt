@@ -7,4 +7,5 @@ httpx
 reportlab
 sqlalchemy
 playwright
-jinja2
+jinja
+tldextract
