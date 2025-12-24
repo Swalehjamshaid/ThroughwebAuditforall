@@ -33,7 +33,7 @@ try:
     PLAYWRIGHT_AVAILABLE = True
 except Exception:
     PLAYWRIGHT_AVAILABLE = False
-    logger.warning("Playwright not installed. Will rely on PSI (Lighthouse) only.")
+    logger.warning("Playwright not installed. Will rely on PSI + requests fallback.")
 
 # ==================== APP ====================
 app = FastAPI(title="FF TECH ELITE v3 - Ultimate Audit")
@@ -54,12 +54,12 @@ CRITICAL_METRICS = {
         "Largest Contentful Paint (LCP)", "First Contentful Paint (FCP)", "Time to First Byte (TTFB)",
         "Cumulative Layout Shift (CLS)", "Interaction to Next Paint (INP)", "Speed Index"
     ],
-    "SEO": ["Page Title (Length & Quality)", "Meta Description (Length & Quality)", "H1 Tag Unique & Present", "Canonical Tag Present"],
+    "SEO": ["Page Title (Length &amp; Quality)", "Meta Description (Length &amp; Quality)", "H1 Tag Unique &amp; Present", "Canonical Tag Present"],
     "UX": ["Viewport Meta Tag", "Mobile-Friendly (PSI Viewport)"],
     "Security": ["HTTPS Enforced", "HSTS Header", "Content-Security-Policy Header", "X-Frame-Options Header"]
 }
 
-# Base metrics + we’ll pad to 300+
+# Base metrics + pad to 300+
 METRICS_LIST: List[Tuple[str, str]] = [
     # Performance
     ("Largest Contentful Paint (LCP)", "Performance"),
@@ -76,10 +76,10 @@ METRICS_LIST: List[Tuple[str, str]] = [
     ("Font Display Strategy", "Performance"),
 
     # SEO
-    ("Page Title (Length & Quality)", "SEO"),
-    ("Meta Description (Length & Quality)", "SEO"),
+    ("Page Title (Length &amp; Quality)", "SEO"),
+    ("Meta Description (Length &amp; Quality)", "SEO"),
     ("Canonical Tag Present", "SEO"),
-    ("H1 Tag Unique & Present", "SEO"),
+    ("H1 Tag Unique &amp; Present", "SEO"),
     ("Heading Structure (H2-H6)", "SEO"),
     ("Image Alt Attributes", "SEO"),
     ("Robots Meta Tag", "SEO"),
@@ -118,17 +118,43 @@ while len(METRICS_LIST) < 300:
          CATEGORIES[len(METRICS_LIST) % 4])
     )
 
+# ==================== DOMAIN REWRITE RULES ====================
+# As requested: treat www.haier.pk (and variants) as http://www.haier.com.pk/#/login
+DOMAIN_REWRITE_RULES = {
+    "haier.pk": "http://www.haier.com.pk/#/login",
+    "www.haier.pk": "http://www.haier.com.pk/#/login",
+    "haier.com.pk": "http://www.haier.com.pk/#/login",
+    "www.haier.com.pk": "http://www.haier.com.pk/#/login",
+}
+
+def apply_domain_rewrite(url: str) -> str:
+    try:
+        p = urlparse(url)
+        host = (p.netloc or "").lower()
+        if host in DOMAIN_REWRITE_RULES:
+            return DOMAIN_REWRITE_RULES[host]
+        return url
+    except Exception:
+        return url
+
 # ==================== HELPERS ====================
 def normalize_url(raw_url: str) -> str:
+    """Normalize and preserve fragment; add https:// if missing, then apply domain rewrite."""
     raw_url = (raw_url or "").strip()
     if not raw_url:
         return ""
-    parsed = urlparse(raw_url)
-    if not parsed.scheme:
-        parsed = urlparse("https://" + raw_url)
-    if not parsed.netloc:
+    p = urlparse(raw_url)
+    if not p.scheme:
+        p = urlparse("https://" + raw_url)
+    if not p.netloc:
         return ""
-    return urlunparse(parsed._replace(path=parsed.path or "/"))
+    # Ensure a path at least '/'
+    p = p._replace(path=(p.path or "/"))
+    normalized = urlunparse(p)
+    # Apply requested domain rewrite logic (may change scheme/path/fragment)
+    rewritten = apply_domain_rewrite(normalized)
+    # If rewrite applied, keep it as-is (may be http + hash)
+    return rewritten
 
 def get_metric_weight(name: str, category: str) -> int:
     return 5 if name in CRITICAL_METRICS.get(category, []) else 3 if "Advanced" in name else 1
@@ -175,20 +201,18 @@ def extract_from_psi(psi: dict) -> dict:
         nv = a.get("numericValue")
         return nv if isinstance(nv, (int, float)) else None
 
-    # Metric enrichment
-    dom_size = _nv("dom-size")                 # count of DOM elements
-    speed_index = _nv("speed-index")           # ms
-    inp = _nv("interaction-to-next-paint")     # ms
-    lcp = _nv("largest-contentful-paint")      # ms (fallback)
-    fcp = _nv("first-contentful-paint")        # ms (fallback)
-    cls_nv = _nv("cumulative-layout-shift")    # unitless (fallback)
-    tbt = _nv("total-blocking-time")           # ms (fallback)
+    dom_size = _nv("dom-size")
+    speed_index = _nv("speed-index")
+    inp = _nv("interaction-to-next-paint")
+    lcp = _nv("largest-contentful-paint")
+    fcp = _nv("first-contentful-paint")
+    cls_nv = _nv("cumulative-layout-shift")
+    tbt = _nv("total-blocking-time")
     viewport_pass = (audits.get("viewport", {}).get("score") == 1)
 
     perf_score = cats.get("performance", {}).get("score")
     perf_percent = int(round(float(perf_score) * 100)) if isinstance(perf_score, (int, float)) else None
 
-    # Opportunities for roadmap
     opp_items = []
     for aid, a in audits.items():
         det = a.get("details", {})
@@ -213,6 +237,24 @@ def extract_from_psi(psi: dict) -> dict:
         "psi_viewport_pass": viewport_pass,
         "psi_opportunities": opp_items,
     }
+
+# ==================== REQUESTS FALLBACK (HTML + headers) ====================
+def fetch_html_and_headers(url: str, timeout: int = 30) -> Tuple[str, Dict[str, str], str]:
+    """
+    Fetch HTML and response headers using requests.
+    Returns: (html_text, headers_lowercased, final_url_after_redirects)
+    """
+    try:
+        sess = requests.Session()
+        resp = sess.get(url, timeout=timeout, allow_redirects=True)
+        resp.raise_for_status()
+        html = resp.text or ""
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        final_url = str(resp.url)
+        return html, headers, final_url
+    except Exception as e:
+        logger.warning(f"Requests fallback failed: {e}")
+        return "", {}, url
 
 # ==================== PLAYWRIGHT LAB METRICS ====================
 async def run_playwright_audit(url: str, mobile: bool) -> Dict[str, Any]:
@@ -323,13 +365,16 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     robots_meta = soup.find("meta", attrs={"name": "robots"})
     og_tags_present = bool(soup.find("meta", attrs={"property": "og:title"}) or soup.find("meta", attrs={"property": "og:description"}))
     schema_present = bool(soup.find("script", attrs={"type": "application/ld+json"}))
-    internal_links = [a for a in soup.find_all("a", href=True) if urlparse(a["href"]).netloc in ("", urlparse(final_url).netloc)]
+    try:
+        base_host = urlparse(final_url).netloc
+    except Exception:
+        base_host = ""
+    internal_links = [a for a in soup.find_all("a", href=True) if urlparse(a["href"]).netloc in ("", base_host)]
 
     viewport_meta = soup.find("meta", attrs={"name": "viewport"})
     viewport_content = (viewport_meta.get("content", "") or "").lower() if viewport_meta else ""
     mobile_friendly_heur = "width=device-width" in viewport_content
 
-    # Social presence via hrefs
     def _has(hosts: List[str]) -> bool:
         for a in soup.find_all("a", href=True):
             href = a["href"].lower()
@@ -349,7 +394,7 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     touch_icons_present = bool(soup.find("link", rel=lambda x: x and "apple-touch-icon" in x.lower()))
     no_console_errors = len(console_errors) == 0
 
-    is_https = final_url.startswith("https://")
+    is_https = str(final_url).startswith("https://")
     hsts = "strict-transport-security" in headers
     csp = "content-security-policy" in headers
     xfo = "x-frame-options" in headers
@@ -438,8 +483,7 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
     if name == "Interaction to Next Paint (INP)":
         inp = psi.get("psi_inp_ms")
         if inp is None:
-            # degrade gracefully using TBT bands
-            inp = audit.get("tbt", 0)
+            inp = audit.get("tbt", 0)  # conservative fallback
         return score_band(inp, [(200, 100), (500, 80), (1000, 60), (9999999, 40)])
     if name == "Speed Index":
         si = psi.get("psi_speed_index_ms") or 0
@@ -459,19 +503,19 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
         return 100 if facts.get("font_display_swap") else 60
 
     # SEO
-    if name == "Page Title (Length & Quality)":
+    if name == "Page Title (Length &amp; Quality)":
         tl = facts.get("title_length", 0)
         if 30 <= tl <= 65: return 100
         if 20 <= tl <= 75: return 85
         return 60 if tl > 0 else 30
-    if name == "Meta Description (Length & Quality)":
+    if name == "Meta Description (Length &amp; Quality)":
         md = facts.get("meta_desc_length", 0)
         if 120 <= md <= 160: return 100
         if 80 <= md <= 180: return 85
         return 60 if md > 0 else 30
     if name == "Canonical Tag Present":
         return 100 if facts.get("canonical_present") else 60
-    if name == "H1 Tag Unique & Present":
+    if name == "H1 Tag Unique &amp; Present":
         h1 = facts.get("h1_count", 0)
         return 100 if h1 == 1 else (70 if h1 > 1 else 40)
     if name == "Heading Structure (H2-H6)":
@@ -555,14 +599,13 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup, psi: Dict
 
     total_grade = clamp_score(sum(weighted_pillars[cat] * PILLAR_WEIGHTS[cat] for cat in CATEGORIES))
 
-    # Roadmap: PSI opportunities + computed low-score advice
     roadmap_items = [f"{i+1}. {item['recommendation']}" for i, item in enumerate(low_score_issues[:20])]
     roadmap_html = ""
     if psi.get("psi_opportunities"):
-        psi_roadmap = "<b>PSI Opportunities:</b><br/><br/>" + "<br/>".join([f"- {x}" for x in psi["psi_opportunities"][:20]])
-        roadmap_html += psi_roadmap + "<br/><br/>"
-    roadmap_html += ("<b>Improvement Roadmap:</b><br/><br/>" + "<br/>".join(roadmap_items)) if roadmap_items \
-                    else "<b>Improvement Roadmap:</b><br/><br/>No critical issues found."
+        psi_roadmap = "&lt;b&gt;PSI Opportunities:&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;" + "&lt;br/&gt;".join([f"- {x}" for x in psi["psi_opportunities"][:20]])
+        roadmap_html += psi_roadmap + "&lt;br/&gt;&lt;br/&gt;"
+    roadmap_html += ("&lt;b&gt;Improvement Roadmap:&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;" + "&lt;br/&gt;".join(roadmap_items)) if roadmap_items \
+                    else "&lt;b&gt;Improvement Roadmap:&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;No critical issues found."
     summary = f"Weighted Scores by Pillar: {weighted_pillars}"
 
     return {
@@ -577,7 +620,6 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup, psi: Dict
 def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]:
     facts = evaluate_facts(soup, audit)
 
-    # Issues & Recommendations — page speed & CWV items (Semrush-style)
     issues = []
     def _iss(element, note, priority="red-flag", type_="Page Speed"):
         issues.append({"type": type_, "element": element, "priority": priority, "message": note})
@@ -588,12 +630,12 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
         _iss("DOM Size", "Unable to retrieve DOM Size metric (PSI unavailable).")
 
     if psi.get("psi_tbt_ms") is not None:
-        _iss("Total Blocking Time (TBT)", f"{int(psi['psi_tbt_ms'])} ms. Reduce long tasks & JS execution.", "flag")
+        _iss("Total Blocking Time (TBT)", f"{int(psi['psi_tbt_ms'])} ms. Reduce long tasks &amp; JS execution.", "flag")
     else:
         _iss("Total Blocking Time (TBT)", "Unable to retrieve TBT metric (PSI unavailable).")
 
     if psi.get("psi_speed_index_ms") is not None:
-        _iss("Speed Index", f"{int(psi['psi_speed_index_ms'])} ms. Optimize render & critical path.", "flag")
+        _iss("Speed Index", f"{int(psi['psi_speed_index_ms'])} ms. Optimize render &amp; critical path.", "flag")
     else:
         _iss("Speed Index", "Unable to retrieve Speed Index metric (PSI unavailable).")
 
@@ -603,7 +645,7 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
     _iss("Time to First Byte (TTFB)", f"{int(audit.get('ttfb', 0))} ms.", "flag")
 
     if psi.get("psi_cls") is not None:
-        _iss("Cumulative Layout Shift (CLS)", f"{psi['psi_cls']:.3f}. Reserve space & preload fonts.", "flag")
+        _iss("Cumulative Layout Shift (CLS)", f"{psi['psi_cls']:.3f}. Reserve space &amp; preload fonts.", "flag")
 
     if psi.get("psi_inp_ms") is not None:
         _iss("Interaction to Next Paint (INP)", f"{int(psi['psi_inp_ms'])} ms. Optimize event handlers/JS.", "flag")
@@ -614,7 +656,7 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
         _iss("Largest Contentful Paint (LCP)", f"{int(psi['psi_lcp_ms'])} ms.", "flag")
 
     if psi.get("psi_viewport_pass") is not None:
-        _iss("Mobile Friendliness", "Pass" if psi["psi_viewport_pass"] else "Fail — configure viewport & responsive layout.", "flag", "Mobile")
+        _iss("Mobile Friendliness", "Pass" if psi["psi_viewport_pass"] else "Fail — configure viewport &amp; responsive layout.", "flag", "Mobile")
 
     if psi.get("psi_performance_percent") is not None:
         _iss("Overall Performance", f"Lighthouse Performance: {psi['psi_performance_percent']}%", "flag")
@@ -636,26 +678,24 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
             "H6": facts.get("headings", {}).get("h6", 0),
         }, "note": "Use semantic hierarchy with H2/H3 for sections."},
         "image_alt": {"priority": "info", "note": f"Alt coverage ~{facts.get('image_alt_ratio', 0):.0f}%."},
-        "keyword_density": {"value": "N/A"}  # real density requires content parsing & stopword handling (optional)
+        "keyword_density": {"value": "N/A"}  # still optional
     }
 
-    # Keyword rankings / top pages / backlinks — require external SEO APIs
     keyword_rankings: List[Dict[str, Any]] = []
     top_pages: List[Dict[str, Any]] = []
-    off_page: Dict[str, Any] = {"message": "Connect an SEO API (e.g., Semrush/Ahrefs/GSC) to populate Off‑Page & Rankings."}
+    off_page: Dict[str, Any] = {"message": "Connect an SEO API (e.g., Semrush/Ahrefs/GSC) to populate Off‑Page &amp; Rankings."}
     top_backlinks: List[Dict[str, Any]] = []
 
-    # Technical SEO
     technical = [
         {"element": "Favicon", "priority": "pass" if facts.get("favicon_present") else "red-flag",
          "value": "Present" if facts.get("favicon_present") else "Missing",
-         "note": "Provide a favicon.ico or <link rel='icon'>."},
+         "note": "Provide a favicon.ico or &lt;link rel='icon'&gt;."},
         {"element": "Noindex", "priority": "pass" if "noindex" not in facts.get("robots_meta","") else "red-flag",
          "note": "Ensure important pages are indexable."},
-        {"element": "Sitemap", "priority": "info", "note": "Not checked. Add /sitemap.xml & declare in robots.txt."},
+        {"element": "Sitemap", "priority": "info", "note": "Not checked. Add /sitemap.xml &amp; declare in robots.txt."},
         {"element": "Hreflang", "priority": "info", "note": "Add hreflang for language/region variants."},
         {"element": "Language", "priority": "info", "value": soup.find("html").get("lang") if soup.find("html") else None,
-         "note": "Set <html lang='...'> for accessibility & SEO."},
+         "note": "Set &lt;html lang='...'&gt; for accessibility &amp; SEO."},
         {"element": "Canonical", "priority": "pass" if facts.get("canonical_present") else "red-flag",
          "note": "Add a single canonical pointing to preferred URL."},
         {"element": "Robots.txt", "priority": "info", "value": f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt",
@@ -664,7 +704,6 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
          "note": "Add JSON-LD (Schema.org) for rich results."},
     ]
 
-    # Page Performance section (CWV lines)
     page_performance = []
     def add_perf(label, value, note="", pr="info"):
         page_performance.append({"element": label, "priority": pr, "note": f"{value} {note}".strip()})
@@ -680,10 +719,8 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
     add_perf("DOM Size", f"{int(psi.get('psi_dom_size') or 0)}")
     add_perf("Mobile Friendliness", "Pass" if psi.get('psi_viewport_pass') else "Fail", pr="info")
 
-    # Competitors — placeholder unless connected
     competitors = [{"competitor": "N/A", "common_keywords": 0, "competition_level": 0}]
 
-    # Social media recommendations based on presence
     social_media = []
     for net, present in facts.get("social_presence", {}).items():
         social_media.append({
@@ -694,10 +731,10 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
 
     return {
         "domain": urlparse(final_url).netloc,
-        "seo_score": psi.get("psi_performance_percent") or 0,  # not a true SEO score; placeholder
+        "seo_score": psi.get("psi_performance_percent") or 0,  # placeholder
         "critical_issues": sum(1 for i in issues if i["priority"] == "red-flag"),
         "minor_issues": sum(1 for i in issues if i["priority"] != "red-flag"),
-        "overview_text": "Automated site audit combining Lighthouse (PSI) & DOM heuristics.",
+        "overview_text": "Automated site audit combining Lighthouse (PSI) &amp; DOM heuristics.",
         "section_scores": {
             "On-Page SEO": 0, "Technical SEO": 0, "Off-Page SEO": 0, "Social Media": 0
         },
@@ -726,9 +763,11 @@ def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Opti
 def _para(text, style): return Paragraph(text or "", style)
 
 def _link(text, url, style):
-    if not url: return Paragraph(text or "", style)
-    safe_text = text or url
-    return Paragraph(f'{url}{safe_text}</link>', style)
+    """Fix: proper ReportLab hyperlink tag."""
+    if not url:
+        return Paragraph(text or "", style)
+    safe_text = (text or url)
+    return Paragraph(f'<link href_text}</link>', style)
 
 def _table(story, data, doc, col_widths=None, header_bg="#0f172a", align_right_cols=None, center_cols=None):
     max_width = A4[0] - doc.leftMargin - doc.rightMargin
@@ -745,7 +784,7 @@ def _table(story, data, doc, col_widths=None, header_bg="#0f172a", align_right_c
         ('TOPPADDING', (0,0), (-1,-1), 5),
         ('BOTTOMPADDING', (0,0), (-1,-1), 5),
     ]
-    if align_right_cols:  # int indexes
+    if align_right_cols:
         for c in align_right_cols: ts.append(('ALIGN', (c,1), (c,-1), 'RIGHT'))
     if center_cols:
         for c in center_cols: ts.append(('ALIGN', (c,1), (c,-1), 'CENTER'))
@@ -793,19 +832,21 @@ async def audit(request: Request):
 
     logger.info(f"Auditing URL: {normalized_url} (mode={'mobile' if mode else 'desktop'})")
 
-    # 1) PSI (Lighthouse) enrichment — always attempt
+    # 1) PSI (Lighthouse) enrichment
     psi_raw = call_psi(normalized_url, strategy=("mobile" if mode else "desktop"))
     psi = extract_from_psi(psi_raw)
 
-    # 2) Playwright lab audit — if available, use it; else fallback to PSI-only
+    # 2) Playwright lab audit OR requests fallback
     audit_data: Dict[str, Any]
     html_for_soup: str
     if PLAYWRIGHT_AVAILABLE:
         try:
             audit_data = await run_playwright_audit(normalized_url, mobile=mode)
-            html_for_soup = audit_data["html"]
+            html_for_soup = audit_data.get("html", "")
         except Exception as e:
             logger.warning(f"Playwright audit failed: {e}")
+            # Try requests fallback to at least populate DOM facts
+            html_text, hdrs, final_u = fetch_html_and_headers(normalized_url)
             audit_data = {
                 "ttfb": 0,
                 "fcp": psi.get("psi_fcp_ms") or 0,
@@ -814,17 +855,18 @@ async def audit(request: Request):
                 "tbt": psi.get("psi_tbt_ms") or 0,
                 "page_weight_kb": 0,
                 "request_count": 0,
-                "final_url": normalized_url,
-                "html": "",
-                "headers": {},
+                "final_url": final_u,
+                "html": html_text,
+                "headers": hdrs,
                 "console_errors": [],
                 "requested_urls": [],
                 "resource_names": [],
                 "cookies": [],
             }
-            html_for_soup = ""
+            html_for_soup = html_text
     else:
-        # Fallback purely to PSI metrics (limited HTML/headers unless separately fetched)
+        # Fallback to PSI + requests to fetch HTML
+        html_text, hdrs, final_u = fetch_html_and_headers(normalized_url)
         audit_data = {
             "ttfb": 0,
             "fcp": psi.get("psi_fcp_ms") or 0,
@@ -833,25 +875,25 @@ async def audit(request: Request):
             "tbt": psi.get("psi_tbt_ms") or 0,
             "page_weight_kb": 0,
             "request_count": 0,
-            "final_url": normalized_url,
-            "html": "",
-            "headers": {},
+            "final_url": final_u,
+            "html": html_text,
+            "headers": hdrs,
             "console_errors": [],
             "requested_urls": [],
             "resource_names": [],
             "cookies": [],
         }
-        html_for_soup = ""
+        html_for_soup = html_text
 
     soup = BeautifulSoup(html_for_soup, "html.parser")
 
-    # 3) Compute FF TECH ELITE metrics + scores
+    # 3) Compute metrics + scores
     results = generate_audit_results(audit_data, soup, psi)
 
-    # 4) Build Semrush-style SEO audit sections for any domain
+    # 4) Build SEO audit sections
     seo_audit = build_seo_audit(audit_data["final_url"], soup, audit_data, psi)
 
-    # 5) Response JSON (exactly what your front-end expects)
+    # 5) Response
     return {
         "url": audit_data["final_url"],
         "audited_at": time.strftime("%B %d, %Y at %H:%M UTC"),
@@ -896,7 +938,6 @@ async def download_pdf(request: Request):
     s = _styles()
     story: List[Any] = []
 
-    # Cover page
     logo_path = "logo.png"
     if os.path.exists(logo_path):
         try:
@@ -912,7 +953,6 @@ async def download_pdf(request: Request):
     story.append(_para(f"Overall Health Score: {total_grade}%", s['KPI']))
     story.append(Spacer(1, 8))
 
-    # Pillars summary table
     pillar_table = [["Pillar", "Score"]]
     for cat in CATEGORIES:
         sc = pillars.get(cat, "—")
@@ -920,26 +960,24 @@ async def download_pdf(request: Request):
     _table(story, pillar_table, doc, col_widths=[300, 100], header_bg="#0f172a", align_right_cols=[1])
     story.append(PageBreak())
 
-    # TOC
     story.append(_para("Table of Contents", s['SectionTitle']))
     toc_items = [
         "1. Advanced Diagnostics (metrics)",
         "2. Improvement Roadmap",
         "3. SEO Audit Results",
-        "   3.1 Overview & Section Scores",
-        "   3.2 Issues & Recommendations",
+        "   3.1 Overview &amp; Section Scores",
+        "   3.2 Issues &amp; Recommendations",
         "   3.3 On-Page SEO",
-        "   3.4 Keyword Rankings & Top Pages",
+        "   3.4 Keyword Rankings &amp; Top Pages",
         "   3.5 Technical SEO",
-        "   3.6 Page Performance & Core Web Vitals",
+        "   3.6 Page Performance &amp; Core Web Vitals",
         "   3.7 Competitors",
-        "   3.8 Off-Page SEO & Top Backlinks",
+        "   3.8 Off-Page SEO &amp; Top Backlinks",
         "   3.9 Social Media",
     ]
     story.append(ListFlowable([ListItem(_para(it, s['Normal']), leftIndent=10, value='•') for it in toc_items], bulletType='bullet'))
     story.append(PageBreak())
 
-    # Metrics table
     story.append(_para("Advanced Diagnostics", s['SectionTitle']))
     table_data = [["#", "Metric", "Category", "Score", "Weight"]]
     for m in metrics:
@@ -953,14 +991,13 @@ async def download_pdf(request: Request):
     _table(story, table_data, doc, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981", align_right_cols=[3, 4], center_cols=[0])
     story.append(PageBreak())
 
-    # Roadmap bullets
     story.append(_para("Improvement Roadmap", s['SectionTitle']))
-    roadmap_html = (data.get("roadmap") or "<b>Improvement Roadmap:</b><br/><br/>Prioritize critical items first.")
+    roadmap_html = (data.get("roadmap") or "&lt;b&gt;Improvement Roadmap:&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;Prioritize critical items first.")
     items = []
-    for line in roadmap_html.split("<br/>"):
+    for line in roadmap_html.split("&lt;br/&gt;"):
         txt = line.strip()
-        if not txt or txt.lower().startswith("<b>"): continue
-        txt = txt.replace("</b>", "").replace("<b>", "")
+        if not txt or txt.lower().startswith("&lt;b&gt;"): continue
+        txt = txt.replace("&lt;/b&gt;", "").replace("&lt;b&gt;", "")
         items.append(txt)
     if items:
         story.append(ListFlowable([ListItem(_para(it, s['Normal']), leftIndent=10, value='–') for it in items], bulletType='bullet'))
@@ -968,7 +1005,6 @@ async def download_pdf(request: Request):
         story.append(_para(roadmap_html, s['Normal']))
     story.append(PageBreak())
 
-    # SEO Audit sections
     if seo_audit:
         story.append(_para(f"SEO Audit Results for {seo_audit.get('domain')}", s['ReportTitle']))
         story.append(Spacer(1, 6))
@@ -1057,7 +1093,7 @@ async def download_pdf(request: Request):
         _table(story, tech_table, doc, col_widths=[140, 90, 120, 200], header_bg="#0f172a")
         story.append(PageBreak())
 
-        story.append(_para("Page Performance & Core Web Vitals", s['SectionTitle']))
+        story.append(_para("Page Performance &amp; Core Web Vitals", s['SectionTitle']))
         pp = seo_audit.get("page_performance", [])
         pp_table = [["Element", "Priority", "Note"]]
         for p in pp:
@@ -1105,10 +1141,9 @@ async def download_pdf(request: Request):
                 Paragraph(srow.get("priority",""), s['Normal']),
                 Paragraph(srow.get("note",""), s['Normal'])
             ])
-        _table(story, sm_table, doc, col_widths=[120, 80, 280], header_bg="#a855f7")
+        _table(story, sm_table, doc, col_widths=[120, 80, 280], header_bg="#a855f7"])
         story.append(PageBreak())
 
-    # Build PDF
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
     buffer.seek(0)
     filename = f"FF_ELITE_Audit_Report_{int(time.time())}.pdf"
