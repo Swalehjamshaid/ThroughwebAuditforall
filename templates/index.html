@@ -244,7 +244,9 @@
     const terminal = document.getElementById('terminal');
     const resultsSec = document.getElementById('results');
     const submitBtn = document.getElementById('submitBtn');
-    let currentAuditId = null;
+    
+    // In Enterprise mode, we need a session token
+    let sessionToken = "demo_session_token"; 
 
     function logTerminal(msg) {
         terminal.style.display = 'block';
@@ -261,48 +263,59 @@
       const maxPages = document.getElementById('max_pages').value;
       const respectRobots = document.getElementById('respect_robots').checked;
 
-      // Reset UI
       resultsSec.style.display = 'none';
       terminal.innerHTML = '';
-      logTerminal(`Initializing crawler for ${urlValue}...`);
+      logTerminal(`Initializing Enterprise Audit for ${urlValue}...`);
       submitBtn.disabled = true;
 
       try {
-        // 1. Call Backend /audit/start
-        logTerminal(`Scanning site structure and assets...`);
-        const response = await fetch('/audit/start', {
+        // Step 1: Request Audit Start
+        // We add ?token= parameter to match the backend requirement
+        logTerminal(`Authorizing request...`);
+        const response = await fetch(`/audit/start?token=${sessionToken}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: urlValue,
+            deep: true,
             max_pages: parseInt(maxPages),
             respect_robots: respectRobots,
-            concurrency: 24
+            concurrency: 24,
+            user_agent: 'FFTechAuditBot/2.0',
+            psi_strategy: 'mobile',
+            link_check_sample_per_page: 25,
+            sitemap_max_depth: 4,
+            sitemap_max_urls: 50000
           })
         });
 
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(JSON.stringify(errData.detail || "Validation Error"));
+        }
 
-        const data = await response.json();
-        currentAuditId = data.audit_id;
+        const startData = await response.json();
+        const auditId = startData.audit_id;
+        logTerminal(`Crawl ID: ${auditId} generated.`);
 
-        // 2. Fetch Full Audit Data
-        logTerminal(`Scoring 140+ metrics...`);
-        const auditRes = await fetch(`/audit/${currentAuditId}`);
-        const fullData = await auditRes.json();
+        // Step 2: Fetch Results
+        logTerminal(`Analyzing DOM, Security Headers, and Accessibility...`);
+        const auditRes = await fetch(`/audit/${auditId}?token=${sessionToken}`);
+        if (!auditRes.ok) throw new Error("Could not fetch audit results.");
         
-        displayResults(fullData);
-        logTerminal(`Audit completed successfully.`);
+        const fullData = await auditRes.json();
+        displayResults(fullData, auditId);
+        logTerminal(`Audit finalized successfully.`);
 
       } catch (err) {
         logTerminal(`ERROR: ${err.message}`);
-        alert('Audit failed. Check terminal for details.');
+        console.error(err);
       } finally {
         submitBtn.disabled = false;
       }
     });
 
-    function displayResults(data) {
+    function displayResults(data, auditId) {
       resultsSec.style.display = 'block';
       const result = data.result;
 
@@ -313,41 +326,29 @@
       document.getElementById('goodBad').textContent = result.good_vs_bad;
       document.getElementById('summary').innerHTML = data.summary;
 
-      // Color coding circle
       const circle = document.getElementById('scoreCircle');
       const score = result.overall_score;
       circle.className = 'score-circle ' + 
         (score >= 85 ? 'grade-a' : score >= 70 ? 'grade-b' : score >= 50 ? 'grade-c' : 'grade-d');
 
-      // Recommendations
-      const recList = document.getElementById('recList');
-      recList.innerHTML = '';
-      result.recommendations?.forEach(rec => {
-        const li = document.createElement('li');
-        li.textContent = rec;
-        recList.appendChild(li);
-      });
+      // Setup PDF Button with the specific ID
+      const pdfBtn = document.getElementById('pdfBtn');
+      pdfBtn.onclick = () => downloadPdf(auditId);
     }
 
-    // PDF Handshake
-    document.getElementById('pdfBtn').addEventListener('click', async () => {
-      if (!currentAuditId) return;
-      logTerminal("Generating PDF certification...");
-      
+    async function downloadPdf(auditId) {
+      logTerminal("Preparing PDF document...");
       try {
-          const res = await fetch(`/audit/${currentAuditId}/pdf`);
+          const res = await fetch(`/audit/${auditId}/pdf?token=${sessionToken}`);
           const pdfInfo = await res.json();
-          
           if (pdfInfo.status === 'ok') {
-              logTerminal(`Report ready: ${pdfInfo.path}`);
+              logTerminal(`Report generated: ${pdfInfo.path}`);
               window.open('/' + pdfInfo.path, '_blank');
-          } else {
-              alert("PDF generation error on server.");
           }
       } catch (e) {
           logTerminal(`PDF ERROR: ${e.message}`);
       }
-    });
+    }
   </script>
 </body>
 </html>
