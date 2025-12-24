@@ -78,6 +78,7 @@
       border: 2px solid #ddd;
       border-radius: 8px;
       font-size: 1rem;
+      box-sizing: border-box;
       transition: border 0.3s;
     }
     input:focus, select:focus {
@@ -107,6 +108,11 @@
       transform: translateY(-3px);
       box-shadow: 0 10px 25px rgba(102,126,234,0.5);
     }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
     .results {
       display: none;
       margin-top: 40px;
@@ -129,6 +135,7 @@
     .grade-b { background: linear-gradient(135deg, #8bc34a, #7cb342); }
     .grade-c { background: linear-gradient(135deg, #ff9800, #f57c00); }
     .grade-d { background: linear-gradient(135deg, #f44336, #d32f2f); }
+    
     .summary-text {
       font-size: 1.1rem;
       line-height: 1.8;
@@ -150,7 +157,6 @@
     .pdf-btn {
       background: #28a745;
       margin-top: 20px;
-      display: none;
     }
     footer {
       text-align: center;
@@ -158,10 +164,15 @@
       color: rgba(255,255,255,0.8);
       font-size: 0.9rem;
     }
-    @media (max-width: 768px) {
-      header h1 { font-size: 2.5rem; }
-      .card { padding: 20px; }
-      .score-circle { width: 150px; height: 150px; font-size: 2rem; }
+    .terminal-loader {
+        font-family: 'Courier New', monospace;
+        background: #000;
+        color: #0f0;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 20px;
+        display: none;
     }
   </style>
 </head>
@@ -169,7 +180,7 @@
   <header>
     <h1>FF Tech — AI Website Audit</h1>
     <p>International SaaS Compliance & Performance Platform</p>
-    <div class="date">Audit Date: December 24, 2025</div>
+    <div class="date" id="currentDate"></div>
   </header>
 
   <div class="container">
@@ -178,22 +189,12 @@
       <form id="auditForm">
         <div class="form-group">
           <label for="url">Website URL</label>
-          <input type="text" id="url" placeholder="https://example.com" required />
+          <input type="text" id="url" name="url" placeholder="https://example.com" required />
         </div>
 
         <div class="form-group">
           <label for="max_pages">Max Pages to Crawl</label>
-          <input type="number" id="max_pages" value="60" min="10" max="200" />
-        </div>
-
-        <div class="form-group">
-          <label for="concurrency">Concurrency (Speed)</label>
-          <input type="number" id="concurrency" value="20" min="5" max="50" />
-        </div>
-
-        <div class="checkbox-group">
-          <input type="checkbox" id="deep" checked />
-          <label for="deep">Deep Audit (recommended)</label>
+          <input type="number" id="max_pages" name="max_pages" value="15" min="5" max="100" />
         </div>
 
         <div class="checkbox-group">
@@ -201,20 +202,17 @@
           <label for="respect_robots">Respect robots.txt</label>
         </div>
 
-        <div class="checkbox-group">
-          <input type="checkbox" id="generate_pdf" checked />
-          <label for="generate_pdf">Generate PDF Report</label>
-        </div>
-
-        <button type="submit">Run Audit</button>
+        <button type="submit" id="submitBtn">Run Full Audit</button>
       </form>
     </div>
 
+    <div class="terminal-loader" id="terminal"></div>
+
     <div class="card results" id="results">
-      <h2>Audit Results</h2>
+      <h2>Audit Results for <span id="resUrl"></span></h2>
 
       <div id="scoreContainer">
-        <div class="score-circle grade-a" id="scoreCircle">
+        <div class="score-circle" id="scoreCircle">
           <div id="score">0</div>
           <div style="font-size:1rem; margin-top:8px;" id="grade">A+</div>
         </div>
@@ -224,91 +222,131 @@
         </div>
       </div>
 
-      <div class="summary-text" id="summary">
-        Your audit is running... Please wait while we analyze your website.
-      </div>
+      <div class="summary-text" id="summary"></div>
 
-      <div class="recommendations" id="recommendations" style="display:none;">
+      <div class="recommendations" id="recommendations">
         <h3>Top Recommendations</h3>
         <ul id="recList"></ul>
       </div>
 
-      <button class="pdf-btn" id="pdfBtn">Download PDF Report</button>
+      <button class="pdf-btn" id="pdfBtn">Download Certified PDF Report</button>
     </div>
   </div>
 
   <footer>
     <p>&copy; 2025 FF Tech — AI-Powered International Website Audit & Compliance Platform</p>
-    <p>All audits are processed securely • Open for integration with backend API</p>
   </footer>
 
   <script>
-    // This script makes the page functional standalone
-    // Later, replace fetch calls with your actual FastAPI endpoints
-    document.getElementById('auditForm').addEventListener('submit', async function(e) {
+    document.getElementById('currentDate').textContent = "Audit Date: " + new Date().toLocaleDateString();
+
+    const auditForm = document.getElementById('auditForm');
+    const terminal = document.getElementById('terminal');
+    const resultsSec = document.getElementById('results');
+    const submitBtn = document.getElementById('submitBtn');
+    let currentAuditId = null;
+
+    function logTerminal(msg) {
+        terminal.style.display = 'block';
+        const line = document.createElement('div');
+        line.textContent = `> [${new Date().toLocaleTimeString()}] ${msg}`;
+        terminal.appendChild(line);
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    auditForm.addEventListener('submit', async function(e) {
       e.preventDefault();
 
-      const url = document.getElementById('url').value.trim();
-      if (!url || !url.startsWith('http')) {
-        alert('Please enter a valid URL starting with http:// or https://');
-        return;
-      }
+      const urlValue = document.getElementById('url').value.trim();
+      const maxPages = document.getElementById('max_pages').value;
+      const respectRobots = document.getElementById('respect_robots').checked;
 
-      // Show results section
-      document.getElementById('results').style.display = 'block';
-      document.getElementById('summary').textContent = 'Crawling and analyzing website... This may take 1–3 minutes.';
-      document.getElementById('recommendations').style.display = 'none';
-      document.getElementById('pdfBtn').style.display = 'none';
+      // Reset UI
+      resultsSec.style.display = 'none';
+      terminal.innerHTML = '';
+      logTerminal(`Initializing crawler for ${urlValue}...`);
+      submitBtn.disabled = true;
 
-      // Placeholder simulation (replace with real fetch to /audit/start later)
-      setTimeout(() => {
-        // Simulated result
-        const simulated = {
-          overall_score: 87.4,
-          grade: 'A',
-          classification: 'Good',
-          good_vs_bad: 'Good',
-          summary: `${BRAND} audit of ${url} shows strong performance with an overall score of 87.4 (Grade A). Strengths include fast response times, HTTPS implementation, and good mobile viewport support. Opportunities exist in reducing render-blocking resources, enabling compression, and improving hreflang configuration for international reach.`,
-          recommendations: [
-            "Enable GZIP/Brotli compression for text assets",
-            "Add Strict-Transport-Security (HSTS) header",
-            "Inline critical CSS and defer non-essential scripts",
-            "Add meaningful alt text to all images",
-            "Implement proper hreflang tags for multilingual versions"
-          ]
-        };
-
-        // Update UI
-        document.getElementById('score').textContent = simulated.overall_score;
-        document.getElementById('grade').textContent = simulated.grade;
-        document.getElementById('classification').textContent = simulated.classification;
-        document.getElementById('goodBad').textContent = simulated.good_vs_bad;
-
-        const circle = document.getElementById('scoreCircle');
-        circle.className = 'score-circle ' + 
-          (simulated.overall_score >= 90 ? 'grade-a' :
-           simulated.overall_score >= 80 ? 'grade-a' :
-           simulated.overall_score >= 70 ? 'grade-b' :
-           simulated.overall_score >= 60 ? 'grade-c' : 'grade-d');
-
-        document.getElementById('summary').textContent = simulated.summary;
-
-        const recList = document.getElementById('recList');
-        recList.innerHTML = '';
-        simulated.recommendations.forEach(rec => {
-          const li = document.createElement('li');
-          li.textContent = rec;
-          recList.appendChild(li);
+      try {
+        // 1. Call Backend /audit/start
+        logTerminal(`Scanning site structure and assets...`);
+        const response = await fetch('/audit/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: urlValue,
+            max_pages: parseInt(maxPages),
+            respect_robots: respectRobots,
+            concurrency: 24
+          })
         });
-        document.getElementById('recommendations').style.display = 'block';
-        document.getElementById('pdfBtn').style.display = 'inline-block';
 
-      }, 3000); // Simulate delay
+        if (!response.ok) throw new Error(await response.text());
+
+        const data = await response.json();
+        currentAuditId = data.audit_id;
+
+        // 2. Fetch Full Audit Data
+        logTerminal(`Scoring 140+ metrics...`);
+        const auditRes = await fetch(`/audit/${currentAuditId}`);
+        const fullData = await auditRes.json();
+        
+        displayResults(fullData);
+        logTerminal(`Audit completed successfully.`);
+
+      } catch (err) {
+        logTerminal(`ERROR: ${err.message}`);
+        alert('Audit failed. Check terminal for details.');
+      } finally {
+        submitBtn.disabled = false;
+      }
     });
 
-    // PDF button placeholder
-    document.getElementById('pdfBtn').addEventListener('click', () => {
-      alert('PDF generation will be available when connected to the backend API.');
+    function displayResults(data) {
+      resultsSec.style.display = 'block';
+      const result = data.result;
+
+      document.getElementById('resUrl').textContent = data.site;
+      document.getElementById('score').textContent = result.overall_score;
+      document.getElementById('grade').textContent = result.grade;
+      document.getElementById('classification').textContent = result.classification;
+      document.getElementById('goodBad').textContent = result.good_vs_bad;
+      document.getElementById('summary').innerHTML = data.summary;
+
+      // Color coding circle
+      const circle = document.getElementById('scoreCircle');
+      const score = result.overall_score;
+      circle.className = 'score-circle ' + 
+        (score >= 85 ? 'grade-a' : score >= 70 ? 'grade-b' : score >= 50 ? 'grade-c' : 'grade-d');
+
+      // Recommendations
+      const recList = document.getElementById('recList');
+      recList.innerHTML = '';
+      result.recommendations?.forEach(rec => {
+        const li = document.createElement('li');
+        li.textContent = rec;
+        recList.appendChild(li);
+      });
+    }
+
+    // PDF Handshake
+    document.getElementById('pdfBtn').addEventListener('click', async () => {
+      if (!currentAuditId) return;
+      logTerminal("Generating PDF certification...");
+      
+      try {
+          const res = await fetch(`/audit/${currentAuditId}/pdf`);
+          const pdfInfo = await res.json();
+          
+          if (pdfInfo.status === 'ok') {
+              logTerminal(`Report ready: ${pdfInfo.path}`);
+              window.open('/' + pdfInfo.path, '_blank');
+          } else {
+              alert("PDF generation error on server.");
+          }
+      } catch (e) {
+          logTerminal(`PDF ERROR: ${e.message}`);
+      }
     });
   </script>
 </body>
