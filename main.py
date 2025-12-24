@@ -2,15 +2,7 @@
 """
 FF Tech — AI Website Audit & Compliance (Single File, ENTERPRISE)
 -------------------------------------------------------------------------------
-Adds on top of PRO version:
-- Render‑blocking remediation suggestions embedded in executive summary.
-- Accessibility (WCAG-ish) heuristics: html[lang], unlabeled inputs, basic ARIA checks, weak-contrast inline colors.
-- GDPR/Cookie banner detection: common CMP vendors (OneTrust, Cookiebot, ConsentManager, TrustArc, CookieFirst) and keyword matches.
-- Persistence with **SQLAlchemy** (Railway Postgres via FFTECH_DB_URL or local SQLite fallback): audits stored; trend endpoints.
-- Trend APIs: list audited sites, fetch score timeline, export simple CSV.
-
-Run (dev):
-    uvicorn fftech_audit_saas_enterprise:app --host 0.0.0.0 --port 8000
+Corrected Version: Added Root Route, Template Rendering, and Static File Mounting.
 """
 
 import os, re, json, time, hashlib, asyncio, csv
@@ -22,9 +14,11 @@ import xml.etree.ElementTree as ET
 
 # Optional imports (guarded)
 try:
-    from fastapi import FastAPI, HTTPException, Depends, Response
+    from fastapi import FastAPI, HTTPException, Depends, Response, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.security import OAuth2PasswordRequestForm
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.templating import Jinja2Templates
     from pydantic import BaseModel
     HAS_FASTAPI = True
 except Exception:
@@ -664,6 +658,15 @@ def build_pdf_report(path: str, site: str, result: Dict[str, Any], summary: str)
 # FastAPI app
 if HAS_FASTAPI:
     app=FastAPI(title=f"{BRAND} — AI Website Audit & Compliance", version="5.0.0")
+    
+    # SETUP FOR STATIC AND TEMPLATES
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.exists("static"):
+        os.makedirs("static")
+    
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
     @app.middleware('http')
@@ -674,6 +677,15 @@ if HAS_FASTAPI:
         resp.headers['Referrer-Policy']='strict-origin-when-cross-origin'
         resp.headers['Content-Security-Policy']="default-src 'self' 'unsafe-inline' data: https:;"
         return resp
+
+    # --- ADDED ROOT ROUTE ---
+    @app.get("/", response_class=Response)
+    async def serve_home(request: Request):
+        """Serves the index.html from templates folder."""
+        return templates.TemplateResponse("index.html", {"request": request})
+
+    @app.get('/health')
+    def health(): return {'status':'ok','time':now_utc()}
 
     @app.post('/auth/register')
     def register(req: RegisterRequest):
@@ -741,7 +753,8 @@ if HAS_FASTAPI:
     def pdf_audit(audit_id: str, token: str):
         user=require_user(token); a=AUDITS.get(audit_id)
         if not a or a['user']!=user: raise HTTPException(404,'Audit not found')
-        path=f"audit_{audit_id}.pdf"; ok=build_pdf_report(path, a['site'], a['result'], a['summary'])
+        # Save to static folder
+        path=f"static/audit_{audit_id}.pdf"; ok=build_pdf_report(path, a['site'], a['result'], a['summary'])
         return {'status':'ok','path':path} if ok else {'status':'pdf_unavailable','path':None}
 
     @app.get('/sites')
@@ -806,5 +819,9 @@ if HAS_FASTAPI:
         csv_content='\n'.join(out_lines)
         return Response(content=csv_content, media_type='text/csv')
 
-    @app.get('/health')
-    def health(): return {'status':'ok','time':now_utc()}
+# RUN LOGIC FOR RAILWAY
+if __name__ == "__main__":
+    import uvicorn
+    # Dynamically bind to the PORT Railway provides
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
