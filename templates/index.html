@@ -1,364 +1,182 @@
-<!DOCTYPE html>
+INDEX_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FF TECH ELITE v3 | World's Most Comprehensive Web Analysis</title>
-  <!-- Tailwind CSS -->
+  <title>FF TECH ELITE v3 | World's Most Advanced Web Audit</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts: Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-  <!-- Font Awesome -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    :root {
-      --bg-card: #0b1220;
-      --border-card: #1f2a3b;
-      --emerald-glow: rgba(16, 185, 129, 0.35);
-    }
-    body { 
-      font-family: 'Inter', sans-serif; 
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
-      color: #e2e8f0; 
-      min-height: 100vh;
-    }
-    .card { 
-      background: var(--bg-card); 
-      border: 1px solid var(--border-card); 
-      border-radius: 1rem; 
-      padding: 2rem;
-    }
-    .glow { 
-      box-shadow: 0 0 30px var(--emerald-glow); 
-    }
-    .loader {
-      border: 6px solid #334155;
-      border-top-color: #10b981;
-      width: 64px; 
-      height: 64px;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas7, "Liberation Mono", monospace; }
-    .table-head { background: #0f172a; }
-    .chip { 
-      display: inline-block; 
-      border-radius: 12px; 
-      padding: 4px 12px; 
-      font-size: 13px; 
-      font-weight: 600;
-      line-height: 1.4;
-    }
-    .chip-red { background: #7f1d1d; color: #fecaca; }
-    .chip-green { background: #064e3b; color: #a7f3d0; }
-    .chip-amber { background: #78350f; color: #fde68a; }
-    .chip-blue { background: #1e3a8a; color: #93c5fd; }
-    .link { color: #34d399; text-decoration: underline; cursor: pointer; }
-    .link:hover { color: #6ee7b7; }
-    .kpi { color: #10b981; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+    .card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 1.5rem; }
+    .glow { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
+    .progress-container { height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #10b981, #34d399, #06b6d4); border-radius: 4px; animation: progress 4s ease-in-out infinite; }
+    @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
+    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .score-good { color: #34d399; }
+    .score-medium { color: #fbbf24; }
+    .score-bad { color: #f87171; }
     .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%); }
   </style>
 </head>
 <body class="min-h-screen">
-  <!-- Header -->
-  <header class="border-b border-slate-800">
-    <div class="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
-      <h1 class="text-3xl font-black kpi">
-        FF TECH ELITE <span class="text-slate-400 text-2xl">v3</span>
-      </h1>
-      <span class="text-sm text-slate-400">World's Most Comprehensive Web Analysis</span>
-    </div>
-  </header>
-
-  <!-- Input Section -->
-  <section class="max-w-7xl mx-auto px-6 py-12">
-    <div class="card rounded-2xl p-10 glow">
-      <div class="grid md:grid-cols-4 gap-6 mb-6">
-        <input id="urlInput" type="text" placeholder="example.com or haier.pk"
-               class="col-span-2 px-6 py-4 rounded-xl bg-slate-800 border border-slate-700 focus:outline-none focus:border-emerald-500 text-lg" />
-        <select id="modeInput" class="px-6 py-4 rounded-xl bg-slate-800 border border-slate-700 focus:border-emerald-500">
-          <option value="desktop">Desktop Audit</option>
-          <option value="mobile">Mobile Audit</option>
-        </select>
-        <button id="runBtn" onclick="runAudit()"
-                class="bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xl rounded-xl px-8 transition transform hover:scale-105">
-          Run Audit
-        </button>
-      </div>
-      <p class="text-sm text-slate-500">
-        Tip: Enter <span class="mono">haier.pk</span> → automatically audited at <span class="mono">http://www.haier.com.pk/#/login</span>
+  <!-- Hero -->
+  <div class="hero-gradient text-white py-20">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <h1 class="text-7xl font-black mb-6">FF TECH ELITE <span class="text-cyan-300">v3</span></h1>
+      <p class="text-2xl mb-16 max-w-4xl mx-auto opacity-90">
+        The World's Most Advanced Website Audit Engine<br>
+        300+ Weighted Metrics • Lighthouse + Real Browser • Enterprise Reports
       </p>
+      <div class="max-w-4xl mx-auto">
+        <div class="card rounded-3xl p-12 glow">
+          <div class="grid md:grid-cols-3 gap-8 items-end">
+            <div class="md:col-span-2">
+              <input id="urlInput" type="url" placeholder="https://example.com" 
+                     class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/60 text-xl focus:outline-none focus:border-white"/>
+            </div>
+            <div>
+              <select id="modeInput" class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white text-lg focus:outline-none">
+                <option value="desktop">Desktop Audit</option>
+                <option value="mobile">Mobile Audit</option>
+              </select>
+            </div>
+          </div>
+          <button onclick="runAudit()" class="mt-10 w-full py-7 bg-white text-slate-900 font-black text-2xl rounded-2xl shadow-2xl hover:scale-105 transition transform">
+            Launch Full Audit
+          </button>
+        </div>
+      </div>
     </div>
-  </section>
+  </div>
 
-  <!-- Loader -->
-  <div id="loader" class="hidden flex flex-col items-center py-24">
-    <div class="loader"></div>
-    <p class="mt-8 text-xl text-slate-400">Running Lighthouse + DOM + Security + UX audit…</p>
+  <!-- Loading with Moving Progress -->
+  <div id="loading" class="hidden max-w-5xl mx-auto px-6 py-32">
+    <div class="card rounded-3xl p-16 text-center glow">
+      <div class="w-40 h-40 mx-auto mb-12 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 p-2">
+        <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center">
+          <i class="fas fa-microchip text-7xl text-emerald-400 pulse"></i>
+        </div>
+      </div>
+      <h2 class="text-5xl font-black mb-8">Elite Audit in Progress</h2>
+      <p class="text-2xl text-slate-400 mb-16">Analyzing 300+ metrics across Performance, SEO, UX & Security</p>
+      
+      <div class="space-y-6 text-left max-w-2xl mx-auto">
+        <div class="flex items-center gap-6">
+          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
+          <span class="text-lg">Fetching page content & headers</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
+          <span class="text-lg">Running Google Lighthouse analysis</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle-notch text-cyan-400 text-2xl animate-spin"></i>
+          <span class="text-lg">Executing real browser lab tests</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle text-slate-500 text-2xl"></i>
+          <span class="text-lg">Scoring 300+ weighted metrics</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle text-slate-500 text-2xl"></i>
+          <span class="text-lg">Generating enterprise report</span>
+        </div>
+      </div>
+
+      <div class="mt-16 max-w-3xl mx-auto">
+        <div class="progress-container">
+          <div class="progress-bar"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Results -->
-  <section id="results" class="hidden max-w-7xl mx-auto px-6 pb-32 space-y-12">
-    <!-- Overview & Pillars -->
-    <div class="grid lg:grid-cols-5 gap-8">
-      <div class="lg:col-span-2 card rounded-2xl p-10 text-center glow">
-        <h2 class="text-xl text-slate-400 mb-4">Overall Health Score</h2>
-        <div id="overallScore" class="text-8xl font-black kpi">—%</div>
-        <p id="auditedUrl" class="text-sm text-slate-400 mt-4 mono break-all"></p>
-        <p id="auditedAt" class="text-xs text-slate-500 mt-2"></p>
-      </div>
-      <div class="lg:col-span-3 card rounded-2xl p-8">
-        <div class="flex items-center justify-between mb-6">
-          <h3 class="text-2xl font-bold">Pillar Scores</h3>
-          <span class="text-xs text-slate-500">Weights: Performance 40%, SEO 30%, UX 20%, Security 10%</span>
+  <div id="results" class="hidden max-w-7xl mx-auto px-6 py-20 space-y-20">
+    <!-- Header -->
+    <div class="text-center">
+      <h2 class="text-6xl font-black mb-6">Audit Complete</h2>
+      <p class="text-3xl text-slate-400 mb-2">Report generated for</p>
+      <p id="auditedUrl" class="text-4xl font-bold text-emerald-400 mb-2">—</p>
+      <p id="auditedAt" class="text-xl text-slate-500">—</p>
+    </div>
+
+    <!-- Overall Score -->
+    <div class="max-w-4xl mx-auto">
+      <div class="card rounded-3xl p-20 text-center glow">
+        <div id="overallScore" class="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+          —%
         </div>
-        <div id="pillarScores" class="grid grid-cols-2 gap-6"></div>
+        <p class="text-4xl font-bold mt-8">Overall Site Health Score</p>
       </div>
     </div>
 
-    <!-- Core Web Vitals -->
-    <div class="card rounded-2xl p-8">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-2xl font-bold">Core Web Vitals & Performance</h3>
-        <span class="text-xs text-slate-500">Source: Google PageSpeed Insights</span>
+    <!-- Pillar Scores -->
+    <div class="max-w-6xl mx-auto">
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Pillar Scores</h3>
+        <div id="pillarScores" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
       </div>
-      <div id="perfGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
     </div>
 
-    <!-- Roadmap -->
-    <div class="card rounded-2xl p-8">
-      <h3 class="text-2xl font-bold mb-6">Improvement Roadmap</h3>
-      <div id="roadmap" class="text-base text-slate-300 leading-relaxed"></div>
-      <p class="text-sm text-slate-500 mt-4">PDF version expands this section to 300+ words with detailed action plan</p>
+    <!-- Core Web Vitals & Performance -->
+    <div class="max-w-6xl mx-auto">
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Core Web Vitals & Performance</h3>
+        <div id="perfGrid" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
+      </div>
+    </div>
+
+    <!-- Improvement Roadmap -->
+    <div class="max-w-6xl mx-auto">
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Improvement Roadmap</h3>
+        <div id="roadmap" class="prose prose-invert prose-xl max-w-none text-lg leading-relaxed"></div>
+      </div>
     </div>
 
     <!-- Advanced Diagnostics -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Advanced Diagnostics (300+ Metrics)</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">#</th>
-            <th class="p-4 text-left">Metric</th>
-            <th class="p-4 text-left">Category</th>
-            <th class="p-4 text-right">Score</th>
-            <th class="p-4 text-right">Weight</th>
-          </tr>
-        </thead>
-        <tbody id="metricsTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- SEO Overview -->
-    <div class="card rounded-2xl p-8">
-      <h3 class="text-2xl font-bold mb-4">SEO Audit Overview</h3>
-      <p id="seoOverview" class="text-base text-slate-300">—</p>
-    </div>
-
-    <!-- Issues -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Issues and Recommendations</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Type</th>
-            <th class="p-4 text-left">Element</th>
-            <th class="p-4 text-left">Priority</th>
-            <th class="p-4 text-left">Problem / Recommendation</th>
-          </tr>
-        </thead>
-        <tbody id="issuesTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- On-Page SEO -->
-    <div class="card rounded-2xl p-8">
-      <h3 class="text-2xl font-bold mb-6">On-Page SEO</h3>
-      <div class="grid md:grid-cols-2 gap-8 text-base">
-        <div>
-          <div class="text-slate-400 mb-2">URL</div>
-          <div id="onpUrl" class="mono text-emerald-400">—</div>
-        </div>
-        <div>
-          <div class="text-slate-400 mb-2">Title</div>
-          <div id="onpTitle">—</div>
-        </div>
-        <div>
-          <div class="text-slate-400 mb-2">Meta Description</div>
-          <div id="onpMeta">—</div>
-        </div>
-        <div>
-          <div class="text-slate-400 mb-2">H1</div>
-          <div id="onpH1">—</div>
-        </div>
-        <div>
-          <div class="text-slate-400 mb-2">Heading Structure</div>
-          <div id="onpHeadings" class="mono">H2:0 H3:0 H4:0 H5:0 H6:0</div>
-        </div>
-        <div>
-          <div class="text-slate-400 mb-2">Image Alt Coverage</div>
-          <div id="onpAlt">—</div>
-        </div>
+    <div class="max-w-7xl mx-auto">
+      <div class="card rounded-3xl p-12 overflow-x-auto">
+        <h3 class="text-4xl font-bold mb-12 text-center">Advanced Diagnostics (300+ Metrics)</h3>
+        <table class="w-full text-left">
+          <thead class="bg-gradient-to-r from-emerald-600 to-cyan-600 text-black">
+            <tr>
+              <th class="p-6 rounded-tl-2xl">#</th>
+              <th class="p-6">Metric</th>
+              <th class="p-6">Category</th>
+              <th class="p-6 text-right">Score</th>
+              <th class="p-6 text-right rounded-tr-2xl">Weight</th>
+            </tr>
+          </thead>
+          <tbody id="metricsTable" class="divide-y divide-slate-700"></tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Keyword Rankings -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Keyword Rankings</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Keyword</th>
-            <th class="p-4 text-center">Rank</th>
-            <th class="p-4 text-center">Traffic %</th>
-            <th class="p-4 text-center">Volume</th>
-            <th class="p-4 text-center">KD %</th>
-            <th class="p-4 text-center">CPC (USD)</th>
-          </tr>
-        </thead>
-        <tbody id="krTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Top Pages -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Top Pages</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">URL</th>
-            <th class="p-4 text-center">Traffic %</th>
-            <th class="p-4 text-center">Keywords</th>
-            <th class="p-4 text-center">Ref Domains</th>
-            <th class="p-4 text-center">Backlinks</th>
-          </tr>
-        </thead>
-        <tbody id="tpTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Technical SEO -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Technical SEO</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Element</th>
-            <th class="p-4 text-left">Priority</th>
-            <th class="p-4 text-left">Value</th>
-            <th class="p-4 text-left">Recommendation</th>
-          </tr>
-        </thead>
-        <tbody id="techTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Page Performance & CWV -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Page Performance & Core Web Vitals</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Element</th>
-            <th class="p-4 text-center">Priority</th>
-            <th class="p-4 text-left">Note</th>
-          </tr>
-        </thead>
-        <tbody id="ppTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Competitors -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Competitors</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Competitor</th>
-            <th class="p-4 text-center">Common Keywords</th>
-            <th class="p-4 text-center">Competition Level</th>
-          </tr>
-        </thead>
-        <tbody id="compTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Off-Page SEO -->
-    <div class="card rounded-2xl p-8">
-      <h3 class="text-2xl font-bold mb-4">Off-Page SEO</h3>
-      <p id="offPageMsg" class="text-base text-slate-300">—</p>
-    </div>
-
-    <!-- Top Backlinks -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Top Backlinks</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Source Title</th>
-            <th class="p-4 text-left">Source URL</th>
-            <th class="p-4 text-left">Anchor</th>
-            <th class="p-4 text-left">Target URL</th>
-          </tr>
-        </thead>
-        <tbody id="blTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Social Media -->
-    <div class="card rounded-2xl p-8 overflow-x-auto">
-      <h3 class="text-2xl font-bold mb-6">Social Media Presence</h3>
-      <table class="w-full text-sm">
-        <thead class="table-head">
-          <tr>
-            <th class="p-4 text-left">Network</th>
-            <th class="p-4 text-left">Status</th>
-            <th class="p-4 text-left">Recommendation</th>
-          </tr>
-        </thead>
-        <tbody id="smTable" class="divide-y divide-slate-800"></tbody>
-      </table>
-    </div>
-
-    <!-- Download Button -->
-    <div class="text-center py-12">
-      <button onclick="downloadPDF()"
-              class="bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-2xl px-16 py-6 rounded-2xl shadow-2xl transform hover:scale-105 transition">
-        <i class="fas fa-file-pdf mr-4"></i>
+    <!-- PDF Download -->
+    <div class="text-center py-20">
+      <button onclick="downloadPDF()" class="px-20 py-10 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-black text-4xl rounded-3xl shadow-2xl transform hover:scale-110 transition flex items-center gap-8 mx-auto">
+        <i class="fas fa-file-pdf text-5xl"></i>
         Download Enterprise PDF Report
       </button>
-      <p class="text-sm text-slate-500 mt-4">Professional 5–15 page report with all data and expanded roadmap</p>
     </div>
-  </section>
+  </div>
 
   <script>
     let auditData = null;
 
-    function aTag(href, text) {
-      const url = (href || "").trim();
-      const label = text || url || "—";
-      if (!url || url === "—") return "—";
-      return `<a href="${url}" target="_blank" class="link">${label}</a>`;
-    }
-
-    function chipPriority(p) {
-      const v = (p || "").toLowerCase();
-      const label = p || "Info";
-      if (v.includes("red") || v.includes("fail")) return `<span class="chip chip-red">${label}</span>`;
-      if (v.includes("pass") || v === "pass") return `<span class="chip chip-green">${label}</span>`;
-      if (v.includes("flag") || v.includes("amber")) return `<span class="chip chip-amber">${label}</span>`;
-      return `<span class="chip chip-blue">${label}</span>`;
-    }
-
     async function runAudit() {
       const url = document.getElementById("urlInput").value.trim();
       const mode = document.getElementById("modeInput").value;
-      if (!url) return alert("Please enter a URL");
+      if (!url) return alert("Please enter a valid URL");
 
       document.getElementById("results").classList.add("hidden");
-      document.getElementById("loader").classList.remove("hidden");
-      document.getElementById("runBtn").disabled = true;
+      document.getElementById("loading").classList.remove("hidden");
 
       try {
         const res = await fetch("/audit", {
@@ -373,178 +191,54 @@
         alert("Audit failed: " + e.message);
         console.error(e);
       } finally {
-        document.getElementById("loader").classList.add("hidden");
-        document.getElementById("runBtn").disabled = false;
+        document.getElementById("loading").classList.add("hidden");
       }
     }
 
     function renderResults(data) {
       document.getElementById("results").classList.remove("hidden");
 
-      // Header
       document.getElementById("overallScore").textContent = (data.total_grade ?? "—") + "%";
-      document.getElementById("auditedUrl").innerHTML = aTag(data.url, data.url);
-      document.getElementById("auditedAt").textContent = data.audited_at || "";
+      document.getElementById("auditedUrl").textContent = data.url ?? "—";
+      document.getElementById("auditedAt").textContent = data.audited_at ?? "—";
 
-      // Pillars
-      const p = document.getElementById("pillarScores");
-      p.innerHTML = "";
-      Object.entries(data.pillars || {}).forEach(([k, v]) => {
-        p.innerHTML += `
-          <div class="bg-slate-800 rounded-xl p-6 text-center">
-            <div class="text-slate-400 text-lg mb-2">${k}</div>
-            <div class="text-4xl font-black kpi">${v}%</div>
+      const pillarDiv = document.getElementById("pillarScores");
+      pillarDiv.innerHTML = "";
+      Object.entries(data.pillars || {}).forEach(([pillar, score]) => {
+        const colorClass = score >= 90 ? "score-good" : score >= 70 ? "score-medium" : "score-bad";
+        pillarDiv.innerHTML += `
+          <div class="bg-slate-800/60 rounded-2xl p-10 text-center glow">
+            <div class="text-slate-400 text-xl mb-4">${pillar}</div>
+            <div class="text-7xl font-black ${colorClass}">${score}%</div>
           </div>`;
       });
 
-      // Performance
-      const perf = document.getElementById("perfGrid");
-      perf.innerHTML = "";
-      Object.entries(data.perf || {}).forEach(([k, v]) => {
-        const label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        perf.innerHTML += `
-          <div class="bg-slate-800 rounded-xl p-6">
-            <div class="text-slate-400 text-sm mb-2">${label}</div>
-            <div class="text-2xl font-bold">${v ?? "—"}</div>
+      const perfDiv = document.getElementById("perfGrid");
+      perfDiv.innerHTML = "";
+      const perfKeys = ["lcp_ms", "fcp_ms", "cls", "tbt_ms", "inp_ms", "speed_index_ms", "ttfb_ms", "page_weight_kb", "request_count", "dom_size"];
+      perfKeys.forEach(key => {
+        const label = key.replace(/_/g, ' ').toUpperCase();
+        const value = data.perf[key] ?? "—";
+        perfDiv.innerHTML += `
+          <div class="bg-slate-800/60 rounded-2xl p-8">
+            <div class="text-slate-400 text-lg mb-3">${label}</div>
+            <div class="text-4xl font-bold">${value}</div>
           </div>`;
       });
 
-      // Roadmap
       document.getElementById("roadmap").innerHTML = (data.roadmap || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
-      // Advanced Metrics
       const tbody = document.getElementById("metricsTable");
       tbody.innerHTML = "";
       (data.metrics || []).slice(0, 100).forEach(m => {
-        const scoreClass = m.score >= 90 ? "kpi" : m.score >= 70 ? "text-amber-400" : "text-red-400";
+        const scoreColor = m.score >= 90 ? "score-good" : m.score >= 70 ? "score-medium" : "score-bad";
         tbody.innerHTML += `
           <tr>
-            <td class="p-4 text-slate-400">${m.no}</td>
-            <td class="p-4">${m.name}</td>
-            <td class="p-4 text-slate-400">${m.category}</td>
-            <td class="p-4 text-right font-bold ${scoreClass}">${m.score}%</td>
-            <td class="p-4 text-right text-slate-400">${m.weight}</td>
-          </tr>`;
-      });
-
-      // SEO Audit
-      const sa = data.seo_audit || {};
-      document.getElementById("seoOverview").textContent = sa.overview_text || "—";
-
-      // Issues
-      const issuesT = document.getElementById("issuesTable");
-      issuesT.innerHTML = "";
-      (sa.issues || []).forEach(it => {
-        issuesT.innerHTML += `
-          <tr>
-            <td class="p-4">${it.type || ""}</td>
-            <td class="p-4">${it.element || ""}</td>
-            <td class="p-4">${chipPriority(it.priority)}</td>
-            <td class="p-4">${it.message || ""}</td>
-          </tr>`;
-      });
-
-      // On-Page
-      const onp = sa.on_page || {};
-      document.getElementById("onpUrl").innerHTML = aTag(onp.url?.value, onp.url?.value);
-      document.getElementById("onpTitle").textContent = onp.title?.value || "—";
-      document.getElementById("onpMeta").textContent = onp.meta_description?.value || "—";
-      document.getElementById("onpH1").textContent = onp.h1?.value || "—";
-      const heads = onp.headings?.structure || {};
-      document.getElementById("onpHeadings").textContent = `H2:${heads.H2||0} H3:${heads.H3||0} H4:${heads.H4||0} H5:${heads.H5||0} H6:${heads.H6||0}`;
-      document.getElementById("onpAlt").textContent = onp.image_alt?.note || "—";
-
-      // Keyword Rankings
-      const krT = document.getElementById("krTable");
-      krT.innerHTML = "";
-      (sa.keyword_rankings || []).forEach(k => {
-        krT.innerHTML += `
-          <tr>
-            <td class="p-4">${k.keyword || "N/A"}</td>
-            <td class="p-4 text-center">${k.rank || ""}</td>
-            <td class="p-4 text-center">${k.traffic_pct || ""}</td>
-            <td class="p-4 text-center">${k.volume || ""}</td>
-            <td class="p-4 text-center">${k.kd_pct || ""}</td>
-            <td class="p-4 text-center">${k.cpc_usd || ""}</td>
-          </tr>`;
-      });
-
-      // Top Pages
-      const tpT = document.getElementById("tpTable");
-      tpT.innerHTML = "";
-      (sa.top_pages || []).forEach(pg => {
-        tpT.innerHTML += `
-          <tr>
-            <td class="p-4">${aTag(pg.url, pg.url)}</td>
-            <td class="p-4 text-center">${pg.traffic_pct || ""}</td>
-            <td class="p-4 text-center">${pg.keywords || ""}</td>
-            <td class="p-4 text-center">${pg.ref_domains || ""}</td>
-            <td class="p-4 text-center">${pg.backlinks || ""}</td>
-          </tr>`;
-      });
-
-      // Technical
-      const techT = document.getElementById("techTable");
-      techT.innerHTML = "";
-      (sa.technical || []).forEach(t => {
-        techT.innerHTML += `
-          <tr>
-            <td class="p-4">${t.element || ""}</td>
-            <td class="p-4">${chipPriority(t.priority)}</td>
-            <td class="p-4">${t.value ?? "—"}</td>
-            <td class="p-4">${t.note || ""}</td>
-          </tr>`;
-      });
-
-      // Page Performance
-      const ppT = document.getElementById("ppTable");
-      ppT.innerHTML = "";
-      (sa.page_performance || []).forEach(p => {
-        ppT.innerHTML += `
-          <tr>
-            <td class="p-4">${p.element || ""}</td>
-            <td class="p-4 text-center">${chipPriority(p.priority)}</td>
-            <td class="p-4">${p.note || ""}</td>
-          </tr>`;
-      });
-
-      // Competitors
-      const compT = document.getElementById("compTable");
-      compT.innerHTML = "";
-      (sa.competitors || []).forEach(c => {
-        compT.innerHTML += `
-          <tr>
-            <td class="p-4">${c.competitor || "N/A"}</td>
-            <td class="p-4 text-center">${c.common_keywords || ""}</td>
-            <td class="p-4 text-center">${c.competition_level || ""}</td>
-          </tr>`;
-      });
-
-      // Off-Page
-      document.getElementById("offPageMsg").textContent = sa.off_page?.message || "No off-page data available";
-
-      // Backlinks
-      const blT = document.getElementById("blTable");
-      blT.innerHTML = "";
-      (sa.top_backlinks || []).forEach(b => {
-        blT.innerHTML += `
-          <tr>
-            <td class="p-4">${b.source_title || "N/A"}</td>
-            <td class="p-4">${aTag(b.source_url, b.source_url)}</td>
-            <td class="p-4">${b.anchor || ""}</td>
-            <td class="p-4">${aTag(b.target_url, b.target_url)}</td>
-          </tr>`;
-      });
-
-      // Social Media
-      const smT = document.getElementById("smTable");
-      smT.innerHTML = "";
-      (sa.social_media || []).forEach(srow => {
-        smT.innerHTML += `
-          <tr>
-            <td class="p-4">${srow.network || ""}</td>
-            <td class="p-4">${chipPriority(srow.priority)}</td>
-            <td class="p-4">${srow.note || ""}</td>
+            <td class="p-6 text-slate-400">${m.no}</td>
+            <td class="p-6">${m.name}</td>
+            <td class="p-6 text-slate-400">${m.category}</td>
+            <td class="p-6 text-right font-bold ${scoreColor}">${m.score}%</td>
+            <td class="p-6 text-right text-slate-400">${m.weight}</td>
           </tr>`;
       });
     }
@@ -571,4 +265,4 @@
     }
   </script>
 </body>
-</html>
+</html>"""
