@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-Web Audit Pro (Single File)
----------------------------
+Web Audit Pro (Single File) — Updated
+-------------------------------------
 Adds:
 - Executive PDF report (summary + charts via ReportLab + Matplotlib)
 - Asynchronous crawling (asyncio + httpx if available; fallback to requests with thread offload)
 - Google Search Console integration (indexed pages via Sitemaps API)
 - SEMrush / Ahrefs integration placeholders (backlinks & authority)
+- PageSpeed Insights enrichment, now with configurable strategy (mobile/desktop)
 
 Usage:
   python web_audit_pro.py --url https://example.com --max-pages 100 --timeout 10 \
       --user-agent "WebAuditPro/1.0" --respect-robots --concurrency 20 \
-      --pagespeed-api-key YOUR_PSI_KEY \
+      --pagespeed-api-key YOUR_PSI_KEY --pagespeed-strategy mobile \
       --gsc-credentials path/to/creds.json --gsc-property https://example.com/ \
       --semrush-key YOUR_SEMRUSH_KEY --ahrefs-key YOUR_AHREFS_KEY \
       --out audit_report.json --pdf-out audit_report.pdf
@@ -19,7 +20,7 @@ Usage:
 Notes:
 - httpx is optional. If missing, the crawler uses requests under asyncio.to_thread.
 - GSC Sitemaps listing requires site verification and proper OAuth credentials.
-- SEMrush/Ahrefs integrations require paid API access; functions are stubs that you can enable.
+- SEMrush/Ahrefs integrations require paid API access; functions are stubs you can enable.
 """
 
 import argparse
@@ -46,9 +47,7 @@ except Exception:
 
 # PDF & Charts
 from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.pdfgen import canvas
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Image
 import matplotlib
@@ -95,7 +94,6 @@ class PageMetrics:
     open_directory_listing: bool = False
     has_login_form_insecure: bool = False
 
-
 # -------------------------------
 # Helper Functions
 # -------------------------------
@@ -113,7 +111,6 @@ def normalize_url(base: str, href: str) -> Optional[str]:
         parsed = urlparse(abs_url)
         if not parsed.scheme.startswith("http"):
             return None
-        # Strip fragments
         return abs_url.split('#')[0]
     except Exception:
         return None
@@ -162,20 +159,21 @@ def parse_security_headers(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
     ]
     return {k: headers.get(k) for k in keys}
 
-
 # -------------------------------
 # Async Auditor
 # -------------------------------
 class AsyncWebsiteAuditor:
     def __init__(self, base_url: str, max_pages: int = 50, timeout: int = 10,
                  user_agent: str = 'WebAuditPro/1.0', respect_robots: bool = True,
-                 concurrency: int = 20, pagespeed_api_key: Optional[str] = None):
+                 concurrency: int = 20, pagespeed_api_key: Optional[str] = None,
+                 pagespeed_strategy: str = 'mobile'):
         self.base_url = base_url.rstrip('/')
         self.max_pages = max_pages
         self.timeout = timeout
         self.headers = {"User-Agent": user_agent}
         self.respect_robots = respect_robots
         self.pagespeed_api_key = pagespeed_api_key
+        self.pagespeed_strategy = pagespeed_strategy.lower() if pagespeed_strategy in ('mobile','desktop') else 'mobile'
         self.visited: Set[str] = set()
         self.to_visit: asyncio.Queue[str] = asyncio.Queue()
         self.pages: Dict[str, PageMetrics] = {}
@@ -216,7 +214,6 @@ class AsyncWebsiteAuditor:
             return None
 
     async def worker(self):
-        # Optional httpx client per worker for keep-alive
         client = None
         if HAS_HTTPX:
             client = httpx.AsyncClient(headers=self.headers)
@@ -243,8 +240,7 @@ class AsyncWebsiteAuditor:
                     self.pages[url] = metrics
                     continue
                 resp, elapsed_ms = result
-                # map response depending on library
-                if HAS_HTTPX and isinstance(resp, httpx.Response):
+                if HAS_HTTPX and 'httpx' in str(type(resp)):
                     text = resp.text
                     headers = resp.headers
                     status_code = resp.status_code
@@ -259,7 +255,7 @@ class AsyncWebsiteAuditor:
                 metrics.status_code = status_code
                 metrics.response_time_ms = elapsed_ms
                 metrics.final_url = final_url
-                metrics.redirect_chain = [getattr(h, 'url', getattr(h, 'request', None).url if hasattr(h, 'request') else final_url) for h in history] + [final_url]
+                metrics.redirect_chain = [getattr(h, 'url', getattr(getattr(h, 'request', None), 'url', final_url)) for h in history] + [final_url]
                 metrics.html_size_bytes = len(text or '')
                 metrics.content_encoding = headers.get('Content-Encoding')
                 metrics.cache_control_header = headers.get('Cache-Control')
@@ -367,7 +363,6 @@ class AsyncWebsiteAuditor:
                 self.pages[url] = metrics
                 self.visited.add(url)
 
-                # Queue new internal URLs
                 for link in metrics.internal_links:
                     if link not in self.visited and link not in [i for i in self._queue_snapshot()] and len(self.visited) + self.to_visit.qsize() < self.max_pages:
                         await self.to_visit.put(link)
@@ -386,7 +381,6 @@ class AsyncWebsiteAuditor:
         workers = [asyncio.create_task(self.worker()) for _ in range(self.concurrency)]
         await asyncio.gather(*workers)
 
-    # Aggregation, scoring, PSI enrichment same as previous version
     def aggregate(self) -> Dict:
         report = {
             'site': self.base_url,
@@ -613,7 +607,8 @@ class AsyncWebsiteAuditor:
             api = (
                 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url='
                 + requests.utils.quote(self.base_url)
-                + '&category=PERFORMANCE&strategy=mobile&key=' + self.pagespeed_api_key
+                + '&category=PERFORMANCE&strategy=' + self.pagespeed_strategy
+                + '&key=' + self.pagespeed_api_key
             )
             resp = requests.get(api, timeout=self.timeout)
             if resp.status_code == 200:
@@ -628,7 +623,8 @@ class AsyncWebsiteAuditor:
                     'performance_score': perf_score,
                     'lcp_ms': lcp,
                     'cls': cls,
-                    'tbt_ms': tbt
+                    'tbt_ms': tbt,
+                    'strategy': self.pagespeed_strategy
                 }
                 if perf_score:
                     report['category_scores']['technical_performance'] = min(
@@ -657,7 +653,6 @@ class AsyncWebsiteAuditor:
         except Exception as e:
             report['pagespeed'] = {'status': f'error: {e}'}
 
-
 # -------------------------------
 # Integrations: GSC, SEMrush, Ahrefs
 # -------------------------------
@@ -667,9 +662,6 @@ class GSCClient:
         self.timeout = timeout
 
     def fetch_indexed_from_sitemaps(self, property_url: str) -> Dict:
-        """Attempt to sum indexed URLs across sitemaps via Google Search Console API.
-        Requires google-api-python-client and proper OAuth credentials.
-        """
         if not self.credentials_json:
             return {'status': 'not_configured'}
         try:
@@ -694,7 +686,6 @@ class GSCClient:
         except Exception as e:
             return {'status': f'error: {e}'}
 
-
 class BacklinksClient:
     def __init__(self, semrush_key: Optional[str], ahrefs_key: Optional[str], timeout: int = 10):
         self.semrush_key = semrush_key
@@ -702,28 +693,17 @@ class BacklinksClient:
         self.timeout = timeout
 
     def fetch_domain_authority(self, domain: str) -> Dict:
-        """Stub methods: attempt to fetch basic authority metrics from SEMrush/Ahrefs.
-        If keys are missing, return not_configured.
-        """
         if not (self.semrush_key or self.ahrefs_key):
             return {'status': 'not_configured'}
         data = {'status': 'partial'}
         try:
             if self.semrush_key:
-                # Example SEMrush API call (may require specific type and parameters per plan).
-                # Replace with valid endpoint per your subscription.
-                # resp = requests.get('https://api.semrush.com/', params={...}, timeout=self.timeout)
-                # data['semrush'] = resp.json()
                 data['semrush'] = {'note': 'Implement SEMrush endpoint with your plan params.'}
             if self.ahrefs_key:
-                # Example Ahrefs API call placeholder.
-                # resp = requests.get('https://apiv2.ahrefs.com', params={...}, timeout=self.timeout)
-                # data['ahrefs'] = resp.json()
                 data['ahrefs'] = {'note': 'Implement Ahrefs endpoint with your token & parameters.'}
         except Exception as e:
             data['error'] = str(e)
         return data
-
 
 # -------------------------------
 # Executive Summary PDF
@@ -735,7 +715,7 @@ class ExecutiveSummaryPDF:
         self.styles = getSampleStyleSheet()
 
     def add_title(self, site: str, overall_score: float, classification: str):
-        title = f"Website Audit Executive Summary"
+        title = "Website Audit Executive Summary"
         subtitle = f"Site: {site} | Overall Score: {overall_score} | Classification: {classification}"
         self.story.append(Paragraph(f"<para align=left><b>{title}</b></para>", self.styles['Title']))
         self.story.append(Spacer(1, 0.3*cm))
@@ -805,7 +785,6 @@ class ExecutiveSummaryPDF:
         plt.savefig(out_path)
         plt.close()
 
-
 # -------------------------------
 # CLI & Orchestration
 # -------------------------------
@@ -819,6 +798,7 @@ def main():
     parser.add_argument('--respect-robots', action='store_true', help='Respect robots.txt (default off)')
     parser.add_argument('--concurrency', type=int, default=20, help='Async concurrency')
     parser.add_argument('--pagespeed-api-key', default=None, help='Google PSI API key (optional)')
+    parser.add_argument('--pagespeed-strategy', default='mobile', choices=['mobile','desktop'], help='PageSpeed strategy (mobile or desktop)')
     parser.add_argument('--gsc-credentials', default=None, help='Path to GSC service account JSON (optional)')
     parser.add_argument('--gsc-property', default=None, help='GSC property URL (e.g., https://example.com/)')
     parser.add_argument('--semrush-key', default=None, help='SEMrush API key (optional)')
@@ -834,14 +814,14 @@ def main():
         user_agent=args.user_agent,
         respect_robots=args.respect_robots,
         concurrency=args.concurrency,
-        pagespeed_api_key=args.pagespeed_api_key
+        pagespeed_api_key=args.pagespeed_api_key,
+        pagespeed_strategy=args.pagespeed_strategy
     )
 
     print(f"[+] Crawling (async, concurrency={args.concurrency}) {args.url} up to {args.max_pages} pages...")
     try:
         asyncio.run(auditor.crawl())
     except RuntimeError:
-        # if already inside an event loop (e.g., Jupyter), fallback
         loop = asyncio.get_event_loop()
         loop.run_until_complete(auditor.crawl())
 
@@ -849,7 +829,6 @@ def main():
     report = auditor.aggregate()
     auditor.enrich_with_pagespeed(report)
 
-    # GSC
     if args.gsc_property:
         gsc_client = GSCClient(args.gsc_credentials, timeout=args.timeout)
         gsc_data = gsc_client.fetch_indexed_from_sitemaps(args.gsc_property)
@@ -857,24 +836,20 @@ def main():
         if gsc_data.get('indexed_pages_estimate') is not None:
             report['summary']['indexed_pages_estimate'] = gsc_data['indexed_pages_estimate']
 
-    # Backlinks
     bk_client = BacklinksClient(args.semrush_key, args.ahrefs_key, timeout=args.timeout)
     domain = urlparse(args.url).netloc
     bk = bk_client.fetch_domain_authority(domain)
     report['backlinks'] = bk
 
-    # Write JSON
     with open(args.out, 'w', encoding='utf-8') as f:
         json.dump(report, f, ensure_ascii=False, indent=2)
     print(f"[+] JSON report written to {args.out}")
 
-    # Charts
     cat_chart = 'chart_categories.png'
     issues_chart = 'chart_issues.png'
     ExecutiveSummaryPDF.make_category_scores_chart(report['category_scores'], cat_chart)
     ExecutiveSummaryPDF.make_top_issues_chart(report['counts'], issues_chart)
 
-    # PDF
     print(f"[+] Building executive summary PDF: {args.pdf_out}")
     pdf = ExecutiveSummaryPDF(args.pdf_out)
     pdf.add_title(report['site'], report['overall_score'], report['classification'])
@@ -884,7 +859,6 @@ def main():
     pdf.add_chart_image(issues_chart, 'Top Issues by Count')
     pdf.build()
 
-    # Cleanup chart images
     for p in [cat_chart, issues_chart]:
         try:
             os.remove(p)
@@ -893,7 +867,6 @@ def main():
 
     print(f"[=] Overall Score: {report['overall_score']} — {report['classification']} ({report['summary']['good_vs_bad']})")
     print(f"[+] PDF report written to {args.pdf_out}")
-
 
 if __name__ == '__main__':
     main()
