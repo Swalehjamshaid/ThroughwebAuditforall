@@ -8,8 +8,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
-    .card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); }
+    body { font-family: 'Inter', system-ui, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+    .card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 1.5rem; }
     .glow { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
     .progress-container { height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
     .progress-bar { height: 100%; background: linear-gradient(90deg, #10b981, #34d399, #06b6d4); border-radius: 4px; animation: progress 4s ease-in-out infinite; }
@@ -198,12 +198,10 @@ INDEX_HTML = r"""<!DOCTYPE html>
     function renderResults(data) {
       document.getElementById("results").classList.remove("hidden");
 
-      // Header
       document.getElementById("overallScore").textContent = (data.total_grade ?? "—") + "%";
       document.getElementById("auditedUrl").textContent = data.url ?? "—";
       document.getElementById("auditedAt").textContent = data.audited_at ?? "—";
 
-      // Pillar Scores
       const pillarDiv = document.getElementById("pillarScores");
       pillarDiv.innerHTML = "";
       Object.entries(data.pillars || {}).forEach(([pillar, score]) => {
@@ -215,7 +213,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
           </div>`;
       });
 
-      // Performance Metrics
       const perfDiv = document.getElementById("perfGrid");
       perfDiv.innerHTML = "";
       const perfKeys = ["lcp_ms", "fcp_ms", "cls", "tbt_ms", "inp_ms", "speed_index_ms", "ttfb_ms", "page_weight_kb", "request_count", "dom_size"];
@@ -229,10 +226,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
           </div>`;
       });
 
-      // Roadmap (safe HTML rendering)
       document.getElementById("roadmap").innerHTML = (data.roadmap || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
-      // Metrics Table (show first 100 for performance)
       const tbody = document.getElementById("metricsTable");
       tbody.innerHTML = "";
       (data.metrics || []).slice(0, 100).forEach(m => {
