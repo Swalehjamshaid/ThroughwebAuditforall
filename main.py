@@ -1,5 +1,5 @@
 
-# FF Tech - Enterprise AI Website Audit (Single-File Backend, Enhanced)
+# FF Tech - Enterprise AI Website Audit (Single-File Backend, Lighthouse-enabled)
 # Run locally:
 #   python -m venv .venv && . .venv/bin/activate
 #   pip install fastapi uvicorn aiohttp beautifulsoup4 lxml tldextract reportlab httpx playwright
@@ -7,7 +7,7 @@
 #   uvicorn main:app --reload
 #
 # Optional env:
-#   export PSI_API_KEY=xxxxxx         # to enable Core Web Vitals via PSI
+#   export PSI_API_KEY=xxxxxx         # to enable Core Web Vitals + Lighthouse via PSI
 #   export ENABLE_HISTORY=true        # to persist trend data to SQLite
 
 import os
@@ -28,23 +28,20 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import tldextract
 
-# Playwright (optional fallback CWV-lite)
 from playwright.async_api import async_playwright
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle)
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
 app = FastAPI()
 AUDITS: Dict[str, Dict[str, Any]] = {}
+
 DB_FILE = "audits.db"
 ENABLE_HISTORY = os.environ.get("ENABLE_HISTORY", "").lower() in ("1", "true", "yes")
 PSI_API_KEY = os.environ.get("PSI_API_KEY")  # optional
 
-# -----------------------------
-# Persistence (optional)
-# -----------------------------
 def init_db():
     if not ENABLE_HISTORY:
         return
@@ -81,9 +78,6 @@ def load_recent_audits(site: str, limit: int = 10) -> List[dict]:
     conn.close()
     return [json.loads(r[0]) for r in rows]
 
-# -----------------------------
-# Config & Crawler
-# -----------------------------
 @dataclass
 class AuditConfig:
     url: str
@@ -120,7 +114,6 @@ class AuditEngine:
             await self._load_robots()
             pages_data, crawl_stats = await self._crawl()
             sitemaps = await self._discover_sitemaps()
-            # CWV integration
             cwv = await self._core_web_vitals(self.base_url, strategy=self.cfg.psi_strategy)
             return {
                 "site": self.base_url,
@@ -128,7 +121,7 @@ class AuditEngine:
                 "pages": pages_data,
                 "crawl_stats": crawl_stats,
                 "sitemaps": sitemaps,
-                "cwv": cwv,  # Core Web Vitals section
+                "cwv": cwv,  # includes Lighthouse when PSI is available
             }
 
     async def _load_robots(self):
@@ -257,7 +250,7 @@ class AuditEngine:
             if head:
                 rb_css = len([l for l in head.find_all("link") if l.get("rel") and "stylesheet" in l.get("rel")])
 
-        # Accessibility (basic heuristics)
+        # Accessibility & i18n (basic heuristics)
         img_tags = soup.find_all("img") if soup else []
         img_with_alt = [img for img in img_tags if (img.get("alt") or "").strip()]
         alt_coverage_pct = round(100.0 * (len(img_with_alt) / max(1, len(img_tags))), 2) if img_tags else 100.0
@@ -265,7 +258,6 @@ class AuditEngine:
         has_landmarks = any(soup.find(tag) for tag in ["nav", "main", "header", "footer", "aside"]) if soup else False
         aria_count = sum(1 for tag in soup.find_all(True) if any(a.startswith("aria-") for a in tag.attrs)) if soup else 0
 
-        # International SEO
         hreflangs = []
         lang_attr_issues = False
         if soup:
@@ -278,7 +270,6 @@ class AuditEngine:
                 if lang_val and not (2 <= len(lang_val) <= 5):
                     lang_attr_issues = True
 
-        # Schema presence
         schema_present = False
         if soup:
             for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
@@ -332,7 +323,6 @@ class AuditEngine:
             else:
                 broken_external += 1 if s >= 400 or s == 0 else 0
 
-        # Canonical / robots meta
         canonical_issue = False
         meta_robots = ""
         if soup:
@@ -342,11 +332,8 @@ class AuditEngine:
             mr = soup.find("meta", attrs={"name": "robots"})
             meta_robots = (mr.get("content", "").lower() if mr else "")
 
-        # Text-to-HTML
         text_len = len(soup.get_text(separator=" ", strip=True)) if soup else 0
         ratio_text_html = (text_len / max(1, len(html_text))) if html_text else 0.0
-
-        # Mobile viewport
         viewport = bool(soup.find("meta", attrs={"name": "viewport"})) if soup else False
 
         return {
@@ -416,18 +403,41 @@ class AuditEngine:
         return sitemaps
 
     async def _core_web_vitals(self, url: str, strategy: str = "mobile") -> Dict[str, Any]:
-        # Try PSI first (if key present), else Playwright fallback
+        # Try PSI first (includes Lighthouse), else Playwright fallback
         if PSI_API_KEY:
             try:
                 psi_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
                 params = {"url": url, "strategy": strategy, "key": PSI_API_KEY}
-                async with httpx.AsyncClient(timeout=30) as client:
+                async with httpx.AsyncClient(timeout=45) as client:
                     r = await client.get(psi_url, params=params)
                     data = r.json()
-                    audits = data.get("lighthouseResult", {}).get("audits", {})
+                    lh = data.get("lighthouseResult", {}) or {}
+                    audits = lh.get("audits", {}) or {}
+                    cats = lh.get("categories", {}) or {}
                     metrics = data.get("loadingExperience", {}).get("metrics", {}) or {}
+
                     def audit_val(key, field="numericValue"):
                         return (audits.get(key, {}) or {}).get(field)
+
+                    # Lighthouse category scores (0-1 → 0-100)
+                    def cat_score(name):
+                        sc = cats.get(name, {}).get("score")
+                        return int(round((sc or 0) * 100)) if sc is not None else None
+
+                    # Collect top failing audits (score < 0.9)
+                    failed = []
+                    for aid, a in audits.items():
+                        sc = a.get("score")
+                        if isinstance(sc, (int, float)) and sc < 0.9:
+                            failed.append({
+                                "id": aid,
+                                "title": a.get("title"),
+                                "description": a.get("description"),
+                                "score": sc,
+                                "displayValue": a.get("displayValue"),
+                            })
+                    failed = sorted([f for f in failed if f["title"]], key=lambda x: (x["score"] or 0))[:10]
+
                     return {
                         "source": "psi",
                         "strategy": strategy,
@@ -436,17 +446,27 @@ class AuditEngine:
                         "cls": audit_val("cumulative-layout-shift", field="numericValue"),
                         "tbt_ms": audit_val("total-blocking-time"),
                         "tti_ms": audit_val("interactive"),
-                        "field_metrics": metrics,  # field data if available
+                        "field_metrics": metrics,
+                        "lighthouse": {
+                            "categories": {
+                                "performance": cat_score("performance"),
+                                "accessibility": cat_score("accessibility"),
+                                "best_practices": cat_score("best-practices"),
+                                "seo": cat_score("seo"),
+                                "pwa": cat_score("pwa"),
+                            },
+                            "failed_audits": failed,
+                        }
                     }
             except Exception:
                 pass
-        # Fallback: Playwright “lite” metrics
+
+        # Fallback: Playwright “lite” if PSI disabled/unavailable
         try:
             async with async_playwright() as pw:
                 browser = await pw.chromium.launch(headless=True)
                 context = await browser.new_context()
                 page = await context.new_page()
-                start = time.perf_counter()
                 await page.goto(url, wait_until="load", timeout=30000)
                 ttfb = (await page.evaluate("performance.timing.responseStart - performance.timing.navigationStart"))
                 reqs = await page.evaluate("performance.getEntriesByType('resource').length")
@@ -456,14 +476,14 @@ class AuditEngine:
                         return entries.reduce((sum,e)=>sum+(e.transferSize||0),0);
                     })()
                 """)
-                # Simple layout shift heuristic: count DOM mutations after load (very rough)
                 await page.wait_for_timeout(1000)
                 cls_like = await page.evaluate("""
                     (() => {
-                        let shifts = 0;
-                        const observer = new MutationObserver(() => { shifts += 1; });
-                        observer.observe(document.body, { childList: true, subtree: true });
-                        return shifts;
+                        let count = 0;
+                        const obs = new MutationObserver(() => { count += 1; });
+                        obs.observe(document.body, { childList: true, subtree: true });
+                        setTimeout(() => obs.disconnect(), 800);
+                        return count;
                     })()
                 """)
                 await browser.close()
@@ -474,12 +494,11 @@ class AuditEngine:
                     "resource_requests": reqs,
                     "transfer_size_bytes": size,
                     "cls_like_events": cls_like,
+                    # no Lighthouse in fallback
                 }
         except Exception:
             return {"source": "none"}
-# -----------------------------
-# Scoring Engine (enhanced)
-# -----------------------------
+
 class ScoreEngine:
     CATEGORY_WEIGHTS = {
         "security": 0.28,
@@ -514,12 +533,10 @@ class ScoreEngine:
         render_blocking_css_pages = sum(1 for p in pages if p.get("performance", {}).get("render_blocking_css_in_head", 0) > 0)
         totals["render_blocking_pages"] = render_blocking_css_pages
 
-        # dedupe sets to find duplicates
         titles_seen = {}
         meta_seen = {}
 
         for p in pages:
-            # Core content & SEO
             title = p.get("title")
             meta_desc = p.get("meta_description")
             if not title:
@@ -533,10 +550,8 @@ class ScoreEngine:
             if not p.get("h1"):
                 totals["missing_h1"] += 1
 
-            # Broken links
             totals["broken_internal_links_total"] += int(p.get("broken", {}).get("internal", 0))
 
-            # Security
             sec = p.get("security", {})
             if p.get("status") == 200:
                 if not sec.get("hsts") and sec.get("is_https"):
@@ -546,42 +561,29 @@ class ScoreEngine:
                 if sec.get("mixed_content"):
                     totals["mixed_content_pages"] += 1
 
-            # Performance
             if p.get("performance", {}).get("gzip_missing"):
                 totals["gzip_missing_pages"] += 1
-
-            # Cookie banner presence (for compliance visibility)
             if p.get("cookie_banner"):
                 totals["cookie_banner_pages"] += 1
 
-            # Accessibility ALT heuristic
             alt_pct = p.get("accessibility", {}).get("alt_coverage_pct", 100.0)
             if alt_pct < 80.0:
                 totals["alt_issues_pages"] += 1
 
-            # Schema
             if p.get("seo", {}).get("schema_present"):
                 totals["schema_pages"] += 1
-
-            # i18n
-            hre = p.get("i18n", {}).get("hreflang") or []
-            if hre:
+            if (p.get("i18n", {}).get("hreflang") or []):
                 totals["hreflang_pages"] += 1
             if p.get("i18n", {}).get("lang_attr_issues"):
                 totals["lang_attr_issue_pages"] += 1
 
-        # Duplicate detection impact (warnings, not errors)
         duplicate_titles = sum(1 for v in titles_seen.values() if v > 1)
         duplicate_meta = sum(1 for v in meta_seen.values() if v > 1)
 
-        # CWV influence
         lcp_ms = cwv.get("lcp_ms")
         cls = cwv.get("cls")
         tbt_ms = cwv.get("tbt_ms")
-        fcp_ms = cwv.get("fcp_ms")
-        tti_ms = cwv.get("tti_ms")
 
-        # Derived KPIs
         total_errors = (
             totals["missing_titles"] + totals["missing_h1"] + totals["hsts_missing_pages"] +
             totals["csp_missing_pages"] + totals["mixed_content_pages"] + totals["alt_issues_pages"]
@@ -592,7 +594,6 @@ class ScoreEngine:
         )
         total_notices = max(0, len(pages) - total_errors - total_warnings)
 
-        # Subscores per category out of 100
         sec_score = 100
         sec_score -= min(45, totals["mixed_content_pages"] * 9)
         sec_score -= min(30, totals["hsts_missing_pages"] * 3)
@@ -603,7 +604,7 @@ class ScoreEngine:
         perf_score -= min(15, totals["render_blocking_pages"] * 1)
         perf_score -= min(25, max(0, (avg_response_time_ms - 800) / 100))
         perf_score -= min(20, max(0, (avg_html_size_kb - 120) / 20))
-        if lcp_ms:  # CWV penalties
+        if lcp_ms:
             perf_score -= min(25, max(0, (lcp_ms - 2500) / 150))
         if tbt_ms:
             perf_score -= min(20, max(0, (tbt_ms - 300) / 50))
@@ -614,14 +615,13 @@ class ScoreEngine:
         seo_score -= min(20, totals["missing_h1"] * 2)
         seo_score -= min(10, duplicate_titles * 1)
         seo_score -= min(10, duplicate_meta * 1)
-        # Schema slightly boosts if present
         seo_score += min(5, totals["schema_pages"])
 
         ux_score = 100
         pages_without_viewport = sum(1 for p in pages if not p.get("has_viewport"))
         ux_score -= min(25, pages_without_viewport * 3)
         if cls:
-            ux_score -= min(20, max(0, (cls - 0.1) * 100))  # penalize CLS > 0.1
+            ux_score -= min(20, max(0, (cls - 0.1) * 100))
 
         crawl_score = 100
         non_200 = sum(1 for p in pages if p.get("status") not in (200, 999))
@@ -636,15 +636,8 @@ class ScoreEngine:
             crawl_score * self.CATEGORY_WEIGHTS["crawl"]
         )
         overall_score = int(round(overall))
-
         grade, classification = self._grade(overall_score)
-
-        risk_level = (
-            "Critical" if overall_score < 60 else
-            "At Risk" if overall_score < 75 else
-            "Moderate" if overall_score < 85 else
-            "Low"
-        )
+        risk_level = ("Critical" if overall_score < 60 else "At Risk" if overall_score < 75 else "Moderate" if overall_score < 85 else "Low")
         business_impact = (
             "High revenue risk due to security/performance gaps" if risk_level in ("Critical", "At Risk") else
             "Some conversion & SEO losses; address prioritized items" if risk_level == "Moderate" else
@@ -660,11 +653,7 @@ class ScoreEngine:
                 "avg_response_time_ms": avg_response_time_ms,
                 "avg_html_size_kb": avg_html_size_kb,
                 "render_blocking_pages": {"css_in_head": totals["render_blocking_pages"]},
-                "totals": {
-                    "errors": total_errors,
-                    "warnings": total_warnings,
-                    "notices": total_notices,
-                },
+                "totals": {"errors": total_errors, "warnings": total_warnings, "notices": total_notices},
                 "subscores": {
                     "security": round(sec_score, 1),
                     "performance": round(perf_score, 1),
@@ -676,6 +665,7 @@ class ScoreEngine:
                 "business_impact": business_impact,
                 "compliance_readiness": round(compliance_readiness, 1),
                 "cwv": cwv,
+                "lighthouse": cwv.get("lighthouse") or None,  # <—— expose Lighthouse in summary
             },
             "counts": totals,
         }
@@ -692,12 +682,10 @@ class ScoreEngine:
         return "D", "Critical"
 
     def build_executive_summary(self, url: str, score_payload: Dict[str, Any]) -> str:
-        s = score_payload["summary"]
-        subs = s["subscores"]
+        s = score_payload["summary"]; subs = s["subscores"]
         weak = sorted(subs.items(), key=lambda kv: kv[1])[:2]
         weak_areas = ", ".join([w[0].capitalize() for w in weak])
 
-        # Actionable guidance
         actions: List[str] = []
         counts = score_payload["counts"]
         if counts["hsts_missing_pages"] or counts["csp_missing_pages"] or counts["mixed_content_pages"]:
@@ -710,29 +698,26 @@ class ScoreEngine:
             actions.append("Fix broken internal links to preserve crawl equity and user pathways.")
         if counts["alt_issues_pages"] > 0:
             actions.append("Improve accessibility by adding meaningful ALT text and landmark semantics.")
-
         if s.get("cwv", {}).get("lcp_ms"):
             actions.append("Reduce LCP by optimizing hero images, critical CSS, and server TTFB.")
+        if s.get("lighthouse", {}):
+            actions.append("Address Lighthouse findings: improve best practices, accessibility, and SEO for higher category scores.")
 
         lines = [
-            f"This audit of {url} evaluates security, performance, SEO, UX, crawl hygiene, accessibility, and international SEO to provide an enterprise-grade health score.",
+            f"This audit of {url} evaluates security, performance, SEO, UX, crawl hygiene, accessibility, international SEO, and Lighthouse categories to provide an enterprise-grade health score.",
             f"The overall score is {score_payload['overall_score']} ({score_payload['grade']}) — {score_payload['classification']}.",
             f"Average response time is {s['avg_response_time_ms']} ms with HTML averaging {s['avg_html_size_kb']} KB.",
             f"Highest-impact improvement areas: {weak_areas}.",
             "Business impact: stronger trust, faster pages, clearer signals for ranking, and better mobile usability translate into higher conversion and lower bounce.",
             "Top fixes:",
-            " • " + "\n • ".join(actions) if actions else " • Maintain current standards; continue monitoring.",
-            "Prioritize by risk: address security/performance first, then SEO/UX/accessibility for sustained growth.",
+            " - " + "\n - ".join(actions) if actions else " - Maintain current standards; continue monitoring.",
+            "Prioritize by risk: address security/performance first, then SEO/UX/accessibility/Lighthouse actions for sustained growth.",
         ]
         text = " ".join([ln if isinstance(ln, str) else " ".join(ln) for ln in lines])
         words = text.split()
-        if len(words) > 240:
-            text = " ".join(words[:240])
+        if len(words) > 260: text = " ".join(words[:260])
         return text
 
-# -----------------------------
-# PDF Builder
-# -----------------------------
 def build_pdf_report(path: str, response: dict, crawl: dict):
     doc = SimpleDocTemplate(path, pagesize=A4, title="FF Tech - AI Website Audit")
     styles = getSampleStyleSheet()
@@ -790,19 +775,41 @@ def build_pdf_report(path: str, response: dict, crawl: dict):
     elements.append(Paragraph("<b>Key Metrics</b>", styles['Heading2']))
     elements.append(t2)
 
-    # CWV (if present)
     s = response['result']['summary']
     cwv = s.get("cwv") or {}
+    lh = s.get("lighthouse") or {}
+
     elements.append(Spacer(1, 12))
     elements.append(Paragraph(
         f"Avg Response: {s['avg_response_time_ms']} ms | Avg HTML Size: {s['avg_html_size_kb']} KB | Render-blocking CSS pages: {s['render_blocking_pages']['css_in_head']}",
         styles['Normal']
     ))
+
     if cwv.get("source") == "psi":
         elements.append(Paragraph(
             f"LCP: {cwv.get('lcp_ms')} ms | FCP: {cwv.get('fcp_ms')} ms | CLS: {cwv.get('cls')} | TBT: {cwv.get('tbt_ms')} ms | TTI: {cwv.get('tti_ms')} ms",
             styles['Normal']
         ))
+        # Lighthouse category scores
+        cats = lh.get("categories") or {}
+        if cats:
+            elements.append(Spacer(1, 12))
+            elements.append(Paragraph("<b>Lighthouse Categories (PSI)</b>", styles['Heading2']))
+            cat_data = [["Category", "Score"],
+                        ["Performance", str(cats.get("performance"))],
+                        ["Accessibility", str(cats.get("accessibility"))],
+                        ["Best Practices", str(cats.get("best_practices"))],
+                        ["SEO", str(cats.get("seo"))],
+                        ["PWA", str(cats.get("pwa"))]]
+            t3 = Table(cat_data, hAlign='LEFT')
+            t3.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#4caf50')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+                ('GRID', (0,0), (-1,-1), 0.25, colors.gray),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('BACKGROUND', (0,1), (-1,-1), colors.whitesmoke),
+            ]))
+            elements.append(t3)
     elif cwv.get("source") == "playwright":
         elements.append(Paragraph(
             f"TTFB: {cwv.get('ttfb_ms')} ms | Requests: {cwv.get('resource_requests')} | Transfer size: {cwv.get('transfer_size_bytes')} bytes",
@@ -811,9 +818,6 @@ def build_pdf_report(path: str, response: dict, crawl: dict):
 
     doc.build(elements)
 
-# -----------------------------
-# API Endpoints
-# -----------------------------
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
@@ -865,13 +869,8 @@ async def audit_start(request: Request):
         "created_at": datetime.utcnow().isoformat(),
     }
 
-    AUDITS[audit_id] = {
-        "config": cfg.to_dict(),
-        "crawl": crawl_result,
-        "response": response,
-    }
+    AUDITS[audit_id] = {"config": cfg.to_dict(), "crawl": crawl_result, "response": response}
 
-    # Save for trends (optional)
     init_db()
     save_audit(audit_id, url, response)
 
@@ -894,7 +893,6 @@ async def audit_pdf(audit_id: str):
     build_pdf_report(pdf_path, data["response"], data["crawl"])
     return JSONResponse({"status": "ok", "path": pdf_path})
 
-# Trend endpoint (optional to power customer ROI charts)
 @app.get("/audit/{site}/trend")
 async def audit_trend(site: str, limit: int = 10):
     records = load_recent_audits(site, limit=limit)
