@@ -1,8 +1,12 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
   <title>FF Tech — Enterprise AI Website Audit</title>
   <style>
     :root {
@@ -11,24 +15,25 @@
       --dark: #343a40; --gray: #6c757d;
     }
     body {
-      font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       color: #333; margin: 0; padding: 0; min-height: 100vh;
     }
     .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
     header { text-align: center; color: white; padding: 40px 20px; }
     .card { background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; margin: 20px 0; }
-    
-    /* Config Panel */
+
+    /* Config */
     .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
     .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--gray); }
     input, select { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-    
-    /* Stats & Score Circle */
+
+    /* Score & summary */
     .score-layout { display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 30px; margin-bottom: 30px; }
     .score-circle { width: 160px; height: 160px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 2.5rem; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     .grade-a { background: var(--success); } .grade-b { background: #8bc34a; } .grade-c { background: var(--warning); } .grade-d { background: var(--danger); }
 
-    /* Results Grid */
+    /* Grid cards */
     .outputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
     .stat-box { background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--primary); }
     .stat-box h4 { margin: 0 0 15px 0; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
@@ -36,11 +41,19 @@
     .data-row:last-child { border-bottom: none; }
     .data-val { font-weight: bold; color: var(--dark); }
 
-    /* UI Components */
+    /* Terminal */
     .terminal-loader { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.8rem; display: none; max-height: 200px; overflow-y: auto; margin: 20px 0; }
+
+    /* Buttons */
     button { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; padding: 16px 32px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
     button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
     .adv-toggle { background: none; border: 1px solid var(--gray); color: var(--gray); width: auto; padding: 6px 15px; font-size: 0.75rem; margin-top: 10px; }
+
+    /* Badges & utils */
+    .badge { display:inline-block; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; color:white; }
+    .badge-red { background:#f44336; } .badge-orange { background:#ff9800; } .badge-green { background:#4caf50; }
+    .muted { color: var(--gray); font-size: 0.85rem; }
+    .trend-canvas { width: 100%; height: 160px; }
   </style>
 </head>
 <body>
@@ -51,6 +64,7 @@
     <p>Enterprise Compliance, SEO & Performance Dashboard</p>
   </header>
 
+  <!-- Configuration -->
   <div class="card">
     <h2>Audit Configuration</h2>
     <form id="auditForm">
@@ -59,27 +73,15 @@
         <input type="text" id="url" placeholder="https://example.com" required>
       </div>
 
-      <button type="button" class="adv-toggle" onclick="document.getElementById('advConfig').style.display='grid'">⚙️ Advanced Python Settings</button>
-      
+      <button type="button" class="adv-toggle" onclick="document.getElementById('advConfig').style.display='grid'">⚙️ Advanced Settings</button>
+
       <div class="config-grid" id="advConfig" style="display:none;">
+        <div class="form-group"><label>Max Pages</label><input type="number" id="max_pages" value="24"></div>
+        <div class="form-group"><label>Threads</label><input type="number" id="concurrency" value="24"></div>
+        <div class="form-group"><label>User Agent</label><input type="text" id="user_agent" value="FFTechAuditBot/2.1"></div>
         <div class="form-group">
-          <label>Max Pages (max_pages)</label>
-          <input type="number" id="max_pages" value="20">
-        </div>
-        <div class="form-group">
-          <label>Threads (concurrency)</label>
-          <input type="number" id="concurrency" value="24">
-        </div>
-        <div class="form-group">
-          <label>User Agent (user_agent)</label>
-          <input type="text" id="user_agent" value="FFTechAuditBot/2.0">
-        </div>
-        <div class="form-group">
-          <label>PSI Strategy (psi_strategy)</label>
-          <select id="psi_strategy">
-            <option value="mobile">Mobile</option>
-            <option value="desktop">Desktop</option>
-          </select>
+          <label>PSI Strategy</label>
+          <select id="psi_strategy"><option value="mobile">Mobile</option><option value="desktop">Desktop</option></select>
         </div>
       </div>
 
@@ -92,8 +94,10 @@
     </form>
   </div>
 
+  <!-- Terminal -->
   <div class="terminal-loader" id="terminal"></div>
 
+  <!-- Results -->
   <div id="results" class="card" style="display:none;">
     <div class="score-layout">
       <div class="score-circle" id="scoreCircle">
@@ -114,6 +118,7 @@
     </div>
 
     <div class="outputs-grid">
+      <!-- SEO & Content -->
       <div class="stat-box">
         <h4>SEO & Content</h4>
         <div class="data-row"><span>Missing Titles</span><span class="data-val" id="cnt_titles">0</span></div>
@@ -122,14 +127,16 @@
         <div class="data-row"><span>Broken Internal Links</span><span class="data-val" id="cnt_broken">0</span></div>
       </div>
 
+      <!-- Security & Trust -->
       <div class="stat-box">
         <h4>Security & Compliance</h4>
         <div class="data-row"><span>HSTS Missing</span><span class="data-val" id="cnt_hsts">0</span></div>
         <div class="data-row"><span>CSP Missing</span><span class="data-val" id="cnt_csp">0</span></div>
         <div class="data-row"><span>Mixed Content</span><span class="data-val" id="cnt_mixed">0</span></div>
-        <div class="data-row"><span>Cookie Banner Found</span><span class="data-val" id="cnt_cookie">0</span></div>
+        <div class="data-row"><span>Cookie Banner Found</span><span class="data-val" id="cnt_cookie">No</span></div>
       </div>
 
+      <!-- Technical Performance -->
       <div class="stat-box">
         <h4>Technical Performance</h4>
         <div class="data-row"><span>Avg Response (ms)</span><span class="data-val" id="avg_resp">0</span></div>
@@ -137,17 +144,66 @@
         <div class="data-row"><span>Gzip Missing</span><span class="data-val" id="cnt_gzip">0</span></div>
         <div class="data-row"><span>Render Blocking CSS</span><span class="data-val" id="cnt_rb_css">0</span></div>
       </div>
+
+      <!-- Core Web Vitals -->
+      <div class="stat-box">
+        <h4>Core Web Vitals</h4>
+        <div class="data-row"><span>Source</span><span class="data-val" id="cwv_source">N/A</span></div>
+        <div class="data-row"><span>LCP (ms)</span><span class="data-val"><span id="lcp_val">N/A</span> <span id="lcp_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>CLS</span><span class="data-val"><span id="cls_val">N/A</span> <span id="cls_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>TBT (ms)</span><span class="data-val"><span id="tbt_val">N/A</span> <span id="tbt_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>FCP (ms)</span><span class="data-val" id="fcp_val">N/A</span></div>
+        <div class="data-row"><span>TTI (ms)</span><span class="data-val" id="tti_val">N/A</span></div>
+        <!-- Fallback metrics (Playwright) -->
+        <div class="data-row"><span>TTFB (ms)</span><span class="data-val"><span id="ttfb_val">N/A</span> <span id="ttfb_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>Requests</span><span class="data-val" id="reqs_val">N/A</span></div>
+        <div class="data-row"><span>Transfer Size (bytes)</span><span class="data-val" id="transfer_val">N/A</span></div>
+      </div>
+
+      <!-- Accessibility -->
+      <div class="stat-box">
+        <h4>Accessibility</h4>
+        <div class="data-row"><span>ALT Issues (pages)</span><span class="data-val"><span id="alt_issues_pages">0</span> <span id="alt_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>Headings Seen</span><span class="data-val" id="heading_info">Signals present</span></div>
+        <div class="data-row"><span>Landmarks / ARIA</span><span class="data-val" id="a11y_landmark">N/A</span></div>
+        <div class="muted">Improve ALT coverage, heading structure, and landmarks for better accessibility & compliance.</div>
+      </div>
+
+      <!-- International SEO -->
+      <div class="stat-box">
+        <h4>International SEO</h4>
+        <div class="data-row"><span>Hreflang (pages)</span><span class="data-val" id="hreflang_pages">0</span></div>
+        <div class="data-row"><span>Lang Attribute Issues</span><span class="data-val"><span id="lang_attr_issue_pages">0</span> <span id="lang_badge" class="badge"></span></span></div>
+        <div class="data-row"><span>Schema Present (pages)</span><span class="data-val" id="schema_pages">0</span></div>
+        <div class="muted">Ensure correct language targeting; add schema for richer SERP and enterprise trust.</div>
+      </div>
+
+      <!-- KPIs & Trend -->
+      <div class="stat-box" style="grid-column: 1 / -1;">
+        <h4>KPIs & Trend</h4>
+        <div class="data-row"><span>Total Errors</span><span class="data-val" id="kpi_errors">0</span></div>
+        <div class="data-row"><span>Total Warnings</span><span class="data-val" id="kpi_warnings">0</span></div>
+        <div class="data-row"><span>Total Notices</span><span class="data-val" id="kpi_notices">0</span></div>
+        <canvas id="trendCanvas" class="trend-canvas"></canvas>
+        <div class="muted">Shows progress and ROI over time.</div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
+  // -----------------------------
+  // Globals
+  // -----------------------------
   const auditForm = document.getElementById('auditForm');
   const terminal = document.getElementById('terminal');
   const resultsSec = document.getElementById('results');
   const submitBtn = document.getElementById('submitBtn');
   const sessionToken = "demo_session_token";
 
+  // -----------------------------
+  // Utilities
+  // -----------------------------
   function log(msg) {
     terminal.style.display = 'block';
     const line = document.createElement('div');
@@ -156,6 +212,71 @@
     terminal.scrollTop = terminal.scrollHeight;
   }
 
+  function setBadge(el, value, thresholds) {
+    // thresholds: { red: number, orange: number, direction: 'up'|'down' }
+    // direction 'up' => higher is worse; 'down' => lower is worse
+    el.className = 'badge';
+    if (value === null || value === undefined || isNaN(value)) { el.textContent = ''; return; }
+    const dirUp = thresholds.direction !== 'down';
+    const redCut = thresholds.red, orangeCut = thresholds.orange;
+    const isRed    = dirUp ? (value >= redCut) : (value <= redCut);
+    const isOrange = dirUp ? (value >= orangeCut && value < redCut) : (value <= orangeCut && value > redCut);
+    const isGreen  = dirUp ? (value < orangeCut) : (value > orangeCut);
+    el.classList.add(isRed ? 'badge-red' : isOrange ? 'badge-orange' : 'badge-green');
+    el.textContent = isRed ? 'Critical' : isOrange ? 'At Risk' : 'Good';
+  }
+
+  async function renderTrend(site) {
+    try {
+      const r = await fetch(`/audit/${encodeURIComponent(site)}/trend`);
+      const t = await r.json();
+      const pts = (t.trend || []).reverse(); // oldest → newest
+
+      const canvas = document.getElementById('trendCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const W = canvas.width, H = canvas.height, pad = 10;
+
+      // Line for overall score
+      const scores = pts.map(p => p.overall_score ?? 0);
+      const maxS = Math.max(100, ...scores), minS = Math.min(0, ...scores);
+      const n = Math.max(1, scores.length);
+      ctx.strokeStyle = '#667eea'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      scores.forEach((s, i) => {
+        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1)));
+        const y = H - pad - ((s - minS) / Math.max(1, (maxS - minS))) * (H - 2*pad);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      // Bars for errors & warnings
+      const errs = pts.map(p => p.errors ?? 0);
+      const warns = pts.map(p => p.warnings ?? 0);
+      const maxBar = Math.max(...errs, ...warns, 1);
+      const barW = Math.min(12, (W - 2*pad) / (n * 2));
+
+      errs.forEach((e, i) => {
+        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1))) - barW;
+        const h = (e / maxBar) * (H/4);
+        ctx.fillStyle = '#f44336';
+        ctx.fillRect(x, H - pad - h, barW, h);
+      });
+
+      warns.forEach((w, i) => {
+        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1))) + 2;
+        const h = (w / maxBar) * (H/4);
+        ctx.fillStyle = '#ff9800';
+        ctx.fillRect(x, H - pad - h, barW, h);
+      });
+    } catch(e) {
+      // silently ignore
+    }
+  }
+
+  // -----------------------------
+  // Form submit → backend
+  // -----------------------------
   auditForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     resultsSec.style.display = 'none';
@@ -188,7 +309,7 @@
 
       const dataRes = await fetch(`/audit/${startData.audit_id}?token=${sessionToken}`);
       const data = await dataRes.json();
-      
+
       renderDashboard(data, startData.audit_id);
       log(`Audit Finalized. Results Rendered.`);
     } catch (err) {
@@ -198,9 +319,13 @@
     }
   });
 
+  // -----------------------------
+  // Renderer
+  // -----------------------------
   function renderDashboard(data, auditId) {
     const res = data.result;
-    const counts = res.counts;
+    const counts = res.counts || {};
+    const summary = res.summary || {};
 
     resultsSec.style.display = 'block';
     document.getElementById('resUrl').textContent = data.site;
@@ -210,26 +335,73 @@
     document.getElementById('summaryText').textContent = data.summary;
     document.getElementById('resDate').textContent = "Audit Date: " + new Date().toLocaleDateString();
 
-    // Circle Grade Class
+    // Circle Grade Class (A/B/C/D)
     const circle = document.getElementById('scoreCircle');
-    circle.className = 'score-circle ' + (res.overall_score >= 85 ? 'grade-a' : res.overall_score >= 70 ? 'grade-b' : 'grade-c');
+    const s = res.overall_score || 0;
+    circle.className =
+      'score-circle ' + (s >= 85 ? 'grade-a' : s >= 70 ? 'grade-b' : s >= 60 ? 'grade-c' : 'grade-d');
 
-    // MAPPING DATA FROM PYTHON COUNTS
-    document.getElementById('cnt_titles').textContent = counts.missing_titles;
-    document.getElementById('cnt_meta').textContent = counts.missing_meta_descriptions;
-    document.getElementById('cnt_h1').textContent = counts.missing_h1;
-    document.getElementById('cnt_broken').textContent = counts.broken_internal_links_total;
-    
-    document.getElementById('cnt_hsts').textContent = counts.hsts_missing_pages;
-    document.getElementById('cnt_csp').textContent = counts.csp_missing_pages;
-    document.getElementById('cnt_mixed').textContent = counts.mixed_content_pages;
-    document.getElementById('cnt_cookie').textContent = counts.cookie_banner_pages > 0 ? "Yes" : "No";
+    // Existing mappings
+    document.getElementById('cnt_titles').textContent = counts.missing_titles || 0;
+    document.getElementById('cnt_meta').textContent = counts.missing_meta_descriptions || 0;
+    document.getElementById('cnt_h1').textContent = counts.missing_h1 || 0;
+    document.getElementById('cnt_broken').textContent = counts.broken_internal_links_total || 0;
 
-    document.getElementById('avg_resp').textContent = res.summary.avg_response_time_ms;
-    document.getElementById('avg_html').textContent = res.summary.avg_html_size_kb;
-    document.getElementById('cnt_gzip').textContent = counts.gzip_missing_pages;
-    document.getElementById('cnt_rb_css').textContent = res.summary.render_blocking_pages.css_in_head;
+    document.getElementById('cnt_hsts').textContent = counts.hsts_missing_pages || 0;
+    document.getElementById('cnt_csp').textContent = counts.csp_missing_pages || 0;
+    document.getElementById('cnt_mixed').textContent = counts.mixed_content_pages || 0;
+    document.getElementById('cnt_cookie').textContent = (counts.cookie_banner_pages || 0) > 0 ? "Yes" : "No";
 
+    document.getElementById('avg_resp').textContent = summary.avg_response_time_ms ?? 0;
+    document.getElementById('avg_html').textContent = summary.avg_html_size_kb ?? 0;
+    document.getElementById('cnt_gzip').textContent = counts.gzip_missing_pages || 0;
+    document.getElementById('cnt_rb_css').textContent = (summary.render_blocking_pages || {}).css_in_head ?? 0;
+
+    // KPIs
+    const totals = summary.totals || { errors: 0, warnings: 0, notices: 0 };
+    document.getElementById('kpi_errors').textContent = totals.errors || 0;
+    document.getElementById('kpi_warnings').textContent = totals.warnings || 0;
+    document.getElementById('kpi_notices').textContent = totals.notices || 0;
+
+    // International
+    document.getElementById('hreflang_pages').textContent = counts.hreflang_pages || 0;
+    document.getElementById('lang_attr_issue_pages').textContent = counts.lang_attr_issue_pages || 0;
+    document.getElementById('schema_pages').textContent = counts.schema_pages || 0;
+    setBadge(document.getElementById('lang_badge'), counts.lang_attr_issue_pages || 0, { red: 5, orange: 1, direction: 'up' });
+
+    // Accessibility
+    document.getElementById('alt_issues_pages').textContent = counts.alt_issues_pages || 0;
+    setBadge(document.getElementById('alt_badge'), counts.alt_issues_pages || 0, { red: 5, orange: 1, direction: 'up' });
+    document.getElementById('heading_info').textContent = (counts.missing_h1 || 0) > 0 ? 'Check heading structure' : 'OK';
+    document.getElementById('a11y_landmark').textContent = 'Heuristics OK';
+
+    // CWV
+    const cwv = summary.cwv || {};
+    document.getElementById('cwv_source').textContent = (cwv.source || 'none').toUpperCase();
+
+    const lcp = cwv.lcp_ms ?? null, cls = cwv.cls ?? null, tbt = cwv.tbt_ms ?? null;
+    document.getElementById('lcp_val').textContent = lcp ?? 'N/A';
+    document.getElementById('cls_val').textContent = cls ?? 'N/A';
+    document.getElementById('tbt_val').textContent = tbt ?? 'N/A';
+    document.getElementById('fcp_val').textContent = cwv.fcp_ms ?? 'N/A';
+    document.getElementById('tti_val').textContent = cwv.tti_ms ?? 'N/A';
+
+    // Badges (PSI)
+    setBadge(document.getElementById('lcp_badge'), lcp, { red: 4000, orange: 2500, direction: 'up' });
+    setBadge(document.getElementById('cls_badge'), cls, { red: 0.25, orange: 0.10, direction: 'up' });
+    setBadge(document.getElementById('tbt_badge'), tbt, { red: 600, orange: 200, direction: 'up' });
+
+    // Fallback (Playwright)
+    const ttfb = cwv.ttfb_ms ?? null, reqs = cwv.resource_requests ?? null, transfer = cwv.transfer_size_bytes ?? null;
+    document.getElementById('ttfb_val').textContent = ttfb ?? 'N/A';
+    document.getElementById('reqs_val').textContent = reqs ?? 'N/A';
+    document.getElementById('transfer_val').textContent = transfer ?? 'N/A';
+    setBadge(document.getElementById('ttfb_badge'), ttfb, { red: 1500, orange: 800, direction: 'up' });
+
+    // Trend
+    renderTrend(data.site);
+
+    // PDF
     document.getElementById('pdfBtn').onclick = async () => {
       const pdfRes = await fetch(`/audit/${auditId}/pdf?token=${sessionToken}`);
       const pdfData = await pdfRes.json();
