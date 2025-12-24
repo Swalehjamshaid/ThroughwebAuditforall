@@ -8,148 +8,149 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <style>
-    body { font-family: 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
-    .gradient-bg { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); }
-    .card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.2); }
-    .glow { box-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
-    .progress-bar { height: 6px; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 3px; animation: progress 3s ease-in-out infinite; }
+    body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+    .card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); }
+    .glow { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
+    .progress-container { height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #10b981, #34d399, #06b6d4); border-radius: 4px; animation: progress 4s ease-in-out infinite; }
     @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
     .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-    .metric-score-good { color: #34d399; }
-    .metric-score-medium { color: #fbbf24; }
-    .metric-score-bad { color: #f87171; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .score-good { color: #34d399; }
+    .score-medium { color: #fbbf24; }
+    .score-bad { color: #f87171; }
+    .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%); }
   </style>
 </head>
-<body class="min-h-screen gradient-bg">
+<body class="min-h-screen">
   <!-- Hero -->
-  <div class="container mx-auto px-6 py-16 text-center">
-    <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-6">
-      FF TECH ELITE v3
-    </h1>
-    <p class="text-2xl text-slate-300 mb-12 max-w-4xl mx-auto">
-      The World's Most Advanced Website Audit Engine<br>
-      300+ Weighted Metrics • Lighthouse + Real Browser • Enterprise PDF Reports
-    </p>
-    <div class="max-w-3xl mx-auto">
-      <div class="card rounded-2xl p-10 glow">
-        <div class="grid md:grid-cols-3 gap-6 items-end">
-          <div class="md:col-span-2">
-            <input id="urlInput" type="url" placeholder="https://example.com" 
-                   class="w-full px-6 py-4 rounded-xl bg-slate-800/80 border border-slate-600 focus:border-emerald-500 focus:outline-none text-lg"/>
+  <div class="hero-gradient text-white py-20">
+    <div class="max-w-7xl mx-auto px-6 text-center">
+      <h1 class="text-7xl font-black mb-6">FF TECH ELITE <span class="text-cyan-300">v3</span></h1>
+      <p class="text-2xl mb-16 max-w-4xl mx-auto opacity-90">
+        The World's Most Advanced Website Audit Engine<br>
+        300+ Weighted Metrics • Lighthouse + Real Browser • Enterprise Reports
+      </p>
+      <div class="max-w-4xl mx-auto">
+        <div class="card rounded-3xl p-12 glow">
+          <div class="grid md:grid-cols-3 gap-8 items-end">
+            <div class="md:col-span-2">
+              <input id="urlInput" type="url" placeholder="https://example.com" 
+                     class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/60 text-xl focus:outline-none focus:border-white"/>
+            </div>
+            <div>
+              <select id="modeInput" class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white text-lg focus:outline-none">
+                <option value="desktop">Desktop Audit</option>
+                <option value="mobile">Mobile Audit</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <select id="modeInput" class="w-full px-6 py-4 rounded-xl bg-slate-800/80 border border-slate-600 focus:border-emerald-500 focus:outline-none">
-              <option value="desktop">Desktop Audit</option>
-              <option value="mobile">Mobile Audit</option>
-            </select>
-          </div>
+          <button onclick="runAudit()" class="mt-10 w-full py-7 bg-white text-slate-900 font-black text-2xl rounded-2xl shadow-2xl hover:scale-105 transition transform">
+            Launch Full Audit
+          </button>
         </div>
-        <button onclick="runAudit()" class="mt-8 w-full py-5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-bold text-xl rounded-xl shadow-2xl transform hover:scale-105 transition">
-          Launch Full Audit
-        </button>
       </div>
     </div>
   </div>
 
-  <!-- Loading State with Moving Progress -->
-  <div id="loading" class="hidden container mx-auto px-6 py-32 text-center">
-    <div class="max-w-2xl mx-auto">
-      <div class="card rounded-2xl p-12 glow">
-        <div class="w-32 h-32 mx-auto mb-8 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 p-1">
-          <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center">
-            <i class="fas fa-search text-5xl text-emerald-400 pulse"></i>
-          </div>
+  <!-- Loading with Moving Progress -->
+  <div id="loading" class="hidden max-w-5xl mx-auto px-6 py-32">
+    <div class="card rounded-3xl p-16 text-center glow">
+      <div class="w-40 h-40 mx-auto mb-12 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 p-2">
+        <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center">
+          <i class="fas fa-microchip text-7xl text-emerald-400 pulse"></i>
         </div>
-        <h2 class="text-4xl font-bold mb-6">Running Elite Audit...</h2>
-        <p class="text-xl text-slate-400 mb-10">Analyzing 300+ metrics using Lighthouse, DOM analysis, and real browser testing</p>
-        <div class="space-y-4">
-          <div class="flex items-center gap-4">
-            <i class="fas fa-circle text-emerald-400"></i>
-            <span>Fetching page & headers</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <i class="fas fa-circle text-emerald-400"></i>
-            <span>Running Lighthouse performance audit</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <i class="fas fa-circle text-cyan-400 pulse"></i>
-            <span>Executing real browser lab tests</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <i class="fas fa-circle text-slate-600"></i>
-            <span>Scoring 300+ weighted metrics</span>
-          </div>
-          <div class="flex items-center gap-4">
-            <i class="fas fa-circle text-slate-600"></i>
-            <span>Generating enterprise report</span>
-          </div>
+      </div>
+      <h2 class="text-5xl font-black mb-8">Elite Audit in Progress</h2>
+      <p class="text-2xl text-slate-400 mb-16">Analyzing 300+ metrics across Performance, SEO, UX & Security</p>
+      
+      <div class="space-y-6 text-left max-w-2xl mx-auto">
+        <div class="flex items-center gap-6">
+          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
+          <span class="text-lg">Fetching page content & headers</span>
         </div>
-        <div class="mt-10">
-          <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
-            <div class="progress-bar h-full"></div>
-          </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
+          <span class="text-lg">Running Google Lighthouse analysis</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle-notch text-cyan-400 text-2xl animate-spin"></i>
+          <span class="text-lg">Executing real browser lab tests</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle text-slate-500 text-2xl"></i>
+          <span class="text-lg">Scoring 300+ weighted metrics</span>
+        </div>
+        <div class="flex items-center gap-6">
+          <i class="fas fa-circle text-slate-500 text-2xl"></i>
+          <span class="text-lg">Generating enterprise report</span>
+        </div>
+      </div>
+
+      <div class="mt-16 max-w-3xl mx-auto">
+        <div class="progress-container">
+          <div class="progress-bar"></div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Results -->
-  <div id="results" class="hidden container mx-auto px-6 py-16 space-y-16">
+  <div id="results" class="hidden max-w-7xl mx-auto px-6 py-20 space-y-20">
     <!-- Header -->
     <div class="text-center">
-      <h2 class="text-5xl font-black mb-4">Audit Complete</h2>
-      <p class="text-2xl text-slate-400">Report generated for</p>
-      <p id="auditedUrl" class="text-3xl font-bold text-emerald-400 mt-2">—</p>
-      <p id="auditedAt" class="text-lg text-slate-500 mt-2">—</p>
+      <h2 class="text-6xl font-black mb-6">Audit Complete</h2>
+      <p class="text-3xl text-slate-400 mb-2">Report generated for</p>
+      <p id="auditedUrl" class="text-4xl font-bold text-emerald-400 mb-2">—</p>
+      <p id="auditedAt" class="text-xl text-slate-500">—</p>
     </div>
 
     <!-- Overall Score -->
     <div class="max-w-4xl mx-auto">
-      <div class="card rounded-3xl p-16 text-center glow">
+      <div class="card rounded-3xl p-20 text-center glow">
         <div id="overallScore" class="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
           —%
         </div>
-        <p class="text-3xl font-bold mt-6">Overall Site Health Score</p>
+        <p class="text-4xl font-bold mt-8">Overall Site Health Score</p>
       </div>
     </div>
 
     <!-- Pillar Scores -->
     <div class="max-w-6xl mx-auto">
-      <div class="card rounded-2xl p-10">
-        <h3 class="text-3xl font-bold mb-8">Pillar Scores</h3>
-        <div id="pillarScores" class="grid grid-cols-2 md:grid-cols-4 gap-8"></div>
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Pillar Scores</h3>
+        <div id="pillarScores" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
       </div>
     </div>
 
     <!-- Core Web Vitals & Performance -->
     <div class="max-w-6xl mx-auto">
-      <div class="card rounded-2xl p-10">
-        <h3 class="text-3xl font-bold mb-8">Core Web Vitals & Performance</h3>
-        <div id="perfGrid" class="grid grid-cols-2 md:grid-cols-4 gap-8"></div>
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Core Web Vitals & Performance</h3>
+        <div id="perfGrid" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
       </div>
     </div>
 
     <!-- Improvement Roadmap -->
     <div class="max-w-6xl mx-auto">
-      <div class="card rounded-2xl p-10">
-        <h3 class="text-3xl font-bold mb-8">Improvement Roadmap</h3>
-        <div id="roadmap" class="prose prose-invert max-w-none text-lg leading-relaxed"></div>
+      <div class="card rounded-3xl p-12">
+        <h3 class="text-4xl font-bold mb-12 text-center">Improvement Roadmap</h3>
+        <div id="roadmap" class="prose prose-invert prose-xl max-w-none text-lg leading-relaxed"></div>
       </div>
     </div>
 
-    <!-- Advanced Diagnostics Table -->
+    <!-- Advanced Diagnostics -->
     <div class="max-w-7xl mx-auto">
-      <div class="card rounded-2xl p-10 overflow-x-auto">
-        <h3 class="text-3xl font-bold mb-8">Advanced Diagnostics (300+ Metrics)</h3>
+      <div class="card rounded-3xl p-12 overflow-x-auto">
+        <h3 class="text-4xl font-bold mb-12 text-center">Advanced Diagnostics (300+ Metrics)</h3>
         <table class="w-full text-left">
           <thead class="bg-gradient-to-r from-emerald-600 to-cyan-600 text-black">
             <tr>
-              <th class="p-4 rounded-tl-lg">#</th>
-              <th class="p-4">Metric</th>
-              <th class="p-4">Category</th>
-              <th class="p-4 text-right">Score</th>
-              <th class="p-4 text-right rounded-tr-lg">Weight</th>
+              <th class="p-6 rounded-tl-2xl">#</th>
+              <th class="p-6">Metric</th>
+              <th class="p-6">Category</th>
+              <th class="p-6 text-right">Score</th>
+              <th class="p-6 text-right rounded-tr-2xl">Weight</th>
             </tr>
           </thead>
           <tbody id="metricsTable" class="divide-y divide-slate-700"></tbody>
@@ -158,9 +159,9 @@ INDEX_HTML = r"""<!DOCTYPE html>
     </div>
 
     <!-- PDF Download -->
-    <div class="text-center py-16">
-      <button onclick="downloadPDF()" class="px-16 py-8 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-black text-3xl rounded-2xl shadow-2xl transform hover:scale-110 transition flex items-center gap-6 mx-auto">
-        <i class="fas fa-file-pdf text-4xl"></i>
+    <div class="text-center py-20">
+      <button onclick="downloadPDF()" class="px-20 py-10 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-black text-4xl rounded-3xl shadow-2xl transform hover:scale-110 transition flex items-center gap-8 mx-auto">
+        <i class="fas fa-file-pdf text-5xl"></i>
         Download Enterprise PDF Report
       </button>
     </div>
@@ -172,7 +173,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
     async function runAudit() {
       const url = document.getElementById("urlInput").value.trim();
       const mode = document.getElementById("modeInput").value;
-      if (!url) return alert("Please enter a URL");
+      if (!url) return alert("Please enter a valid URL");
 
       document.getElementById("results").classList.add("hidden");
       document.getElementById("loading").classList.remove("hidden");
@@ -206,46 +207,49 @@ INDEX_HTML = r"""<!DOCTYPE html>
       const pillarDiv = document.getElementById("pillarScores");
       pillarDiv.innerHTML = "";
       Object.entries(data.pillars || {}).forEach(([pillar, score]) => {
-        const color = score >= 90 ? "text-emerald-400" : score >= 70 ? "text-yellow-400" : "text-red-400";
+        const colorClass = score >= 90 ? "score-good" : score >= 70 ? "score-medium" : "score-bad";
         pillarDiv.innerHTML += `
-          <div class="bg-slate-800/50 rounded-xl p-8 text-center glow">
-            <div class="text-slate-400 text-lg mb-2">${pillar}</div>
-            <div class="text-5xl font-black ${color}">${score}%</div>
+          <div class="bg-slate-800/60 rounded-2xl p-10 text-center glow">
+            <div class="text-slate-400 text-xl mb-4">${pillar}</div>
+            <div class="text-7xl font-black ${colorClass}">${score}%</div>
           </div>`;
       });
 
       // Performance Metrics
       const perfDiv = document.getElementById("perfGrid");
       perfDiv.innerHTML = "";
-      Object.entries(data.perf || {}).forEach(([key, value]) => {
+      const perfKeys = ["lcp_ms", "fcp_ms", "cls", "tbt_ms", "inp_ms", "speed_index_ms", "ttfb_ms", "page_weight_kb", "request_count", "dom_size"];
+      perfKeys.forEach(key => {
+        const label = key.replace(/_/g, ' ').toUpperCase();
+        const value = data.perf[key] ?? "—";
         perfDiv.innerHTML += `
-          <div class="bg-slate-800/50 rounded-xl p-6">
-            <div class="text-slate-400 text-sm mb-1">${key.replace(/_/g, ' ')}</div>
-            <div class="text-2xl font-bold">${value ?? "—"}</div>
+          <div class="bg-slate-800/60 rounded-2xl p-8">
+            <div class="text-slate-400 text-lg mb-3">${label}</div>
+            <div class="text-4xl font-bold">${value}</div>
           </div>`;
       });
 
-      // Roadmap
+      // Roadmap (safe HTML rendering)
       document.getElementById("roadmap").innerHTML = (data.roadmap || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
-      // Metrics Table
+      // Metrics Table (show first 100 for performance)
       const tbody = document.getElementById("metricsTable");
       tbody.innerHTML = "";
-      (data.metrics || []).slice(0, 100).forEach(m => {  // Show first 100 for performance
-        const scoreColor = m.score >= 90 ? "metric-score-good" : m.score >= 70 ? "metric-score-medium" : "metric-score-bad";
+      (data.metrics || []).slice(0, 100).forEach(m => {
+        const scoreColor = m.score >= 90 ? "score-good" : m.score >= 70 ? "score-medium" : "score-bad";
         tbody.innerHTML += `
           <tr>
-            <td class="p-4 text-slate-400">${m.no}</td>
-            <td class="p-4">${m.name}</td>
-            <td class="p-4 text-slate-400">${m.category}</td>
-            <td class="p-4 text-right font-bold ${scoreColor}">${m.score}%</td>
-            <td class="p-4 text-right text-slate-400">${m.weight}</td>
+            <td class="p-6 text-slate-400">${m.no}</td>
+            <td class="p-6">${m.name}</td>
+            <td class="p-6 text-slate-400">${m.category}</td>
+            <td class="p-6 text-right font-bold ${scoreColor}">${m.score}%</td>
+            <td class="p-6 text-right text-slate-400">${m.weight}</td>
           </tr>`;
       });
     }
 
     async function downloadPDF() {
-      if (!auditData) return alert("Run an audit first");
+      if (!auditData) return alert("Please run an audit first");
       try {
         const res = await fetch("/download", {
           method: "POST",
