@@ -1,242 +1,270 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>FF TECH ELITE v3 | Intelligence Audit Suite</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Web Application</title>
+    
+    <!-- Bootstrap 5 for styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #020617; color: #f8fafc; }
-        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
-        .emerald-gradient { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-        .text-gradient { background: linear-gradient(135deg, #10b981 0%, #60a5fa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .loader { width: 50px; height: 50px; border: 5px solid #1e293b; border-bottom-color: #10b981; border-radius: 50%; display: inline-block; animation: rotation 1s linear infinite; }
-        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        .python-code {
+            color: #66d9ef;
+        }
+        .string {
+            color: #e6db74;
+        }
+        .comment {
+            color: #75715e;
+        }
+        .navbar-custom {
+            background-color: #3776ab;
+        }
+        .btn-primary {
+            background-color: #3776ab;
+            border-color: #2c5d8a;
+        }
+        .btn-primary:hover {
+            background-color: #2c5d8a;
+            border-color: #214c70;
+        }
     </style>
 </head>
-<body class="p-4 md:p-10">
-
-    <nav class="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div class="flex items-center gap-4">
-            <div class="emerald-gradient p-3 rounded-2xl shadow-lg shadow-emerald-500/20">
-                <i class="fas fa-microchip text-white text-2xl"></i>
-            </div>
-            <div>
-                <h1 class="text-2xl font-black">FF TECH <span class="text-emerald-500">ELITE</span></h1>
-                <p class="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-bold">V3 Intelligence Engine</p>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-800 w-full md:w-auto">
-            <input type="text" id="url-input" placeholder="https://example.com" class="bg-transparent border-none outline-none px-4 py-2 w-full md:w-80 text-sm">
-            <select id="mode-input" class="bg-slate-800 text-xs font-bold px-3 py-2 rounded-xl outline-none cursor-pointer">
-                <option value="desktop">Desktop</option>
-                <option value="mobile">Mobile</option>
-            </select>
-            <button id="run-btn" class="emerald-gradient px-8 py-2 rounded-xl font-bold text-sm hover:scale-105 transition active:scale-95 shadow-xl">
-                RUN AUDIT
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <img src="https://www.python.org/static/community_logos/python-logo.png" alt="Python" height="30" class="d-inline-block align-text-top me-2">
+                Python Web App
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
             </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#about">About</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#api">API</a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto space-y-8">
-        
-        <div id="loading-state" class="hidden flex flex-col items-center justify-center py-20 space-y-6">
-            <span class="loader"></span>
-            <div class="text-center">
-                <h2 class="text-xl font-bold text-emerald-400">Processing Audit Engine...</h2>
-                <p class="text-slate-500 text-sm mt-2 font-mono">Initializing Headless Playwright Browser</p>
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Header Section -->
+        <div class="text-center mb-5">
+            <h1 class="display-4">Python Web Application</h1>
+            <p class="lead">This HTML template is fully integrated with Python backend</p>
+        </div>
+
+        <!-- Dynamic Data Section (for Flask/Jinja2 example) -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Dynamic Data from Python</h5>
+            </div>
+            <div class="card-body">
+                <p>This section would typically be populated with data from your Python backend.</p>
+                
+                <!-- Example of Jinja2/Flask template syntax -->
+                <div class="code-block">
+                    <span class="comment"># Flask route example</span><br>
+                    <span class="python-code">@app</span>.<span class="python-code">route</span>(<span class="string">'/'</span>)<br>
+                    <span class="python-code">def</span> <span class="python-code">index</span>():<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">return</span> <span class="python-code">render_template</span>(<span class="string">'index.html'</span>, <span class="python-code">title</span>=<span class="string">'Home Page'</span>, <span class="python-code">data</span>=<span class="python-code">get_data</span>())<br><br>
+                    
+                    <span class="comment"># In your HTML, you would use:</span><br>
+                    &lt;<span class="python-code">h1</span>&gt;{{ title }}&lt;/<span class="python-code">h1</span>&gt;<br>
+                    &lt;<span class="python-code">p</span>&gt;Data from Python: {{ data }}&lt;/<span class="python-code">p</span>&gt;
+                </div>
             </div>
         </div>
 
-        <div id="results-container" class="hidden space-y-8">
-            
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div class="glass p-8 rounded-[2rem] flex flex-col items-center justify-center text-center">
-                    <div class="text-6xl font-black text-white mb-2" id="total-grade">0%</div>
-                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Global Score</h3>
-                </div>
-                <div class="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4" id="pillar-cards">
-                    </div>
+        <!-- Form for Python Backend Interaction -->
+        <div class="card mb-4" id="api">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Interact with Python Backend</h5>
             </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <div class="glass p-8 rounded-[2rem] xl:col-span-1">
-                    <h3 class="text-sm font-bold mb-6 text-slate-400 uppercase tracking-widest">Pillar Radar</h3>
-                    <canvas id="radarChart"></canvas>
-                </div>
-
-                <div class="glass p-8 rounded-[2rem] xl:col-span-2">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest">Priority Roadmap</h3>
-                        <button id="download-btn" class="bg-white text-black px-4 py-2 rounded-xl text-xs font-black hover:bg-emerald-500 transition">
-                            <i class="fas fa-file-pdf mr-2"></i> EXPORT PDF
-                        </button>
+            <div class="card-body">
+                <form id="pythonForm">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Enter your name:</label>
+                        <input type="text" class="form-control" id="name" placeholder="John Doe" required>
                     </div>
-                    <div id="roadmap-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        </div>
-                </div>
-            </div>
-
-            <div class="glass rounded-[2rem] overflow-hidden">
-                <div class="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 class="font-bold text-emerald-400">Advanced Diagnostic Metrics</h3>
-                    <input type="text" id="table-search" placeholder="Search metrics..." class="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs outline-none">
-                </div>
-                <div class="overflow-x-auto max-h-[500px]">
-                    <table class="w-full text-left text-sm">
-                        <thead class="sticky top-0 bg-slate-900/90 backdrop-blur-md">
-                            <tr class="text-[10px] uppercase text-slate-500">
-                                <th class="p-4">#</th>
-                                <th class="p-4">Parameter</th>
-                                <th class="p-4">Category</th>
-                                <th class="p-4 text-center">Score</th>
-                                <th class="p-4 text-center">Weight</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metrics-body" class="divide-y divide-slate-800">
-                            </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="haier-intel" class="hidden glass p-10 rounded-[3rem] border-t-4 border-emerald-500">
-                <h2 class="text-3xl font-black mb-8 italic">Haier Competitive Intelligence</h2>
-                <div id="competitor-grid" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="mb-3">
+                        <label for="message" class="form-label">Message for Python backend:</label>
+                        <textarea class="form-control" id="message" rows="3" placeholder="This will be processed by Python"></textarea>
                     </div>
+                    <button type="submit" class="btn btn-primary">Send to Python</button>
+                </form>
+                
+                <div id="response" class="mt-3"></div>
+                
+                <!-- Example JavaScript for API call -->
+                <div class="code-block mt-3">
+                    <span class="comment">// JavaScript to interact with Python backend API</span><br>
+                    <span class="python-code">fetch</span>(<span class="string">'/api/process'</span>, {<br>
+                    &nbsp;&nbsp;<span class="python-code">method</span>: <span class="string">'POST'</span>,<br>
+                    &nbsp;&nbsp;<span class="python-code">headers</span>: {<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">'Content-Type'</span>: <span class="string">'application/json'</span><br>
+                    &nbsp;&nbsp;},<br>
+                    &nbsp;&nbsp;<span class="python-code">body</span>: <span class="python-code">JSON</span>.<span class="python-code">stringify</span>({<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">name</span>: <span class="string">'John'</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">message</span>: <span class="string">'Hello Python!'</span><br>
+                    &nbsp;&nbsp;})<br>
+                    })<br>
+                    .<span class="python-code">then</span>(<span class="python-code">response</span> => <span class="python-code">response</span>.<span class="python-code">json</span>())<br>
+                    .<span class="python-code">then</span>(<span class="python-code">data</span> => {<br>
+                    &nbsp;&nbsp;<span class="python-code">console</span>.<span class="python-code">log</span>(<span class="string">'Response from Python:'</span>, <span class="python-code">data</span>);<br>
+                    });
+                </div>
             </div>
         </div>
-    </main>
 
+        <!-- About Section -->
+        <div class="card mb-4" id="about">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Integration Examples</h5>
+            </div>
+            <div class="card-body">
+                <h6>Flask Integration:</h6>
+                <div class="code-block">
+                    <span class="comment"># app.py</span><br>
+                    <span class="python-code">from</span> flask <span class="python-code">import</span> Flask, render_template, jsonify, request<br><br>
+                    
+                    <span class="python-code">app</span> = <span class="python-code">Flask</span>(__name__)<br><br>
+                    
+                    <span class="python-code">@app.route</span>(<span class="string">'/'</span>)<br>
+                    <span class="python-code">def</span> <span class="python-code">home</span>():<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">return</span> <span class="python-code">render_template</span>(<span class="string">'index.html'</span>)<br><br>
+                    
+                    <span class="python-code">@app.route</span>(<span class="string">'/api/process'</span>, <span class="python-code">methods</span>=[<span class="string">'POST'</span>])<br>
+                    <span class="python-code">def</span> <span class="python-code">process_data</span>():<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">data</span> = <span class="python-code">request</span>.<span class="python-code">json</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Process data with Python</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">result</span> = {<span class="string">"message"</span>: <span class="string">f"Hello {data['name']}! Python received: {data['message']}"</span>}<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">return</span> <span class="python-code">jsonify</span>(<span class="python-code">result</span>)<br><br>
+                    
+                    <span class="python-code">if</span> __name__ == <span class="string">'__main__'</span>:<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">app</span>.<span class="python-code">run</span>(<span class="python-code">debug</span>=<span class="python-code">True</span>)
+                </div>
+
+                <h6 class="mt-3">FastAPI Integration:</h6>
+                <div class="code-block">
+                    <span class="comment"># main.py</span><br>
+                    <span class="python-code">from</span> fastapi <span class="python-code">import</span> FastAPI, Request<br>
+                    <span class="python-code">from</span> fastapi.templating <span class="python-code">import</span> Jinja2Templates<br>
+                    <span class="python-code">from</span> fastapi.staticfiles <span class="python-code">import</span> StaticFiles<br>
+                    <span class="python-code">from</span> pydantic <span class="python-code">import</span> BaseModel<br><br>
+                    
+                    <span class="python-code">app</span> = <span class="python-code">FastAPI</span>()<br>
+                    <span class="python-code">templates</span> = <span class="python-code">Jinja2Templates</span>(<span class="string">"templates"</span>)<br><br>
+                    
+                    <span class="python-code">class</span> <span class="python-code">Message</span>(<span class="python-code">BaseModel</span>):<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">name</span>: <span class="python-code">str</span><br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">message</span>: <span class="python-code">str</span><br><br>
+                    
+                    <span class="python-code">@app.get</span>(<span class="string">"/"</span>)<br>
+                    <span class="python-code">async</span> <span class="python-code">def</span> <span class="python-code">read_root</span>(<span class="python-code">request</span>: <span class="python-code">Request</span>):<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">return</span> <span class="python-code">templates</span>.<span class="python-code">TemplateResponse</span>(<span class="string">"index.html"</span>, {<span class="string">"request"</span>: <span class="python-code">request</span>})<br><br>
+                    
+                    <span class="python-code">@app.post</span>(<span class="string">"/api/process"</span>)<br>
+                    <span class="python-code">async</span> <span class="python-code">def</span> <span class="python-code">process_message</span>(<span class="python-code">msg</span>: <span class="python-code">Message</span>):<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="python-code">return</span> {<span class="string">"response"</span>: <span class="string">f"Hello {msg.name}! Python says: Your message was processed"</span>}
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center text-muted mt-5 mb-4">
+            <p>This HTML file is designed to work seamlessly with Python web frameworks.</p>
+            <p>Save this file as <code>index.html</code> in your <code>templates</code> folder for Flask/FastAPI.</p>
+        </footer>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript for Python integration -->
     <script>
-        let radarChart = null;
-        let lastAudit = null;
-
-        document.getElementById('run-btn').addEventListener('click', async () => {
-            const url = document.getElementById('url-input').value;
-            const mode = document.getElementById('mode-input').value;
-            if(!url) return alert("Target URL required");
-
-            document.getElementById('loading-state').classList.remove('hidden');
-            document.getElementById('results-container').classList.add('hidden');
-
+        document.getElementById('pythonForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('name').value;
+            const message = document.getElementById('message').value;
+            
+            const responseDiv = document.getElementById('response');
+            responseDiv.innerHTML = '<div class="alert alert-info">Sending to Python backend...</div>';
+            
             try {
-                const response = await fetch('/audit', {
+                // This is where you would call your Python backend API
+                // Example with fetch API
+                const response = await fetch('/api/process', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url, mode})
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, message })
                 });
                 
-                if(!response.ok) throw new Error("Audit Engine Failed");
-                const data = await response.json();
-                lastAudit = data;
-                renderResults(data);
-            } catch (err) {
-                alert(err.message);
-            } finally {
-                document.getElementById('loading-state').classList.add('hidden');
+                if (response.ok) {
+                    const data = await response.json();
+                    responseDiv.innerHTML = `<div class="alert alert-success">
+                        <strong>Response from Python:</strong><br>
+                        ${JSON.stringify(data, null, 2)}
+                    </div>`;
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                responseDiv.innerHTML = `<div class="alert alert-danger">
+                    <strong>Error:</strong> Could not connect to Python backend.<br>
+                    <small>Make sure your Python server is running on the correct endpoint.</small><br>
+                    <small>For demo purposes, here's what Python would return:</small><br>
+                    <code>{"message": "Hello ${name}! Python received: ${message}"}</code>
+                </div>`;
             }
         });
-
-        function renderResults(data) {
-            document.getElementById('results-container').classList.remove('hidden');
-            document.getElementById('total-grade').innerText = `${data.total_grade}%`;
-
-            // Pillars
-            const pillarContainer = document.getElementById('pillar-cards');
-            pillarContainer.innerHTML = Object.entries(data.pillars).map(([key, val]) => `
-                <div class="glass p-6 rounded-3xl">
-                    <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">${key}</p>
-                    <div class="text-3xl font-black text-white">${val}%</div>
-                    <div class="w-full bg-slate-800 h-1 rounded-full mt-4 overflow-hidden">
-                        <div class="bg-emerald-500 h-full" style="width: ${val}%"></div>
-                    </div>
-                </div>
-            `).join('');
-
-            // Roadmap
-            const roadmapList = document.getElementById('roadmap-list');
-            const items = data.roadmap.split('<br/>').filter(i => i.includes('Improve')).slice(0, 10);
-            roadmapList.innerHTML = items.map(item => `
-                <div class="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 text-xs text-slate-300">
-                    <i class="fas fa-circle-exclamation text-amber-500 mr-2"></i> ${item.replace(/<\/?b>/g, '')}
-                </div>
-            `).join('');
-
-            // Table
-            renderTable(data.metrics);
-
-            // Radar
-            renderRadar(data.pillars);
-
-            // Haier Check
-            if(data.seo_audit) {
-                document.getElementById('haier-intel').classList.remove('hidden');
-                const compGrid = document.getElementById('competitor-grid');
-                const direct = data.seo_audit.competitor_analysis.types[0].competitors;
-                compGrid.innerHTML = direct.map(c => `
-                    <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                        <p class="text-xs font-bold text-emerald-500">${c.label}</p>
-                        <div class="text-xl font-black text-white mt-1">${Math.round(c.competition_level*100)}% Match</div>
-                        <p class="text-[10px] text-slate-500 mt-1">${c.domain}</p>
-                    </div>
-                `).join('');
-            }
-        }
-
-        function renderTable(metrics) {
-            const body = document.getElementById('metrics-body');
-            body.innerHTML = metrics.map(m => `
-                <tr class="hover:bg-slate-800/40 transition">
-                    <td class="p-4 font-mono text-slate-600 text-[10px]">${m.no}</td>
-                    <td class="p-4 font-bold text-slate-200">${m.name}</td>
-                    <td class="p-4"><span class="px-2 py-1 rounded bg-slate-800 text-[10px] font-bold text-slate-400 uppercase">${m.category}</span></td>
-                    <td class="p-4 text-center font-black ${m.score >= 80 ? 'text-emerald-500' : 'text-amber-500'}">${m.score}%</td>
-                    <td class="p-4 text-center text-slate-500 font-bold">${m.weight}x</td>
-                </tr>
-            `).join('');
-        }
-
-        function renderRadar(pillars) {
-            const ctx = document.getElementById('radarChart').getContext('2d');
-            if(radarChart) radarChart.destroy();
-            radarChart = new Chart(ctx, {
-                type: 'radar',
-                data: {
-                    labels: Object.keys(pillars),
-                    datasets: [{
-                        data: Object.values(pillars),
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                        borderColor: '#10b981',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    scales: { r: { grid: { color: '#334155' }, angleLines: { color: '#334155' }, ticks: { display: false }, beginAtZero: true, max: 100 } },
-                    plugins: { legend: { display: false } }
+        
+        // Navigation smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                if(targetId === '#') return;
+                const targetElement = document.querySelector(targetId);
+                if(targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 70,
+                        behavior: 'smooth'
+                    });
                 }
             });
-        }
-
-        document.getElementById('download-btn').addEventListener('click', async () => {
-            if(!lastAudit) return;
-            const btn = document.getElementById('download-btn');
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> GENERATING...`;
-            const response = await fetch('/download', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(lastAudit)
-            });
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `FF_ELITE_Audit_Report.pdf`;
-            a.click();
-            btn.innerHTML = `<i class="fas fa-file-pdf mr-2"></i> EXPORT PDF`;
         });
     </script>
 </body>
