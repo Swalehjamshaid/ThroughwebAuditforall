@@ -1,8 +1,8 @@
 [phases.setup]
 nixPkgs = ["python3", "gcc", "playwright-driver"]
 
+[phases.install]
+cmds = ["python -m venv /opt/venv", ". /opt/venv/bin/activate && pip install -r requirements.txt"]
+
 [phases.build]
-cmds = [
-    "pip install -r requirements.txt",
-    "python -m playwright install chromium"
-]
+cmds = [". /opt/venv/bin/activate && python -m playwright install chromium"]
