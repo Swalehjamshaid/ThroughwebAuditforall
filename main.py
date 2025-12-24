@@ -2,7 +2,7 @@
 """
 FF Tech — AI Website Audit & Compliance (Single File, ENTERPRISE)
 -------------------------------------------------------------------------------
-Corrected Version: Added Root Route, Template Rendering, and Static File Mounting.
+FIXED: Added Root Route, Jinja2 Template mapping, and Static Mounting.
 """
 
 import os, re, json, time, hashlib, asyncio, csv
@@ -19,6 +19,7 @@ try:
     from fastapi.security import OAuth2PasswordRequestForm
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
+    from fastapi.responses import HTMLResponse
     from pydantic import BaseModel
     HAS_FASTAPI = True
 except Exception:
@@ -659,12 +660,13 @@ def build_pdf_report(path: str, site: str, result: Dict[str, Any], summary: str)
 if HAS_FASTAPI:
     app=FastAPI(title=f"{BRAND} — AI Website Audit & Compliance", version="5.0.0")
     
-    # SETUP FOR STATIC AND TEMPLATES
+    # --- SETUP STATIC FILES AND TEMPLATES ---
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     if not os.path.exists("static"):
         os.makedirs("static")
     
     app.mount("/static", StaticFiles(directory="static"), name="static")
+    # This renders your index.html inside the templates folder
     templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -678,10 +680,9 @@ if HAS_FASTAPI:
         resp.headers['Content-Security-Policy']="default-src 'self' 'unsafe-inline' data: https:;"
         return resp
 
-    # --- ADDED ROOT ROUTE ---
-    @app.get("/", response_class=Response)
+    # --- ADDED ROOT ROUTE FOR DASHBOARD ---
+    @app.get("/", response_class=HTMLResponse)
     async def serve_home(request: Request):
-        """Serves the index.html from templates folder."""
         return templates.TemplateResponse("index.html", {"request": request})
 
     @app.get('/health')
@@ -753,7 +754,6 @@ if HAS_FASTAPI:
     def pdf_audit(audit_id: str, token: str):
         user=require_user(token); a=AUDITS.get(audit_id)
         if not a or a['user']!=user: raise HTTPException(404,'Audit not found')
-        # Save to static folder
         path=f"static/audit_{audit_id}.pdf"; ok=build_pdf_report(path, a['site'], a['result'], a['summary'])
         return {'status':'ok','path':path} if ok else {'status':'pdf_unavailable','path':None}
 
@@ -819,9 +819,9 @@ if HAS_FASTAPI:
         csv_content='\n'.join(out_lines)
         return Response(content=csv_content, media_type='text/csv')
 
-# RUN LOGIC FOR RAILWAY
+# --- RUN BLOCK FOR RAILWAY ---
 if __name__ == "__main__":
     import uvicorn
-    # Dynamically bind to the PORT Railway provides
+    # Railway provides the port via the PORT variable
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
