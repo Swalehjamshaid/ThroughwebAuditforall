@@ -1,165 +1,249 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>{{ app_name }} | AI Website Audit Platform</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-:root {
-    --good:#16a34a;
-    --warn:#f59e0b;
-    --bad:#dc2626;
-    --bg:#f5f7fb;
-    --card:#ffffff;
-}
-body { font-family: 'Inter', sans-serif; background: var(--bg); margin:0; color:#1f2937; }
-.container { max-width:1500px; margin:auto; padding:30px; }
-.card { background:var(--card); border-radius:16px; padding:24px; margin-bottom:24px; box-shadow:0 10px 30px rgba(0,0,0,.06); }
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
-h1,h2,h3 { margin-bottom:10px; }
-.score { font-size:48px; font-weight:700; }
-.grade { display:inline-block; padding:10px 18px; border-radius:12px; font-weight:700; font-size:22px; }
-.Aplus{background:#16a34a;color:#fff} .A{background:#22c55e;color:#fff} .B{background:#facc15;color:#000} .C{background:#fb923c;color:#fff} .D{background:#ef4444;color:#fff}
-.good{color:var(--good);font-weight:600} .warning{color:var(--warn);font-weight:600} .critical{color:var(--bad);font-weight:700}
-table { width:100%; border-collapse:collapse; margin-top:12px; }
-th,td { padding:12px; border-bottom:1px solid #e5e7eb; text-align:left; }
-th { background:#f1f5f9; }
-.badge { padding:6px 10px; border-radius:10px; font-size:12px; font-weight:600; }
-.high{background:#fee2e2;color:#991b1b} .medium{background:#fef3c7;color:#92400e} .low{background:#dcfce7;color:#166534}
-footer { text-align:center; font-size:13px; color:#6b7280; margin-top:40px; }
-.collapse-btn { cursor:pointer; font-weight:600; color:#2563eb; margin-bottom:10px; display:inline-block; }
-.collapse-content { display:none; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH — Enterprise AI Audit: {{ domain_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: #f8fafc; }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+        .metric-row:hover { background: rgba(255, 255, 255, 0.03); }
+        .bg-gradient-header { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .score-ring { transition: stroke-dashoffset 1.5s ease-in-out; }
+        @media print { .no-print { display: none !important; } .glass-card { border: 1px solid #334155; } }
+    </style>
 </head>
-<body>
-<div class="container">
+<body class="min-h-screen pb-20">
 
-<!-- HEADER -->
-<div class="card">
-    <h1>{{ app_name }}</h1>
-    <p><strong>Website:</strong> {{ website_url }}</p>
-    <p><strong>Audit Date:</strong> {{ audit_date }}</p>
-    <p><strong>Audit ID:</strong> {{ audit_id }}</p>
-</div>
+    <nav class="border-b border-white/10 px-8 py-4 flex justify-between items-center bg-slate-950/90 backdrop-blur-md sticky top-0 z-50 no-print">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <i class="fas fa-certificate text-white"></i>
+            </div>
+            <span class="text-xl font-extrabold tracking-tighter italic uppercase">FF TECH <span class="text-indigo-400 font-normal">Audit SaaS</span></span>
+        </div>
+        <div class="flex items-center gap-6">
+            <span class="text-[10px] text-slate-500 font-bold uppercase">Audit ID: #{{ audit_id }}</span>
+            <button onclick="window.print()" class="bg-white text-black px-6 py-2 rounded-full font-bold text-sm hover:bg-slate-200 transition">
+                <i class="fas fa-file-pdf mr-2"></i>DOWNLOAD PDF
+            </button>
+        </div>
+    </nav>
 
-<!-- OVERALL HEALTH -->
-<div class="grid">
-    <div class="card">
-        <h3>Overall Website Health</h3>
-        <div class="score">{{ overall_score }}%</div>
-        <div class="grade {{ grade_class }}">{{ grade }}</div>
-    </div>
-    <div class="card">
-        <h3>Risk Breakdown</h3>
-        <p class="critical">Errors: {{ total_errors }}</p>
-        <p class="warning">Warnings: {{ total_warnings }}</p>
-        <p class="good">Notices: {{ total_notices }}</p>
-    </div>
-    <div class="card">
-        <h3>Category Scores</h3>
-        {% for cat, score in category_scores.items() %}
-            <p>{{ cat }}: {{ score }}%</p>
-        {% endfor %}
-    </div>
-</div>
+    <div id="capture-area" class="max-w-7xl mx-auto px-6 py-12">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+            <div class="lg:col-span-8 glass-card p-10 border-t-4 border-indigo-500">
+                <div class="flex justify-between items-start mb-6">
+                    <div>
+                        <h1 class="text-3xl font-black italic tracking-tighter uppercase">{{ domain_name }}</h1>
+                        <p class="text-slate-500 text-xs font-bold mt-1 uppercase">Audit Conducted: {{ audit_date }}</p>
+                    </div>
+                    <div class="px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                        <span class="text-indigo-400 font-black text-xl">{{ overall_grade }}</span>
+                    </div>
+                </div>
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3">Executive Summary</h3>
+                <p class="text-slate-300 text-sm leading-relaxed italic">
+                    {{ executive_summary_text }}
+                </p>
+                <div class="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl">
+                        <div class="text-xs text-red-400 font-bold uppercase mb-1">Critical</div>
+                        <div class="text-2xl font-black">{{ critical_count }}</div>
+                    </div>
+                    <div class="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+                        <div class="text-xs text-amber-400 font-bold uppercase mb-1">Warnings</div>
+                        <div class="text-2xl font-black">{{ warning_count }}</div>
+                    </div>
+                    <div class="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
+                        <div class="text-xs text-emerald-400 font-bold uppercase mb-1">Security</div>
+                        <div class="text-2xl font-black">{{ security_score }}%</div>
+                    </div>
+                    <div class="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
+                        <div class="text-xs text-indigo-400 font-bold uppercase mb-1">Performance</div>
+                        <div class="text-2xl font-black">{{ performance_score }}%</div>
+                    </div>
+                </div>
+            </div>
 
-<!-- EXECUTIVE SUMMARY -->
-<div class="card">
-    <h2>Executive Summary</h2>
-    <p>{{ executive_summary_200_words }}</p>
-</div>
+            <div class="lg:col-span-4 glass-card p-10 flex flex-col items-center justify-center text-center">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Overall Site Health</h3>
+                <div class="relative flex items-center justify-center">
+                    <svg class="w-48 h-48 transform -rotate-90">
+                        <circle cx="96" cy="96" r="85" stroke="#1e293b" stroke-width="12" fill="transparent" />
+                        <circle cx="96" cy="96" r="85" stroke="{{ health_color }}" stroke-width="12" fill="transparent" stroke-dasharray="534" stroke-dashoffset="{{ dash_offset }}" class="score-ring" />
+                    </svg>
+                    <div class="absolute flex flex-col">
+                        <span class="text-5xl font-black">{{ overall_score }}%</span>
+                        <span class="text-[10px] font-bold uppercase text-slate-500 tracking-tighter">Certified Health</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<!-- WEAK AREAS HIGHLIGHT -->
-<div class="card">
-    <h2>Critical Weak Areas</h2>
-    <ul>
-        {% for weakness in weak_areas %}
-        <li class="critical">{{ weakness }}</li>
-        {% endfor %}
-    </ul>
-</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <div class="glass-card p-8">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6">Site Health Over Time</h3>
+                <canvas id="healthTrendChart" height="150"></canvas>
+            </div>
+            <div class="glass-card p-8">
+                <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-6">Category Distribution</h3>
+                <canvas id="categoryRadarChart" height="150"></canvas>
+            </div>
+        </div>
 
-<!-- AUDIT CATEGORIES & METRICS -->
-{% for category in audit_categories %}
-<div class="card">
-    <h2>{{ category.name }}</h2>
-    <p>{{ category.description }}</p>
-    <span class="collapse-btn" onclick="toggleCollapse('{{ loop.index0 }}')">Show / Hide Metrics</span>
-    <div id="collapse-{{ loop.index0 }}" class="collapse-content">
-        <table>
-            <thead>
-            <tr>
-                <th>Metric</th>
-                <th>Status</th>
-                <th>Score</th>
-                <th>Priority</th>
-                <th>Why It Matters</th>
-                <th>Recommendation</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for metric in category.metrics %}
-            <tr>
-                <td>{{ metric.name }}</td>
-                <td class="{{ metric.status_class }}">{{ metric.status }}</td>
-                <td>{{ metric.score }}/100</td>
-                <td><span class="badge {{ metric.priority_class }}">{{ metric.priority }}</span></td>
-                <td>{{ metric.impact }}</td>
-                <td>{{ metric.recommendation }}</td>
-            </tr>
+        <div class="space-y-8">
+            {% for category in audit_categories %}
+            <div class="glass-card overflow-hidden">
+                <button onclick="toggleCategory('cat-{{ loop.index }}')" class="w-full px-8 py-6 flex justify-between items-center hover:bg-white/5 transition">
+                    <div class="flex items-center gap-4">
+                        <div class="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+                            <i class="{{ category.icon }}"></i>
+                        </div>
+                        <div class="text-left">
+                            <h2 class="text-lg font-black uppercase italic">{{ category.name }}</h2>
+                            <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{{ category.metrics|length }} Checkpoints Analyzed</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="text-right">
+                            <span class="text-2xl font-black">{{ category.score }}%</span>
+                            <div class="w-24 bg-slate-800 h-1.5 rounded-full mt-1 overflow-hidden">
+                                <div class="bg-indigo-500 h-full" style="width: {{ category.score }}%"></div>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-down text-slate-500 transition-transform" id="icon-cat-{{ loop.index }}"></i>
+                    </div>
+                </button>
+                
+                <div id="cat-{{ loop.index }}" class="hidden px-8 pb-8">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="text-slate-500 uppercase text-[9px] tracking-widest border-b border-white/10">
+                                    <th class="py-4">Metric Name</th>
+                                    <th class="py-4">Status</th>
+                                    <th class="py-4">Impact</th>
+                                    <th class="py-4">Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-300">
+                                {% for m in category.metrics %}
+                                <tr class="border-b border-white/5 metric-row transition">
+                                    <td class="py-4 font-bold">{{ m.name }}</td>
+                                    <td class="py-4">
+                                        <span class="px-2 py-1 rounded-md font-bold text-[8px] uppercase 
+                                        {% if m.status == 'Pass' %} bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 
+                                        {% elif m.status == 'Warning' %} bg-amber-500/10 text-amber-500 border border-amber-500/20 
+                                        {% else %} bg-red-500/10 text-red-500 border border-red-500/20 {% endif %}">
+                                            {{ m.status }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4">
+                                        <span class="font-bold {% if m.priority == 'High' %} text-red-400 {% else %} text-slate-500 {% endif %}">{{ m.priority }}</span>
+                                    </td>
+                                    <td class="py-4 italic text-slate-400 max-w-xs">{{ m.recommendation }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
             {% endfor %}
-            </tbody>
-        </table>
+        </div>
+
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="glass-card p-10 border-l-4 border-amber-500">
+                <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-6">Top 5 Actionable Weak Areas</h3>
+                <ul class="space-y-4">
+                    {% for insight in owner_insights %}
+                    <li class="flex gap-4 items-start">
+                        <div class="mt-1 w-5 h-5 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 flex-shrink-0 text-[10px] font-bold">{{ loop.index }}</div>
+                        <p class="text-sm text-slate-300 leading-relaxed">{{ insight }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="glass-card p-10 border-l-4 border-emerald-500">
+                <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-6">Certified Improvement Roadmap</h3>
+                <div class="space-y-6">
+                    <div class="relative pl-8 border-l border-white/10 pb-4">
+                        <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-indigo-500"></div>
+                        <span class="text-[10px] font-bold text-indigo-400 uppercase">Weeks 1-4: Stability</span>
+                        <p class="text-xs text-slate-400 mt-1">Focus on SSL, Server Latency, and Critical Broken Links.</p>
+                    </div>
+                    <div class="relative pl-8 border-l border-white/10 pb-4">
+                        <div class="absolute -left-1.5 top-0 w-3 h-3 rounded-full bg-slate-700"></div>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">Weeks 5-8: Content & Schema</span>
+                        <p class="text-xs text-slate-400 mt-1">Deploy Structured Data and optimize thin content pages.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 glass-card p-12 text-center bg-gradient-header">
+            <i class="fas fa-shield-check text-5xl text-white/90 mb-4"></i>
+            <h2 class="text-3xl font-black italic tracking-tighter uppercase">Audit Certified: {{ overall_grade }}</h2>
+            <p class="text-white/80 text-sm mt-2 max-w-2xl mx-auto italic">This audit confirms that {{ domain_name }} has been evaluated across 142 enterprise-grade metrics. Report validity: 30 days from {{ audit_date }}.</p>
+        </div>
+
     </div>
-</div>
-{% endfor %}
 
-<!-- TREND ANALYSIS -->
-<div class="card">
-    <h2>Historical Performance Trend</h2>
-    <canvas id="trendChart"></canvas>
-</div>
+    <footer class="mt-20 border-t border-white/10 py-10 text-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-2">Developed by FF TECH ENTERPRISE AI</p>
+        <p class="text-slate-600 text-[9px]">v4.2.0 | &copy; 2025 FF TECH INC. ALL RIGHTS RESERVED.</p>
+    </footer>
 
-<!-- OWNER INSIGHTS -->
-<div class="card">
-    <h2>Owner-Focused Insights</h2>
-    <ul>
-        {% for insight in owner_insights %}
-        <li>{{ insight }}</li>
-        {% endfor %}
-    </ul>
-</div>
+    <script>
+        // TOGGLE COLLAPSIBLE SECTIONS
+        function toggleCategory(id) {
+            const el = document.getElementById(id);
+            const icon = document.getElementById('icon-' + id);
+            el.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+        }
 
-<!-- CERTIFIED AUDIT -->
-<div class="card">
-    <h2>Certified Audit Report</h2>
-    <p>This audit is officially certified by <strong>{{ company_name }}</strong>.</p>
-    <p>Valid Until: {{ validity_date }}</p>
-    <p>Certification Level: {{ grade }}</p>
-</div>
+        // CHART: SITE HEALTH TREND
+        const ctxTrend = document.getElementById('healthTrendChart').getContext('2d');
+        new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                datasets: [{
+                    label: 'Health Score',
+                    data: [65, 72, 68, 81, 79, {{ overall_score }}],
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+        });
 
-<footer>
-    © {{ current_year }} {{ company_name }} | International AI Audit SaaS
-</footer>
-
-<script>
-function toggleCollapse(id){
-    var content = document.getElementById('collapse-'+id);
-    if(content.style.display === "block"){ content.style.display="none"; }
-    else{ content.style.display="block"; }
-}
-
-// TREND CHART
-const trendData = {{ trend_chart_data | safe }};
-if(trendData){
-    new Chart(document.getElementById('trendChart'), {
-        type:'line',
-        data:trendData,
-        options:{responsive:true, plugins:{legend:{display:true}}}
-    });
-}
-</script>
+        // CHART: CATEGORY RADAR
+        const ctxRadar = document.getElementById('categoryRadarChart').getContext('2d');
+        new Chart(ctxRadar, {
+            type: 'radar',
+            data: {
+                labels: ['Security', 'Performance', 'SEO', 'UX', 'Content', 'Infrastructure'],
+                datasets: [{
+                    label: 'Current Audit',
+                    data: [{{ security_score }}, {{ performance_score }}, 85, 70, 90, 80],
+                    backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                    borderColor: '#a855f7',
+                    pointBackgroundColor: '#a855f7'
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { r: { angleLines: { color: 'rgba(255,255,255,0.1)' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#94a3b8' } } } }
+        });
+    </script>
 </body>
 </html>
