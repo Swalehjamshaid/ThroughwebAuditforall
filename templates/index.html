@@ -1,257 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>FF Tech — Enterprise AI Website Audit</title>
-    <style>
-        :root {
-            --primary: #667eea; --primary-dark: #764ba2; --success: #4caf50;
-            --warning: #ff9800; --danger: #f44336; --light: #f8f9fa;
-            --dark: #343a40; --gray: #6c757d;
-        }
-        body {
-            font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: #333; margin: 0; min-height: 100vh;
-        }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { text-align: center; color: white; padding: 40px 20px; }
-        .card { background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; margin: 20px 0; }
-        
-        /* Form Styling */
-        .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; }
-        input, select { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        
-        /* Output Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-top: 20px; }
-        .stat-card { background: var(--light); padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); }
-        .stat-card h4 { margin: 0 0 10px 0; color: var(--primary-dark); font-size: 0.9rem; text-transform: uppercase; }
-        .stat-item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
-        .val { font-weight: bold; color: var(--dark); }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FF Tech — Enterprise AI Website Audit</title>
+  <style>
+    :root {
+      --primary: #667eea; --primary-dark: #764ba2; --success: #4caf50;
+      --warning: #ff9800; --danger: #f44336; --light: #f8f9fa;
+      --dark: #343a40; --gray: #6c757d;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: #333; margin: 0; padding: 0; min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header { text-align: center; color: white; padding: 40px 20px; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; margin: 20px 0; }
+    
+    /* Config Panel */
+    .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--gray); }
+    input, select { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+    
+    /* Stats & Score Circle */
+    .score-layout { display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 30px; margin-bottom: 30px; }
+    .score-circle { width: 160px; height: 160px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 2.5rem; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .grade-a { background: var(--success); } .grade-b { background: #8bc34a; } .grade-c { background: var(--warning); } .grade-d { background: var(--danger); }
 
-        /* Terminal & Results */
-        .terminal-loader { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 0.8rem; display: none; max-height: 200px; overflow-y: auto; }
-        .results { display: none; }
-        .score-row { display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; margin-bottom: 30px; }
-        .score-circle { width: 150px; height: 150px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 2.2rem; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-        
-        .grade-a { background: #4caf50; } .grade-b { background: #8bc34a; }
-        .grade-c { background: #ff9800; } .grade-d { background: #f44336; }
-        
-        button { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; padding: 15px 30px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
-        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .advanced-btn { background: none; border: 1px solid var(--gray); color: var(--gray); width: auto; padding: 5px 15px; margin-bottom: 10px; border-radius: 5px; font-size: 0.8rem; }
-    </style>
+    /* Results Grid */
+    .outputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .stat-box { background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--primary); }
+    .stat-box h4 { margin: 0 0 15px 0; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
+    .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    .data-row:last-child { border-bottom: none; }
+    .data-val { font-weight: bold; color: var(--dark); }
+
+    /* UI Components */
+    .terminal-loader { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.8rem; display: none; max-height: 200px; overflow-y: auto; margin: 20px 0; }
+    button { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; padding: 16px 32px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+    .adv-toggle { background: none; border: 1px solid var(--gray); color: var(--gray); width: auto; padding: 6px 15px; font-size: 0.75rem; margin-top: 10px; }
+  </style>
 </head>
 <body>
 
 <div class="container">
-    <header>
-        <h1>FF Tech — AI Enterprise Audit</h1>
-        <p>Full-Stack Compliance & Performance Analysis</p>
-    </header>
+  <header>
+    <h1>FF Tech — AI Website Audit</h1>
+    <p>Enterprise Compliance, SEO & Performance Dashboard</p>
+  </header>
 
-    <div class="card">
-        <h2>Audit Configuration</h2>
-        <form id="auditForm">
-            <div class="form-group">
-                <label>Target Website URL</label>
-                <input type="text" id="url" placeholder="https://example.com" required>
-            </div>
+  <div class="card">
+    <h2>Audit Configuration</h2>
+    <form id="auditForm">
+      <div class="form-group">
+        <label>Target URL (url)</label>
+        <input type="text" id="url" placeholder="https://example.com" required>
+      </div>
 
-            <button type="button" class="advanced-btn" onclick="document.getElementById('adv').style.display='grid'">Show Advanced Python Inputs</button>
-            
-            <div class="input-grid" id="adv" style="display:none">
-                <div class="form-group">
-                    <label>Max Pages (max_pages)</label>
-                    <input type="number" id="max_pages" value="15">
-                </div>
-                <div class="form-group">
-                    <label>Concurrency (concurrency)</label>
-                    <input type="number" id="concurrency" value="24">
-                </div>
-                <div class="form-group">
-                    <label>User Agent (user_agent)</label>
-                    <input type="text" id="user_agent" value="FFTechAuditBot/2.0">
-                </div>
-                <div class="form-group">
-                    <label>PSI Strategy</label>
-                    <select id="psi_strategy">
-                        <option value="mobile">Mobile</option>
-                        <option value="desktop">Desktop</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Link Sample/Page</label>
-                    <input type="number" id="link_sample" value="25">
-                </div>
-                <div class="form-group">
-                    <label>Sitemap Depth</label>
-                    <input type="number" id="sitemap_depth" value="4">
-                </div>
-            </div>
+      <button type="button" class="adv-toggle" onclick="document.getElementById('advConfig').style.display='grid'">⚙️ Advanced Python Settings</button>
+      
+      <div class="config-grid" id="advConfig" style="display:none;">
+        <div class="form-group">
+          <label>Max Pages (max_pages)</label>
+          <input type="number" id="max_pages" value="20">
+        </div>
+        <div class="form-group">
+          <label>Threads (concurrency)</label>
+          <input type="number" id="concurrency" value="24">
+        </div>
+        <div class="form-group">
+          <label>User Agent (user_agent)</label>
+          <input type="text" id="user_agent" value="FFTechAuditBot/2.0">
+        </div>
+        <div class="form-group">
+          <label>PSI Strategy (psi_strategy)</label>
+          <select id="psi_strategy">
+            <option value="mobile">Mobile</option>
+            <option value="desktop">Desktop</option>
+          </select>
+        </div>
+      </div>
 
-            <div style="margin: 15px 0;">
-                <input type="checkbox" id="respect_robots" checked> Respect robots.txt
-                <input type="checkbox" id="deep_scan" checked style="margin-left: 20px;"> Deep Scan (Recursive)
-            </div>
+      <div style="margin: 20px 0;">
+        <label><input type="checkbox" id="respect_robots" checked> Respect robots.txt</label>
+        <label style="margin-left:20px;"><input type="checkbox" id="deep" checked> Recursive Deep Scan</label>
+      </div>
 
-            <button type="submit" id="submitBtn">Execute AI Audit</button>
-        </form>
+      <button type="submit" id="submitBtn">Start AI Engine</button>
+    </form>
+  </div>
+
+  <div class="terminal-loader" id="terminal"></div>
+
+  <div id="results" class="card" style="display:none;">
+    <div class="score-layout">
+      <div class="score-circle" id="scoreCircle">
+        <div id="overallScore">0</div>
+        <div id="gradeLabel" style="font-size: 1rem;">A+</div>
+      </div>
+      <div style="flex: 1; min-width: 300px;">
+        <h2 id="resUrl" style="margin:0;"></h2>
+        <h3 id="classification" style="color: var(--primary-dark); margin: 5px 0;"></h3>
+        <p id="resDate" style="color: var(--gray);"></p>
+        <button id="pdfBtn" style="width:auto; padding: 10px 25px; background: var(--success);">Download Certified PDF</button>
+      </div>
     </div>
 
-    <div class="terminal-loader" id="terminal"></div>
-
-    <div class="card results" id="results">
-        <div class="score-row">
-            <div class="score-circle" id="scoreCircle">
-                <span id="scoreVal">0</span>
-                <small id="gradeText" style="font-size: 1rem;">A+</small>
-            </div>
-            <div style="text-align: left;">
-                <h2 id="resUrl"></h2>
-                <h3 id="classification">Excellent</h3>
-                <p id="goodBad">Status: Good</p>
-                <button id="pdfBtn" style="width: auto; background: #28a745; padding: 10px 20px;">Download Certified PDF</button>
-            </div>
-        </div>
-
-        <div class="summary-text" id="summaryBox"></div>
-
-        <h3>Detailed Metrics</h3>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h4>SEO & Content</h4>
-                <div class="stat-item">Missing Titles: <span class="val" id="cnt_titles">0</span></div>
-                <div class="stat-item">Missing Meta: <span class="val" id="cnt_meta">0</span></div>
-                <div class="stat-item">Missing H1: <span class="val" id="cnt_h1">0</span></div>
-                <div class="stat-item">Multiple H1: <span class="val" id="cnt_h1_multi">0</span></div>
-            </div>
-            <div class="stat-card">
-                <h4>Security & SSL</h4>
-                <div class="stat-item">HTTPS Protocol: <span class="val" id="cnt_https">OK</span></div>
-                <div class="stat-item">Mixed Content: <span class="val" id="cnt_mixed">0</span></div>
-                <div class="stat-item">HSTS Header: <span class="val" id="cnt_hsts">0</span></div>
-                <div class="stat-item">CSP Header: <span class="val" id="cnt_csp">0</span></div>
-            </div>
-            <div class="stat-card">
-                <h4>Performance (Core)</h4>
-                <div class="stat-item">Gzip/Brotli Missing: <span class="val" id="cnt_gzip">0</span></div>
-                <div class="stat-item">Render Block CSS: <span class="val" id="cnt_rb_css">0</span></div>
-                <div class="stat-item">Render Block JS: <span class="val" id="cnt_rb_js">0</span></div>
-                <div class="stat-item">Images Missing Alt: <span class="val" id="cnt_alt">0</span></div>
-            </div>
-            <div class="stat-card">
-                <h4>Accessibility & I18N</h4>
-                <div class="stat-item">Missing HTML Lang: <span class="val" id="cnt_lang">0</span></div>
-                <div class="stat-item">Invalid ARIA: <span class="val" id="cnt_aria">0</span></div>
-                <div class="stat-item">Broken Int. Links: <span class="val" id="cnt_links_int">0</span></div>
-                <div class="stat-item">Hreflang Issues: <span class="val" id="cnt_hreflang">0</span></div>
-            </div>
-        </div>
+    <div class="stat-box" style="margin-bottom:30px; border-left: 5px solid var(--primary-dark);">
+      <h4>Executive Summary (AI Generated)</h4>
+      <p id="summaryText" style="line-height:1.6; font-style: italic;"></p>
     </div>
+
+    <div class="outputs-grid">
+      <div class="stat-box">
+        <h4>SEO & Content</h4>
+        <div class="data-row"><span>Missing Titles</span><span class="data-val" id="cnt_titles">0</span></div>
+        <div class="data-row"><span>Missing Meta</span><span class="data-val" id="cnt_meta">0</span></div>
+        <div class="data-row"><span>Missing H1</span><span class="data-val" id="cnt_h1">0</span></div>
+        <div class="data-row"><span>Broken Internal Links</span><span class="data-val" id="cnt_broken">0</span></div>
+      </div>
+
+      <div class="stat-box">
+        <h4>Security & Compliance</h4>
+        <div class="data-row"><span>HSTS Missing</span><span class="data-val" id="cnt_hsts">0</span></div>
+        <div class="data-row"><span>CSP Missing</span><span class="data-val" id="cnt_csp">0</span></div>
+        <div class="data-row"><span>Mixed Content</span><span class="data-val" id="cnt_mixed">0</span></div>
+        <div class="data-row"><span>Cookie Banner Found</span><span class="data-val" id="cnt_cookie">0</span></div>
+      </div>
+
+      <div class="stat-box">
+        <h4>Technical Performance</h4>
+        <div class="data-row"><span>Avg Response (ms)</span><span class="data-val" id="avg_resp">0</span></div>
+        <div class="data-row"><span>Avg HTML (kb)</span><span class="data-val" id="avg_html">0</span></div>
+        <div class="data-row"><span>Gzip Missing</span><span class="data-val" id="cnt_gzip">0</span></div>
+        <div class="data-row"><span>Render Blocking CSS</span><span class="data-val" id="cnt_rb_css">0</span></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-    const auditForm = document.getElementById('auditForm');
-    const terminal = document.getElementById('terminal');
-    const resultsSec = document.getElementById('results');
-    const submitBtn = document.getElementById('submitBtn');
-    let sessionToken = "demo_session_token";
+  const auditForm = document.getElementById('auditForm');
+  const terminal = document.getElementById('terminal');
+  const resultsSec = document.getElementById('results');
+  const submitBtn = document.getElementById('submitBtn');
+  const sessionToken = "demo_session_token";
 
-    function log(msg) {
-        terminal.style.display = 'block';
-        const line = document.createElement('div');
-        line.textContent = `> [${new Date().toLocaleTimeString()}] ${msg}`;
-        terminal.appendChild(line);
-        terminal.scrollTop = terminal.scrollHeight;
+  function log(msg) {
+    terminal.style.display = 'block';
+    const line = document.createElement('div');
+    line.textContent = `> [${new Date().toLocaleTimeString()}] ${msg}`;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  auditForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    resultsSec.style.display = 'none';
+    terminal.innerHTML = '';
+    submitBtn.disabled = true;
+
+    const payload = {
+      url: document.getElementById('url').value.trim(),
+      deep: document.getElementById('deep').checked,
+      max_pages: parseInt(document.getElementById('max_pages').value),
+      respect_robots: document.getElementById('respect_robots').checked,
+      concurrency: parseInt(document.getElementById('concurrency').value),
+      user_agent: document.getElementById('user_agent').value,
+      psi_strategy: document.getElementById('psi_strategy').value,
+      link_check_sample_per_page: 25,
+      sitemap_max_depth: 4,
+      sitemap_max_urls: 50000
+    };
+
+    try {
+      log(`Authorizing with Python Enterprise backend...`);
+      const startRes = await fetch(`/audit/start?token=${sessionToken}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!startRes.ok) throw new Error("Auth/Validation Failed.");
+      const startData = await startRes.json();
+      log(`Scanning ${payload.url} using ${payload.concurrency} async workers...`);
+
+      const dataRes = await fetch(`/audit/${startData.audit_id}?token=${sessionToken}`);
+      const data = await dataRes.json();
+      
+      renderDashboard(data, startData.audit_id);
+      log(`Audit Finalized. Results Rendered.`);
+    } catch (err) {
+      log(`CRITICAL ERROR: ${err.message}`);
+    } finally {
+      submitBtn.disabled = false;
     }
+  });
 
-    auditForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        resultsSec.style.display = 'none';
-        terminal.innerHTML = '';
-        submitBtn.disabled = true;
+  function renderDashboard(data, auditId) {
+    const res = data.result;
+    const counts = res.counts;
 
-        const payload = {
-            url: document.getElementById('url').value.trim(),
-            deep: document.getElementById('deep_scan').checked,
-            max_pages: parseInt(document.getElementById('max_pages').value),
-            respect_robots: document.getElementById('respect_robots').checked,
-            concurrency: parseInt(document.getElementById('concurrency').value),
-            user_agent: document.getElementById('user_agent').value,
-            psi_strategy: document.getElementById('psi_strategy').value,
-            link_check_sample_per_page: parseInt(document.getElementById('link_sample').value),
-            sitemap_max_depth: parseInt(document.getElementById('sitemap_depth').value),
-            sitemap_max_urls: 50000
-        };
+    resultsSec.style.display = 'block';
+    document.getElementById('resUrl').textContent = data.site;
+    document.getElementById('overallScore').textContent = res.overall_score;
+    document.getElementById('gradeLabel').textContent = res.grade;
+    document.getElementById('classification').textContent = res.classification;
+    document.getElementById('summaryText').textContent = data.summary;
+    document.getElementById('resDate').textContent = "Audit Date: " + new Date().toLocaleDateString();
 
-        try {
-            log(`Authorizing request and initializing ${payload.concurrency} async threads...`);
-            const startRes = await fetch(`/audit/start?token=${sessionToken}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+    // Circle Grade Class
+    const circle = document.getElementById('scoreCircle');
+    circle.className = 'score-circle ' + (res.overall_score >= 85 ? 'grade-a' : res.overall_score >= 70 ? 'grade-b' : 'grade-c');
 
-            if (!startRes.ok) throw new Error("Verification Failed. Check Python console.");
+    // MAPPING DATA FROM PYTHON COUNTS
+    document.getElementById('cnt_titles').textContent = counts.missing_titles;
+    document.getElementById('cnt_meta').textContent = counts.missing_meta_descriptions;
+    document.getElementById('cnt_h1').textContent = counts.missing_h1;
+    document.getElementById('cnt_broken').textContent = counts.broken_internal_links_total;
+    
+    document.getElementById('cnt_hsts').textContent = counts.hsts_missing_pages;
+    document.getElementById('cnt_csp').textContent = counts.csp_missing_pages;
+    document.getElementById('cnt_mixed').textContent = counts.mixed_content_pages;
+    document.getElementById('cnt_cookie').textContent = counts.cookie_banner_pages > 0 ? "Yes" : "No";
 
-            const startData = await startRes.json();
-            log(`Crawl Started. Processing ${payload.max_pages} pages...`);
+    document.getElementById('avg_resp').textContent = res.summary.avg_response_time_ms;
+    document.getElementById('avg_html').textContent = res.summary.avg_html_size_kb;
+    document.getElementById('cnt_gzip').textContent = counts.gzip_missing_pages;
+    document.getElementById('cnt_rb_css').textContent = res.summary.render_blocking_pages.css_in_head;
 
-            const dataRes = await fetch(`/audit/${startData.audit_id}?token=${sessionToken}`);
-            const data = await dataRes.json();
-            
-            displayAllData(data, startData.audit_id);
-            log(`Audit finalized. Dashboard updated.`);
-        } catch (err) {
-            log(`ERROR: ${err.message}`);
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-
-    function displayAllData(data, auditId) {
-        resultsSec.style.display = 'block';
-        const res = data.result;
-        const counts = res.counts;
-
-        // Header Results
-        document.getElementById('resUrl').textContent = data.site;
-        document.getElementById('scoreVal').textContent = res.overall_score;
-        document.getElementById('gradeText').textContent = res.grade;
-        document.getElementById('classification').textContent = res.classification;
-        document.getElementById('summaryBox').innerHTML = data.summary;
-
-        // Score Color
-        const circle = document.getElementById('scoreCircle');
-        circle.className = 'score-circle ' + (res.overall_score >= 85 ? 'grade-a' : res.overall_score >= 70 ? 'grade-b' : 'grade-c');
-
-        // MAPPING ALL PYTHON OUTPUTS
-        document.getElementById('cnt_titles').textContent = counts.missing_titles;
-        document.getElementById('cnt_meta').textContent = counts.missing_meta_descriptions;
-        document.getElementById('cnt_h1').textContent = counts.missing_h1;
-        document.getElementById('cnt_h1_multi').textContent = counts.multiple_h1;
-        document.getElementById('cnt_https').textContent = data.site.startsWith('https') ? 'Secure' : 'Insecure';
-        document.getElementById('cnt_mixed').textContent = counts.mixed_content_pages;
-        document.getElementById('cnt_hsts').textContent = counts.hsts_missing_pages;
-        document.getElementById('cnt_csp').textContent = counts.csp_missing_pages;
-        document.getElementById('cnt_gzip').textContent = counts.gzip_missing_pages;
-        document.getElementById('cnt_rb_css').textContent = data.result.summary.render_blocking_pages.css_in_head;
-        document.getElementById('cnt_rb_js').textContent = data.result.summary.render_blocking_pages.js_in_head;
-        document.getElementById('cnt_alt').textContent = counts.images_missing_alt_total;
-        document.getElementById('cnt_lang').textContent = counts.html_lang_missing_pages;
-        document.getElementById('cnt_aria').textContent = counts.invalid_aria_pages;
-        document.getElementById('cnt_links_int').textContent = counts.broken_internal_links_total;
-        document.getElementById('cnt_hreflang').textContent = counts.hreflang_missing_pages;
-
-        // PDF download setup
-        document.getElementById('pdfBtn').onclick = async () => {
-            const pdfRes = await fetch(`/audit/${auditId}/pdf?token=${sessionToken}`);
-            const pdfData = await pdfRes.json();
-            if (pdfData.status === 'ok') window.open('/' + pdfData.path, '_blank');
-        };
-    }
+    document.getElementById('pdfBtn').onclick = async () => {
+      const pdfRes = await fetch(`/audit/${auditId}/pdf?token=${sessionToken}`);
+      const pdfData = await pdfRes.json();
+      if (pdfData.status === 'ok') window.open('/' + pdfData.path, '_blank');
+    };
+  }
 </script>
 </body>
 </html>
