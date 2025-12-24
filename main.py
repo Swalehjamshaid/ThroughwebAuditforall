@@ -1,706 +1,899 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
-Website Audit Tool (Single File)
---------------------------------
-A comprehensive, single-file Python script that audits a modern website across
-technical SEO, on-page SEO, performance, security, mobile usability,
-international SEO, and advanced metrics, and produces a JSON report with
-category scores and an overall classification (Excellent / Good / Needs Improvement / Poor).
+Web Audit Pro (Single File)
+---------------------------
+Adds:
+- Executive PDF report (summary + charts via ReportLab + Matplotlib)
+- Asynchronous crawling (asyncio + httpx if available; fallback to requests with thread offload)
+- Google Search Console integration (indexed pages via Sitemaps API)
+- SEMrush / Ahrefs integration placeholders (backlinks & authority)
+
 Usage:
-    python website_audit.py --url https://example.com --max-pages 100 --timeout 10
-Optional:
-    --pagespeed-api-key YOUR_KEY # to fetch Core Web Vitals via PSI
-    --include-external # also crawl external links (default: internal only)
-    --output report.json # write JSON report to a file
+  python web_audit_pro.py --url https://example.com --max-pages 100 --timeout 10 \
+      --user-agent "WebAuditPro/1.0" --respect-robots --concurrency 20 \
+      --pagespeed-api-key YOUR_PSI_KEY \
+      --gsc-credentials path/to/creds.json --gsc-property https://example.com/ \
+      --semrush-key YOUR_SEMRUSH_KEY --ahrefs-key YOUR_AHREFS_KEY \
+      --out audit_report.json --pdf-out audit_report.pdf
+
 Notes:
-- This tool performs light crawling (BFS), respects domain boundaries by default.
-- Some advanced metrics require external APIs (Google PageSpeed Insights, GSC, SEMrush).
-  Stub hooks are provided. If no API key is supplied, those metrics will be marked as "unavailable".
-- Scoring is heuristic and transparent. Adjust weights as needed.
-Author: M365 Copilot
+- httpx is optional. If missing, the crawler uses requests under asyncio.to_thread.
+- GSC Sitemaps listing requires site verification and proper OAuth credentials.
+- SEMrush/Ahrefs integrations require paid API access; functions are stubs that you can enable.
 """
+
 import argparse
+import asyncio
 import json
+import os
 import re
 import time
-import urllib.parse as urlparse
-from collections import defaultdict, deque
-from datetime import datetime
-from typing import Dict, List, Set, Tuple
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Tuple
+from urllib.parse import urljoin, urlparse
+import urllib.robotparser as robotparser
+
 import requests
 from bs4 import BeautifulSoup
-# ---------------------------- Utility Functions ---------------------------- #
-def normalize_url(base: str, link: str) -> str:
-    """Resolve relative links, strip fragments, normalize scheme/host."""
+
+# Optional httpx for async crawling
+try:
+    import httpx  # type: ignore
+    HAS_HTTPX = True
+except Exception:
+    HAS_HTTPX = False
+
+# PDF & Charts
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.pdfgen import canvas
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Image
+import matplotlib
+matplotlib.use('Agg')  # headless backend
+import matplotlib.pyplot as plt
+
+# -------------------------------
+# Data Structures
+# -------------------------------
+@dataclass
+class PageMetrics:
+    url: str
+    status_code: Optional[int] = None
+    final_url: Optional[str] = None
+    redirect_chain: List[str] = field(default_factory=list)
+    html_size_bytes: int = 0
+    response_time_ms: Optional[int] = None
+    title: Optional[str] = None
+    meta_description: Optional[str] = None
+    h1: List[str] = field(default_factory=list)
+    headings: Dict[str, List[str]] = field(default_factory=lambda: defaultdict(list))
+    canonical: Optional[str] = None
+    meta_robots: Optional[str] = None
+    hreflang: List[Tuple[str, str]] = field(default_factory=list)  # (lang, href)
+    og_tags_present: bool = False
+    twitter_tags_present: bool = False
+    structured_data_types: List[str] = field(default_factory=list)
+    images: List[str] = field(default_factory=list)
+    images_missing_alt: int = 0
+    images_with_lazy_loading: int = 0
+    has_webp_image: bool = False
+    internal_links: List[str] = field(default_factory=list)
+    external_links: List[str] = field(default_factory=list)
+    anchor_issues: List[str] = field(default_factory=list)
+    mixed_content_http_resources: List[str] = field(default_factory=list)
+    has_viewport_meta: bool = False
+    dom_nodes_estimate: int = 0
+    render_blocking_css_in_head: int = 0
+    render_blocking_js_in_head: int = 0
+    third_party_scripts: int = 0
+    cache_control_header: Optional[str] = None
+    content_encoding: Optional[str] = None
+    security_headers: Dict[str, Optional[str]] = field(default_factory=dict)
+    open_directory_listing: bool = False
+    has_login_form_insecure: bool = False
+
+
+# -------------------------------
+# Helper Functions
+# -------------------------------
+
+def is_same_domain(base: str, url: str) -> bool:
     try:
-        absolute = urlparse.urljoin(base, link)
-        parsed = urlparse.urlparse(absolute)
-        # Remove fragments
-        parsed = parsed._replace(fragment="")
-        # Normalize default ports
-        netloc = parsed.netloc
-        if netloc.endswith(":80") and parsed.scheme == "http":
-            netloc = netloc[:-3]
-        if netloc.endswith(":443") and parsed.scheme == "https":
-            netloc = netloc[:-4]
-        parsed = parsed._replace(netloc=netloc)
-        return urlparse.urlunparse(parsed)
+        return urlparse(base).netloc == urlparse(url).netloc
     except Exception:
-        return link
-def is_same_domain(start_url: str, candidate_url: str) -> bool:
-    a = urlparse.urlparse(start_url)
-    b = urlparse.urlparse(candidate_url)
-    return (a.scheme == b.scheme) and (a.netloc == b.netloc)
-def get_domain(url: str) -> str:
-    p = urlparse.urlparse(url)
-    return f"{p.scheme}://{p.netloc}"
-def clean_text(text: str) -> str:
-    return re.sub(r"\s+", " ", text or "").strip()
-# ---------------------------- Robots.txt Parsing --------------------------- #
-def fetch_robots(domain: str, timeout: int) -> Dict[str, List[str]]:
-    robots = {"disallow": [], "allow": []}
+        return False
+
+
+def normalize_url(base: str, href: str) -> Optional[str]:
     try:
-        resp = requests.get(urlparse.urljoin(domain, "/robots.txt"), timeout=timeout, headers={"User-Agent": "WebsiteAuditBot/1.0"})
-        if resp.status_code == 200:
-            for line in resp.text.splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if line.lower().startswith("disallow:"):
-                    path = line.split(":", 1)[1].strip()
-                    robots["disallow"].append(path)
-                elif line.lower().startswith("allow:"):
-                    path = line.split(":", 1)[1].strip()
-                    robots["allow"].append(path)
+        abs_url = urljoin(base, href)
+        parsed = urlparse(abs_url)
+        if not parsed.scheme.startswith("http"):
+            return None
+        # Strip fragments
+        return abs_url.split('#')[0]
     except Exception:
-        pass
-    return robots
-def is_blocked_by_robots(robots: Dict[str, List[str]], url: str, domain: str) -> bool:
-    # Very simple robots parsing (path-level). For production, use robots.txt parser.
-    path = urlparse.urlparse(url).path or "/"
-    disallows = robots.get("disallow", [])
-    allows = robots.get("allow", [])
-    for a in allows:
-        if path.startswith(a):
-            return False
-    for d in disallows:
-        if path.startswith(d):
-            return True
-    return False
-# ---------------------------- Fetch & Parse ------------------------------- #
-def fetch(url: str, timeout: int) -> Tuple[int, requests.Response, BeautifulSoup, Dict[str, str], float]:
-    """Fetch URL and return (status, response, soup, headers, elapsed)."""
-    headers = {"User-Agent": "WebsiteAuditBot/1.0"}
-    start = time.time()
-    try:
-        resp = requests.get(url, timeout=timeout, headers=headers, allow_redirects=True)
-        elapsed = time.time() - start
-        status = resp.status_code
-        content_type = resp.headers.get("Content-Type", "")
-        soup = None
-        if "text/html" in content_type.lower():
-            soup = BeautifulSoup(resp.text, "html.parser")
-        return status, resp, soup, resp.headers, elapsed
-    except Exception:
-        return 0, None, None, {}, 0.0
-# ---------------------------- Audit Classes ------------------------------- #
-class PageAudit:
-    """Collect metrics for a single page."""
-    def __init__(self, url: str):
-        self.url = url
-        self.metrics = {
-            # Crawlability & Indexation
-            "status_code": None,
-            "redirect_chain_len": 0,
-            "is_blocked_robots": False,
-            "canonical": None,
-            "canonical_missing": False,
-            "canonical_incorrect": False,
-            "meta_robots": None,
-            "noindex": False,
-            "nofollow": False,
-            # On-Page SEO
-            "title": None,
-            "title_length": 0,
-            "title_missing": False,
-            "meta_description": None,
-            "meta_description_length": 0,
-            "meta_description_missing": False,
-            "h1_count": 0,
-            "h1_missing": False,
-            "h2_h6_count": 0,
-            "duplicate_headings": False,
-            "word_count": 0,
-            "thin_content": False,
-            "images_without_alt": 0,
-            "duplicate_alt_attrs": 0,
-            "open_graph_present": False,
-            "twitter_card_present": False,
-            # URL & Internal Linking
-            "url_length": 0,
-            "url_has_uppercase": False,
-            "internal_links": 0,
-            "external_links": 0,
-            "nofollow_internal_links": 0,
-            "broken_internal_links": 0,
-            "broken_external_links": 0,
-            "anchor_issues": 0,
-            # Technical & Performance
-            "dom_elements": 0,
-            "script_count": 0,
-            "css_count": 0,
-            "img_count": 0,
-            "render_blocking": False,
-            "lazy_loading_images": False,
-            "uses_webp": False,
-            "cache_control_present": False,
-            "compression": None, # gzip/brotli/none
-            "ttfb": 0.0,
-            # Mobile & Usability
-            "viewport_present": False,
-            # Security
-            "https": False,
-            "mixed_content": False,
-            "security_headers": {
-                "csp": False,
-                "hsts": False,
-                "x_frame_options": False,
-            },
-            "password_form_insecure": False,
-            # International SEO
-            "hreflang_tags": [],
-            "hreflang_errors": 0,
-        }
-    def run(self, soup: BeautifulSoup, headers: Dict[str, str], resp: requests.Response, status: int, elapsed: float, robots: Dict[str, List[str]], domain: str):
-        self.metrics["status_code"] = status
-        self.metrics["redirect_chain_len"] = len(resp.history) if resp is not None else 0
-        self.metrics["ttfb"] = elapsed
-        self.metrics["https"] = self.url.lower().startswith("https://")
-        self.metrics["is_blocked_robots"] = is_blocked_by_robots(robots, self.url, domain)
-        if headers:
-            enc = headers.get("Content-Encoding", "").lower()
-            if "gzip" in enc:
-                self.metrics["compression"] = "gzip"
-            elif "br" in enc:
-                self.metrics["compression"] = "brotli"
-            else:
-                self.metrics["compression"] = "none"
-            self.metrics["cache_control_present"] = bool(headers.get("Cache-Control"))
-            # Security Headers
-            self.metrics["security_headers"]["csp"] = bool(headers.get("Content-Security-Policy"))
-            self.metrics["security_headers"]["hsts"] = bool(headers.get("Strict-Transport-Security"))
-            self.metrics["security_headers"]["x_frame_options"] = bool(headers.get("X-Frame-Options"))
-        # Early return if not HTML
-        if soup is None:
-            return
-        # Canonical (case-insensitive)
-        link_canon = soup.find("link", rel=lambda v: v and "canonical" in str(v).lower() if v else False)
-        if link_canon and link_canon.get("href"):
-            canon_href = link_canon.get("href").strip()
-            self.metrics["canonical"] = normalize_url(self.url, canon_href)
-            # Incorrect if canonical points to different domain
-            self.metrics["canonical_incorrect"] = not is_same_domain(self.url, self.metrics["canonical"])
-        else:
-            self.metrics["canonical_missing"] = True
-        # Meta robots
-        mr = soup.find("meta", attrs={"name": "robots"})
-        if mr and mr.get("content"):
-            content = mr.get("content", "").lower()
-            self.metrics["meta_robots"] = content
-            self.metrics["noindex"] = "noindex" in content
-            self.metrics["nofollow"] = "nofollow" in content
-        # Title & description
-        title_tag = soup.title
-        title_text = clean_text(title_tag.string) if title_tag and title_tag.string else ""
-        self.metrics["title"] = title_text or None
-        self.metrics["title_length"] = len(title_text)
-        self.metrics["title_missing"] = (self.metrics["title"] is None)
-        desc_tag = soup.find("meta", attrs={"name": "description"})
-        desc_content = clean_text(desc_tag.get("content", "")) if desc_tag else ""
-        self.metrics["meta_description"] = desc_content or None
-        self.metrics["meta_description_length"] = len(desc_content)
-        self.metrics["meta_description_missing"] = (self.metrics["meta_description"] is None)
-        # Headings
-        h1s = [clean_text(h.get_text()) for h in soup.find_all("h1")]
-        self.metrics["h1_count"] = len(h1s)
-        self.metrics["h1_missing"] = (len(h1s) == 0)
-        h2_h6 = [clean_text(h.get_text()) for h in soup.find_all(["h2", "h3", "h4", "h5", "h6"])]
-        self.metrics["h2_h6_count"] = len(h2_h6)
-        self.metrics["duplicate_headings"] = len(h1s) != len(set(h1s)) or len(h2_h6) != len(set(h2_h6))
-        # Content
-        text = clean_text(soup.get_text(" "))
-        self.metrics["word_count"] = len(text.split())
-        self.metrics["thin_content"] = (self.metrics["word_count"] < 300)
-        # Images
-        images = soup.find_all("img")
-        self.metrics["img_count"] = len(images)
-        alt_values = []
-        for img in images:
-            alt = img.get("alt")
-            if not alt or not alt.strip():
-                self.metrics["images_without_alt"] += 1
-            else:
-                alt_values.append(alt.strip())
-        self.metrics["duplicate_alt_attrs"] = len(alt_values) - len(set(alt_values))
-        # Social metadata
-        self.metrics["open_graph_present"] = bool(soup.find("meta", property=re.compile(r"^og:")))
-        self.metrics["twitter_card_present"] = bool(soup.find("meta", attrs={"name": re.compile(r"^twitter:")}))
-        # URL metrics
-        self.metrics["url_length"] = len(self.url)
-        self.metrics["url_has_uppercase"] = any(c.isupper() for c in urlparse.urlparse(self.url).path)
-        # Links
-        anchors = soup.find_all("a", href=True)
-        internal, external, nofollow_internal = 0, 0, 0
-        anchor_issues = 0
-        for a in anchors:
-            href_raw = a.get("href").strip()
-            if not href_raw:
-                continue
-            rel = [r.lower() for r in (a.get("rel") or [])]
-            target_url = normalize_url(self.url, href_raw)
-            # Skip non-http(s) for counting links (but still count anchor issues if fragment)
-            if target_url.startswith(("mailto:", "tel:", "javascript:")):
-                if urlparse.urlparse(target_url).fragment:
-                    if not soup.find(id=urlparse.urlparse(target_url).fragment):
-                        anchor_issues += 1
-                continue
-            if not target_url.startswith(("http://", "https://")):
-                # Relative or invalid - check for fragment
-                parsed = urlparse.urlparse(target_url)
-                if parsed.fragment:
-                    if not soup.find(id=parsed.fragment):
-                        anchor_issues += 1
-                continue
-            # Valid http(s) link
-            if is_same_domain(self.url, target_url):
-                internal += 1
-                if "nofollow" in rel:
-                    nofollow_internal += 1
-                parsed = urlparse.urlparse(target_url)
-                if parsed.fragment:
-                    if not soup.find(id=parsed.fragment):
-                        anchor_issues += 1
-            else:
-                external += 1
-        self.metrics["internal_links"] = internal
-        self.metrics["external_links"] = external
-        self.metrics["nofollow_internal_links"] = nofollow_internal
-        self.metrics["anchor_issues"] = anchor_issues
-        # Technical (DOM, resources, render-blocking hints)
-        self.metrics["dom_elements"] = len(soup.find_all(True))
-        scripts = soup.find_all("script")
-        self.metrics["script_count"] = len(scripts)
-        css_links = soup.find_all("link", rel=lambda v: v and "stylesheet" in str(v).lower() if v else False)
-        self.metrics["css_count"] = len(css_links)
-        # Render blocking heuristic: many CSS in <head> and scripts without async/defer
-        head = soup.find("head")
-        rb = False
-        if head:
-            head_scripts = head.find_all("script")
-            for s in head_scripts:
-                if not s.get("async") and not s.get("defer"):
-                    rb = True
-                    break
-            if len(css_links) > 2:
-                rb = True
-        self.metrics["render_blocking"] = rb
-        # Lazy loading images & WebP usage
-        lazy_count = 0
-        for img in images:
-            loading = img.get("loading")
-            if loading and loading.lower() == "lazy":
-                lazy_count += 1
-            elif img.get("data-src") or img.get("data-lazy"):
-                lazy_count += 1
-        self.metrics["lazy_loading_images"] = lazy_count > 0
-        self.metrics["uses_webp"] = any((img.get("src") or "").lower().endswith(".webp") for img in images)
-        # Mixed content (http resources on https pages)
-        if self.metrics["https"]:
-            http_resource_found = False
-            for tag in soup.find_all(["img", "script", "link", "source", "iframe"]):
-                src = tag.get("src") or tag.get("href") or tag.get("srcset")
-                if src:
-                    normalized_src = normalize_url(self.url, src.split(",")[0].strip().split(" ")[0])  # basic for srcset
-                    if normalized_src.startswith("http://"):
-                        http_resource_found = True
-                        break
-            self.metrics["mixed_content"] = http_resource_found
-        # Viewport
-        self.metrics["viewport_present"] = bool(soup.find("meta", attrs={"name": "viewport"}))
-        # Password forms on HTTP
-        forms = soup.find_all("form")
-        has_password = any(f.find("input", attrs={"type": "password"}) for f in forms)
-        self.metrics["password_form_insecure"] = (has_password and not self.metrics["https"])
-        # International SEO: hreflang (case-insensitive)
-        hreflangs = soup.find_all("link", rel=lambda v: v and "alternate" in str(v).lower() if v else False)
-        lang_errors = 0
-        tags = []
-        for hl in hreflangs:
-            hreflang = hl.get("hreflang")
-            href = hl.get("href")
-            if hreflang and href:
-                lang = hreflang.strip().lower()
-                normalized_href = normalize_url(self.url, href.strip())
-                # Basic language code validation: xx or xx-YY
-                if not re.match(r"^[a-z]{2}(-[a-zA-Z]{2})?$", lang):
-                    lang_errors += 1
-                tags.append({"hreflang": lang, "href": normalized_href})
-        self.metrics["hreflang_tags"] = tags
-        self.metrics["hreflang_errors"] = lang_errors
-# ---------------------------- Site Audit & Scoring ------------------------ #
-class WebsiteAudit:
-    def __init__(self, base_url: str, max_pages: int = 100, timeout: int = 10, include_external: bool = False, pagespeed_api_key: str = None):
-        self.base_url = base_url.rstrip("/")
-        self.domain = get_domain(self.base_url)
+        return None
+
+
+def is_seo_friendly_url(url: str) -> bool:
+    if len(url) > 100:
+        return False
+    path = urlparse(url).path
+    if any(ch.isupper() for ch in path):
+        return False
+    if '_' in path:
+        return False
+    if urlparse(url).query and len(urlparse(url).query) > 100:
+        return False
+    return True
+
+
+def count_dom_nodes(html: str) -> int:
+    return html.count('<')
+
+
+def extract_structured_data_types(soup: BeautifulSoup) -> List[str]:
+    types = []
+    for tag in soup.find_all('script', type='application/ld+json'):
+        try:
+            data = json.loads(tag.string or '{}')
+            if isinstance(data, dict):
+                t = data.get('@type')
+                if t:
+                    types.append(t)
+            elif isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and item.get('@type'):
+                        types.append(item['@type'])
+        except Exception:
+            continue
+    return types
+
+
+def parse_security_headers(headers: Dict[str, str]) -> Dict[str, Optional[str]]:
+    keys = [
+        'Content-Security-Policy', 'Strict-Transport-Security',
+        'X-Frame-Options', 'X-Content-Type-Options', 'Referrer-Policy',
+        'Permissions-Policy'
+    ]
+    return {k: headers.get(k) for k in keys}
+
+
+# -------------------------------
+# Async Auditor
+# -------------------------------
+class AsyncWebsiteAuditor:
+    def __init__(self, base_url: str, max_pages: int = 50, timeout: int = 10,
+                 user_agent: str = 'WebAuditPro/1.0', respect_robots: bool = True,
+                 concurrency: int = 20, pagespeed_api_key: Optional[str] = None):
+        self.base_url = base_url.rstrip('/')
         self.max_pages = max_pages
         self.timeout = timeout
-        self.include_external = include_external
+        self.headers = {"User-Agent": user_agent}
+        self.respect_robots = respect_robots
         self.pagespeed_api_key = pagespeed_api_key
-        # Data stores
         self.visited: Set[str] = set()
-        self.queue: deque = deque()
-        self.incoming_links: defaultdict = defaultdict(int) # URL -> incoming internal link count
-        self.page_results: Dict[str, Dict] = {}
-        # Robots
-        self.robots = fetch_robots(self.domain, self.timeout)
-        # Report structure
-        self.report: Dict = {
-            "meta": {
-                "base_url": self.base_url,
-                "domain": self.domain,
-                "crawled_at": datetime.utcnow().isoformat() + "Z",
-                "max_pages": self.max_pages,
-                "timeout": self.timeout,
-            },
-            "site_health": {},
-            "crawlability": {},
-            "on_page_seo": {},
-            "technical_performance": {},
-            "mobile_usability": {},
-            "security": {},
-            "international_seo": {},
-            "advanced_metrics": {},
-            "trend_metrics": {"available": False},
-            "scores": {},
-            "overall": {"score": 0, "classification": ""},
-            "pages": {},
-            "recommendations": [],
-        }
-    def crawl(self):
-        normalized_base = normalize_url(self.base_url, self.base_url)
-        self.queue.append(normalized_base)
-        while self.queue and len(self.visited) < self.max_pages:
-            url = self.queue.popleft()
+        self.to_visit: asyncio.Queue[str] = asyncio.Queue()
+        self.pages: Dict[str, PageMetrics] = {}
+        self.concurrency = max(1, concurrency)
+        self.sem = asyncio.Semaphore(self.concurrency)
+        self.robots = robotparser.RobotFileParser()
+        self.robots.set_url(urljoin(self.base_url, '/robots.txt'))
+        try:
+            self.robots.read()
+        except Exception:
+            pass
+
+    def allowed_by_robots(self, url: str) -> bool:
+        if not self.respect_robots:
+            return True
+        try:
+            return self.robots.can_fetch(self.headers['User-Agent'], url)
+        except Exception:
+            return True
+
+    async def fetch_httpx(self, client: 'httpx.AsyncClient', url: str):
+        try:
+            start = time.time()
+            resp = await client.get(url, timeout=self.timeout, follow_redirects=True)
+            elapsed_ms = int((time.time() - start) * 1000)
+            return resp, elapsed_ms
+        except Exception:
+            return None
+
+    async def fetch_requests_threaded(self, url: str):
+        def _do_get(u):
+            start = time.time()
+            r = requests.get(u, timeout=self.timeout, allow_redirects=True, headers=self.headers)
+            return r, int((time.time() - start) * 1000)
+        try:
+            return await asyncio.to_thread(_do_get, url)
+        except Exception:
+            return None
+
+    async def worker(self):
+        # Optional httpx client per worker for keep-alive
+        client = None
+        if HAS_HTTPX:
+            client = httpx.AsyncClient(headers=self.headers)
+        while len(self.visited) < self.max_pages:
+            try:
+                url = await asyncio.wait_for(self.to_visit.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                break
             if url in self.visited:
                 continue
-            self.visited.add(url)
-            status, resp, soup, headers, elapsed = fetch(url, self.timeout)
-            page_audit = PageAudit(url)
-            page_audit.run(soup, headers, resp, status, elapsed, self.robots, self.domain)
-            self.page_results[url] = page_audit.metrics
-            # Extract links only if HTML
-            if soup:
-                for a in soup.find_all("a", href=True):
-                    href_raw = a.get("href").strip()
-                    if not href_raw:
+            if not self.allowed_by_robots(url):
+                self.visited.add(url)
+                self.pages[url] = PageMetrics(url=url, status_code=None)
+                continue
+            async with self.sem:
+                result = None
+                if HAS_HTTPX and client is not None:
+                    result = await self.fetch_httpx(client, url)
+                else:
+                    result = await self.fetch_requests_threaded(url)
+                metrics = PageMetrics(url=url)
+                if result is None:
+                    self.visited.add(url)
+                    self.pages[url] = metrics
+                    continue
+                resp, elapsed_ms = result
+                # map response depending on library
+                if HAS_HTTPX and isinstance(resp, httpx.Response):
+                    text = resp.text
+                    headers = resp.headers
+                    status_code = resp.status_code
+                    final_url = str(resp.url)
+                    history = resp.history
+                else:
+                    text = resp.text
+                    headers = resp.headers
+                    status_code = resp.status_code
+                    final_url = str(resp.url)
+                    history = resp.history
+                metrics.status_code = status_code
+                metrics.response_time_ms = elapsed_ms
+                metrics.final_url = final_url
+                metrics.redirect_chain = [getattr(h, 'url', getattr(h, 'request', None).url if hasattr(h, 'request') else final_url) for h in history] + [final_url]
+                metrics.html_size_bytes = len(text or '')
+                metrics.content_encoding = headers.get('Content-Encoding')
+                metrics.cache_control_header = headers.get('Cache-Control')
+                metrics.security_headers = parse_security_headers(headers)
+
+                soup = BeautifulSoup(text, 'html.parser')
+                metrics.title = soup.title.string.strip() if soup.title and soup.title.string else None
+                md = soup.find('meta', attrs={'name': 'description'})
+                metrics.meta_description = (md.get('content').strip() if md and md.get('content') else None)
+
+                for level in ['h1','h2','h3','h4','h5','h6']:
+                    tags = [t.get_text(strip=True) for t in soup.find_all(level)]
+                    if level == 'h1':
+                        metrics.h1 = tags
+                    metrics.headings[level] = tags
+
+                canon = soup.find('link', rel='canonical')
+                metrics.canonical = canon.get('href') if canon and canon.get('href') else None
+
+                robots_meta = soup.find('meta', attrs={'name': 'robots'})
+                metrics.meta_robots = robots_meta.get('content') if robots_meta and robots_meta.get('content') else None
+
+                for link in soup.find_all('link', rel='alternate'):
+                    if link.get('hreflang') and link.get('href'):
+                        metrics.hreflang.append((link.get('hreflang'), link.get('href')))
+
+                metrics.og_tags_present = bool(soup.find('meta', property=re.compile(r'^og:')))
+                metrics.twitter_tags_present = bool(soup.find('meta', attrs={'name': re.compile(r'^twitter:')}))
+                metrics.structured_data_types = extract_structured_data_types(soup)
+
+                imgs = soup.find_all('img')
+                metrics.images = []
+                metrics.images_missing_alt = 0
+                metrics.images_with_lazy_loading = 0
+                has_webp = False
+                for img in imgs:
+                    src = img.get('src') or img.get('data-src')
+                    if src:
+                        nsrc = normalize_url(url, src)
+                        if nsrc:
+                            metrics.images.append(nsrc)
+                            if nsrc.lower().endswith('.webp'):
+                                has_webp = True
+                    alt = img.get('alt')
+                    if not alt or alt.strip() == '':
+                        metrics.images_missing_alt += 1
+                    if (img.get('loading') or '').lower() == 'lazy':
+                        metrics.images_with_lazy_loading += 1
+                metrics.has_webp_image = has_webp
+
+                anchors = soup.find_all('a', href=True)
+                for a in anchors:
+                    href = a['href']
+                    nurl = normalize_url(url, href)
+                    if not nurl:
                         continue
-                    target = normalize_url(url, href_raw)
-                    # Skip non-http(s), mailto, tel, javascript for crawling
-                    if target.startswith(("mailto:", "tel:", "javascript:")):
-                        continue
-                    if not target.startswith(("http://", "https://")):
-                        continue
-                    # Internal-only unless include_external
-                    if not self.include_external and not is_same_domain(self.base_url, target):
-                        continue
-                    # Robots block
-                    if is_blocked_by_robots(self.robots, target, self.domain):
-                        continue
-                    if target not in self.visited:
-                        self.queue.append(target)
-                    # Incoming internal links
-                    if is_same_domain(self.base_url, target):
-                        self.incoming_links[target] += 1
-    # ------------------------ Aggregation Helpers ------------------------- #
-    def aggregate(self):
-        pages = self.page_results
-        total = len(pages)
-        self.report["meta"]["pages_crawled"] = total if total > 0 else 1
-        # Site health summary
-        status_counts = defaultdict(int)
-        redirects = 0
-        robots_blocked = 0
-        noindex_pages = 0
-        for url, m in pages.items():
-            sc = m.get("status_code", 0)
-            if sc:
-                status_counts[str(sc)] += 1
-            if m.get("redirect_chain_len", 0) > 1:
-                redirects += 1
-            if m.get("is_blocked_robots"):
-                robots_blocked += 1
-            if m.get("noindex"):
-                noindex_pages += 1
-        self.report["site_health"] = {
-            "status_distribution": dict(status_counts),
-            "redirect_chains": redirects,
-            "robots_blocked_pages": robots_blocked,
-            "noindex_pages": noindex_pages,
-            "orphan_pages": max(0, total - len(self.incoming_links)),
+                    text_a = a.get_text(strip=True) or ''
+                    if is_same_domain(self.base_url, nurl):
+                        metrics.internal_links.append(nurl)
+                    else:
+                        metrics.external_links.append(nurl)
+                    if len(text_a) <= 2:
+                        metrics.anchor_issues.append('Very short anchor text')
+                    if re.search(r'click here|read more', text_a, flags=re.I):
+                        metrics.anchor_issues.append('Generic anchor text')
+
+                if urlparse(metrics.final_url or url).scheme == 'https':
+                    for tag in soup.find_all(src=True):
+                        src = normalize_url(url, tag.get('src'))
+                        if src and urlparse(src).scheme == 'http':
+                            metrics.mixed_content_http_resources.append(src)
+                    for tag in soup.find_all(href=True):
+                        href = normalize_url(url, tag.get('href'))
+                        if href and urlparse(href).scheme == 'http':
+                            metrics.mixed_content_http_resources.append(href)
+
+                viewport = soup.find('meta', attrs={'name': 'viewport'})
+                metrics.has_viewport_meta = bool(viewport)
+
+                metrics.dom_nodes_estimate = count_dom_nodes(text)
+
+                head = soup.find('head')
+                if head:
+                    for link in head.find_all('link', rel='stylesheet'):
+                        metrics.render_blocking_css_in_head += 1
+                    for script in head.find_all('script', src=True):
+                        attrs = script.attrs
+                        if not ('defer' in attrs or 'async' in attrs):
+                            metrics.render_blocking_js_in_head += 1
+
+                for script in soup.find_all('script', src=True):
+                    ssrc = normalize_url(url, script.get('src'))
+                    if ssrc and not is_same_domain(self.base_url, ssrc):
+                        metrics.third_party_scripts += 1
+
+                title_text = metrics.title or ''
+                metrics.open_directory_listing = title_text.lower().startswith('index of')
+                if urlparse(url).scheme == 'http':
+                    forms = soup.find_all('form')
+                    for f in forms:
+                        if f.find('input', attrs={'type':'password'}):
+                            metrics.has_login_form_insecure = True
+                            break
+
+                self.pages[url] = metrics
+                self.visited.add(url)
+
+                # Queue new internal URLs
+                for link in metrics.internal_links:
+                    if link not in self.visited and link not in [i for i in self._queue_snapshot()] and len(self.visited) + self.to_visit.qsize() < self.max_pages:
+                        await self.to_visit.put(link)
+
+        if HAS_HTTPX and client is not None:
+            await client.aclose()
+
+    def _queue_snapshot(self) -> List[str]:
+        try:
+            return list(self.to_visit._queue)  # type: ignore
+        except Exception:
+            return []
+
+    async def crawl(self):
+        await self.to_visit.put(self.base_url)
+        workers = [asyncio.create_task(self.worker()) for _ in range(self.concurrency)]
+        await asyncio.gather(*workers)
+
+    # Aggregation, scoring, PSI enrichment same as previous version
+    def aggregate(self) -> Dict:
+        report = {
+            'site': self.base_url,
+            'summary': {},
+            'counts': {},
+            'recommendations': [],
+            'category_scores': {},
+            'overall_score': 0,
+            'classification': ''
         }
-        # Crawlability
-        missing_canon = sum(1 for m in pages.values() if m.get("canonical_missing"))
-        incorrect_canon = sum(1 for m in pages.values() if m.get("canonical_incorrect"))
-        self.report["crawlability"] = {
-            "missing_canonical": missing_canon,
-            "incorrect_canonical": incorrect_canon,
-            "blocked_by_robots": robots_blocked,
-            "broken_internal_links": 0,  # Not checking 404s - left as 0
-            "broken_external_links": 0,
+        total_pages = len(self.pages)
+        codes = Counter([p.status_code for p in self.pages.values() if p.status_code])
+        errors_4xx = sum(v for k,v in codes.items() if k and 400 <= k < 500)
+        errors_5xx = sum(v for k,v in codes.items() if k and 500 <= k < 600)
+
+        broken_internal_links = 0
+        redirect_chains = 0
+        blocked_by_robots = 0
+        for url, pm in self.pages.items():
+            if pm.status_code is None:
+                if self.respect_robots and not self.allowed_by_robots(url):
+                    blocked_by_robots += 1
+            if pm.status_code and pm.status_code in (404, 410):
+                broken_internal_links += 1
+            if pm.redirect_chain and len(pm.redirect_chain) > 2:
+                redirect_chains += 1
+
+        missing_titles = sum(1 for p in self.pages.values() if not p.title)
+        missing_meta_desc = sum(1 for p in self.pages.values() if not p.meta_description)
+        multiple_h1 = sum(1 for p in self.pages.values() if len(p.h1) > 1)
+        missing_h1 = sum(1 for p in self.pages.values() if len(p.h1) == 0)
+        long_urls = sum(1 for u in self.pages if len(u) > 100)
+        uppercase_in_urls = sum(1 for u in self.pages if any(ch.isupper() for ch in urlparse(u).path))
+        non_seo_friendly = sum(1 for u in self.pages if not is_seo_friendly_url(u))
+        images_missing_alt_total = sum(p.images_missing_alt for p in self.pages.values())
+        pages_without_og = sum(1 for p in self.pages.values() if not p.og_tags_present)
+        pages_without_twitter = sum(1 for p in self.pages.values() if not p.twitter_tags_present)
+
+        avg_html_kb = int(sum(p.html_size_bytes for p in self.pages.values()) / (total_pages or 1) / 1024)
+        avg_dom_nodes = int(sum(p.dom_nodes_estimate for p in self.pages.values()) / (total_pages or 1))
+        avg_resp_ms = int(sum(p.response_time_ms or 0 for p in self.pages.values()) / (total_pages or 1))
+        render_blocking_css_pages = sum(1 for p in self.pages.values() if p.render_blocking_css_in_head > 0)
+        render_blocking_js_pages = sum(1 for p in self.pages.values() if p.render_blocking_js_in_head > 0)
+        third_party_script_heavy = sum(1 for p in self.pages.values() if p.third_party_scripts >= 5)
+        gzip_missing = sum(1 for p in self.pages.values() if (p.content_encoding or '').lower() not in ('gzip','br'))
+
+        viewport_missing_pages = sum(1 for p in self.pages.values() if not p.has_viewport_meta)
+
+        https_implemented = self.base_url.startswith('https')
+        mixed_content_pages = sum(1 for p in self.pages.values() if len(p.mixed_content_http_resources) > 0)
+        hsts_missing_pages = sum(1 for p in self.pages.values() if not p.security_headers.get('Strict-Transport-Security'))
+        csp_missing_pages = sum(1 for p in self.pages.values() if not p.security_headers.get('Content-Security-Policy'))
+        xfo_missing_pages = sum(1 for p in self.pages.values() if not p.security_headers.get('X-Frame-Options'))
+        open_dir_pages = sum(1 for p in self.pages.values() if p.open_directory_listing)
+        insecure_login_pages = sum(1 for p in self.pages.values() if p.has_login_form_insecure)
+
+        hreflang_missing_pages = sum(1 for p in self.pages.values() if len(p.hreflang) == 0)
+
+        report['summary'] = {
+            'total_crawled_pages': total_pages,
+            'http_status_counts': dict(codes),
+            'avg_html_size_kb': avg_html_kb,
+            'avg_response_time_ms': avg_resp_ms,
+            'avg_dom_nodes_estimate': avg_dom_nodes,
         }
-        # On-page SEO
-        title_missing = sum(1 for m in pages.values() if m.get("title_missing"))
-        desc_missing = sum(1 for m in pages.values() if m.get("meta_description_missing"))
-        h1_missing = sum(1 for m in pages.values() if m.get("h1_missing"))
-        thin_content = sum(1 for m in pages.values() if m.get("thin_content"))
-        images_no_alt = sum(m.get("images_without_alt", 0) for m in pages.values())
-        duplicate_alt = sum(m.get("duplicate_alt_attrs", 0) for m in pages.values())
-        og_present = sum(1 for m in pages.values() if m.get("open_graph_present"))
-        tw_present = sum(1 for m in pages.values() if m.get("twitter_card_present"))
-        self.report["on_page_seo"] = {
-            "missing_titles": title_missing,
-            "missing_meta_descriptions": desc_missing,
-            "missing_h1": h1_missing,
-            "thin_content_pages": thin_content,
-            "images_missing_alt": images_no_alt,
-            "duplicate_alt_attributes": duplicate_alt,
-            "open_graph_present_pages": og_present,
-            "twitter_card_present_pages": tw_present,
+        report['counts'] = {
+            'errors_4xx': errors_4xx,
+            'errors_5xx': errors_5xx,
+            'broken_internal_links': broken_internal_links,
+            'redirect_chains': redirect_chains,
+            'blocked_by_robots': blocked_by_robots,
+            'missing_titles': missing_titles,
+            'missing_meta_descriptions': missing_meta_desc,
+            'missing_h1': missing_h1,
+            'multiple_h1': multiple_h1,
+            'long_urls': long_urls,
+            'uppercase_in_urls': uppercase_in_urls,
+            'non_seo_friendly_urls': non_seo_friendly,
+            'images_missing_alt_total': images_missing_alt_total,
+            'pages_without_og': pages_without_og,
+            'pages_without_twitter': pages_without_twitter,
+            'render_blocking_css_pages': render_blocking_css_pages,
+            'render_blocking_js_pages': render_blocking_js_pages,
+            'third_party_script_heavy_pages': third_party_script_heavy,
+            'gzip_missing_pages': gzip_missing,
+            'viewport_missing_pages': viewport_missing_pages,
+            'mixed_content_pages': mixed_content_pages,
+            'hsts_missing_pages': hsts_missing_pages,
+            'csp_missing_pages': csp_missing_pages,
+            'xfo_missing_pages': xfo_missing_pages,
+            'open_directory_listing_pages': open_dir_pages,
+            'insecure_login_pages': insecure_login_pages,
+            'hreflang_missing_pages': hreflang_missing_pages,
         }
-        # Technical performance (heuristics)
-        total = len(pages) if pages else 1
-        avg_dom = sum(m.get("dom_elements", 0) for m in pages.values()) / total
-        avg_scripts = sum(m.get("script_count", 0) for m in pages.values()) / total
-        avg_css = sum(m.get("css_count", 0) for m in pages.values()) / total
-        avg_ttfb = sum(m.get("ttfb", 0.0) for m in pages.values()) / total
-        render_blocking_pages = sum(1 for m in pages.values() if m.get("render_blocking"))
-        lazy_images_pages = sum(1 for m in pages.values() if m.get("lazy_loading_images"))
-        webp_pages = sum(1 for m in pages.values() if m.get("uses_webp"))
-        cache_control_pages = sum(1 for m in pages.values() if m.get("cache_control_present"))
-        compression_none_pages = sum(1 for m in pages.values() if m.get("compression") == "none")
-        self.report["technical_performance"] = {
-            "avg_dom_elements": int(avg_dom),
-            "avg_script_count": int(avg_scripts),
-            "avg_css_count": int(avg_css),
-            "avg_ttfb_seconds": round(avg_ttfb, 3),
-            "render_blocking_pages": render_blocking_pages,
-            "lazy_loading_images_pages": lazy_images_pages,
-            "webp_usage_pages": webp_pages,
-            "cache_control_present_pages": cache_control_pages,
-            "no_compression_pages": compression_none_pages,
-            "core_web_vitals": {"available": False},
-        }
-        # Mobile usability
-        viewport_missing = sum(1 for m in pages.values() if not m.get("viewport_present"))
-        self.report["mobile_usability"] = {
-            "viewport_missing_pages": viewport_missing,
-        }
-        # Security
-        https_pages = sum(1 for m in pages.values() if m.get("https"))
-        mixed_content_pages = sum(1 for m in pages.values() if m.get("mixed_content"))
-        csp_pages = sum(1 for m in pages.values() if m.get("security_headers", {}).get("csp"))
-        hsts_pages = sum(1 for m in pages.values() if m.get("security_headers", {}).get("hsts"))
-        xfo_pages = sum(1 for m in pages.values() if m.get("security_headers", {}).get("x_frame_options"))
-        password_insecure_pages = sum(1 for m in pages.values() if m.get("password_form_insecure"))
-        self.report["security"] = {
-            "https_pages": https_pages,
-            "mixed_content_pages": mixed_content_pages,
-            "csp_header_pages": csp_pages,
-            "hsts_header_pages": hsts_pages,
-            "x_frame_options_header_pages": xfo_pages,
-            "password_form_insecure_pages": password_insecure_pages,
-        }
-        # International SEO
-        hreflang_errors_total = sum(m.get("hreflang_errors", 0) for m in pages.values())
-        hreflang_pages = sum(1 for m in pages.values() if len(m.get("hreflang_tags", [])) > 0)
-        self.report["international_seo"] = {
-            "hreflang_pages": hreflang_pages,
-            "hreflang_errors_total": hreflang_errors_total,
-        }
-        # Advanced metrics (selected subset)
-        uppercase_urls = sum(1 for m in pages.values() if m.get("url_has_uppercase"))
-        long_urls = sum(1 for m in pages.values() if m.get("url_length", 0) > 100)
-        anchor_issues_pages = sum(1 for m in pages.values() if m.get("anchor_issues", 0) > 0)
-        self.report["advanced_metrics"] = {
-            "uppercase_urls": uppercase_urls,
-            "long_urls_over_100_chars": long_urls,
-            "anchor_issues_pages": anchor_issues_pages,
-        }
-        # Per-page dump
-        self.report["pages"] = pages
-    # ------------------------ Scoring Matrices ---------------------------- #
-    def score(self):
-        pages = self.page_results
-        total = len(pages) if pages else 1
-        # Weights by category (sum to 100)
+
         weights = {
-            "crawlability": 20,
-            "on_page_seo": 20,
-            "technical_performance": 20,
-            "mobile_usability": 10,
-            "security": 15,
-            "international_seo": 5,
-            "advanced_metrics": 10,
+            'site_health': 0.20,
+            'crawlability': 0.20,
+            'on_page_seo': 0.20,
+            'technical_performance': 0.20,
+            'mobile_usability': 0.10,
+            'security': 0.10
         }
-        # Crawlability score (start at 100 and deduct)
-        crawl_score = 100.0
-        crawl_score -= 5 * min(10, self.report["crawlability"].get("missing_canonical", 0) / max(1, total) * 10)
-        crawl_score -= 5 * min(10, self.report["crawlability"].get("incorrect_canonical", 0) / max(1, total) * 10)
-        blocked = self.report["crawlability"].get("blocked_by_robots", 0)
-        crawl_score -= min(30, blocked / max(1, total) * 60)
-        crawl_score = max(0, min(100, crawl_score))
-        # On-page SEO
-        onpage_score = 100.0
-        onpage_score -= min(30, self.report["on_page_seo"].get("missing_titles", 0) / max(1, total) * 60)
-        onpage_score -= min(30, self.report["on_page_seo"].get("missing_meta_descriptions", 0) / max(1, total) * 40)
-        onpage_score -= min(20, self.report["on_page_seo"].get("missing_h1", 0) / max(1, total) * 40)
-        onpage_score -= min(30, self.report["on_page_seo"].get("thin_content_pages", 0) / max(1, total) * 50)
-        images_no_alt = self.report["on_page_seo"].get("images_missing_alt", 0)
-        onpage_score -= min(20, (images_no_alt / max(1, total * 10)) * 20)
-        onpage_score = max(0, min(100, onpage_score))
-        # Technical performance
-        tech_score = 100.0
-        avg_ttfb = self.report["technical_performance"].get("avg_ttfb_seconds", 0)
-        if avg_ttfb > 1.0:
-            tech_score -= 20
-        if avg_ttfb > 2.0:
-            tech_score -= 20
-        rb_pages = self.report["technical_performance"].get("render_blocking_pages", 0)
-        tech_score -= min(40, rb_pages / max(1, total) * 80)
-        no_comp_pages = self.report["technical_performance"].get("no_compression_pages", 0)
-        tech_score -= min(20, no_comp_pages / max(1, total) * 40)
-        cache_pages = self.report["technical_performance"].get("cache_control_present_pages", 0)
-        if cache_pages < total:
-            tech_score -= 10
-        tech_score = max(0, min(100, tech_score))
-        # Mobile usability
-        mob_score = 100.0
-        viewport_missing = self.report["mobile_usability"].get("viewport_missing_pages", 0)
-        mob_score -= viewport_missing / max(1, total) * 100
-        mob_score = max(0, min(100, mob_score))
-        # Security
-        sec_score = 100.0
-        mixed_pages = self.report["security"].get("mixed_content_pages", 0)
-        sec_score -= min(40, mixed_pages / max(1, total) * 80)
-        pass_insec = self.report["security"].get("password_form_insecure_pages", 0)
-        sec_score -= min(40, pass_insec / max(1, total) * 80)
-        hsts_pages = self.report["security"].get("hsts_header_pages", 0)
-        if hsts_pages < total:
-            sec_score -= 10
-        sec_score = max(0, min(100, sec_score))
-        # International
-        intl_score = 100.0
-        hreflang_err = self.report["international_seo"].get("hreflang_errors_total", 0)
-        intl_score -= min(40, hreflang_err * 5)
-        intl_score = max(0, min(100, intl_score))
-        # Advanced metrics
-        adv_score = 100.0
-        long_urls = self.report["advanced_metrics"].get("long_urls_over_100_chars", 0)
-        uppercase_urls = self.report["advanced_metrics"].get("uppercase_urls", 0)
-        anchor_issue_pages = self.report["advanced_metrics"].get("anchor_issues_pages", 0)
-        adv_score -= min(30, long_urls / max(1, total) * 60)
-        adv_score -= min(30, uppercase_urls / max(1, total) * 60)
-        adv_score -= min(40, anchor_issue_pages / max(1, total) * 80)
-        adv_score = max(0, min(100, adv_score))
-        # Weighted overall
-        weighted = (
-            crawl_score * weights["crawlability"] +
-            onpage_score * weights["on_page_seo"] +
-            tech_score * weights["technical_performance"] +
-            mob_score * weights["mobile_usability"] +
-            sec_score * weights["security"] +
-            intl_score * weights["international_seo"] +
-            adv_score * weights["advanced_metrics"]
-        ) / 100.0
-        self.report["scores"] = {
-            "crawlability": round(crawl_score, 1),
-            "on_page_seo": round(onpage_score, 1),
-            "technical_performance": round(tech_score, 1),
-            "mobile_usability": round(mob_score, 1),
-            "security": round(sec_score, 1),
-            "international_seo": round(intl_score, 1),
-            "advanced_metrics": round(adv_score, 1),
-        }
-        classification = (
-            "Excellent" if weighted >= 90 else
-            "Good" if weighted >= 70 else
-            "Needs Improvement" if weighted >= 50 else
-            "Poor"
-        )
-        self.report["overall"] = {"score": round(weighted, 1), "classification": classification}
-    # ------------------------ Recommendations ---------------------------- #
-    def build_recommendations(self):
+
+        bad_rate = (errors_4xx + errors_5xx) / (total_pages or 1)
+        site_health_score = 100 - min(60, int(bad_rate * 100))
+        site_health_score -= 20 if avg_resp_ms > 1500 else (10 if avg_resp_ms > 800 else 0)
+        report['category_scores']['site_health'] = max(0, site_health_score)
+
+        crawlability_score = 100
+        crawlability_score -= min(40, redirect_chains * 5)
+        crawlability_score -= min(40, broken_internal_links * 5)
+        crawlability_score -= min(20, blocked_by_robots * 2)
+        report['category_scores']['crawlability'] = max(0, crawlability_score)
+
+        onpage_score = 100
+        onpage_score -= min(30, int((missing_titles / (total_pages or 1))*100))
+        onpage_score -= min(30, int((missing_meta_desc / (total_pages or 1))*100))
+        onpage_score -= min(10, int((missing_h1 / (total_pages or 1))*100))
+        onpage_score -= min(10, int((multiple_h1 / (total_pages or 1))*100))
+        onpage_score -= min(10, int((non_seo_friendly / (total_pages or 1))*100))
+        report['category_scores']['on_page_seo'] = max(0, onpage_score)
+
+        tech_score = 100
+        tech_score -= 20 if avg_html_kb > 1200 else (10 if avg_html_kb > 300 else 0)
+        tech_score -= 20 if avg_dom_nodes > 5000 else (10 if avg_dom_nodes > 2000 else 0)
+        tech_score -= min(20, render_blocking_css_pages * 3)
+        tech_score -= min(20, render_blocking_js_pages * 3)
+        tech_score -= min(20, third_party_script_heavy * 2)
+        tech_score -= min(20, gzip_missing * 2)
+        report['category_scores']['technical_performance'] = max(0, tech_score)
+
+        mobile_score = 100 - min(30, int((viewport_missing_pages / (total_pages or 1))*100))
+        report['category_scores']['mobile_usability'] = max(0, mobile_score)
+
+        security_score = 100
+        if not https_implemented:
+            security_score -= 40
+        security_score -= min(20, mixed_content_pages * 5)
+        security_score -= min(20, hsts_missing_pages * 2)
+        security_score -= min(20, csp_missing_pages * 2)
+        security_score -= min(20, xfo_missing_pages * 2)
+        security_score -= min(20, open_dir_pages * 5)
+        security_score -= min(20, insecure_login_pages * 10)
+        report['category_scores']['security'] = max(0, security_score)
+
+        overall = 0
+        for cat, sc in report['category_scores'].items():
+            overall += sc * weights[cat]
+        report['overall_score'] = round(overall, 2)
+        report['summary']['good_vs_bad'] = 'Good' if overall >= 70 else 'Bad'
+        report['classification'] = (
+            'Excellent' if overall >= 90 else (
+                'Good' if overall >= 70 else (
+                    'Needs Improvement' if overall >= 50 else 'Poor')))
+
         recs = []
-        R = self.report
-        total = R["meta"].get("pages_crawled", 1)
-        if R["crawlability"].get("missing_canonical", 0) > total * 0.1:
-            recs.append("Add canonical tags to pages missing them to consolidate signals.")
-        if R["on_page_seo"].get("missing_titles", 0) > total * 0.1:
-            recs.append("Write unique, descriptive <title> tags for all pages.")
-        if R["on_page_seo"].get("missing_meta_descriptions", 0) > total * 0.2:
-            recs.append("Add concise meta descriptions (120–160 chars) to improve CTR.")
-        if R["on_page_seo"].get("images_missing_alt", 0) > total:
-            recs.append("Provide alt text for all images to improve accessibility and SEO.")
-        if R["technical_performance"].get("render_blocking_pages", 0) > total * 0.2:
-            recs.append("Defer or async non-critical JS and inline critical CSS to reduce render-blocking.")
-        if R["technical_performance"].get("no_compression_pages", 0) > total * 0.2:
-            recs.append("Enable GZIP/Brotli compression on the server for text assets.")
-        if R["mobile_usability"].get("viewport_missing_pages", 0) > 0:
-            recs.append("Add <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> for mobile responsiveness.")
-        if R["security"].get("mixed_content_pages", 0) > 0:
-            recs.append("Serve all assets over HTTPS to eliminate mixed content.")
-        if R["security"].get("password_form_insecure_pages", 0) > 0:
-            recs.append("Serve login forms over HTTPS and set Secure/HSTS headers.")
-        if R["international_seo"].get("hreflang_errors_total", 0) > 0:
-            recs.append("Fix hreflang codes (use formats like en, en-GB) and ensure reciprocal tags.")
-        if R["advanced_metrics"].get("long_urls_over_100_chars", 0) > total * 0.1:
-            recs.append("Shorten very long URLs; keep semantic, readable slugs.")
-        self.report["recommendations"] = recs
-    # ------------------------ Runner ------------------------------------- #
-    def run(self):
-        self.crawl()
-        self.aggregate()
-        self.score()
-        self.build_recommendations()
-        return self.report
-# ---------------------------- CLI Entrypoint ------------------------------ #
+        if missing_titles or missing_meta_desc:
+            recs.append('Add unique, optimized titles and meta descriptions to all pages.')
+        if missing_h1 or multiple_h1:
+            recs.append('Ensure exactly one descriptive H1 per page; fix missing or multiple H1s.')
+        if non_seo_friendly:
+            recs.append('Normalize URLs: use lowercase, short paths, hyphens; avoid long query strings.')
+        if render_blocking_css_pages or render_blocking_js_pages:
+            recs.append('Minimize render-blocking resources: inline critical CSS; use defer/async for JS.')
+        if gzip_missing:
+            recs.append('Enable server-side compression (GZIP/Brotli) and proper Cache-Control headers.')
+        if viewport_missing_pages:
+            recs.append('Add responsive <meta name="viewport"> to all templates.')
+        if not https_implemented:
+            recs.append('Serve the entire site over HTTPS with a valid certificate.')
+        if mixed_content_pages:
+            recs.append('Remove mixed content by upgrading all resources to HTTPS.')
+        if hsts_missing_pages:
+            recs.append('Enable HSTS (Strict-Transport-Security) to enforce HTTPS.')
+        if csp_missing_pages:
+            recs.append('Add a Content-Security-Policy to mitigate XSS; tighten sources.')
+        if xfo_missing_pages:
+            recs.append('Add X-Frame-Options/Frame-ancestors to prevent clickjacking.')
+        if images_missing_alt_total:
+            recs.append('Provide meaningful alt text for images to improve accessibility and SEO.')
+        if third_party_script_heavy:
+            recs.append('Audit and reduce third-party scripts; load asynchronously and after interaction.')
+        report['recommendations'] = recs
+
+        pages_snapshot = []
+        for u, p in self.pages.items():
+            pages_snapshot.append({
+                'url': u,
+                'status_code': p.status_code,
+                'title': p.title,
+                'meta_description': p.meta_description,
+                'h1_count': len(p.h1),
+                'canonical': p.canonical,
+                'meta_robots': p.meta_robots,
+                'og_tags_present': p.og_tags_present,
+                'twitter_tags_present': p.twitter_tags_present,
+                'structured_data_types': p.structured_data_types,
+                'images_missing_alt': p.images_missing_alt,
+                'images_with_lazy_loading': p.images_with_lazy_loading,
+                'has_webp_image': p.has_webp_image,
+                'internal_links_count': len(p.internal_links),
+                'external_links_count': len(p.external_links),
+                'render_blocking_css_in_head': p.render_blocking_css_in_head,
+                'render_blocking_js_in_head': p.render_blocking_js_in_head,
+                'third_party_scripts': p.third_party_scripts,
+                'mixed_content_http_resources_count': len(p.mixed_content_http_resources),
+                'has_viewport_meta': p.has_viewport_meta,
+                'dom_nodes_estimate': p.dom_nodes_estimate,
+                'cache_control_header': p.cache_control_header,
+                'content_encoding': p.content_encoding,
+                'security_headers': p.security_headers,
+                'open_directory_listing': p.open_directory_listing,
+                'has_login_form_insecure': p.has_login_form_insecure
+            })
+        report['pages'] = pages_snapshot
+        return report
+
+    def enrich_with_pagespeed(self, report: Dict):
+        if not self.pagespeed_api_key:
+            report['pagespeed'] = {'status': 'not_configured'}
+            return
+        try:
+            api = (
+                'https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url='
+                + requests.utils.quote(self.base_url)
+                + '&category=PERFORMANCE&strategy=mobile&key=' + self.pagespeed_api_key
+            )
+            resp = requests.get(api, timeout=self.timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                lighthouse = data.get('lighthouseResult', {})
+                perf_score = lighthouse.get('categories', {}).get('performance', {}).get('score', 0)
+                audits = lighthouse.get('audits', {})
+                lcp = audits.get('largest-contentful-paint', {}).get('numericValue')
+                cls = audits.get('cumulative-layout-shift', {}).get('numericValue')
+                tbt = audits.get('total-blocking-time', {}).get('numericValue')
+                report['pagespeed'] = {
+                    'performance_score': perf_score,
+                    'lcp_ms': lcp,
+                    'cls': cls,
+                    'tbt_ms': tbt
+                }
+                if perf_score:
+                    report['category_scores']['technical_performance'] = min(
+                        100,
+                        report['category_scores']['technical_performance'] + int(perf_score * 10)
+                    )
+                    weights = {
+                        'site_health': 0.20,
+                        'crawlability': 0.20,
+                        'on_page_seo': 0.20,
+                        'technical_performance': 0.20,
+                        'mobile_usability': 0.10,
+                        'security': 0.10
+                    }
+                    overall = 0
+                    for cat, sc in report['category_scores'].items():
+                        overall += sc * weights[cat]
+                    report['overall_score'] = round(overall, 2)
+                    report['summary']['good_vs_bad'] = 'Good' if overall >= 70 else 'Bad'
+                    report['classification'] = (
+                        'Excellent' if overall >= 90 else (
+                            'Good' if overall >= 70 else (
+                                'Needs Improvement' if overall >= 50 else 'Poor')))
+            else:
+                report['pagespeed'] = {'status': f'error {resp.status_code}'}
+        except Exception as e:
+            report['pagespeed'] = {'status': f'error: {e}'}
+
+
+# -------------------------------
+# Integrations: GSC, SEMrush, Ahrefs
+# -------------------------------
+class GSCClient:
+    def __init__(self, credentials_json: Optional[str], timeout: int = 10):
+        self.credentials_json = credentials_json
+        self.timeout = timeout
+
+    def fetch_indexed_from_sitemaps(self, property_url: str) -> Dict:
+        """Attempt to sum indexed URLs across sitemaps via Google Search Console API.
+        Requires google-api-python-client and proper OAuth credentials.
+        """
+        if not self.credentials_json:
+            return {'status': 'not_configured'}
+        try:
+            from google.oauth2 import service_account  # type: ignore
+            from googleapiclient.discovery import build  # type: ignore
+            SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
+            creds = service_account.Credentials.from_service_account_file(
+                self.credentials_json, scopes=SCOPES)
+            service = build('webmasters', 'v3', credentials=creds)
+            sitemaps = service.sitemaps().list(siteUrl=property_url).execute()
+            total_indexed = 0
+            total_submitted = 0
+            for sm in sitemaps.get('sitemap', []):
+                for c in sm.get('contents', []):
+                    total_indexed += int(c.get('indexed', 0))
+                    total_submitted += int(c.get('submitted', 0))
+            return {
+                'status': 'ok',
+                'indexed_pages_estimate': total_indexed,
+                'submitted_pages_estimate': total_submitted
+            }
+        except Exception as e:
+            return {'status': f'error: {e}'}
+
+
+class BacklinksClient:
+    def __init__(self, semrush_key: Optional[str], ahrefs_key: Optional[str], timeout: int = 10):
+        self.semrush_key = semrush_key
+        self.ahrefs_key = ahrefs_key
+        self.timeout = timeout
+
+    def fetch_domain_authority(self, domain: str) -> Dict:
+        """Stub methods: attempt to fetch basic authority metrics from SEMrush/Ahrefs.
+        If keys are missing, return not_configured.
+        """
+        if not (self.semrush_key or self.ahrefs_key):
+            return {'status': 'not_configured'}
+        data = {'status': 'partial'}
+        try:
+            if self.semrush_key:
+                # Example SEMrush API call (may require specific type and parameters per plan).
+                # Replace with valid endpoint per your subscription.
+                # resp = requests.get('https://api.semrush.com/', params={...}, timeout=self.timeout)
+                # data['semrush'] = resp.json()
+                data['semrush'] = {'note': 'Implement SEMrush endpoint with your plan params.'}
+            if self.ahrefs_key:
+                # Example Ahrefs API call placeholder.
+                # resp = requests.get('https://apiv2.ahrefs.com', params={...}, timeout=self.timeout)
+                # data['ahrefs'] = resp.json()
+                data['ahrefs'] = {'note': 'Implement Ahrefs endpoint with your token & parameters.'}
+        except Exception as e:
+            data['error'] = str(e)
+        return data
+
+
+# -------------------------------
+# Executive Summary PDF
+# -------------------------------
+class ExecutiveSummaryPDF:
+    def __init__(self, pdf_path: str):
+        self.pdf_path = pdf_path
+        self.story = []
+        self.styles = getSampleStyleSheet()
+
+    def add_title(self, site: str, overall_score: float, classification: str):
+        title = f"Website Audit Executive Summary"
+        subtitle = f"Site: {site} | Overall Score: {overall_score} | Classification: {classification}"
+        self.story.append(Paragraph(f"<para align=left><b>{title}</b></para>", self.styles['Title']))
+        self.story.append(Spacer(1, 0.3*cm))
+        self.story.append(Paragraph(subtitle, self.styles['Normal']))
+        self.story.append(Spacer(1, 0.3*cm))
+
+    def add_kpis(self, summary: Dict, counts: Dict):
+        bullets = [
+            f"Total Crawled Pages: {summary.get('total_crawled_pages', 0)}",
+            f"Avg Response Time (ms): {summary.get('avg_response_time_ms', 0)}",
+            f"Avg HTML Size (KB): {summary.get('avg_html_size_kb', 0)}",
+            f"4xx Errors: {counts.get('errors_4xx', 0)}",
+            f"5xx Errors: {counts.get('errors_5xx', 0)}",
+            f"Missing Titles: {counts.get('missing_titles', 0)}",
+            f"Missing Meta Descriptions: {counts.get('missing_meta_descriptions', 0)}",
+            f"Viewport Missing Pages: {counts.get('viewport_missing_pages', 0)}",
+            f"Mixed Content Pages: {counts.get('mixed_content_pages', 0)}",
+        ]
+        text = '<br/>'.join([f"• {b}" for b in bullets])
+        self.story.append(Paragraph(text, self.styles['Normal']))
+        self.story.append(Spacer(1, 0.3*cm))
+
+    def add_recommendations(self, recs: List[str]):
+        if not recs:
+            return
+        self.story.append(Paragraph('<b>Top Recommendations</b>', self.styles['Heading2']))
+        text = '<br/>'.join([f"• {r}" for r in recs[:10]])
+        self.story.append(Paragraph(text, self.styles['Normal']))
+        self.story.append(Spacer(1, 0.3*cm))
+
+    def add_chart_image(self, img_path: str, title: str):
+        self.story.append(Paragraph(f"<b>{title}</b>", self.styles['Heading2']))
+        try:
+            self.story.append(Image(img_path, width=16*cm, height=9*cm))
+        except Exception:
+            self.story.append(Paragraph('Chart unavailable.', self.styles['Italic']))
+        self.story.append(Spacer(1, 0.4*cm))
+
+    def build(self):
+        doc = SimpleDocTemplate(self.pdf_path, pagesize=A4)
+        doc.build(self.story)
+
+    @staticmethod
+    def make_category_scores_chart(category_scores: Dict[str, float], out_path: str):
+        cats = list(category_scores.keys())
+        vals = [category_scores[k] for k in cats]
+        plt.figure(figsize=(8, 4.5))
+        plt.bar(cats, vals, color='#0078D4')
+        plt.ylim(0, 100)
+        plt.title('Category Scores (0–100)')
+        plt.ylabel('Score')
+        plt.xticks(rotation=30, ha='right')
+        plt.tight_layout()
+        plt.savefig(out_path)
+        plt.close()
+
+    @staticmethod
+    def make_top_issues_chart(counts: Dict[str, int], out_path: str, topn: int = 10):
+        pairs = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        labels = [k for k,_ in pairs[:topn]]
+        values = [v for _,v in pairs[:topn]]
+        plt.figure(figsize=(8, 4.5))
+        plt.barh(labels[::-1], values[::-1], color='#F25022')
+        plt.title('Top Issues by Count')
+        plt.xlabel('Count')
+        plt.tight_layout()
+        plt.savefig(out_path)
+        plt.close()
+
+
+# -------------------------------
+# CLI & Orchestration
+# -------------------------------
+
 def main():
-    parser = argparse.ArgumentParser(description="Comprehensive Website Audit Tool (single-file)")
-    parser.add_argument("--url", required=True, help="Base URL to audit, e.g., https://example.com")
-    parser.add_argument("--max-pages", type=int, default=50, help="Max pages to crawl")
-    parser.add_argument("--timeout", type=int, default=10, help="HTTP timeout in seconds")
-    parser.add_argument("--include-external", action="store_true", help="Also crawl external links")
-    parser.add_argument("--pagespeed-api-key", default=None, help="Google PageSpeed Insights API key (optional)")
-    parser.add_argument("--output", default=None, help="Write report JSON to this file")
+    parser = argparse.ArgumentParser(description='Web Audit Pro — Async crawler + PDF + API integrations')
+    parser.add_argument('--url', required=True, help='Base URL to audit (e.g., https://example.com)')
+    parser.add_argument('--max-pages', type=int, default=100, help='Maximum pages to crawl')
+    parser.add_argument('--timeout', type=int, default=10, help='HTTP timeout (seconds)')
+    parser.add_argument('--user-agent', default='WebAuditPro/1.0', help='Crawler User-Agent')
+    parser.add_argument('--respect-robots', action='store_true', help='Respect robots.txt (default off)')
+    parser.add_argument('--concurrency', type=int, default=20, help='Async concurrency')
+    parser.add_argument('--pagespeed-api-key', default=None, help='Google PSI API key (optional)')
+    parser.add_argument('--gsc-credentials', default=None, help='Path to GSC service account JSON (optional)')
+    parser.add_argument('--gsc-property', default=None, help='GSC property URL (e.g., https://example.com/)')
+    parser.add_argument('--semrush-key', default=None, help='SEMrush API key (optional)')
+    parser.add_argument('--ahrefs-key', default=None, help='Ahrefs API token (optional)')
+    parser.add_argument('--out', default='audit_report.json', help='Output JSON')
+    parser.add_argument('--pdf-out', default='audit_report.pdf', help='Output PDF')
     args = parser.parse_args()
-    audit = WebsiteAudit(
+
+    auditor = AsyncWebsiteAuditor(
         base_url=args.url,
         max_pages=args.max_pages,
         timeout=args.timeout,
-        include_external=args.include_external,
-        pagespeed_api_key=args.pagespeed_api_key,
+        user_agent=args.user_agent,
+        respect_robots=args.respect_robots,
+        concurrency=args.concurrency,
+        pagespeed_api_key=args.pagespeed_api_key
     )
-    report = audit.run()
-    text = json.dumps(report, indent=2, ensure_ascii=False)
-    if args.output:
+
+    print(f"[+] Crawling (async, concurrency={args.concurrency}) {args.url} up to {args.max_pages} pages...")
+    try:
+        asyncio.run(auditor.crawl())
+    except RuntimeError:
+        # if already inside an event loop (e.g., Jupyter), fallback
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(auditor.crawl())
+
+    print(f"[+] Aggregating metrics and scoring...")
+    report = auditor.aggregate()
+    auditor.enrich_with_pagespeed(report)
+
+    # GSC
+    if args.gsc_property:
+        gsc_client = GSCClient(args.gsc_credentials, timeout=args.timeout)
+        gsc_data = gsc_client.fetch_indexed_from_sitemaps(args.gsc_property)
+        report['gsc'] = gsc_data
+        if gsc_data.get('indexed_pages_estimate') is not None:
+            report['summary']['indexed_pages_estimate'] = gsc_data['indexed_pages_estimate']
+
+    # Backlinks
+    bk_client = BacklinksClient(args.semrush_key, args.ahrefs_key, timeout=args.timeout)
+    domain = urlparse(args.url).netloc
+    bk = bk_client.fetch_domain_authority(domain)
+    report['backlinks'] = bk
+
+    # Write JSON
+    with open(args.out, 'w', encoding='utf-8') as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+    print(f"[+] JSON report written to {args.out}")
+
+    # Charts
+    cat_chart = 'chart_categories.png'
+    issues_chart = 'chart_issues.png'
+    ExecutiveSummaryPDF.make_category_scores_chart(report['category_scores'], cat_chart)
+    ExecutiveSummaryPDF.make_top_issues_chart(report['counts'], issues_chart)
+
+    # PDF
+    print(f"[+] Building executive summary PDF: {args.pdf_out}")
+    pdf = ExecutiveSummaryPDF(args.pdf_out)
+    pdf.add_title(report['site'], report['overall_score'], report['classification'])
+    pdf.add_kpis(report['summary'], report['counts'])
+    pdf.add_recommendations(report['recommendations'])
+    pdf.add_chart_image(cat_chart, 'Category Scores')
+    pdf.add_chart_image(issues_chart, 'Top Issues by Count')
+    pdf.build()
+
+    # Cleanup chart images
+    for p in [cat_chart, issues_chart]:
         try:
-            with open(args.output, "w", encoding="utf-8") as f:
-                f.write(text)
-            print(f"Report written to {args.output}")
-        except Exception as e:
-            print(f"Error writing to file: {e}")
-            print(text)
-    else:
-        print(text)
-if __name__ == "__main__":
+            os.remove(p)
+        except Exception:
+            pass
+
+    print(f"[=] Overall Score: {report['overall_score']} — {report['classification']} ({report['summary']['good_vs_bad']})")
+    print(f"[+] PDF report written to {args.pdf_out}")
+
+
+if __name__ == '__main__':
     main()
