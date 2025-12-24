@@ -2,12 +2,12 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "pip install -r requirements.txt && python -m playwright install chromium"
+    "buildCommand": "/opt/venv/bin/pip install -r requirements.txt && /opt/venv/bin/python -m playwright install chromium"
   },
   "deploy": {
-    "startCommand": "uvicorn main:app --host 0.0.0.0 --port ${PORT}",
+    "startCommand": "/opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT}",
     "restartPolicyType": "ON_FAILURE",
-    "healthCheckPath": "/",
+    "healthCheckPath": "/health",
     "healthCheckTimeout": 120
   }
 }
