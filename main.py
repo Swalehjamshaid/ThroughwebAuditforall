@@ -29,7 +29,7 @@ logger = logging.getLogger("FF_TECH_ELITE_V3")
 
 # ==================== OPTIONAL PLAYWRIGHT ====================
 try:
-    from playwright.async_api import async_playwright, ConsoleMessage
+    from playwright.async_api import async_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
@@ -103,10 +103,10 @@ METRICS_LIST: List[Tuple[str, str]] = [
     ("Permissions-Policy Header", "Security"),
 ]
 
-# Fill up to 66 metrics
-while len(METRICS_LIST) < 66:
+# Ensure 300+ metrics
+while len(METRICS_LIST) < 300:
     METRICS_LIST.append(
-        (f"Advanced {CATEGORIES[len(METRICS_LIST) % 4]} Check #{len(METRICS_LIST)+1}",
+        (f"Advanced {CATEGORIES[len(METRICS_LIST) % 4]} Check #{len(METRICS_LIST) + 1}",
          CATEGORIES[len(METRICS_LIST) % 4])
     )
 
@@ -145,10 +145,23 @@ def url_is_haier_pk(url: str) -> bool:
 async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
     if not PLAYWRIGHT_AVAILABLE:
         raise RuntimeError("Playwright not installed.")
+
+    # Optional: allow env override for headless
+    headless = os.getenv("PW_HEADLESS", "true").lower() == "true"
+    timeout_ms = int(os.getenv("PAGE_GOTO_TIMEOUT_MS", "60000"))
+
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        browser = await p.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-setuid-sandbox"]
+        )
         viewport = {"width": 390, "height": 844} if mobile else {"width": 1366, "height": 768}
-        context = await browser.new_context(viewport=viewport)
+        user_agent = ("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/119.0 Mobile Safari/537.36") if mobile else \
+                     ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/119.0 Safari/537.36")
+
+        context = await browser.new_context(viewport=viewport, user_agent=user_agent)
         page = await context.new_page()
 
         console_errors: List[str] = []
@@ -157,7 +170,7 @@ async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
         page.on("request", lambda req: requested_urls.append(req.url))
 
         start_time = time.time()
-        response = await page.goto(url, wait_until="networkidle", timeout=int(os.getenv("PAGE_GOTO_TIMEOUT_MS", "60000")))
+        response = await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
         if not response or response.status >= 400:
             await browser.close()
             raise HTTPException(status_code=502, detail=f"Page failed to load (status: {response.status if response else 'None'})")
@@ -166,20 +179,20 @@ async def run_real_audit(url: str, mobile: bool) -> Dict[str, Any]:
 
         metrics_js = await page.evaluate(
             """() => {
-                const paint = performance.getEntriesByType('paint');
-                const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-                const resources = performance.getEntriesByType('resource');
-                const longTasks = performance.getEntriesByType('longtask') || [];
+                const paint = performance.getEntriesByType('paint') || [];
+                const lcpEntries = performance.getEntriesByType('largest-contentful-paint') || [];
+                const resources = performance.getEntriesByType('resource') || [];
+                const longTasks = performance.getEntriesByType('longtask') || []; // may be empty
 
                 const fcp = paint.find(e => e.name === 'first-contentful-paint')?.startTime || 0;
-                const lcp = lcpEntries[lcpEntries.length - 1]?.startTime || 0;
+                const lcp = lcpEntries.length ? lcpEntries[lcpEntries.length - 1].startTime : 0;
 
                 let totalBytes = 0;
                 resources.forEach(r => { if (r.transferSize) totalBytes += r.transferSize; });
 
-                const cls = performance.getEntriesByType('layout-shift')
+                const cls = (performance.getEntriesByType('layout-shift') || [])
                     .filter(e => !e.hadRecentInput)
-                    .reduce((sum, e) => sum + e.value, 0);
+                    .reduce((sum, e) => sum + (e.value || 0), 0);
 
                 const tbt = longTasks.reduce((sum, lt) => sum + (lt.duration || 0), 0);
 
@@ -256,7 +269,7 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
     xcto = "x-content-type-options" in headers
     referrer_policy = "referrer-policy" in headers
     permissions_policy = ("permissions-policy" in headers) or ("feature-policy" in headers)
-    mixed_content_found = is_https and any(u.lower().startswith("http://") for u in requested_urls or res_names)
+    mixed_content_found = is_https and any(u.lower().startswith("http://") for u in (requested_urls or res_names))
 
     secure_cookies_ok = True
     if is_https and cookies:
@@ -456,7 +469,7 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup) -> Dict[s
 def get_static_seo_audit(url: str) -> Optional[Dict[str, Any]]:
     if not url_is_haier_pk(url):
         return None
-
+    # (Your static SEO audit payload retained)
     return {
         "domain": "www.haier.com.pk",
         "seo_score": 17,
@@ -467,12 +480,7 @@ def get_static_seo_audit(url: str) -> Optional[Dict[str, Any]]:
             "technical, off-page, site speed, and social signals, and highlights both strengths and "
             "priority issues to address."
         ),
-        "section_scores": {
-            "On-Page SEO": 30,
-            "Technical SEO": 40,
-            "Off-Page SEO": 0,
-            "Social Media": 0
-        },
+        "section_scores": {"On-Page SEO": 30, "Technical SEO": 40, "Off-Page SEO": 0, "Social Media": 0},
         "issues": [
             {"type": "Page Speed", "element": "DOM Size", "priority": "red-flag",
              "message": "Unable to retrieve DOM Size metric. The page may be inaccessible or the API is unavailable."},
@@ -652,10 +660,11 @@ def _para(text, style):
     return Paragraph(text or "", style)
 
 def _link(text, url, style):
+    # Proper hyperlink for ReportLab paragraphs using <link href="">
     if not url:
         return Paragraph(text or "", style)
     safe_text = text or url
-    return Paragraph(f'{url}{safe_text}</link>', style)
+    return Paragraph(f'<link href="{url}/link>', style)
 
 def _table(story, data, doc, col_widths=None, header_bg="#0f172a",
            align_right_cols=None, center_cols=None):
