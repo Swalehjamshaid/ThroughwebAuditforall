@@ -1,268 +1,558 @@
-INDEX_HTML = r"""<!DOCTYPE html>
+
+<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FF TECH ELITE v3 | World's Most Advanced Web Audit</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <title>FF TECH ELITE v3 | Enterprise Web Audit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind -->
+  https://cdn.tailwindcss.com</script>
+
+  <!-- Fonts -->
+  https://fonts.googleapis.com
+  https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap
+
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
-    .card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 1.5rem; }
-    .glow { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
-    .progress-container { height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden; }
-    .progress-bar { height: 100%; background: linear-gradient(90deg, #10b981, #34d399, #06b6d4); border-radius: 4px; animation: progress 4s ease-in-out infinite; }
-    @keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
-    .pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-    .score-good { color: #34d399; }
-    .score-medium { color: #fbbf24; }
-    .score-bad { color: #f87171; }
-    .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%); }
+    body { font-family: Inter, sans-serif; }
+    .glow { box-shadow: 0 0 25px rgba(16,185,129,.35); }
+    .loader {
+      border-top-color: #10b981;
+      animation: spin 1s linear infinite;
+      border: 4px solid #334155;
+      border-top-color: #10b981;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .card { background:#0b1220; border:1px solid #1f2a3b; }
+    .table-head { background:#0f172a; }
+    .chip { display:inline-block; border-radius:12px; padding:2px 8px; font-size:12px; }
+    .chip-red { background:#7f1d1d; color:#fecaca; }
+    .chip-green { background:#064e3b; color:#a7f3d0; }
+    .chip-amber { background:#78350f; color:#fde68a; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
-<body class="min-h-screen">
-  <!-- Hero -->
-  <div class="hero-gradient text-white py-20">
-    <div class="max-w-7xl mx-auto px-6 text-center">
-      <h1 class="text-7xl font-black mb-6">FF TECH ELITE <span class="text-cyan-300">v3</span></h1>
-      <p class="text-2xl mb-16 max-w-4xl mx-auto opacity-90">
-        The World's Most Advanced Website Audit Engine<br>
-        300+ Weighted Metrics • Lighthouse + Real Browser • Enterprise Reports
-      </p>
-      <div class="max-w-4xl mx-auto">
-        <div class="card rounded-3xl p-12 glow">
-          <div class="grid md:grid-cols-3 gap-8 items-end">
-            <div class="md:col-span-2">
-              <input id="urlInput" type="url" placeholder="https://example.com" 
-                     class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/60 text-xl focus:outline-none focus:border-white"/>
-            </div>
-            <div>
-              <select id="modeInput" class="w-full px-8 py-6 rounded-2xl bg-white/10 backdrop-blur border border-white/20 text-white text-lg focus:outline-none">
-                <option value="desktop">Desktop Audit</option>
-                <option value="mobile">Mobile Audit</option>
-              </select>
-            </div>
-          </div>
-          <button onclick="runAudit()" class="mt-10 w-full py-7 bg-white text-slate-900 font-black text-2xl rounded-2xl shadow-2xl hover:scale-105 transition transform">
-            Launch Full Audit
-          </button>
-        </div>
-      </div>
-    </div>
+
+<body class="bg-slate-950 text-slate-100 min-h-full">
+
+<!-- ================= HEADER ================= -->
+<header class="border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-emerald-400">
+      FF TECH ELITE <span class="text-slate-400">v3</span>
+    </h1>
+    <span class="text-sm text-slate-400">World's Most Comprehensive Web Analysis</span>
   </div>
+</header>
 
-  <!-- Loading with Moving Progress -->
-  <div id="loading" class="hidden max-w-5xl mx-auto px-6 py-32">
-    <div class="card rounded-3xl p-16 text-center glow">
-      <div class="w-40 h-40 mx-auto mb-12 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 p-2">
-        <div class="w-full h-full rounded-full bg-slate-900 flex items-center justify-center">
-          <i class="fas fa-microchip text-7xl text-emerald-400 pulse"></i>
-        </div>
-      </div>
-      <h2 class="text-5xl font-black mb-8">Elite Audit in Progress</h2>
-      <p class="text-2xl text-slate-400 mb-16">Analyzing 300+ metrics across Performance, SEO, UX & Security</p>
-      
-      <div class="space-y-6 text-left max-w-2xl mx-auto">
-        <div class="flex items-center gap-6">
-          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
-          <span class="text-lg">Fetching page content & headers</span>
-        </div>
-        <div class="flex items-center gap-6">
-          <i class="fas fa-check-circle text-emerald-400 text-2xl"></i>
-          <span class="text-lg">Running Google Lighthouse analysis</span>
-        </div>
-        <div class="flex items-center gap-6">
-          <i class="fas fa-circle-notch text-cyan-400 text-2xl animate-spin"></i>
-          <span class="text-lg">Executing real browser lab tests</span>
-        </div>
-        <div class="flex items-center gap-6">
-          <i class="fas fa-circle text-slate-500 text-2xl"></i>
-          <span class="text-lg">Scoring 300+ weighted metrics</span>
-        </div>
-        <div class="flex items-center gap-6">
-          <i class="fas fa-circle text-slate-500 text-2xl"></i>
-          <span class="text-lg">Generating enterprise report</span>
-        </div>
-      </div>
+<!-- ================= INPUT ================= -->
+<section class="max-w-7xl mx-auto px-6 py-10">
+  <div class="card rounded-xl p-8 glow">
+    <div class="grid md:grid-cols-4 gap-4">
+      <input id="urlInput" type="text"
+        placeholder="example.com"
+        class="col-span-2 px-4 py-3 rounded bg-slate-800 border border-slate-700 focus:outline-none" />
 
-      <div class="mt-16 max-w-3xl mx-auto">
-        <div class="progress-container">
-          <div class="progress-bar"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+      <select id="modeInput"
+        class="px-4 py-3 rounded bg-slate-800 border border-slate-700">
+        <option value="desktop">Desktop Audit</option>
+        <option value="mobile">Mobile Audit</option>
+      </select>
 
-  <!-- Results -->
-  <div id="results" class="hidden max-w-7xl mx-auto px-6 py-20 space-y-20">
-    <!-- Header -->
-    <div class="text-center">
-      <h2 class="text-6xl font-black mb-6">Audit Complete</h2>
-      <p class="text-3xl text-slate-400 mb-2">Report generated for</p>
-      <p id="auditedUrl" class="text-4xl font-bold text-emerald-400 mb-2">—</p>
-      <p id="auditedAt" class="text-xl text-slate-500">—</p>
-    </div>
-
-    <!-- Overall Score -->
-    <div class="max-w-4xl mx-auto">
-      <div class="card rounded-3xl p-20 text-center glow">
-        <div id="overallScore" class="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
-          —%
-        </div>
-        <p class="text-4xl font-bold mt-8">Overall Site Health Score</p>
-      </div>
-    </div>
-
-    <!-- Pillar Scores -->
-    <div class="max-w-6xl mx-auto">
-      <div class="card rounded-3xl p-12">
-        <h3 class="text-4xl font-bold mb-12 text-center">Pillar Scores</h3>
-        <div id="pillarScores" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
-      </div>
-    </div>
-
-    <!-- Core Web Vitals & Performance -->
-    <div class="max-w-6xl mx-auto">
-      <div class="card rounded-3xl p-12">
-        <h3 class="text-4xl font-bold mb-12 text-center">Core Web Vitals & Performance</h3>
-        <div id="perfGrid" class="grid grid-cols-2 md:grid-cols-4 gap-10"></div>
-      </div>
-    </div>
-
-    <!-- Improvement Roadmap -->
-    <div class="max-w-6xl mx-auto">
-      <div class="card rounded-3xl p-12">
-        <h3 class="text-4xl font-bold mb-12 text-center">Improvement Roadmap</h3>
-        <div id="roadmap" class="prose prose-invert prose-xl max-w-none text-lg leading-relaxed"></div>
-      </div>
-    </div>
-
-    <!-- Advanced Diagnostics -->
-    <div class="max-w-7xl mx-auto">
-      <div class="card rounded-3xl p-12 overflow-x-auto">
-        <h3 class="text-4xl font-bold mb-12 text-center">Advanced Diagnostics (300+ Metrics)</h3>
-        <table class="w-full text-left">
-          <thead class="bg-gradient-to-r from-emerald-600 to-cyan-600 text-black">
-            <tr>
-              <th class="p-6 rounded-tl-2xl">#</th>
-              <th class="p-6">Metric</th>
-              <th class="p-6">Category</th>
-              <th class="p-6 text-right">Score</th>
-              <th class="p-6 text-right rounded-tr-2xl">Weight</th>
-            </tr>
-          </thead>
-          <tbody id="metricsTable" class="divide-y divide-slate-700"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PDF Download -->
-    <div class="text-center py-20">
-      <button onclick="downloadPDF()" class="px-20 py-10 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-black font-black text-4xl rounded-3xl shadow-2xl transform hover:scale-110 transition flex items-center gap-8 mx-auto">
-        <i class="fas fa-file-pdf text-5xl"></i>
-        Download Enterprise PDF Report
+      <button onclick="runAudit()"
+        class="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded px-6 py-3">
+        Run Audit
       </button>
     </div>
+    <p class="text-xs text-slate-500 mt-3">Tip: You can enter <span class="mono">haier.pk</span> — it will be audited at <span class="mono">http://www.haier.com.pk/#/login</span> per internal rewrite.</p>
+  </div>
+</section>
+
+<!-- ================= LOADER ================= -->
+<div id="loader" class="hidden flex flex-col items-center py-16">
+  <div class="loader"></div>
+  <p class="mt-4 text-slate-400">Running Lighthouse (PSI) + DOM + Security + UX audit…</p>
+</div>
+
+<!-- ================= RESULTS ================= -->
+<section id="results" class="hidden max-w-7xl mx-auto px-6 pb-24 space-y-12">
+
+  <!-- OVERALL SCORE & PILLARS -->
+  <div class="grid lg:grid-cols-5 gap-6">
+    <div class="lg:col-span-2 card rounded-xl p-8 text-center glow">
+      <h2 class="text-lg text-slate-400">Overall Health Score</h2>
+      <div id="overallScore" class="text-6xl font-bold text-emerald-400 mt-4">—</div>
+      <p id="auditedUrl" class="text-sm text-slate-400 mt-2 mono"></p>
+      <p id="auditedAt" class="text-xs text-slate-500 mt-1"></p>
+    </div>
+
+    <div class="lg:col-span-3 card rounded-xl p-6">
+      <h3 class="font-semibold mb-4">Pillar Scores</h3>
+      <div id="pillarScores" class="grid grid-cols-2 gap-4"></div>
+    </div>
   </div>
 
-  <script>
-    let auditData = null;
+  <!-- CORE WEB VITALS & PERF -->
+  <div class="card rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold">Core Web Vitals &amp; Performance</h3>
+      <span class="text-xs text-slate-500">Live data via Lighthouse (Google PSI)</span>
+    </div>
+    <div id="perfGrid" class="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+  </div>
 
-    async function runAudit() {
-      const url = document.getElementById("urlInput").value.trim();
-      const mode = document.getElementById("modeInput").value;
-      if (!url) return alert("Please enter a valid URL");
+  <!-- ROADMAP -->
+  <div class="card rounded-xl p-6">
+    <h3 class="font-semibold mb-4">Improvement Roadmap</h3>
+    <div id="roadmap" class="text-sm text-slate-300 leading-relaxed"></div>
+    <p class="text-xs text-slate-500 mt-3">The roadmap is auto-expanded to at least 300 words based on PSI opportunities and audit findings.</p>
+  </div>
 
-      document.getElementById("results").classList.add("hidden");
-      document.getElementById("loading").classList.remove("hidden");
+  <!-- ADVANCED DIAGNOSTICS -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Advanced Diagnostics (300+ Metrics)</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">#</th>
+          <th class="p-2 text-left">Metric</th>
+          <th class="p-2 text-left">Category</th>
+          <th class="p-2 text-right">Score</th>
+          <th class="p-2 text-right">Weight</th>
+        </tr>
+      </thead>
+      <tbody id="metricsTable"></tbody>
+    </table>
+  </div>
 
-      try {
-        const res = await fetch("/audit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, mode })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        auditData = await res.json();
-        renderResults(auditData);
-      } catch (e) {
-        alert("Audit failed: " + e.message);
-        console.error(e);
-      } finally {
-        document.getElementById("loading").classList.add("hidden");
-      }
+  <!-- ======= SEO REPORT SECTIONS ======= -->
+
+  <!-- Overview text -->
+  <div class="card rounded-xl p-6">
+    <h3 class="font-semibold mb-2">SEO Audit Overview</h3>
+    <p id="seoOverview" class="text-sm text-slate-300"></p>
+  </div>
+
+  <!-- Issues & Recommendations -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Issues and Recommendations</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Type</th>
+          <th class="p-2 text-left">Element</th>
+          <th class="p-2 text-left">Priority</th>
+          <th class="p-2 text-left">Problem / Recommendation</th>
+        </tr>
+      </thead>
+      <tbody id="issuesTable"></tbody>
+    </table>
+  </div>
+
+  <!-- On-Page SEO -->
+  <div class="card rounded-xl p-6">
+    <h3 class="font-semibold mb-4">On‑Page SEO</h3>
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <div class="text-slate-400">URL</div>
+        <div id="onpUrl" class="mono"></div>
+      </div>
+      <div>
+        <div class="text-slate-400">Title</div>
+        <div id="onpTitle"></div>
+      </div>
+      <div>
+        <div class="text-slate-400">Meta Description</div>
+        <div id="onpMeta"></div>
+      </div>
+      <div>
+        <div class="text-slate-400">H1</div>
+        <div id="onpH1"></div>
+      </div>
+      <div>
+        <div class="text-slate-400">Heading Structure</div>
+        <div id="onpHeadings" class="mono"></div>
+      </div>
+      <div>
+        <div class="text-slate-400">Image Alt Coverage</div>
+        <div id="onpAlt"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyword Rankings -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Keyword Rankings</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Keyword</th>
+          <th class="p-2 text-center">Rank</th>
+          <th class="p-2 text-center">Traffic %</th>
+          <th class="p-2 text-center">Volume</th>
+          <th class="p-2 text-center">KD %</th>
+          <th class="p-2 text-center">CPC (USD)</th>
+        </tr>
+      </thead>
+      <tbody id="krTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Top Pages -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Top Pages</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">URL</th>
+          <th class="p-2 text-center">Traffic %</th>
+          <th class="p-2 text-center">Keywords</th>
+          <th class="p-2 text-center">Ref Dom</th>
+          <th class="p-2 text-center">Backlinks</th>
+        </tr>
+      </thead>
+      <tbody id="tpTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Technical SEO -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Technical SEO</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Element</th>
+          <th class="p-2 text-left">Priority</th>
+          <th class="p-2 text-left">Value</th>
+          <th class="p-2 text-left">Recommendation</th>
+        </tr>
+      </thead>
+      <tbody id="techTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Page Performance & CWV -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Page Performance &amp; Core Web Vitals</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Element</th>
+          <th class="p-2 text-center">Priority</th>
+          <th class="p-2 text-left">Note</th>
+        </tr>
+      </thead>
+      <tbody id="ppTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Competitors -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Competitors</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Competitor</th>
+          <th class="p-2 text-center">Common Keywords</th>
+          <th class="p-2 text-center">Competition Level</th>
+        </tr>
+      </thead>
+      <tbody id="compTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Off-Page SEO -->
+  <div class="card rounded-xl p-6">
+    <h3 class="font-semibold mb-2">Off‑Page SEO</h3>
+    <p id="offPageMsg" class="text-sm text-slate-300"></p>
+  </div>
+
+  <!-- Top Backlinks -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Top Backlinks</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Source Title</th>
+          <th class="p-2 text-left">Source URL</th>
+          <th class="p-2 text-left">Anchor</th>
+          <th class="p-2 text-left">Target URL</th>
+        </tr>
+      </thead>
+      <tbody id="blTable"></tbody>
+    </table>
+  </div>
+
+  <!-- Social Media -->
+  <div class="card rounded-xl p-6 overflow-x-auto">
+    <h3 class="font-semibold mb-4">Social Media</h3>
+    <table class="w-full text-sm">
+      <thead class="table-head">
+        <tr>
+          <th class="p-2 text-left">Network</th>
+          <th class="p-2 text-left">Priority</th>
+          <th class="p-2 text-left">Recommendation</th>
+        </tr>
+      </thead>
+      <tbody id="smTable"></tbody>
+    </table>
+  </div>
+
+  <!-- DOWNLOAD -->
+  <div class="text-center">
+    <button onclick="downloadPDF()"
+      class="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold px-10 py-4 rounded-xl">
+      Download Enterprise PDF Report
+    </button>
+    <p class="text-xs text-slate-500 mt-2">Your PDF will include the same sections shown above.</p>
+  </div>
+
+</section>
+
+<!-- ================= SCRIPT ================= -->
+<script>
+let auditData = null;
+
+function aTag(href, text) {
+  const url = (href || "");
+  const label = text || href || "";
+  return `${url}${label}</a>`;
+}
+
+function chipPriority(p) {
+  const v = (p || "").toLowerCase();
+  const label = p || "info";
+  if (v.includes("red")) return `<span class="chip chip-red">${label}</span>`;
+  if (v.includes("pass") || v.includes("green")) return `<span class="chip chip-green">${label}</span>`;
+  if (v.includes("flag")) return `<span class="chip chip-amber">${label}</span>`;
+  return `<span class="chip chip-amber">${label}</span>`;
+}
+
+async function runAudit() {
+  const url = document.getElementById("urlInput").value.trim();
+  const mode = document.getElementById("modeInput").value;
+
+  if (!url) { alert("Please enter a URL"); return; }
+
+  document.getElementById("results").classList.add("hidden");
+  document.getElementById("loader").classList.remove("hidden");
+
+  try {
+    const res = await fetch("/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, mode })
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || "Audit request failed");
     }
 
-    function renderResults(data) {
-      document.getElementById("results").classList.remove("hidden");
+    auditData = await res.json();
+    renderResults(auditData);
+  } catch (e) {
+    alert("Audit failed: " + e.message);
+    console.error(e);
+  } finally {
+    document.getElementById("loader").classList.add("hidden");
+  }
+}
 
-      document.getElementById("overallScore").textContent = (data.total_grade ?? "—") + "%";
-      document.getElementById("auditedUrl").textContent = data.url ?? "—";
-      document.getElementById("auditedAt").textContent = data.audited_at ?? "—";
+function renderResults(data) {
+  document.getElementById("results").classList.remove("hidden");
 
-      const pillarDiv = document.getElementById("pillarScores");
-      pillarDiv.innerHTML = "";
-      Object.entries(data.pillars || {}).forEach(([pillar, score]) => {
-        const colorClass = score >= 90 ? "score-good" : score >= 70 ? "score-medium" : "score-bad";
-        pillarDiv.innerHTML += `
-          <div class="bg-slate-800/60 rounded-2xl p-10 text-center glow">
-            <div class="text-slate-400 text-xl mb-4">${pillar}</div>
-            <div class="text-7xl font-black ${colorClass}">${score}%</div>
-          </div>`;
-      });
+  // Header
+  document.getElementById("overallScore").textContent = (data.total_grade ?? "—") + "%";
+  document.getElementById("auditedUrl").innerHTML = aTag(data.url, data.url);
+  document.getElementById("auditedAt").textContent = data.audited_at || "";
 
-      const perfDiv = document.getElementById("perfGrid");
-      perfDiv.innerHTML = "";
-      const perfKeys = ["lcp_ms", "fcp_ms", "cls", "tbt_ms", "inp_ms", "speed_index_ms", "ttfb_ms", "page_weight_kb", "request_count", "dom_size"];
-      perfKeys.forEach(key => {
-        const label = key.replace(/_/g, ' ').toUpperCase();
-        const value = data.perf[key] ?? "—";
-        perfDiv.innerHTML += `
-          <div class="bg-slate-800/60 rounded-2xl p-8">
-            <div class="text-slate-400 text-lg mb-3">${label}</div>
-            <div class="text-4xl font-bold">${value}</div>
-          </div>`;
-      });
+  // Pillars
+  const p = document.getElementById("pillarScores");
+  p.innerHTML = "";
+  Object.entries(data.pillars || {}).forEach(([k,v]) => {
+    p.innerHTML += `
+      <div class="bg-slate-800 rounded p-4">
+        <div class="text-slate-400 text-sm">${k}</div>
+        <div class="text-xl font-bold text-emerald-400">${v}%</div>
+      </div>`;
+  });
 
-      document.getElementById("roadmap").innerHTML = (data.roadmap || "").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  // Performance
+  const perf = document.getElementById("perfGrid");
+  perf.innerHTML = "";
+  Object.entries(data.perf || {}).forEach(([k,v]) => {
+    perf.innerHTML += `
+      <div class="bg-slate-800 rounded p-4">
+        <div class="text-xs text-slate-400">${k}</div>
+        <div class="font-semibold">${(v ?? "—")}</div>
+      </div>`;
+  });
 
-      const tbody = document.getElementById("metricsTable");
-      tbody.innerHTML = "";
-      (data.metrics || []).slice(0, 100).forEach(m => {
-        const scoreColor = m.score >= 90 ? "score-good" : m.score >= 70 ? "score-medium" : "score-bad";
-        tbody.innerHTML += `
-          <tr>
-            <td class="p-6 text-slate-400">${m.no}</td>
-            <td class="p-6">${m.name}</td>
-            <td class="p-6 text-slate-400">${m.category}</td>
-            <td class="p-6 text-right font-bold ${scoreColor}">${m.score}%</td>
-            <td class="p-6 text-right text-slate-400">${m.weight}</td>
-          </tr>`;
-      });
-    }
+  // Roadmap (already HTML-encoded from backend; expand in PDF)
+  document.getElementById("roadmap").innerHTML = data.roadmap || "";
 
-    async function downloadPDF() {
-      if (!auditData) return alert("Please run an audit first");
-      try {
-        const res = await fetch("/download", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(auditData)
-        });
-        if (!res.ok) throw new Error("PDF generation failed");
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "FF_TECH_ELITE_Audit_Report.pdf";
-        a.click();
-        URL.revokeObjectURL(url);
-      } catch (e) {
-        alert("Download failed: " + e.message);
-      }
-    }
-  </script>
+  // Advanced Diagnostics
+  const tbody = document.getElementById("metricsTable");
+  tbody.innerHTML = "";
+  (data.metrics || []).forEach(m => {
+    tbody.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${m.no}</td>
+        <td class="p-2">${m.name}</td>
+        <td class="p-2">${m.category}</td>
+        <td class="p-2 text-right font-semibold ${m.score < 80 ? 'text-red-400' : 'text-emerald-400'}">${m.score}%</td>
+        <td class="p-2 text-right">${m.weight}</td>
+      </tr>`;
+  });
+
+  // SEO Overview
+  const sa = data.seo_audit || {};
+  document.getElementById("seoOverview").textContent = sa.overview_text || "—";
+
+  // Issues
+  const issuesT = document.getElementById("issuesTable");
+  issuesT.innerHTML = "";
+  (sa.issues || []).forEach(it => {
+    issuesT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${it.type || ""}</td>
+        <td class="p-2">${it.element || ""}</td>
+        <td class="p-2">${chipPriority(it.priority)}</td>
+        <td class="p-2">${it.message || ""}</td>
+      </tr>`;
+  });
+
+  // On-Page
+  const onp = sa.on_page || {};
+  document.getElementById("onpUrl").innerHTML = aTag(onp.url?.value, onp.url?.value);
+  document.getElementById("onpTitle").textContent = onp.title?.value || "—";
+  document.getElementById("onpMeta").textContent = onp.meta_description?.value || "—";
+  document.getElementById("onpH1").textContent = onp.h1?.value || "—";
+  const heads = onp.headings?.structure || {};
+  document.getElementById("onpHeadings").textContent =
+    `H2:${heads.H2||0} H3:${heads.H3||0} H4:${heads.H4||0} H5:${heads.H5||0} H6:${heads.H6||0}`;
+  document.getElementById("onpAlt").textContent = onp.image_alt?.note || "—";
+
+  // Keyword Rankings
+  const krT = document.getElementById("krTable");
+  krT.innerHTML = "";
+  (sa.keyword_rankings || [{keyword:"N/A", rank:"", traffic_pct:"", volume:"", kd_pct:"", cpc_usd:""}]).forEach(k => {
+    krT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${k.keyword || ""}</td>
+        <td class="p-2 text-center">${k.rank || ""}</td>
+        <td class="p-2 text-center">${k.traffic_pct || ""}</td>
+        <td class="p-2 text-center">${k.volume || ""}</td>
+        <td class="p-2 text-center">${k.kd_pct || ""}</td>
+        <td class="p-2 text-center">${k.cpc_usd || ""}</td>
+      </tr>`;
+  });
+
+  // Top Pages
+  const tpT = document.getElementById("tpTable");
+  tpT.innerHTML = "";
+  (sa.top_pages || [{url:data.url, traffic_pct:"", keywords:"", ref_domains:"", backlinks:""}]).forEach(pg => {
+    tpT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${aTag(pg.url, pg.url)}</td>
+        <td class="p-2 text-center">${pg.traffic_pct || ""}</td>
+        <td class="p-2 text-center">${pg.keywords || ""}</td>
+        <td class="p-2 text-center">${pg.ref_domains || ""}</td>
+        <td class="p-2 text-center">${pg.backlinks || ""}</td>
+      </tr>`;
+  });
+
+  // Technical SEO
+  const techT = document.getElementById("techTable");
+  techT.innerHTML = "";
+  (sa.technical || []).forEach(t => {
+    techT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${t.element || ""}</td>
+        <td class="p-2">${chipPriority(t.priority)}</td>
+        <td class="p-2">${(t.value ?? "—")}</td>
+        <td class="p-2">${t.note || ""}</td>
+      </tr>`;
+  });
+
+  // Page Performance & CWV
+  const ppT = document.getElementById("ppTable");
+  ppT.innerHTML = "";
+  (sa.page_performance || []).forEach(p => {
+    ppT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${p.element || ""}</td>
+        <td class="p-2 text-center">${chipPriority(p.priority)}</td>
+        <td class="p-2">${p.note || ""}</td>
+      </tr>`;
+  });
+
+  // Competitors
+  const compT = document.getElementById("compTable");
+  compT.innerHTML = "";
+  (sa.competitors || [{competitor:"N/A",common_keywords:"",competition_level:""}]).forEach(c => {
+    compT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${c.competitor || ""}</td>
+        <td class="p-2 text-center">${c.common_keywords || ""}</td>
+        <td class="p-2 text-center">${c.competition_level || ""}</td>
+      </tr>`;
+  });
+
+  // Off-Page
+  document.getElementById("offPageMsg").textContent = sa.off_page?.message || "—";
+
+  // Backlinks
+  const blT = document.getElementById("blTable");
+  blT.innerHTML = "";
+  (sa.top_backlinks || [{source_title:"N/A", source_url:data.url, anchor:"", target_url:data.url}]).forEach(b => {
+    blT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${b.source_title || ""}</td>
+        <td class="p-2">${aTag(b.source_url, b.source_url)}</td>
+        <td class="p-2">${b.anchor || ""}</td>
+        <td class="p-2">${aTag(b.target_url, b.target_url)}</td>
+      </tr>`;
+  });
+
+  // Social Media
+  const smT = document.getElementById("smTable");
+  smT.innerHTML = "";
+  (sa.social_media || []).forEach(srow => {
+    smT.innerHTML += `
+      <tr class="border-b border-slate-800">
+        <td class="p-2">${srow.network || ""}</td>
+        <td class="p-2">${chipPriority(srow.priority)}</td>
+        <td class="p-2">${srow.note || ""}</td>
+      </tr>`;
+  });
+}
+
+async function downloadPDF() {
+  try {
+    const res = await fetch("/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(auditData || {})
+    });
+
+    if (!res.ok) throw new Error("PDF generation failed");
+
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "FF_TECH_ELITE_Audit_Report.pdf";
+    a.click();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+</script>
+
 </body>
-</html>"""
+</html>
