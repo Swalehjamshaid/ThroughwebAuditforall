@@ -1,413 +1,165 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-  <title>FF Tech — Enterprise AI Website Audit</title>
-  <style>
-    :root {
-      --primary: #667eea; --primary-dark: #764ba2; --success: #4caf50;
-      --warning: #ff9800; --danger: #f44336; --light: #f8f9fa;
-      --dark: #343a40; --gray: #6c757d;
-    }
-    body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-      color: #333; margin: 0; padding: 0; min-height: 100vh;
-    }
-    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-    header { text-align: center; color: white; padding: 40px 20px; }
-    .card { background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; margin: 20px 0; }
-
-    /* Config */
-    .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
-    .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.85rem; color: var(--gray); }
-    input, select { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-
-    /* Score & summary */
-    .score-layout { display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 30px; margin-bottom: 30px; }
-    .score-circle { width: 160px; height: 160px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 2.5rem; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
-    .grade-a { background: var(--success); } .grade-b { background: #8bc34a; } .grade-c { background: var(--warning); } .grade-d { background: var(--danger); }
-
-    /* Grid cards */
-    .outputs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-    .stat-box { background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--primary); }
-    .stat-box h4 { margin: 0 0 15px 0; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
-    .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-    .data-row:last-child { border-bottom: none; }
-    .data-val { font-weight: bold; color: var(--dark); }
-
-    /* Terminal */
-    .terminal-loader { background: #000; color: #0f0; padding: 15px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.8rem; display: none; max-height: 200px; overflow-y: auto; margin: 20px 0; }
-
-    /* Buttons */
-    button { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; padding: 16px 32px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.3s; }
-    button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-    .adv-toggle { background: none; border: 1px solid var(--gray); color: var(--gray); width: auto; padding: 6px 15px; font-size: 0.75rem; margin-top: 10px; }
-
-    /* Badges & utils */
-    .badge { display:inline-block; padding:4px 10px; border-radius:12px; font-size:0.75rem; font-weight:700; color:white; }
-    .badge-red { background:#f44336; } .badge-orange { background:#ff9800; } .badge-green { background:#4caf50; }
-    .muted { color: var(--gray); font-size: 0.85rem; }
-    .trend-canvas { width: 100%; height: 160px; }
-  </style>
+<meta charset="UTF-8">
+<title>{{ app_name }} | AI Website Audit Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+    --good:#16a34a;
+    --warn:#f59e0b;
+    --bad:#dc2626;
+    --bg:#f5f7fb;
+    --card:#ffffff;
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); margin:0; color:#1f2937; }
+.container { max-width:1500px; margin:auto; padding:30px; }
+.card { background:var(--card); border-radius:16px; padding:24px; margin-bottom:24px; box-shadow:0 10px 30px rgba(0,0,0,.06); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:20px; }
+h1,h2,h3 { margin-bottom:10px; }
+.score { font-size:48px; font-weight:700; }
+.grade { display:inline-block; padding:10px 18px; border-radius:12px; font-weight:700; font-size:22px; }
+.Aplus{background:#16a34a;color:#fff} .A{background:#22c55e;color:#fff} .B{background:#facc15;color:#000} .C{background:#fb923c;color:#fff} .D{background:#ef4444;color:#fff}
+.good{color:var(--good);font-weight:600} .warning{color:var(--warn);font-weight:600} .critical{color:var(--bad);font-weight:700}
+table { width:100%; border-collapse:collapse; margin-top:12px; }
+th,td { padding:12px; border-bottom:1px solid #e5e7eb; text-align:left; }
+th { background:#f1f5f9; }
+.badge { padding:6px 10px; border-radius:10px; font-size:12px; font-weight:600; }
+.high{background:#fee2e2;color:#991b1b} .medium{background:#fef3c7;color:#92400e} .low{background:#dcfce7;color:#166534}
+footer { text-align:center; font-size:13px; color:#6b7280; margin-top:40px; }
+.collapse-btn { cursor:pointer; font-weight:600; color:#2563eb; margin-bottom:10px; display:inline-block; }
+.collapse-content { display:none; }
+</style>
 </head>
 <body>
-
 <div class="container">
-  <header>
-    <h1>FF Tech — AI Website Audit</h1>
-    <p>Enterprise Compliance, SEO & Performance Dashboard</p>
-  </header>
 
-  <!-- Configuration -->
-  <div class="card">
-    <h2>Audit Configuration</h2>
-    <form id="auditForm">
-      <div class="form-group">
-        <label>Target URL (url)</label>
-        <input type="text" id="url" placeholder="https://example.com" required>
-      </div>
-
-      <button type="button" class="adv-toggle" onclick="document.getElementById('advConfig').style.display='grid'">⚙️ Advanced Settings</button>
-
-      <div class="config-grid" id="advConfig" style="display:none;">
-        <div class="form-group"><label>Max Pages</label><input type="number" id="max_pages" value="24"></div>
-        <div class="form-group"><label>Threads</label><input type="number" id="concurrency" value="24"></div>
-        <div class="form-group"><label>User Agent</label><input type="text" id="user_agent" value="FFTechAuditBot/2.1"></div>
-        <div class="form-group">
-          <label>PSI Strategy</label>
-          <select id="psi_strategy"><option value="mobile">Mobile</option><option value="desktop">Desktop</option></select>
-        </div>
-      </div>
-
-      <div style="margin: 20px 0;">
-        <label><input type="checkbox" id="respect_robots" checked> Respect robots.txt</label>
-        <label style="margin-left:20px;"><input type="checkbox" id="deep" checked> Recursive Deep Scan</label>
-      </div>
-
-      <button type="submit" id="submitBtn">Start AI Engine</button>
-    </form>
-  </div>
-
-  <!-- Terminal -->
-  <div class="terminal-loader" id="terminal"></div>
-
-  <!-- Results -->
-  <div id="results" class="card" style="display:none;">
-    <div class="score-layout">
-      <div class="score-circle" id="scoreCircle">
-        <div id="overallScore">0</div>
-        <div id="gradeLabel" style="font-size: 1rem;">A+</div>
-      </div>
-      <div style="flex: 1; min-width: 300px;">
-        <h2 id="resUrl" style="margin:0;"></h2>
-        <h3 id="classification" style="color: var(--primary-dark); margin: 5px 0;"></h3>
-        <p id="resDate" style="color: var(--gray);"></p>
-        <button id="pdfBtn" style="width:auto; padding: 10px 25px; background: var(--success);">Download Certified PDF</button>
-      </div>
-    </div>
-
-    <div class="stat-box" style="margin-bottom:30px; border-left: 5px solid var(--primary-dark);">
-      <h4>Executive Summary (AI Generated)</h4>
-      <p id="summaryText" style="line-height:1.6; font-style: italic;"></p>
-    </div>
-
-    <div class="outputs-grid">
-      <!-- SEO & Content -->
-      <div class="stat-box">
-        <h4>SEO & Content</h4>
-        <div class="data-row"><span>Missing Titles</span><span class="data-val" id="cnt_titles">0</span></div>
-        <div class="data-row"><span>Missing Meta</span><span class="data-val" id="cnt_meta">0</span></div>
-        <div class="data-row"><span>Missing H1</span><span class="data-val" id="cnt_h1">0</span></div>
-        <div class="data-row"><span>Broken Internal Links</span><span class="data-val" id="cnt_broken">0</span></div>
-      </div>
-
-      <!-- Security & Trust -->
-      <div class="stat-box">
-        <h4>Security & Compliance</h4>
-        <div class="data-row"><span>HSTS Missing</span><span class="data-val" id="cnt_hsts">0</span></div>
-        <div class="data-row"><span>CSP Missing</span><span class="data-val" id="cnt_csp">0</span></div>
-        <div class="data-row"><span>Mixed Content</span><span class="data-val" id="cnt_mixed">0</span></div>
-        <div class="data-row"><span>Cookie Banner Found</span><span class="data-val" id="cnt_cookie">No</span></div>
-      </div>
-
-      <!-- Technical Performance -->
-      <div class="stat-box">
-        <h4>Technical Performance</h4>
-        <div class="data-row"><span>Avg Response (ms)</span><span class="data-val" id="avg_resp">0</span></div>
-        <div class="data-row"><span>Avg HTML (kb)</span><span class="data-val" id="avg_html">0</span></div>
-        <div class="data-row"><span>Gzip Missing</span><span class="data-val" id="cnt_gzip">0</span></div>
-        <div class="data-row"><span>Render Blocking CSS</span><span class="data-val" id="cnt_rb_css">0</span></div>
-      </div>
-
-      <!-- Core Web Vitals -->
-      <div class="stat-box">
-        <h4>Core Web Vitals</h4>
-        <div class="data-row"><span>Source</span><span class="data-val" id="cwv_source">N/A</span></div>
-        <div class="data-row"><span>LCP (ms)</span><span class="data-val"><span id="lcp_val">N/A</span> <span id="lcp_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>CLS</span><span class="data-val"><span id="cls_val">N/A</span> <span id="cls_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>TBT (ms)</span><span class="data-val"><span id="tbt_val">N/A</span> <span id="tbt_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>FCP (ms)</span><span class="data-val" id="fcp_val">N/A</span></div>
-        <div class="data-row"><span>TTI (ms)</span><span class="data-val" id="tti_val">N/A</span></div>
-        <!-- Fallback metrics (Playwright) -->
-        <div class="data-row"><span>TTFB (ms)</span><span class="data-val"><span id="ttfb_val">N/A</span> <span id="ttfb_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>Requests</span><span class="data-val" id="reqs_val">N/A</span></div>
-        <div class="data-row"><span>Transfer Size (bytes)</span><span class="data-val" id="transfer_val">N/A</span></div>
-      </div>
-
-      <!-- Accessibility -->
-      <div class="stat-box">
-        <h4>Accessibility</h4>
-        <div class="data-row"><span>ALT Issues (pages)</span><span class="data-val"><span id="alt_issues_pages">0</span> <span id="alt_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>Headings Seen</span><span class="data-val" id="heading_info">Signals present</span></div>
-        <div class="data-row"><span>Landmarks / ARIA</span><span class="data-val" id="a11y_landmark">N/A</span></div>
-        <div class="muted">Improve ALT coverage, heading structure, and landmarks for better accessibility & compliance.</div>
-      </div>
-
-      <!-- International SEO -->
-      <div class="stat-box">
-        <h4>International SEO</h4>
-        <div class="data-row"><span>Hreflang (pages)</span><span class="data-val" id="hreflang_pages">0</span></div>
-        <div class="data-row"><span>Lang Attribute Issues</span><span class="data-val"><span id="lang_attr_issue_pages">0</span> <span id="lang_badge" class="badge"></span></span></div>
-        <div class="data-row"><span>Schema Present (pages)</span><span class="data-val" id="schema_pages">0</span></div>
-        <div class="muted">Ensure correct language targeting; add schema for richer SERP and enterprise trust.</div>
-      </div>
-
-      <!-- KPIs & Trend -->
-      <div class="stat-box" style="grid-column: 1 / -1;">
-        <h4>KPIs & Trend</h4>
-        <div class="data-row"><span>Total Errors</span><span class="data-val" id="kpi_errors">0</span></div>
-        <div class="data-row"><span>Total Warnings</span><span class="data-val" id="kpi_warnings">0</span></div>
-        <div class="data-row"><span>Total Notices</span><span class="data-val" id="kpi_notices">0</span></div>
-        <canvas id="trendCanvas" class="trend-canvas"></canvas>
-        <div class="muted">Shows progress and ROI over time.</div>
-      </div>
-    </div>
-  </div>
+<!-- HEADER -->
+<div class="card">
+    <h1>{{ app_name }}</h1>
+    <p><strong>Website:</strong> {{ website_url }}</p>
+    <p><strong>Audit Date:</strong> {{ audit_date }}</p>
+    <p><strong>Audit ID:</strong> {{ audit_id }}</p>
 </div>
 
+<!-- OVERALL HEALTH -->
+<div class="grid">
+    <div class="card">
+        <h3>Overall Website Health</h3>
+        <div class="score">{{ overall_score }}%</div>
+        <div class="grade {{ grade_class }}">{{ grade }}</div>
+    </div>
+    <div class="card">
+        <h3>Risk Breakdown</h3>
+        <p class="critical">Errors: {{ total_errors }}</p>
+        <p class="warning">Warnings: {{ total_warnings }}</p>
+        <p class="good">Notices: {{ total_notices }}</p>
+    </div>
+    <div class="card">
+        <h3>Category Scores</h3>
+        {% for cat, score in category_scores.items() %}
+            <p>{{ cat }}: {{ score }}%</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<div class="card">
+    <h2>Executive Summary</h2>
+    <p>{{ executive_summary_200_words }}</p>
+</div>
+
+<!-- WEAK AREAS HIGHLIGHT -->
+<div class="card">
+    <h2>Critical Weak Areas</h2>
+    <ul>
+        {% for weakness in weak_areas %}
+        <li class="critical">{{ weakness }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- AUDIT CATEGORIES & METRICS -->
+{% for category in audit_categories %}
+<div class="card">
+    <h2>{{ category.name }}</h2>
+    <p>{{ category.description }}</p>
+    <span class="collapse-btn" onclick="toggleCollapse('{{ loop.index0 }}')">Show / Hide Metrics</span>
+    <div id="collapse-{{ loop.index0 }}" class="collapse-content">
+        <table>
+            <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Priority</th>
+                <th>Why It Matters</th>
+                <th>Recommendation</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for metric in category.metrics %}
+            <tr>
+                <td>{{ metric.name }}</td>
+                <td class="{{ metric.status_class }}">{{ metric.status }}</td>
+                <td>{{ metric.score }}/100</td>
+                <td><span class="badge {{ metric.priority_class }}">{{ metric.priority }}</span></td>
+                <td>{{ metric.impact }}</td>
+                <td>{{ metric.recommendation }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+<!-- TREND ANALYSIS -->
+<div class="card">
+    <h2>Historical Performance Trend</h2>
+    <canvas id="trendChart"></canvas>
+</div>
+
+<!-- OWNER INSIGHTS -->
+<div class="card">
+    <h2>Owner-Focused Insights</h2>
+    <ul>
+        {% for insight in owner_insights %}
+        <li>{{ insight }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- CERTIFIED AUDIT -->
+<div class="card">
+    <h2>Certified Audit Report</h2>
+    <p>This audit is officially certified by <strong>{{ company_name }}</strong>.</p>
+    <p>Valid Until: {{ validity_date }}</p>
+    <p>Certification Level: {{ grade }}</p>
+</div>
+
+<footer>
+    © {{ current_year }} {{ company_name }} | International AI Audit SaaS
+</footer>
+
 <script>
-  // -----------------------------
-  // Globals
-  // -----------------------------
-  const auditForm = document.getElementById('auditForm');
-  const terminal = document.getElementById('terminal');
-  const resultsSec = document.getElementById('results');
-  const submitBtn = document.getElementById('submitBtn');
-  const sessionToken = "demo_session_token";
+function toggleCollapse(id){
+    var content = document.getElementById('collapse-'+id);
+    if(content.style.display === "block"){ content.style.display="none"; }
+    else{ content.style.display="block"; }
+}
 
-  // -----------------------------
-  // Utilities
-  // -----------------------------
-  function log(msg) {
-    terminal.style.display = 'block';
-    const line = document.createElement('div');
-    line.textContent = `> [${new Date().toLocaleTimeString()}] ${msg}`;
-    terminal.appendChild(line);
-    terminal.scrollTop = terminal.scrollHeight;
-  }
-
-  function setBadge(el, value, thresholds) {
-    // thresholds: { red: number, orange: number, direction: 'up'|'down' }
-    // direction 'up' => higher is worse; 'down' => lower is worse
-    el.className = 'badge';
-    if (value === null || value === undefined || isNaN(value)) { el.textContent = ''; return; }
-    const dirUp = thresholds.direction !== 'down';
-    const redCut = thresholds.red, orangeCut = thresholds.orange;
-    const isRed    = dirUp ? (value >= redCut) : (value <= redCut);
-    const isOrange = dirUp ? (value >= orangeCut && value < redCut) : (value <= orangeCut && value > redCut);
-    const isGreen  = dirUp ? (value < orangeCut) : (value > orangeCut);
-    el.classList.add(isRed ? 'badge-red' : isOrange ? 'badge-orange' : 'badge-green');
-    el.textContent = isRed ? 'Critical' : isOrange ? 'At Risk' : 'Good';
-  }
-
-  async function renderTrend(site) {
-    try {
-      const r = await fetch(`/audit/${encodeURIComponent(site)}/trend`);
-      const t = await r.json();
-      const pts = (t.trend || []).reverse(); // oldest → newest
-
-      const canvas = document.getElementById('trendCanvas');
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const W = canvas.width, H = canvas.height, pad = 10;
-
-      // Line for overall score
-      const scores = pts.map(p => p.overall_score ?? 0);
-      const maxS = Math.max(100, ...scores), minS = Math.min(0, ...scores);
-      const n = Math.max(1, scores.length);
-      ctx.strokeStyle = '#667eea'; ctx.lineWidth = 2;
-      ctx.beginPath();
-      scores.forEach((s, i) => {
-        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1)));
-        const y = H - pad - ((s - minS) / Math.max(1, (maxS - minS))) * (H - 2*pad);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      // Bars for errors & warnings
-      const errs = pts.map(p => p.errors ?? 0);
-      const warns = pts.map(p => p.warnings ?? 0);
-      const maxBar = Math.max(...errs, ...warns, 1);
-      const barW = Math.min(12, (W - 2*pad) / (n * 2));
-
-      errs.forEach((e, i) => {
-        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1))) - barW;
-        const h = (e / maxBar) * (H/4);
-        ctx.fillStyle = '#f44336';
-        ctx.fillRect(x, H - pad - h, barW, h);
-      });
-
-      warns.forEach((w, i) => {
-        const x = pad + i * ((W - 2*pad) / Math.max(1, (n - 1))) + 2;
-        const h = (w / maxBar) * (H/4);
-        ctx.fillStyle = '#ff9800';
-        ctx.fillRect(x, H - pad - h, barW, h);
-      });
-    } catch(e) {
-      // silently ignore
-    }
-  }
-
-  // -----------------------------
-  // Form submit → backend
-  // -----------------------------
-  auditForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    resultsSec.style.display = 'none';
-    terminal.innerHTML = '';
-    submitBtn.disabled = true;
-
-    const payload = {
-      url: document.getElementById('url').value.trim(),
-      deep: document.getElementById('deep').checked,
-      max_pages: parseInt(document.getElementById('max_pages').value),
-      respect_robots: document.getElementById('respect_robots').checked,
-      concurrency: parseInt(document.getElementById('concurrency').value),
-      user_agent: document.getElementById('user_agent').value,
-      psi_strategy: document.getElementById('psi_strategy').value,
-      link_check_sample_per_page: 25,
-      sitemap_max_depth: 4,
-      sitemap_max_urls: 50000
-    };
-
-    try {
-      log(`Authorizing with Python Enterprise backend...`);
-      const startRes = await fetch(`/audit/start?token=${sessionToken}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!startRes.ok) throw new Error("Auth/Validation Failed.");
-      const startData = await startRes.json();
-      log(`Scanning ${payload.url} using ${payload.concurrency} async workers...`);
-
-      const dataRes = await fetch(`/audit/${startData.audit_id}?token=${sessionToken}`);
-      const data = await dataRes.json();
-
-      renderDashboard(data, startData.audit_id);
-      log(`Audit Finalized. Results Rendered.`);
-    } catch (err) {
-      log(`CRITICAL ERROR: ${err.message}`);
-    } finally {
-      submitBtn.disabled = false;
-    }
-  });
-
-  // -----------------------------
-  // Renderer
-  // -----------------------------
-  function renderDashboard(data, auditId) {
-    const res = data.result;
-    const counts = res.counts || {};
-    const summary = res.summary || {};
-
-    resultsSec.style.display = 'block';
-    document.getElementById('resUrl').textContent = data.site;
-    document.getElementById('overallScore').textContent = res.overall_score;
-    document.getElementById('gradeLabel').textContent = res.grade;
-    document.getElementById('classification').textContent = res.classification;
-    document.getElementById('summaryText').textContent = data.summary;
-    document.getElementById('resDate').textContent = "Audit Date: " + new Date().toLocaleDateString();
-
-    // Circle Grade Class (A/B/C/D)
-    const circle = document.getElementById('scoreCircle');
-    const s = res.overall_score || 0;
-    circle.className =
-      'score-circle ' + (s >= 85 ? 'grade-a' : s >= 70 ? 'grade-b' : s >= 60 ? 'grade-c' : 'grade-d');
-
-    // Existing mappings
-    document.getElementById('cnt_titles').textContent = counts.missing_titles || 0;
-    document.getElementById('cnt_meta').textContent = counts.missing_meta_descriptions || 0;
-    document.getElementById('cnt_h1').textContent = counts.missing_h1 || 0;
-    document.getElementById('cnt_broken').textContent = counts.broken_internal_links_total || 0;
-
-    document.getElementById('cnt_hsts').textContent = counts.hsts_missing_pages || 0;
-    document.getElementById('cnt_csp').textContent = counts.csp_missing_pages || 0;
-    document.getElementById('cnt_mixed').textContent = counts.mixed_content_pages || 0;
-    document.getElementById('cnt_cookie').textContent = (counts.cookie_banner_pages || 0) > 0 ? "Yes" : "No";
-
-    document.getElementById('avg_resp').textContent = summary.avg_response_time_ms ?? 0;
-    document.getElementById('avg_html').textContent = summary.avg_html_size_kb ?? 0;
-    document.getElementById('cnt_gzip').textContent = counts.gzip_missing_pages || 0;
-    document.getElementById('cnt_rb_css').textContent = (summary.render_blocking_pages || {}).css_in_head ?? 0;
-
-    // KPIs
-    const totals = summary.totals || { errors: 0, warnings: 0, notices: 0 };
-    document.getElementById('kpi_errors').textContent = totals.errors || 0;
-    document.getElementById('kpi_warnings').textContent = totals.warnings || 0;
-    document.getElementById('kpi_notices').textContent = totals.notices || 0;
-
-    // International
-    document.getElementById('hreflang_pages').textContent = counts.hreflang_pages || 0;
-    document.getElementById('lang_attr_issue_pages').textContent = counts.lang_attr_issue_pages || 0;
-    document.getElementById('schema_pages').textContent = counts.schema_pages || 0;
-    setBadge(document.getElementById('lang_badge'), counts.lang_attr_issue_pages || 0, { red: 5, orange: 1, direction: 'up' });
-
-    // Accessibility
-    document.getElementById('alt_issues_pages').textContent = counts.alt_issues_pages || 0;
-    setBadge(document.getElementById('alt_badge'), counts.alt_issues_pages || 0, { red: 5, orange: 1, direction: 'up' });
-    document.getElementById('heading_info').textContent = (counts.missing_h1 || 0) > 0 ? 'Check heading structure' : 'OK';
-    document.getElementById('a11y_landmark').textContent = 'Heuristics OK';
-
-    // CWV
-    const cwv = summary.cwv || {};
-    document.getElementById('cwv_source').textContent = (cwv.source || 'none').toUpperCase();
-
-    const lcp = cwv.lcp_ms ?? null, cls = cwv.cls ?? null, tbt = cwv.tbt_ms ?? null;
-    document.getElementById('lcp_val').textContent = lcp ?? 'N/A';
-    document.getElementById('cls_val').textContent = cls ?? 'N/A';
-    document.getElementById('tbt_val').textContent = tbt ?? 'N/A';
-    document.getElementById('fcp_val').textContent = cwv.fcp_ms ?? 'N/A';
-    document.getElementById('tti_val').textContent = cwv.tti_ms ?? 'N/A';
-
-    // Badges (PSI)
-    setBadge(document.getElementById('lcp_badge'), lcp, { red: 4000, orange: 2500, direction: 'up' });
-    setBadge(document.getElementById('cls_badge'), cls, { red: 0.25, orange: 0.10, direction: 'up' });
-    setBadge(document.getElementById('tbt_badge'), tbt, { red: 600, orange: 200, direction: 'up' });
-
-    // Fallback (Playwright)
-    const ttfb = cwv.ttfb_ms ?? null, reqs = cwv.resource_requests ?? null, transfer = cwv.transfer_size_bytes ?? null;
-    document.getElementById('ttfb_val').textContent = ttfb ?? 'N/A';
-    document.getElementById('reqs_val').textContent = reqs ?? 'N/A';
-    document.getElementById('transfer_val').textContent = transfer ?? 'N/A';
-    setBadge(document.getElementById('ttfb_badge'), ttfb, { red: 1500, orange: 800, direction: 'up' });
-
-    // Trend
-    renderTrend(data.site);
-
-    // PDF
-    document.getElementById('pdfBtn').onclick = async () => {
-      const pdfRes = await fetch(`/audit/${auditId}/pdf?token=${sessionToken}`);
-      const pdfData = await pdfRes.json();
-      if (pdfData.status === 'ok') window.open('/' + pdfData.path, '_blank');
-    };
-  }
+// TREND CHART
+const trendData = {{ trend_chart_data | safe }};
+if(trendData){
+    new Chart(document.getElementById('trendChart'), {
+        type:'line',
+        data:trendData,
+        options:{responsive:true, plugins:{legend:{display:true}}}
+    });
+}
 </script>
 </body>
 </html>
