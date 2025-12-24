@@ -104,21 +104,27 @@
 
     <!-- Pillar Scores -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-16">
-      <div v-for="cat in ['Performance', 'SEO', 'UX', 'Security']" class="glass rounded-2xl p-8 text-center transform hover:scale-105 transition">
+      {% for cat in ['Performance', 'SEO', 'UX', 'Security'] %}
+      <div class="glass rounded-2xl p-8 text-center transform hover:scale-105 transition">
         <div class="w-32 h-32 mx-auto mb-6 relative">
           <svg class="w-full h-full transform -rotate-90">
             <circle cx="64" cy="64" r="50" stroke="#334155" stroke-width="20" fill="none"/>
-            <circle class="progress-ring pillar-ring" :data-pillar="cat" cx="64" cy="64" r="50" stroke="#10b981" stroke-width="20" fill="none" stroke-dasharray="314" stroke-dashoffset="314"/>
+            <circle class="progress-ring pillar-ring" data-pillar="{{ cat }}" cx="64" cy="64" r="50" stroke="#10b981" stroke-width="20" fill="none" stroke-dasharray="314" stroke-dashoffset="314"/>
           </svg>
           <div class="absolute inset-0 flex items-center justify-center -mt-32">
-            <span class="pillar-score text-3xl font-bold" :data-pillar="cat">0%</span>
+            <span class="pillar-score text-3xl font-bold" data-pillar="{{ cat }}">0%</span>
           </div>
         </div>
         <h3 class="text-2xl font-bold mb-2">{{ cat }}</h3>
-        <p class="text-3xl font-bold text-emerald-400 pillar-weight">
-          {{ cat === 'Performance' ? '40%' : cat === 'SEO' ? '30%' : cat === 'UX' ? '20%' : '10%' }} Weight
+        <p class="text-3xl font-bold text-emerald-400">
+          {% if cat == 'Performance' %}40%
+          {% elif cat == 'SEO' %}30%
+          {% elif cat == 'UX' %}20%
+          {% else %}10%
+          {% endif %} Weight
         </p>
       </div>
+      {% endfor %}
     </div>
 
     <!-- Core Web Vitals -->
@@ -138,9 +144,9 @@
       <div class="overflow-x-auto">
         <table>
           <thead class="bg-slate-700">
-            <tr><th>#</th><th>Metric</th><th>Category</th><th class="text-center">Score</th></tr>
+            <tr><th class="w-12">#</th><th>Metric</th><th class="text-center w-32">Category</th><th class="text-center w-32">Score</th></tr>
           </thead>
-          <tbody id="metricsTable"></tbody>
+          <tbody id="metricsTable" class="divide-y divide-gray-700"></tbody>
         </table>
       </div>
     </div>
@@ -151,10 +157,10 @@
       <div id="roadmap" class="prose prose-invert max-w-none text-lg leading-relaxed"></div>
     </div>
 
-    <!-- Special SEO Audit (haier.com.pk only) -->
-    <div id="seoAuditSection" class="hidden">
+    <!-- Special SEO Audit Section (only shown if present) -->
+    <div id="seoAuditSection" class="hidden space-y-16 mb-16">
       <h2 class="text-4xl font-bold text-center mb-12 text-emerald-400">Special In-Depth SEO Audit</h2>
-      <div id="seoAudit" class="space-y-16"></div>
+      <div id="seoAudit" class="space-y-12"></div>
     </div>
 
     <!-- Download PDF -->
@@ -172,9 +178,10 @@
     const urlInput = document.getElementById('urlInput');
     let currentData = null;
 
-    // Mode toggle
+    // Mode switch
     document.getElementById('modeDesktop').addEventListener('click', () => switchMode('desktop'));
     document.getElementById('modeMobile').addEventListener('click', () => switchMode('mobile'));
+
     function switchMode(mode) {
       const desk = document.getElementById('modeDesktop');
       const mob = document.getElementById('modeMobile');
@@ -193,8 +200,9 @@
 
     auditBtn.addEventListener('click', async () => {
       const url = urlInput.value.trim();
-      const mode = document.getElementById('modeMobile').classList.contains('bg-emerald-600') ? 'mobile' : 'desktop';
       if (!url) return alert('Please enter a URL');
+
+      const mode = document.getElementById('modeMobile').classList.contains('bg-emerald-600') ? 'mobile' : 'desktop';
 
       loading.classList.remove('hidden');
       results.classList.add('hidden');
@@ -207,13 +215,20 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, mode: mode === 'mobile' ? 'mobile' : 'desktop' })
         });
-        if (!res.ok) throw new Error(await res.text());
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err || 'Audit failed');
+        }
+
         currentData = await res.json();
         displayResults(currentData);
+
         loading.classList.add('hidden');
         results.classList.remove('hidden');
       } catch (err) {
         alert('Error: ' + err.message);
+        console.error(err);
       } finally {
         auditBtn.disabled = false;
         auditBtn.textContent = 'Start Audit';
@@ -224,87 +239,91 @@
       document.getElementById('auditedUrl').textContent = data.url;
       document.getElementById('auditedAt').textContent = data.audited_at;
 
-      // Overall
+      // Overall Score
       const total = data.total_grade;
       document.getElementById('overallScore').textContent = total + '%';
       document.getElementById('overallRing').style.strokeDashoffset = 691 - (total / 100) * 691;
 
-      // Pillars
+      // Pillar Scores
       ['Performance', 'SEO', 'UX', 'Security'].forEach(cat => {
         const score = data.pillars[cat] || 0;
         document.querySelector(`.pillar-score[data-pillar="${cat}"]`).textContent = score + '%';
         const ring = document.querySelector(`.pillar-ring[data-pillar="${cat}"]`);
-        ring.style.strokeDashoffset = 314 - (score / 100) * 314;
+        if (ring) ring.style.strokeDashoffset = 314 - (score / 100) * 314;
       });
 
-      // Core Vitals
+      // Core Web Vitals
       const p = data.perf || {};
-      document.getElementById('lcp').textContent = (p.lcp_ms || '--') + ' ms';
-      document.getElementById('fcp').textContent = (p.fcp_ms || '--') + ' ms';
+      document.getElementById('lcp').textContent = (p.lcp_ms ?? '--') + ' ms';
+      document.getElementById('fcp').textContent = (p.fcp_ms ?? '--') + ' ms';
       document.getElementById('cls').textContent = p.cls ?? '--';
-      document.getElementById('tbt').textContent = (p.tbt_ms || '--') + ' ms';
+      document.getElementById('tbt').textContent = (p.tbt_ms ?? '--') + ' ms';
 
-      // Metrics
+      // Metrics Table
       const tbl = document.getElementById('metricsTable');
       tbl.innerHTML = '';
       data.metrics.forEach(m => {
         const color = m.score >= 90 ? 'text-emerald-400' : m.score >= 70 ? 'text-yellow-400' : 'text-red-400';
-        tbl.innerHTML += `<tr class="hover:bg-white/5">
-          <td>${m.no}</td>
-          <td class="font-medium">${m.name}</td>
-          <td class="text-gray-400">${m.category}</td>
-          <td class="text-center text-2xl font-bold ${color}">${m.score}%</td>
-        </tr>`;
+        tbl.innerHTML += `
+          <tr class="hover:bg-white/5 transition">
+            <td>${m.no}</td>
+            <td class="font-medium">${m.name}</td>
+            <td class="text-center text-gray-400">${m.category}</td>
+            <td class="text-center text-2xl font-bold ${color}">${m.score}%</td>
+          </tr>`;
       });
 
       // Roadmap
-      document.getElementById('roadmap').innerHTML = data.roadmap || 'No critical issues found. Excellent!';
+      document.getElementById('roadmap').innerHTML = data.roadmap || '<p>No critical issues found. Excellent performance!</p>';
 
-      // Special SEO Audit
+      // Special SEO Audit (only for haier.com.pk)
       const seoSection = document.getElementById('seoAuditSection');
       const seoDiv = document.getElementById('seoAudit');
       if (data.seo_audit) {
         seoSection.classList.remove('hidden');
-        let html = `
+        // You can expand this section with full tables later
+        seoDiv.innerHTML = `
           <div class="glass rounded-2xl p-10">
-            <h3 class="text-3xl font-bold mb-6">Overview</h3>
-            <p class="text-xl mb-4">SEO Score: <span class="text-4xl font-bold text-red-400">${data.seo_audit.seo_score}/100</span></p>
-            <p>Critical issues: ${data.seo_audit.critical_issues} | Minor: ${data.seo_audit.minor_issues}</p>
-            <p class="mt-4">${data.seo_audit.overview_text}</p>
+            <h3 class="text-3xl font-bold mb-6">SEO Overview</h3>
+            <p class="text-2xl mb-4">Overall SEO Score: <span class="text-4xl font-bold text-red-400">${data.seo_audit.seo_score}/100</span></p>
+            <p>Critical Issues: ${data.seo_audit.critical_issues} | Minor Issues: ${data.seo_audit.minor_issues}</p>
+            <p class="mt-6 text-lg">${data.seo_audit.overview_text}</p>
           </div>
-
           <div class="glass rounded-2xl p-10">
             <h3 class="text-3xl font-bold mb-6">Section Scores</h3>
-            <table><thead><tr><th>Section</th><th class="text-center">Score</th></tr></thead><tbody>
-              ${Object.entries(data.seo_audit.section_scores).map(([k,v]) => `<tr><td>${k}</td><td class="text-center text-2xl font-bold text-yellow-400">${v}%</td></tr>`).join('')}
-            </tbody></table>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              ${Object.entries(data.seo_audit.section_scores).map(([name, score]) => `
+                <div class="text-center">
+                  <p class="text-gray-400">${name}</p>
+                  <p class="text-4xl font-bold text-yellow-400">${score}%</p>
+                </div>
+              `).join('')}
+            </div>
           </div>
-
-          <div class="glass rounded-2xl p-10">
-            <h3 class="text-3xl font-bold mb-6 text-red-400">Issues & Recommendations</h3>
-            <table><thead><tr><th>Type</th><th>Element</th><th>Priority</th><th>Message</th></tr></thead><tbody>
-              ${data.seo_audit.issues.map(i => `<tr><td>${i.type}</td><td>${i.element}</td><td class="text-red-400 font-bold">${i.priority}</td><td>${i.message}</td></tr>`).join('')}
-            </tbody></table>
-          </div>
-
-          <!-- Add more sections similarly: On-Page, Keywords, Technical, etc. -->
-          <!-- (Truncated for brevity - full code includes all sections) -->
+          <!-- Add more detailed SEO sections here if desired -->
         `;
-        // Full implementation of all SEO sections (On-Page, Keywords, Top Pages, Technical, Page Performance, Competitors, Competitor Analysis 4 types, Off-Page, Backlinks, Social) would be added here exactly as in your PDF logic.
-        seoDiv.innerHTML = html; // In real code, expand this to cover every part
       } else {
         seoSection.classList.add('hidden');
       }
 
       // PDF Download
       document.getElementById('downloadPdf').onclick = async () => {
-        const res = await fetch('/download', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(currentData) });
-        if (res.ok) {
+        try {
+          const res = await fetch('/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentData)
+          });
+          if (!res.ok) throw new Error('Download failed');
           const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `FF_ELITE_Audit_${Date.now()}.pdf`;
+          a.href = url;
+          a.download = `FF_ELITE_Audit_Report_${new Date().getTime()}.pdf`;
           a.click();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert('PDF download failed: ' + e.message);
         }
       };
     }
