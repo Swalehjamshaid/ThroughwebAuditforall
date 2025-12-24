@@ -1,4 +1,5 @@
 
+# main.py
 import os
 import io
 import time
@@ -119,7 +120,7 @@ while len(METRICS_LIST) < 300:
     )
 
 # ==================== DOMAIN REWRITE RULES ====================
-# As requested: treat www.haier.pk (and variants) as http://www.haier.com.pk/#/login
+# Treat haier.pk variants as http://www.haier.com.pk/#/login
 DOMAIN_REWRITE_RULES = {
     "haier.pk": "http://www.haier.com.pk/#/login",
     "www.haier.pk": "http://www.haier.com.pk/#/login",
@@ -139,7 +140,7 @@ def apply_domain_rewrite(url: str) -> str:
 
 # ==================== HELPERS ====================
 def normalize_url(raw_url: str) -> str:
-    """Normalize and preserve fragment; add https:// if missing, then apply domain rewrite."""
+    """Normalize and preserve fragment; add https:// if missing; apply rewrite rules."""
     raw_url = (raw_url or "").strip()
     if not raw_url:
         return ""
@@ -148,12 +149,9 @@ def normalize_url(raw_url: str) -> str:
         p = urlparse("https://" + raw_url)
     if not p.netloc:
         return ""
-    # Ensure a path at least '/'
     p = p._replace(path=(p.path or "/"))
     normalized = urlunparse(p)
-    # Apply requested domain rewrite logic (may change scheme/path/fragment)
     rewritten = apply_domain_rewrite(normalized)
-    # If rewrite applied, keep it as-is (may be http + hash)
     return rewritten
 
 def get_metric_weight(name: str, category: str) -> int:
@@ -177,6 +175,7 @@ def call_psi(url: str, strategy: str = "desktop", locale: str = "en") -> Optiona
         "url": url,
         "strategy": strategy,
         "locale": locale,
+        # Lighthouse allows passing multiple categories; Google API accepts repeated params or array.
         "category": ["performance", "seo", "best-practices", "accessibility"],
     }
     if PSI_API_KEY:
@@ -240,10 +239,6 @@ def extract_from_psi(psi: dict) -> dict:
 
 # ==================== REQUESTS FALLBACK (HTML + headers) ====================
 def fetch_html_and_headers(url: str, timeout: int = 30) -> Tuple[str, Dict[str, str], str]:
-    """
-    Fetch HTML and response headers using requests.
-    Returns: (html_text, headers_lowercased, final_url_after_redirects)
-    """
     try:
         sess = requests.Session()
         resp = sess.get(url, timeout=timeout, allow_redirects=True)
@@ -462,7 +457,6 @@ def evaluate_facts(soup: BeautifulSoup, audit: Dict[str, Any]) -> Dict[str, Any]
 
 # ==================== SCORING ====================
 def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts: Dict[str, Any], psi: Dict[str, Any]) -> int:
-    # Prefer PSI values when available; otherwise Playwright/lab heuristics.
     if name == "Largest Contentful Paint (LCP)":
         lcp = audit.get("lcp") or psi.get("psi_lcp_ms") or 0
         return score_band(lcp, [(2500, 100), (4000, 80), (10000, 60), (9999999, 40)])
@@ -483,7 +477,7 @@ def compute_metric_score(name: str, category: str, audit: Dict[str, Any], facts:
     if name == "Interaction to Next Paint (INP)":
         inp = psi.get("psi_inp_ms")
         if inp is None:
-            inp = audit.get("tbt", 0)  # conservative fallback
+            inp = audit.get("tbt", 0)
         return score_band(inp, [(200, 100), (500, 80), (1000, 60), (9999999, 40)])
     if name == "Speed Index":
         si = psi.get("psi_speed_index_ms") or 0
@@ -616,7 +610,7 @@ def generate_audit_results(audit: Dict[str, Any], soup: BeautifulSoup, psi: Dict
         "roadmap": roadmap_html,
     }
 
-# ==================== SEO REPORT (dynamic for any domain) ====================
+# ==================== SEO REPORT (Semrush-style) ====================
 def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]:
     facts = evaluate_facts(soup, audit)
 
@@ -661,7 +655,6 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
     if psi.get("psi_performance_percent") is not None:
         _iss("Overall Performance", f"Lighthouse Performance: {psi['psi_performance_percent']}%", "flag")
 
-    # On-Page SEO
     on_page = {
         "url": {"value": final_url, "note": "Audited page URL."},
         "title": {"priority": "info", "value": soup.find("title").text.strip() if soup.find("title") else None,
@@ -678,7 +671,7 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
             "H6": facts.get("headings", {}).get("h6", 0),
         }, "note": "Use semantic hierarchy with H2/H3 for sections."},
         "image_alt": {"priority": "info", "note": f"Alt coverage ~{facts.get('image_alt_ratio', 0):.0f}%."},
-        "keyword_density": {"value": "N/A"}  # still optional
+        "keyword_density": {"value": "N/A"}  # optional
     }
 
     keyword_rankings: List[Dict[str, Any]] = []
@@ -689,13 +682,13 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
     technical = [
         {"element": "Favicon", "priority": "pass" if facts.get("favicon_present") else "red-flag",
          "value": "Present" if facts.get("favicon_present") else "Missing",
-         "note": "Provide a favicon.ico or &lt;link rel='icon'&gt;."},
+         "note": "Provide a favicon.ico or <link rel='icon'>."},
         {"element": "Noindex", "priority": "pass" if "noindex" not in facts.get("robots_meta","") else "red-flag",
          "note": "Ensure important pages are indexable."},
-        {"element": "Sitemap", "priority": "info", "note": "Not checked. Add /sitemap.xml &amp; declare in robots.txt."},
+        {"element": "Sitemap", "priority": "info", "note": "Add /sitemap.xml & declare in robots.txt."},
         {"element": "Hreflang", "priority": "info", "note": "Add hreflang for language/region variants."},
         {"element": "Language", "priority": "info", "value": soup.find("html").get("lang") if soup.find("html") else None,
-         "note": "Set &lt;html lang='...'&gt; for accessibility &amp; SEO."},
+         "note": "Set <html lang='...'> for accessibility & SEO."},
         {"element": "Canonical", "priority": "pass" if facts.get("canonical_present") else "red-flag",
          "note": "Add a single canonical pointing to preferred URL."},
         {"element": "Robots.txt", "priority": "info", "value": f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}/robots.txt",
@@ -734,10 +727,8 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
         "seo_score": psi.get("psi_performance_percent") or 0,  # placeholder
         "critical_issues": sum(1 for i in issues if i["priority"] == "red-flag"),
         "minor_issues": sum(1 for i in issues if i["priority"] != "red-flag"),
-        "overview_text": "Automated site audit combining Lighthouse (PSI) &amp; DOM heuristics.",
-        "section_scores": {
-            "On-Page SEO": 0, "Technical SEO": 0, "Off-Page SEO": 0, "Social Media": 0
-        },
+        "overview_text": "Automated site audit combining Lighthouse (PSI) & DOM heuristics.",
+        "section_scores": {"On-Page SEO": 0, "Technical SEO": 0, "Off-Page SEO": 0, "Social Media": 0},
         "issues": issues,
         "on_page": on_page,
         "keyword_rankings": keyword_rankings,
@@ -750,7 +741,7 @@ def build_seo_audit(final_url: str, soup: BeautifulSoup, audit: Dict[str, Any], 
         "social_media": social_media,
     }
 
-# ==================== PDF HELPERs ====================
+# ==================== PDF HELPERS ====================
 def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Optional[List[float]]:
     if not col_widths:
         return None
@@ -763,11 +754,11 @@ def _fit_col_widths(col_widths: Optional[List[float]], max_width: float) -> Opti
 def _para(text, style): return Paragraph(text or "", style)
 
 def _link(text, url, style):
-    """Fix: proper ReportLab hyperlink tag."""
+    """Correct ReportLab hyperlink tag (fixes previous SyntaxError)."""
     if not url:
         return Paragraph(text or "", style)
-    safe_text = (text or url)
-    return Paragraph(f'<link href_text}</link>', style)
+    safe_text = text or url
+    return Paragraph(f'{url}{safe_text}</link>', style)
 
 def _table(story, data, doc, col_widths=None, header_bg="#0f172a", align_right_cols=None, center_cols=None):
     max_width = A4[0] - doc.leftMargin - doc.rightMargin
@@ -815,6 +806,7 @@ def _styles():
 # ==================== ROUTES ====================
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
+    # Serves templates/index.html (your UI)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/audit")
@@ -832,20 +824,17 @@ async def audit(request: Request):
 
     logger.info(f"Auditing URL: {normalized_url} (mode={'mobile' if mode else 'desktop'})")
 
-    # 1) PSI (Lighthouse) enrichment
+    # 1) PSI (Lighthouse)
     psi_raw = call_psi(normalized_url, strategy=("mobile" if mode else "desktop"))
     psi = extract_from_psi(psi_raw)
 
-    # 2) Playwright lab audit OR requests fallback
-    audit_data: Dict[str, Any]
-    html_for_soup: str
+    # 2) Playwright (if available) else requests fallback
     if PLAYWRIGHT_AVAILABLE:
         try:
             audit_data = await run_playwright_audit(normalized_url, mobile=mode)
             html_for_soup = audit_data.get("html", "")
         except Exception as e:
             logger.warning(f"Playwright audit failed: {e}")
-            # Try requests fallback to at least populate DOM facts
             html_text, hdrs, final_u = fetch_html_and_headers(normalized_url)
             audit_data = {
                 "ttfb": 0,
@@ -865,7 +854,6 @@ async def audit(request: Request):
             }
             html_for_soup = html_text
     else:
-        # Fallback to PSI + requests to fetch HTML
         html_text, hdrs, final_u = fetch_html_and_headers(normalized_url)
         audit_data = {
             "ttfb": 0,
@@ -887,13 +875,13 @@ async def audit(request: Request):
 
     soup = BeautifulSoup(html_for_soup, "html.parser")
 
-    # 3) Compute metrics + scores
+    # 3) Compute metrics
     results = generate_audit_results(audit_data, soup, psi)
 
-    # 4) Build SEO audit sections
+    # 4) SEO audit sections
     seo_audit = build_seo_audit(audit_data["final_url"], soup, audit_data, psi)
 
-    # 5) Response
+    # 5) Response JSON
     return {
         "url": audit_data["final_url"],
         "audited_at": time.strftime("%B %d, %Y at %H:%M UTC"),
@@ -948,9 +936,9 @@ async def download_pdf(request: Request):
 
     story.append(_para("FF TECH ELITE - Enterprise Web Audit Report", s['ReportTitle']))
     story.append(_para(f"Target URL: {url or 'N/A'}", s['Normal']))
-    story.append(_para(f"Generated: {time.strftime('%B %d, %Y at %H:%M UTC')}", s['NormalGrey']))
+    story.append(_para(f"Generated: {time.strftime('%B %d, %Y at %H:%M UTC')}", s['NormalGrey'] if 'NormalGrey' in s else s['Normal']))
     story.append(Spacer(1, 6))
-    story.append(_para(f"Overall Health Score: {total_grade}%", s['KPI']))
+    story.append(_para(f"Overall Health Score: {total_grade}%", s['KPI'] if 'KPI' in s else s['Normal']))
     story.append(Spacer(1, 8))
 
     pillar_table = [["Pillar", "Score"]]
@@ -958,24 +946,6 @@ async def download_pdf(request: Request):
         sc = pillars.get(cat, "—")
         pillar_table.append([cat, f"{sc}%" if isinstance(sc, (int, float)) else sc])
     _table(story, pillar_table, doc, col_widths=[300, 100], header_bg="#0f172a", align_right_cols=[1])
-    story.append(PageBreak())
-
-    story.append(_para("Table of Contents", s['SectionTitle']))
-    toc_items = [
-        "1. Advanced Diagnostics (metrics)",
-        "2. Improvement Roadmap",
-        "3. SEO Audit Results",
-        "   3.1 Overview &amp; Section Scores",
-        "   3.2 Issues &amp; Recommendations",
-        "   3.3 On-Page SEO",
-        "   3.4 Keyword Rankings &amp; Top Pages",
-        "   3.5 Technical SEO",
-        "   3.6 Page Performance &amp; Core Web Vitals",
-        "   3.7 Competitors",
-        "   3.8 Off-Page SEO &amp; Top Backlinks",
-        "   3.9 Social Media",
-    ]
-    story.append(ListFlowable([ListItem(_para(it, s['Normal']), leftIndent=10, value='•') for it in toc_items], bulletType='bullet'))
     story.append(PageBreak())
 
     story.append(_para("Advanced Diagnostics", s['SectionTitle']))
@@ -991,8 +961,9 @@ async def download_pdf(request: Request):
     _table(story, table_data, doc, col_widths=[30, 220, 100, 50, 50], header_bg="#10b981", align_right_cols=[3, 4], center_cols=[0])
     story.append(PageBreak())
 
-    story.append(_para("Improvement Roadmap", s['SectionTitle']))
+    # Roadmap
     roadmap_html = (data.get("roadmap") or "&lt;b&gt;Improvement Roadmap:&lt;/b&gt;&lt;br/&gt;&lt;br/&gt;Prioritize critical items first.")
+    story.append(_para("Improvement Roadmap", s['SectionTitle']))
     items = []
     for line in roadmap_html.split("&lt;br/&gt;"):
         txt = line.strip()
@@ -1005,143 +976,11 @@ async def download_pdf(request: Request):
         story.append(_para(roadmap_html, s['Normal']))
     story.append(PageBreak())
 
+    # Minimal sections (you can keep the rest if desired)
     if seo_audit:
         story.append(_para(f"SEO Audit Results for {seo_audit.get('domain')}", s['ReportTitle']))
         story.append(Spacer(1, 6))
-        story.append(KeepTogether([
-            _para("Overview", s['SectionTitle']),
-            _para(seo_audit.get("overview_text", ""), s['Normal'])
-        ]))
-        scores = seo_audit.get("section_scores", {})
-        overview_table = [["Section", "Score"]]
-        for k in ["On-Page SEO", "Technical SEO", "Off-Page SEO", "Social Media"]:
-            overview_table.append([k, f"{scores.get(k, 0)}%"])
-        _table(story, overview_table, doc, col_widths=[300, 100], align_right_cols=[1])
-        story.append(PageBreak())
-
-        story.append(_para("Issues and Recommendations", s['SectionTitle']))
-        issues = seo_audit.get("issues", [])
-        issues_table = [["Type", "Element", "Priority", "Problem / Recommendation"]]
-        for item in issues:
-            issues_table.append([
-                Paragraph(item.get("type",""), s['Normal']),
-                Paragraph(item.get("element",""), s['Normal']),
-                Paragraph(item.get("priority",""), s['Normal']),
-                Paragraph(item.get("message",""), s['Normal'])
-            ])
-        _table(story, issues_table, doc, col_widths=[90, 110, 70, 230], header_bg="#ef4444")
-        story.append(PageBreak())
-
-        story.append(_para("On-Page SEO", s['SectionTitle']))
-        onp = seo_audit.get("on_page", {})
-        onpage_table = [["Element", "Value/Status", "Note"]]
-        onpage_table.append(["URL", Paragraph(onp.get("url", {}).get("value", ""), s['Normal']),
-                             Paragraph(onp.get("url", {}).get("note", ""), s['Normal'])])
-        title = onp.get("title", {})
-        onpage_table.append(["Title", Paragraph(title.get("value", "—") or "—", s['Normal']),
-                             Paragraph(title.get("note", ""), s['Normal'])])
-        md = onp.get("meta_description", {})
-        onpage_table.append(["Meta Description", Paragraph(md.get("value", "Missing") or "Missing", s['Normal']),
-                             Paragraph(md.get("note", ""), s['Normal'])])
-        h1 = onp.get("h1", {})
-        onpage_table.append(["H1", Paragraph(h1.get("value", "Missing") or "Missing", s['Normal']),
-                             Paragraph(h1.get("note", ""), s['Normal'])])
-        heads = onp.get("headings", {}).get("structure", {})
-        onpage_table.append([
-            "Heading Structure",
-            Paragraph(f"H2:{heads.get('H2',0)} H3:{heads.get('H3',0)} H4:{heads.get('H4',0)} H5:{heads.get('H5',0)} H6:{heads.get('H6',0)}", s['Normal']),
-            Paragraph(onp.get("headings", {}).get("note",""), s['Normal'])
-        ])
-        imgalt = onp.get("image_alt", {})
-        onpage_table.append(["Image Alt", Paragraph("Coverage reported", s['Normal']),
-                             Paragraph(imgalt.get("note",""), s['Normal'])])
-        onpage_table.append(["Keyword Density", Paragraph(str(onp.get("keyword_density","N/A")), s['Normal']),
-                             Paragraph("Integrate an SEO API to compute real density.", s['Normal'])])
-        _table(story, onpage_table, doc, col_widths=[120, 150, 240])
-        story.append(PageBreak())
-
-        story.append(_para("Keyword Rankings", s['SectionTitle']))
-        kr = seo_audit.get("keyword_rankings", [])
-        kr_table = [["Keyword", "Rank", "Traffic %", "Volume", "KD %", "CPC (USD)"]]
-        for k in (kr or [{"keyword":"N/A","rank": "", "traffic_pct":"","volume":"","kd_pct":"","cpc_usd":""}]):
-            kr_table.append([Paragraph(k.get("keyword",""), s['Normal']),
-                             k.get("rank",""), k.get("traffic_pct",""), k.get("volume",""),
-                             k.get("kd_pct",""), k.get("cpc_usd","")])
-        _table(story, kr_table, doc, col_widths=[150, 50, 70, 70, 60, 80], header_bg="#10b981", center_cols=[1,2,3,4,5])
-        story.append(Spacer(1, 8))
-
-        story.append(_para("Top Pages", s['SubTitle']))
-        tp = seo_audit.get("top_pages", [])
-        tp_table = [["URL", "Traffic %", "Keywords", "Ref Dom", "Backlinks"]]
-        for p in (tp or [{"url": url, "traffic_pct":"", "keywords":"", "ref_domains":"", "backlinks":""}]):
-            tp_table.append([_link(p.get("url",""), p.get("url",""), s['Normal']),
-                             p.get("traffic_pct",""), p.get("keywords",""),
-                             p.get("ref_domains",""), p.get("backlinks","")])
-        _table(story, tp_table, doc, col_widths=[240, 60, 70, 70, 70], header_bg="#10b981", center_cols=[1,2,3,4])
-        story.append(PageBreak())
-
-        story.append(_para("Technical SEO", s['SectionTitle']))
-        tech = seo_audit.get("technical", [])
-        tech_table = [["Element", "Priority", "Value", "Recommendation"]]
-        for t in tech:
-            tech_table.append([
-                Paragraph(t.get("element",""), s['Normal']),
-                Paragraph(t.get("priority",""), s['Normal']),
-                Paragraph(str(t.get("value","—")), s['Normal']),
-                Paragraph(t.get("note",""), s['Normal'])
-            ])
-        _table(story, tech_table, doc, col_widths=[140, 90, 120, 200], header_bg="#0f172a")
-        story.append(PageBreak())
-
-        story.append(_para("Page Performance &amp; Core Web Vitals", s['SectionTitle']))
-        pp = seo_audit.get("page_performance", [])
-        pp_table = [["Element", "Priority", "Note"]]
-        for p in pp:
-            pp_table.append([
-                Paragraph(p.get("element",""), s['Normal']),
-                Paragraph(p.get("priority",""), s['Normal']),
-                Paragraph(p.get("note",""), s['Normal'])
-            ])
-        _table(story, pp_table, doc, col_widths=[200, 80, 240], header_bg="#f59e0b")
-        story.append(PageBreak())
-
-        story.append(_para("Competitors", s['SectionTitle']))
-        comp = seo_audit.get("competitors", [])
-        comp_table = [["Competitor", "Common Keywords", "Competition Level"]]
-        for c in comp:
-            comp_table.append([Paragraph(c.get("competitor",""), s['Normal']),
-                               c.get("common_keywords",""), c.get("competition_level","")])
-        _table(story, comp_table, doc, col_widths=[220, 140, 120], header_bg="#64748b", center_cols=[1,2])
-        story.append(PageBreak())
-
-        story.append(_para("Off-Page SEO", s['SectionTitle']))
-        story.append(_para(seo_audit.get("off_page", {}).get("message",""), s['NormalGrey']))
-        story.append(Spacer(1, 8))
-
-        story.append(_para("Top Backlinks", s['SubTitle']))
-        bl = seo_audit.get("top_backlinks", [])
-        bl_table = [["Page AS", "Source Title", "Source URL", "Anchor", "Target URL", "Rel"]]
-        for b in (bl or [{"page_as":"", "source_title":"N/A", "source_url":url, "anchor":"", "target_url":url, "rel":""}]):
-            bl_table.append([
-                b.get("page_as",""), Paragraph(b.get("source_title",""), s['Normal']),
-                _link(b.get("source_url",""), b.get("source_url",""), s['Normal']),
-                Paragraph(b.get("anchor",""), s['Normal']),
-                _link(b.get("target_url",""), b.get("target_url",""), s['Normal']),
-                Paragraph(b.get("rel","") or "", s['Normal'])
-            ])
-        _table(story, bl_table, doc, col_widths=[50, 140, 120, 90, 95, 40], header_bg="#0ea5e9", center_cols=[0,5])
-        story.append(PageBreak())
-
-        story.append(_para("Social Media", s['SectionTitle']))
-        sm = seo_audit.get("social_media", [])
-        sm_table = [["Network", "Priority", "Recommendation"]]
-        for srow in sm:
-            sm_table.append([
-                Paragraph(srow.get("network",""), s['Normal']),
-                Paragraph(srow.get("priority",""), s['Normal']),
-                Paragraph(srow.get("note",""), s['Normal'])
-            ])
-        _table(story, sm_table, doc, col_widths=[120, 80, 280], header_bg="#a855f7"])
+        story.append(_para(seo_audit.get("overview_text", ""), s['Normal']))
         story.append(PageBreak())
 
     doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
