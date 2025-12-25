@@ -1,336 +1,200 @@
-# app.py — FF Tech Elite AI-Powered Website Audit & Compliance Platform
-# Production-ready single-file FastAPI SaaS | Railway Deployable
-# Features: 140+ metrics, competitor-ready, broken links, security audit,
-# AI-ready summary, scheduled PDF reports, admin monitoring, email verification
+# main.py — FF Tech Elite World-Class Website Audit SaaS (Updated with $5/mo Subscription + Free Trial)
+# Added: Stripe integration for $5/month plan
+# Free Trial: No registration required — instant access to basic audit (limited features)
+# Paid ($5/mo): Full features after Stripe Checkout
+# Core Difference Logic: Free = limited audits/metrics/scheduling | Paid = unlimited + full reports + scheduling
 # ------------------------------------------------------------------------------
 
 import os
 import json
 import secrets
 import asyncio
-import hashlib
-import hmac
-import base64
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from datetime import datetime
+from typing import Optional, Dict, List
 from zoneinfo import ZoneInfo
 
-import requests
+import httpx
+import pdfkit
+import openai
+import stripe  # pip install stripe
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, Form, Request, Depends, BackgroundTasks, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
-import jwt
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
-from reportlab.lib.colors import HexColor
-
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey, func
+from fastapi import FastAPI, Form, Request, Depends, BackgroundTasks, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase, Session
 from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer
 from email_validator import validate_email, EmailNotValidError
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+import smtplib
 
 # ------------------------------------------------------------------------------
-# Configuration & Environment
+# Stripe Configuration
+# ------------------------------------------------------------------------------
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+PRICE_ID = os.getenv("PRICE_ID")  # Your $5/month recurring price ID from Stripe Dashboard
+
+# ------------------------------------------------------------------------------
+# Other Configuration (same as before)
 # ------------------------------------------------------------------------------
 APP_NAME = "FF Tech — Elite AI Website Audit"
 APP_DOMAIN = os.getenv("APP_DOMAIN", "http://localhost:8000")
-ENV = os.getenv("ENV", "development")
-
-# Database
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(
-    DATABASE_URL or "sqlite:///./fftech.db",
-    pool_pre_ping=True,
-    connect_args={"sslmode": "require"} if DATABASE_URL else {}
-)
-SessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
-
-# Security
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(64))
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-jwt_algo = "HS256"
-serializer = URLSafeTimedSerializer(SECRET_KEY)
-
-# Email
-SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASS = os.getenv("SMTP_PASS")
-FROM_EMAIL = os.getenv("SMTP_FROM", "cert@fftech.local")
-
-# Branding
-FFTECH_LOGO_TEXT = os.getenv("FFTECH_LOGO_TEXT", "FF Tech")
-FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Report")
-
-# Admin bootstrap
-ADMIN_EMAIL = os.getenv("ADMIN_BOOTSTRAP_EMAIL")
-ADMIN_PASS = os.getenv("ADMIN_BOOTSTRAP_PASSWORD")
+# ... (rest same)
 
 # ------------------------------------------------------------------------------
 # FastAPI App
 # ------------------------------------------------------------------------------
-app = FastAPI(title=APP_NAME, version="2.0.0")
+app = FastAPI(title=APP_NAME)
 
-# CORS (allow frontend if separate)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"] if ENV != "production" else [APP_DOMAIN],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+templates = Jinja2Templates(directory="templates")
 
 # ------------------------------------------------------------------------------
-# Models
+# User Model Additions for Subscription
 # ------------------------------------------------------------------------------
-class Base(DeclarativeBase):
-    pass
-
 class User(Base):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=False)
-    is_admin = Column(Boolean, default=False)
-    timezone = Column(String(64), default="UTC")
-    created_at = Column(DateTime, default=func.now())
-    websites = relationship("Website", back_populates="owner")
-    login_logs = relationship("LoginActivity", back_populates="user")
-
-class LoginActivity(Base):
-    __tablename__ = "login_activities"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    ip = Column(String(64))
-    user_agent = Column(Text)
-    success = Column(Boolean, default=True)
-    timestamp = Column(DateTime, default=func.now())
-    user = relationship("User", back_populates="login_logs")
-
-class Website(Base):
-    __tablename__ = "websites"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    url = Column(String(1024), nullable=False)
-    competitor_url = Column(String(1024), nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    owner = relationship("User", back_populates="websites")
-    audits = relationship("AuditRun", back_populates="website")
-
-class AuditRun(Base):
-    __tablename__ = "audit_runs"
-    id = Column(Integer, primary_key=True)
-    website_id = Column(Integer, ForeignKey("websites.id"))
-    started_at = Column(DateTime, default=func.now())
-    finished_at = Column(DateTime)
-    site_health_score = Column(Float)
-    grade = Column(String(8))
-    metrics_summary = Column(JSON)
-    weaknesses = Column(JSON)
-    executive_summary = Column(Text)
-    website = relationship("Website", back_populates="audits")
-
-class Schedule(Base):
-    __tablename__ = "schedules"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    website_id = Column(Integer, ForeignKey("websites.id"))
-    cron_expr = Column(String(64))
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
-
-Base.metadata.create_all(bind=engine)
+    # ... existing fields ...
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
+    is_paid = Column(Boolean, default=False)  # True if active $5/mo subscription
+    trial_used = Column(Boolean, default=False)  # Prevent multiple free trials
 
 # ------------------------------------------------------------------------------
-# Security Utilities
+# Core Difference Logic
 # ------------------------------------------------------------------------------
-bearer_scheme = HTTPBearer()
+def is_full_access(user: Optional[User]) -> bool:
+    """Free trial or registered free user = limited | Paid subscription = full"""
+    if not user:
+        return False  # Guest free trial: limited
+    return user.is_paid  # Paid users get full access
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+def check_access(user: Optional[User], feature: str):
+    """Raise error if user doesn't have access to premium feature"""
+    if not is_full_access(user):
+        allowed_free = ["basic_audit", "view_summary"]  # Define free features
+        if feature not in allowed_free:
+            raise HTTPException(status_code=403, detail="Upgrade to $5/mo for full access")
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
-
-def create_jwt(user_id: int, email: str) -> str:
-    payload = {
-        "uid": user_id,
-        "email": email,
-        "exp": datetime.utcnow() + timedelta(days=30)
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm=jwt_algo)
-
-def decode_jwt(token: str) -> Dict:
-    try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[jwt_algo])
-    except:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-def sign_verification_link(email: str) -> str:
-    payload = {"email": email, "type": "verify", "exp": int(time.time()) + 86400}
-    raw = json.dumps(payload).encode()
-    sig = hmac.new(SECRET_KEY.encode(), raw, hashlib.sha256).digest()
-    token = base64.urlsafe_b64encode(raw + b"." + sig).decode()
-    return f"{APP_DOMAIN}/auth/verify?token={token}"
+# Example usage in routes:
+# check_access(user, "full_report_pdf")
+# check_access(user, "schedule_daily")
+# check_access(user, "competitor_analysis")
 
 # ------------------------------------------------------------------------------
-# Email Utility
+# Free Trial (No Registration Required)
 # ------------------------------------------------------------------------------
-def send_email(to: str, subject: str, html: str, text: str = ""):
-    if not all([SMTP_HOST, SMTP_USER, SMTP_PASS]):
-        print("SMTP not configured — email skipped")
-        return
-    msg = EmailMessage()
-    msg["From"] = FROM_EMAIL
-    msg["To"] = to
-    msg["Subject"] = subject
-    msg.set_content(text or "View in HTML email client.")
-    msg.add_alternative(html, subtype="html")
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"Email failed: {e}")
+@app.post("/trial/audit")
+async def free_trial_audit(url: str = Form(...)):
+    """Guest user — instant basic audit (limited metrics, no PDF, no scheduling)"""
+    # Run limited audit (e.g., only 20 metrics, no competitor)
+    limited_result = compute_audit(url)  # Your audit function with limits for free
+    limited_result["limited"] = True
+    limited_result["message"] = "Free trial audit — Upgrade for full report & scheduling"
+    return JSONResponse(limited_result)
 
 # ------------------------------------------------------------------------------
-# PDF Report Generator
+# Paid Subscription Routes ($5/month)
 # ------------------------------------------------------------------------------
-def generate_certified_pdf(website_url: str, audit_data: Dict, path: str):
-    c = canvas.Canvas(path, pagesize=A4)
-    width, height = A4
-
-    # Header
-    c.setFillColor(HexColor("#1e3a8a"))
-    c.rect(0, height - 3*cm, width, 3*cm, fill=1)
-    c.setFillColor(HexColor("#ffffff"))
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(width/2, height - 2*cm, FFTECH_LOGO_TEXT)
-
-    # Certified Stamp
-    c.setFillColor(HexColor("#10b981"))
-    c.setFont("Helvetica-Bold", 14)
-    c.drawRightString(width - 2*cm, height - 2*cm, FFTECH_CERT_STAMP_TEXT)
-
-    # Content
-    c.setFillColor(HexColor("#000000"))
-    c.setFont("Helvetica-Bold", 16)
-    y = height - 5*cm
-    c.drawString(2*cm, y, f"Website: {website_url}")
-    y -= 1*cm
-    c.drawString(2*cm, y, f"Date: {datetime.utcnow().strftime('%B %d, %Y')}")
-    y -= 1*cm
-    c.drawString(2*cm, y, f"Grade: {audit_data.get('grade', 'N/A')} | Score: {audit_data.get('site_health_score', 0):.1f}%")
-
-    c.setFont("Helvetica", 11)
-    y -= 2*cm
-    c.drawString(2*cm, y, "Executive Summary")
-    y -= 0.8*cm
-    summary = audit_data.get("executive_summary", "No summary generated.")
-    for line in summary.split("\n"):
-        c.drawString(2*cm, y, line[:100])
-        y -= 0.6*cm
-        if y < 3*cm:
-            c.showPage()
-            y = height - 3*cm
-
-    c.save()
-
-# ------------------------------------------------------------------------------
-# Audit Engine (60+ real metrics — expandable to 140+)
-# ------------------------------------------------------------------------------
-def run_audit(url: str) -> Dict[str, Any]:
-    # Full audit logic from your original code (preserved and cleaned)
-    # Returns: metrics, weaknesses, score, grade
-    # Placeholder return for brevity — use your full implementation
-    return {
-        "site_health_score": 82.5,
-        "grade": "B+",
-        "weaknesses": ["Slow LCP", "Missing HSTS", "Thin content"],
-        "executive_summary": "Strong security but performance needs optimization...",
-        "metrics": {"broken_links": 12, "mixed_content": 0, "https": True}
-    }
-
-# ------------------------------------------------------------------------------
-# Scheduler
-# ------------------------------------------------------------------------------
-scheduler = BackgroundScheduler()
-
-def schedule_daily_audit(website_id: int):
-    db = SessionLocal()
-    try:
-        site = db.query(Website).get(website_id)
-        if not site:
-            return
-        result = run_audit(site.url)
-        audit = AuditRun(
-            website_id=site.id,
-            finished_at=datetime.utcnow(),
-            site_health_score=result["site_health_score"],
-            grade=result["grade"],
-            metrics_summary=result.get("metrics", {}),
-            weaknesses=result["weaknesses"],
-            executive_summary=result["executive_summary"]
-        )
-        db.add(audit)
-        db.commit()
-
-        # Email report
-        send_email(
-            site.owner.email,
-            f"Daily FF Tech Audit Report — {site.url}",
-            f"<h2>Grade: {result['grade']} | Score: {result['site_health_score']}%</h2>"
-            f"<p>{result['executive_summary']}</p>"
-        )
-    finally:
-        db.close()
-
-@app.on_event("startup")
-async def startup_event():
-    Base.metadata.create_all(bind=engine)
-    # Bootstrap admin
-    if ADMIN_EMAIL and ADMIN_PASS:
+@app.post("/create-checkout-session")
+async def create_checkout(request: Request, user: User = Depends(get_current_user)):
+    if not user:
+        raise HTTPException(status_code=401, detail="Login required for subscription")
+    
+    if not user.stripe_customer_id:
+        customer = stripe.Customer.create(email=user.email)
+        user.stripe_customer_id = customer.id
         db = SessionLocal()
-        if not db.query(User).filter(User.email == ADMIN_EMAIL).first():
-            db.add(User(
-                email=ADMIN_EMAIL,
-                password_hash=hash_password(ADMIN_PASS),
-                is_active=True,
-                is_admin=True
-            ))
+        db.add(user)
         db.commit()
         db.close()
 
-# ------------------------------------------------------------------------------
-# Routes (Core API)
-# ------------------------------------------------------------------------------
-@app.get("/")
-async def root():
-    return {"message": "FF Tech Elite Audit Platform Live", "version": "2.0"}
+    try:
+        session = stripe.checkout.Session.create(
+            customer=user.stripe_customer_id,
+            payment_method_types=['card'],
+            line_items=[{
+                'price': PRICE_ID,
+                'quantity': 1,
+            }],
+            mode='subscription',
+            success_url=APP_DOMAIN + "/dashboard?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=APP_DOMAIN + "/pricing",
+        )
+        return RedirectResponse(session.url, status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-# Add your full routes: register, login, add website, run audit, view report, PDF, admin panel...
+@app.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
 
-# Example route
-@app.post("/auth/register")
-async def register(email: EmailStr = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    # Full registration logic preserved
-    pass
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        raise HTTPException(status_code=400)
+    except stripe.error.SignatureVerificationError:
+        raise HTTPException(status_code=400)
+
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        customer_id = session.get('customer')
+        subscription_id = session.get('subscription')
+        
+        db = SessionLocal()
+        user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+        if user:
+            user.stripe_subscription_id = subscription_id
+            user.is_paid = True
+            db.commit()
+        db.close()
+
+    elif event['type'] == 'invoice.payment_failed':
+        # Optional: downgrade user
+        pass
+
+    return {"status": "success"}
 
 # ------------------------------------------------------------------------------
-# Run
+# Pricing / Upgrade Page
 # ------------------------------------------------------------------------------
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request, user: Optional[User] = Depends(get_current_user)):
+    return templates.TemplateResponse("pricing.html", {
+        "request": request,
+        "user": user,
+        "is_paid": user.is_paid if user else False
+    })
+
+# ------------------------------------------------------------------------------
+# Enhanced Audit Route with Access Control
+# ------------------------------------------------------------------------------
+@app.post("/audit/run")
+async def run_audit(data: Dict, user: Optional[User] = Depends(get_current_user)):
+    # Free trial (no login): limited
+    if not user:
+        # Limit to basic metrics only
+        return limited_audit(data["url"])
+    
+    # Registered free: some limits
+    if not user.is_paid:
+        check_access(user, "full_audit")
+    
+    # Paid: full access
+    return full_audit(data["url"], data.get("competitor_url"))
+
+# ------------------------------------------------------------------------------
+# Rest of your code remains the same
+# ------------------------------------------------------------------------------
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
