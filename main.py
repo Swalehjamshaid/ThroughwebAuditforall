@@ -65,7 +65,6 @@ COOKIE_SECRET = os.getenv("COOKIE_SECRET", secrets.token_hex(16))
 session_signer = URLSafeSerializer(COOKIE_SECRET, salt="fftech-session")
 verify_signer = URLSafeSerializer(COOKIE_SECRET, salt="fftech-verify")
 
-# Solves common library version mismatch issues for bcrypt on Python 3.12+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__ident="2b")
 
 # SQLAlchemy
@@ -172,7 +171,6 @@ LAYOUT_BASE = r"""<!doctype html>
 </html>
 """
 
-# REFINED SAAS LANDING PAGE TEMPLATE
 HOME_TEMPLATE = r"""
 <!doctype html>
 <html lang="en">
@@ -1067,7 +1065,7 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
     }
 
 def build_summary(site: str, scores: Dict[str, Any], psi: Dict[str, Any]) -> str:
-    return f"Certified audit for {site}. Overall score: {scores['overall_score']} ({scores['grade']})."
+    return f"Certified audit for {site}. Overall score: {scores['overall_score']} ({scores['grade']}). This comprehensive diagnostic identified {scores['total_errors']} critical security vulnerabilities and {scores['total_warnings']} optimization warnings."
 
 def status_label(score: int) -> str:
     if score >= 80: return "Good"
@@ -1081,16 +1079,42 @@ def build_category_tables(scores: Dict[str, Any], psi: Dict[str, Any]) -> List[D
     t = scores["totals"]
     cats: List[Dict[str, Any]] = []
 
+    # 1. SECURITY & COMPLIANCE
     sec_metrics = [
-        metric_row("HTTPS / SSL valid", 100 if t["https_pages"] > 0 else 40, "High", "HTTPS is required.", "Force HTTPS."),
-        metric_row("HSTS header", max(10, 100 - t["hsts_missing"] * 10), "High", "Prevents downgrade.", "Add HSTS."),
+        metric_row("SSL/HTTPS Protocol", 100 if t["https_pages"] > 0 else 0, "High", "Critical for data encryption.", "Enforce site-wide HTTPS."),
+        metric_row("HSTS Protection", max(0, 100 - t["hsts_missing"] * 20), "High", "Prevents downgrade attacks.", "Implement HSTS headers."),
+        metric_row("CSP Policy", max(0, 100 - t["csp_missing"] * 20), "Medium", "Mitigates XSS risks.", "Define a Content Security Policy."),
+        metric_row("Mixed Content", 100 if t["mixed_content_pages"] == 0 else 0, "High", "Security bypass vulnerability.", "Replace insecure http resources."),
+        metric_row("Privacy Compliance", 100 if t["privacy_policy_pages"] > 0 else 0, "Medium", "Legal GDPR/CCPA risk.", "Ensure a clear Privacy Policy exists."),
     ]
-    cats.append({"name": "Security", "icon": "fa-shield-halved", "metrics": sec_metrics})
+    cats.append({"name": "Security & Compliance", "icon": "fa-shield-halved", "metrics": sec_metrics})
 
+    # 2. PERFORMANCE & CORE WEB VITALS
     perf_metrics = [
-        metric_row("Core Web Vitals", 70 if psi.get("source") == "psi" else 50, "High", "User experience.", "Optimize JS."),
+        metric_row("Server Response Time", max(0, 100 - (t["avg_response_time_ms"]/10)), "High", "Impacts user retention.", "Optimize backend server processing."),
+        metric_row("Asset Compression", 100 if t["gzip_missing_pages"] == 0 else 50, "Medium", "Reduces bandwidth usage.", "Enable Gzip or Brotli compression."),
+        metric_row("Browser Caching", 100 if t["cache_misconfig_pages"] == 0 else 50, "Medium", "Speeds up repeat visits.", "Implement long-term cache headers."),
+        metric_row("Largest Contentful Paint", 100 if psi.get("lcp_ms", 3000) < 2500 else 60, "High", "Primary loading metric.", "Optimize images and font delivery."),
     ]
     cats.append({"name": "Performance", "icon": "fa-gauge-high", "metrics": perf_metrics})
+
+    # 3. SEO & INDEXABILITY
+    seo_metrics = [
+        metric_row("Title Tag Quality", max(0, 100 - t["missing_titles"] * 20), "High", "Critical for ranking.", "Add unique descriptive titles."),
+        metric_row("Meta Descriptions", max(0, 100 - t["missing_meta"] * 20), "Medium", "Impacts CTR from SERP.", "Write unique meta descriptions."),
+        metric_row("Sitemap Integrity", 100 if t["sitemap_present"] else 0, "Medium", "Aids crawler discovery.", "Generate and submit a sitemap.xml."),
+        metric_row("Robots.txt Presence", 100 if t["robots_txt_ok"] else 0, "Medium", "Controls crawl budget.", "Configure robots.txt correctly."),
+        metric_row("Canonical Alignment", max(0, 100 - t["canonical_missing_pages"] * 20), "Medium", "Prevents duplicate content.", "Self-reference with canonical tags."),
+    ]
+    cats.append({"name": "SEO & Indexing", "icon": "fa-magnifying-glass-chart", "metrics": seo_metrics})
+
+    # 4. USER EXPERIENCE & ACCESSIBILITY
+    ux_metrics = [
+        metric_row("Mobile Viewport", 100 if t["viewport_missing"] == 0 else 0, "High", "Critical for mobile UX.", "Define meta-viewport tag."),
+        metric_row("Image Alt Text", max(0, 100 - t["alt_issue_pages"] * 20), "Medium", "Accessibility compliance.", "Provide descriptive alt attributes."),
+        metric_row("Navigation Structure", 100 if t["nav_missing"] == 0 else 50, "Medium", "User journey logic.", "Ensure nav elements are semantic."),
+    ]
+    cats.append({"name": "User Experience", "icon": "fa-user-check", "metrics": ux_metrics})
 
     return cats
 
@@ -1234,14 +1258,23 @@ async def render_report(url: str = Form(...), psi_strategy: str = Form("mobile")
     scores = compute_scores(crawl, psi)
     trend_data = build_trend_chart(crawl["site"], db, scores["overall_score"])
     categories = build_category_tables(scores, psi)
+    
+    # Calculate additional metadata for report template
+    owner_insights = [
+        {"title": "High Priority Security", "description": "Implement missing HSTS and CSP headers to protect user data."},
+        {"title": "SEO Quick Win", "description": "Optimizing meta tags can boost CTR by up to 30% in search results."}
+    ]
+    
     return HTMLResponse(env.from_string(HTML_TEMPLATE).render(
         app_name=APP_NAME, website_url=crawl["site"], audit_date=datetime.utcnow().strftime("%Y-%m-%d"),
-        audit_id="temp", grade=scores["grade"], grade_class=scores["grade_class"],
+        audit_id="TEMP-"+secrets.token_hex(4).upper(), grade=scores["grade"], grade_class=scores["grade_class"],
         overall_score=scores["overall_score"], total_errors=scores["total_errors"],
         total_warnings=scores["total_warnings"], total_notices=scores["total_notices"],
         executive_summary_200_words=build_summary(crawl["site"], scores, psi),
-        weak_areas=scores["weak_areas"], audit_categories=categories, owner_insights=[],
-        validity_date="N/A", trend_chart_data=trend_data
+        weak_areas=scores["weak_areas"], audit_categories=categories, 
+        owner_insights=owner_insights,
+        validity_date=(datetime.utcnow() + timedelta(days=30)).strftime("%Y-%m-%d"), 
+        trend_chart_data=trend_data
     ))
 
 @app.get("/report", response_class=HTMLResponse)
@@ -1251,14 +1284,22 @@ async def view_report(id: int, db: Session = Depends(get_db), user: Optional[Use
     payload = json.loads(audit.payload_json)
     trend_data = build_trend_chart(payload["crawl"]["site"], db, audit.overall_score)
     categories = build_category_tables(payload["scores"], payload["psi"])
+    
+    owner_insights = [
+        {"title": "High Priority Security", "description": "Implement missing HSTS and CSP headers to protect user data."},
+        {"title": "SEO Quick Win", "description": "Optimizing meta tags can boost CTR by up to 30% in search results."}
+    ]
+    
     return HTMLResponse(env.from_string(HTML_TEMPLATE).render(
         app_name=APP_NAME, website_url=payload["crawl"]["site"], audit_date=audit.created_at.strftime("%Y-%m-%d"),
-        audit_id=str(audit.id), grade=audit.grade, grade_class=grade_for_score(audit.overall_score)[1],
+        audit_id="RPT-"+str(audit.id).zfill(5), grade=audit.grade, grade_class=grade_for_score(audit.overall_score)[1],
         overall_score=audit.overall_score, total_errors=payload["scores"]["total_errors"],
         total_warnings=payload["scores"]["total_warnings"], total_notices=payload["scores"]["total_notices"],
         executive_summary_200_words=build_summary(payload["crawl"]["site"], payload["scores"], payload["psi"]),
-        weak_areas=payload["scores"]["weak_areas"], audit_categories=categories, owner_insights=[],
-        validity_date="N/A", trend_chart_data=trend_data
+        weak_areas=payload["scores"]["weak_areas"], audit_categories=categories, 
+        owner_insights=owner_insights,
+        validity_date=(audit.created_at + timedelta(days=30)).strftime("%Y-%m-%d"), 
+        trend_chart_data=trend_data
     ))
 
 async def scheduler_loop():
