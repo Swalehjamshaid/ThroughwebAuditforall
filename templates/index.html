@@ -1,263 +1,284 @@
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF Tech — Certified Audit Report</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <meta charset="utf-8">
+  <title>FF Tech SaaS Audit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Bootstrap 5 CSS -->
+  https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css
+  <!-- Chart.js -->
+  https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js</script>
   <style>
-    body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom, #f8fafc, #e0e7ff); color: #1e293b; }
-    .page { @apply bg-white shadow-2xl rounded-3xl p-10 lg:p-16 my-16 border border-indigo-100; }
-    .grade-display { font-size: clamp(120px, 25vw, 300px); font-weight: 900; }
-    canvas { max-height: 500px; width: 100% !important; }
-    @media print {
-      body { background: white; }
-      .no-print { display: none !important; }
-      .page { page-break-after: always; box-shadow: none; margin: 0; padding: 40px; border: none; }
-    }
-    .high { @apply bg-red-50 border-l-8 border-red-500; }
-    .med { @apply bg-amber-50 border-l-8 border-amber-500; }
-    .gap-bad { @apply text-red-600 font-black; }
-    .gap-good { @apply text-emerald-600 font-black; }
-    .roadmap-box { @apply bg-gradient-to-r from-sky-50 to-indigo-50 border-l-8 border-indigo-600 p-12 rounded-r-3xl shadow-2xl my-12 text-xl leading-relaxed; }
+    body { background: #0f172a; color: #e2e8f0; }
+    .navbar { background: #1e293b; }
+    .card { background: #111827; color: #e2e8f0; border: 1px solid #334155; }
+    .btn-primary { background:#2563eb; border-color:#1d4ed8; }
+    .btn-outline-secondary { color:#e2e8f0; border-color:#334155; }
+   fd; }
+    .brand { font-weight: 700; letter-spacing: .4px; }
+    .hidden { display:none; }
   </style>
 </head>
-<body class="min-h-screen">
+<body>
+<nav class="navbar navbar-dark">
+  <div class="container">
+    <span class="navbar-brand brand">FF Tech</span>
+    <div id="navActions">
+      #Login</a>
+      #Register</a>
+    </div>
+  </div>
+</nav>
 
-  <div class="max-w-7xl mx-auto px-6 py-12">
-    <!-- PDF Export Button -->
-    <button onclick="window.print()" class="no-print fixed bottom-8 right-8 z-50 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-12 py-6 rounded-full shadow-2xl font-black text-2xl flex items-center gap-5 transition-all hover:scale-105">
-      <i class="fas fa-file-pdf text-4xl"></i> Export Certified PDF
-    </button>
+<main class="container py-4">
+  <div id="alerts"></div>
 
-    <div id="reportContent" class="space-y-32"></div>
+  <!-- Login View -->
+  <div id="loginView" class="hidden">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card p-4">
+          <h3 class="mb-3">Sign In</h3>
+          <form id="loginForm">
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="loginEmail" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" id="loginPassword" required>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Login</button>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <script>
-    // Fetch data from your Python backend (adjust URL if needed)
-    async function loadReport() {
-      try {
-        const res = await fetch('/audit/latest'); // or '/report-data' or '/audit/{id}'
-        if (!res.ok) throw new Error();
-        const audit = await res.json();
-        renderReport(audit);
-      } catch (err) {
-        // Beautiful fallback demo data
-        renderReport({
-          site_url: "https://example.com",
-          overall_score: 82,
-          grade: "B+",
-          executive_summary: "Your website demonstrates strong technical health with an overall score of 82/100 (B+). The primary growth blocker is mobile performance with LCP at 3.2s—causing an estimated 18–24% revenue leak due to higher bounce rates. Security posture is excellent with full header compliance. Compared to your main competitor, you are slightly slower on load times but lead in SEO depth.\n\nTop 3 Urgent Fixes:\n1. Optimize images and defer non-critical JS\n2. Enable browser caching\n3. Expand thin content pages\n\nImmediate action will restore trust and unlock significant revenue growth.",
-          metrics: {
-            site_health_score: 82,
-            grade: "B+",
-            total_errors: 4,
-            total_warnings: 12,
-            total_notices: 8,
-            broken_internal_external_links: 15,
-            https: true,
-            ssl_valid: true,
-            viewport_present: true,
-            compression_enabled: false,
-            ttfb_seconds: 1.2,
-            total_page_size_bytes: 2400000
-          },
-          weaknesses: ["Slow Mobile LCP", "No GZIP Compression", "Thin Content", "Missing Alt Texts", "High Number of Requests"],
-          trend_data: { labels: ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], values: [72, 75, 78, 79, 81, 82] },
-          radar_data: { labels: ["Security","Performance","SEO","UX","Content"], your: [94,68,85,91,76], competitor: [91,82,88,90,80] },
-          cwv_data: { lcp: 3200, cls: 0.09, tbt: 380, lcp_target: 2500, cls_target: 0.1, tbt_target: 300 }
-        });
-      }
+  <!-- Register View -->
+  <div id="registerView" class="hidden">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card p-4">
+          <h3 class="mb-3">Create Account</h3>
+          <form id="registerForm">
+            <div class="mb-3">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="regEmail" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" id="regPassword" minlength="8" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Timezone</label>
+              <input type="text" class="form-control" id="regTimezone" value="Asia/Karachi">
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Register</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard View -->
+  <div id="dashboardView" class="hidden">
+    <div class="d-flex justify-content-between mb-3">
+      <h3>Dashboard</h3>
+      <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+    </div>
+    <div class="row">
+      <div class="col-lg-4">
+        <div class="card p-3 mb-4">
+          <h5>Add Website</h5>
+          <form id="addWebsiteForm">
+            <input type="url" class="form-control mb-2" id="siteUrl" placeholder="https://example.com" required>
+            <button class="btn btn-primary w-100">Save</button>
+          </form>
+        </div>
+        <div class="card p-3 mb-4">
+          <h5>Schedule Daily Email</h5>
+          <form id="scheduleForm">
+            <select class="form-select mb-2" id="schedWebsite"></select>
+            <div class="row">
+              <div class="col"><input type="number" class="form-control" id="schedHour" min="0" max="23" value="9"></div>
+              <div class="col"><input type="number" class="form-control" id="schedMinute" min="0" max="59" value="0"></div>
+            </div>
+            <button class="btn btn-primary w-100 mt-2">Create Schedule</button>
+          </form>
+          <ul id="scheduleList" class="small mt-2"></ul>
+        </div>
+      </div>
+      <div class="col-lg-8">
+        <div class="card p-3 mb-4">
+          <h5>Websites</h5>
+          <table class="table table-dark table-striped">
+            <thead><tr><th>#</th><th>URL</th><th>Actions</th></tr></thead>
+            <tbody id="websitesTableBody"></tbody>
+          </table>
+        </div>
+        <div class="card p-3">
+          <h5>Latest Audit Summary</h5>
+          <div id="latestArea"></div>
+          <hr>
+          <canvas id="trendChart" height="90"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const BASE_URL = ""; // e.g., "https://yourapp.up.railway.app"
+let token = localStorage.getItem('fftech_token');
+
+function showView(view) {
+  document.querySelectorAll('#loginView,#registerView,#dashboardView').forEach(el => el.classList.add('hidden'));
+  document.getElementById(view+'View').classList.remove('hidden');
+}
+
+function showAlert(msg,type='info') {
+  document.getElementById('alerts').innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(()=>document.getElementById('alerts').innerHTML='',4000);
+}
+
+async function api(path, options={}) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Authorization': token ? `Bearer ${token}` : '',
+      ...(options.headers||{})
     }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.headers.get('content-type').includes('json') ? res.json() : res.blob();
+}
 
-    function renderReport(data) {
-      const content = document.getElementById('reportContent');
-      content.innerHTML = `
-        <!-- Page 1: Cover -->
-        <div class="page text-center bg-gradient-to-br from-indigo-50 to-purple-50">
-          <div class="grade-display text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-8">${data.grade}</div>
-          <h1 class="text-5xl lg:text-7xl font-black mb-8 leading-tight">FF Tech Certified Audit Report</h1>
-          <p class="text-3xl font-bold text-indigo-800 mb-6">${data.site_url || "example.com"}</p>
-          <p class="text-xl text-gray-700 mb-12">Generated on December 25, 2025</p>
-          <div class="bg-white/90 backdrop-blur-lg rounded-3xl p-10 inline-block shadow-2xl border border-indigo-200">
-            <img src="https://dummyimage.com/500x150/4f46e5/ffffff&text=FF+Tech+Elite+Certified+Seal" alt="FF Tech Certified" class="mx-auto rounded-xl">
-          </div>
-        </div>
+// Login
+document.getElementById('loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const email=document.getElementById('loginEmail').value.trim();
+  const password=document.getElementById('loginPassword').value;
+  try {
+    const data=await fetch(`${BASE_URL}/auth/login`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password})
+    }).then(r=>r.json());
+    token=data.access_token;
+    localStorage.setItem('fftech_token',token);
+    showView('dashboard');
+    loadDashboard();
+  }catch(err){showAlert('Login failed','danger');}
+});
 
-        <!-- Page 2: Executive Summary + Radar Chart -->
-        <div class="page">
-          <h2 class="text-5xl font-black border-b-8 border-indigo-600 pb-6 mb-12">AI Executive Summary</h2>
-          <div class="bg-gradient-to-r from-indigo-50 to-purple-50 p-16 rounded-3xl border-l-8 border-indigo-600 mb-20 text-xl leading-relaxed shadow-2xl">
-            ${data.executive_summary.replace(/\n/g, '<br><br>')}
-          </div>
+// Register
+document.getElementById('registerForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const email=document.getElementById('regEmail').value.trim();
+  const password=document.getElementById('regPassword').value;
+  const timezone=document.getElementById('regTimezone').value;
+  try {
+    const res=await fetch(`${BASE_URL}/auth/register`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,timezone})
+    });
+    const data=await res.json();
+    showAlert(data.message,'success');
+    showView('login');
+  }catch(err){showAlert('Registration failed','danger');}
+});
 
-          <div class="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <h2 class="text-4xl font-black mb-10">Global Health Score</h2>
-              <div class="overflow-x-auto">
-                <table class="w-full border-collapse rounded-3xl overflow-hidden shadow-2xl">
-                  <thead class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-                    <tr><th class="p-8 text-left text-xl font-black">Area</th><th class="p-8 text-center text-xl">Weight</th><th class="p-8 text-right text-xl font-black">Score</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr class="bg-emerald-50"><td class="p-8 font-bold text-lg">Security</td><td class="p-8 text-center">28%</td><td class="p-8 text-right text-4xl text-emerald-600">94</td></tr>
-                    <tr class="bg-red-50"><td class="p-8 font-bold text-lg">Performance</td><td class="p-8 text-center">27%</td><td class="p-8 text-right text-4xl text-red-600">68</td></tr>
-                    <tr class="bg-amber-50"><td class="p-8 font-bold text-lg">SEO</td><td class="p-8 text-center">23%</td><td class="p-8 text-right text-4xl text-amber-600">85</td></tr>
-                    <tr class="bg-emerald-50"><td class="p-8 font-bold text-lg">UX</td><td class="p-8 text-center">12%</td><td class="p-8 text-right text-4xl text-emerald-600">91</td></tr>
-                    <tr class="bg-amber-50"><td class="p-8 font-bold text-lg">Content</td><td class="p-8 text-center">10%</td><td class="p-8 text-right text-4xl text-amber-600">76</td></tr>
-                    <tr class="bg-gradient-to-r from-indigo-800 to-purple-800 text-white">
-                      <td class="p-8 font-black text-2xl">Overall</td>
-                      <td class="p-8 font-black text-2xl">100%</td>
-                      <td class="p-8 text-right font-black text-6xl">${data.overall_score || 82}/100 (${data.grade || "B+"})</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div class="bg-gradient-to-br from-gray-50 to-indigo-50 rounded-3xl p-12 shadow-2xl">
-              <h3 class="text-3xl font-bold text-center mb-12">Category Strength Radar</h3>
-              <canvas id="radarChart"></canvas>
-            </div>
-          </div>
-        </div>
+function logout(){localStorage.removeItem('fftech_token');token=null;showView('login');}
 
-        <!-- Page 3: Priority Matrix + Competitor + Trend -->
-        <div class="page">
-          <h2 class="text-5xl font-black border-b-8 border-red-600 pb-6 mb-12">Priority Fix Matrix</h2>
-          <div class="grid md:grid-cols-3 gap-10 mb-20">
-            <div class="high p-10 rounded-3xl shadow-xl">
-              <div class="text-4xl font-black text-red-600 mb-6">HIGH Priority</div>
-              <div class="text-2xl font-bold mb-4">Impact: Revenue</div>
-              <div class="text-xl">Fix: Optimize LCP below 2.5s</div>
-            </div>
-            <div class="high p-10 rounded-3xl shadow-xl">
-              <div class="text-4xl font-black text-red-600 mb-6">HIGH Priority</div>
-              <div class="text-2xl font-bold mb-4">Impact: Trust</div>
-              <div class="text-xl">Fix: Add HSTS & CSP headers</div>
-            </div>
-            <div class="med p-10 rounded-3xl shadow-xl">
-              <div class="text-4xl font-black text-amber-600 mb-6">MED Priority</div>
-              <div class="text-2xl font-bold mb-4">Impact: SEO</div>
-              <div class="text-xl">Fix: Fix missing meta descriptions</div>
-            </div>
-          </div>
+// Dashboard logic
+async function loadDashboard(){
+  try{
+    const me=await api('/auth/me');
+    document.getElementById('navActions').innerHTML=`<span class="me-3 small">Signed in as ${me.email}</span>`;
+    const websites=await api('/websites');
+    const tbody=document.getElementById('websitesTableBody');
+    const schedSel=document.getElementById('schedWebsite');
+    tbody.innerHTML='';schedSel.innerHTML='';
+    websites.forEach(w=>{
+      schedSel.add(new Option(w.url,w.id));
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${w.id}</td><td>${w.url}</td>
+      <td><button class="btn btn-sm btn-primary" onclick="runAudit(${w.id})">Run Audit</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="downloadPDF(${w.id})">Download PDF</button></td>`;
+      tbody.appendChild(tr);
+    });
+    if(websites.length) loadLatest(websites[0].id);
+    loadSchedules();
+  }catch(err){showAlert('Failed to load dashboard','danger');}
+}
 
-          <div class="grid lg:grid-cols-2 gap-16">
-            <div>
-              <h2 class="text-4xl font-black border-b-8 border-blue-600 pb-6 mb-12">Competitor Gap Analysis</h2>
-              <table class="w-full border-collapse rounded-3xl overflow-hidden shadow-2xl">
-                <thead class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                  <tr><th class="p-8 text-left text-xl font-black">Metric</th><th class="p-8 text-xl">You</th><th class="p-8 text-xl">Competitor</th><th class="p-8 text-left text-xl">Gap</th></tr>
-                </thead>
-                <tbody>
-                  <tr class="gap-bad"><td class="p-8 font-bold text-lg">Mobile LCP</td><td class="p-8 text-3xl">3.2s</td><td class="p-8 text-xl">1.9s</td><td class="p-8 text-5xl">❌ Slower</td></tr>
-                  <tr class="gap-bad"><td class="p-8 font-bold text-lg">Overall Score</td><td class="p-8 text-3xl">82</td><td class="p-8 text-xl">88</td><td class="p-8 text-5xl">❌ Lower</td></tr>
-                  <tr class="gap-good"><td class="p-8 font-bold text-lg">Security Score</td><td class="p-8 text-3xl">94</td><td class="p-8 text-xl">91</td><td class="p-8 text-5xl">✅ Stronger</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="bg-gradient-to-br from-gray-50 to-indigo-50 rounded-3xl p-12 shadow-2xl">
-              <h3 class="text-3xl font-bold text-center mb-12">Health Score Trend (6 Months)</h3>
-              <canvas id="trendChart"></canvas>
-            </div>
-          </div>
-        </div>
+async function runAudit(id){
+  try{
+    const res=await api('/audit/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({website_id:id})});
+    showAlert(`Audit done: Grade ${res.grade}, Score ${res.score}%`,'success');
+    loadLatest(id);
+  }catch(err){showAlert('Audit failed','danger');}
+}
 
-        <!-- Page 4: Core Web Vitals + Risks + Roadmap -->
-        <div class="page">
-          <h2 class="text-5xl font-black border-b-8 border-amber-600 pb-6 mb-12">Core Web Vitals Performance</h2>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-16 mb-20 text-center">
-            <div class="bg-white rounded-3xl p-12 shadow-2xl"><canvas id="lcpGauge"></canvas><p class="mt-8 text-3xl font-bold">LCP: ${data.cwv_data?.lcp || 3200}ms</p></div>
-            <div class="bg-white rounded-3xl p-12 shadow-2xl"><canvas id="clsGauge"></canvas><p class="mt-8 text-3xl font-bold">CLS: ${data.cwv_data?.cls || 0.09}</p></div>
-            <div class="bg-white rounded-3xl p-12 shadow-2xl"><canvas id="tbtGauge"></canvas><p class="mt-8 text-3xl font-bold">TBT: ${data.cwv_data?.tbt || 380}ms</p></div>
-          </div>
+async function downloadPDF(id){
+  try{
+    const latest=await api(`/audit/website/${id}/latest`);
+    const auditId=latest.audit_id;
+    const blob=await api(`/audit/${auditId}/pdf`);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`FFTech_Audit_${auditId}.pdf`;a.click();
+    URL.revokeObjectURL(url);
+  }catch(err){showAlert('Download failed','danger');}
+}
 
-          <h2 class="text-5xl font-black border-b-8 border-red-600 pb-6 mb-12">Critical Risk Areas</h2>
-          <div class="flex flex-wrap justify-center gap-12 mb-20">
-            ${(data.weaknesses || ["Slow Mobile LCP", "Thin Content", "Missing Alt Texts"]).map(a => `
-              <div class="px-16 py-10 bg-red-100 text-red-800 rounded-3xl text-3xl font-black border-8 border-red-300 shadow-2xl flex items-center">
-                <i class="fas fa-exclamation-triangle mr-8 text-5xl"></i>${a}
-              </div>
-            `).join('')}
-          </div>
+async function loadLatest(id){
+  try{
+    const latest=await api(`/audit/website/${id}/latest`);
+    const m=latest.metrics;
+    document.getElementById('latestArea').innerHTML=`
+      <p><strong>Grade:</strong> ${latest.grade} | <strong>Score:</strong> ${latest.score}%</p>
+      <p>Errors: ${m.total_errors}, Warnings: ${m.total_warnings}, Notices: ${m.total_notices}</p>
+      <p class="small">${latest.executive_summary}</p>
+      <canvas id="distChart" height="120"></canvas>`;
+    new Chart(document.getElementById('distChart'),{
+      type:'pie',data:{labels:['Errors','Warnings','Notices'],datasets:[{data:[m.total_errors,m.total_warnings,m.total_notices],backgroundColor:['#ef4444','#f59e0b','#22c55e']}]}
+    });
+    const acc=await api(`/audit/website/${id}/accumulated`);
+    const labels=acc.trend.map(t=>t.date?t.date.slice(0,10):`Run ${t.id}`);
+    const scores=acc.trend.map(t=>t.score);
+    new Chart(document.getElementById('trendChart'),{
+      type:'line',data:{labels,datasets:[{label:'Site Health Score (%)',data:scores,borderColor:'#93c5fd',tension:0.25}]},
+      options:{scales:{y:{suggestedMin:0,suggestedMax:100}}}
+    });
+  }catch(err){document.getElementById('latestArea').innerHTML='<p>No audits yet.</p>';}
+}
 
-          <h2 class="text-5xl font-black border-b-8 border-emerald-600 pb-6 mb-12">30-60-90 Day Action Roadmap</h2>
-          <div class="grid md:grid-cols-3 gap-16">
-            <div class="roadmap-box">
-              <strong class="text-4xl block mb-8">30 Days: Restore Trust & Speed</strong>
-              Fix security headers + optimize LCP → Reduce bounce rate by 25%
-            </div>
-            <div class="roadmap-box">
-              <strong class="text-4xl block mb-8">60 Days: Drive Traffic</strong>
-              SEO fixes + content depth → 40% organic growth potential
-            </div>
-            <div class="roadmap-box">
-              <strong class="text-4xl block mb-8">90 Days: Revenue Lift</strong>
-              UX & conversion optimization → 18-30% sales increase
-            </div>
-          </div>
-        </div>
-      `;
+async function loadSchedules(){
+  const items=await api('/schedules');
+  document.getElementById('scheduleList').innerHTML=items.map(s=>`<li>#${s.id} • ${s.cron}</li>`).join('');
+}
 
-      initCharts(data);
-    }
+document.getElementById('addWebsiteForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const url=document.getElementById('siteUrl').value.trim();
+  try{await api('/websites',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+    showAlert('Website added','success');loadDashboard();
+  }catch(err){showAlert('Failed to add website','danger');}
+});
 
-    function initCharts(data) {
-      // Radar Chart
-      new Chart(document.getElementById('radarChart'), {
-        type: 'radar',
-        data: {
-          labels: data.radar_data?.labels || ["Security","Performance","SEO","UX","Content"],
-          datasets: [
-            { label: 'Your Site', data: data.radar_data?.your || [94,68,85,91,76], backgroundColor: 'rgba(79,70,229,0.2)', borderColor: '#4f46e5', pointBackgroundColor: '#4f46e5', borderWidth: 4 },
-            { label: 'Competitor', data: data.radar_data?.competitor || [91,82,88,90,80], backgroundColor: 'rgba(34,197,94,0.2)', borderColor: '#22c55e', pointBackgroundColor: '#22c55e', borderWidth: 4 }
-          ]
-        },
-        options: { responsive: true, scales: { r: { min: 0, max: 100, ticks: { stepSize: 20 } } } }
-      });
+document.getElementById('scheduleForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const website_id=Number(document.getElementById('schedWebsite').value);
+  const hour_24=Number(document.getElementById('schedHour').value);
+  const minute=Number(document.getElementById('schedMinute').value);
+  try{await api('/schedules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({website_id,hour_24,minute})});
+    showAlert('Schedule created','success');loadSchedules();
+  }catch(err){showAlert('Failed to create schedule','danger');}
+});
 
-      // Trend Line
-      new Chart(document.getElementById('trendChart'), {
-        type: 'line',
-        data: {
-          labels: data.trend_data?.labels || ["Jul","Aug","Sep","Oct","Nov","Dec"],
-          datasets: [{ label: 'Score', data: data.trend_data?.values || [72,75,78,79,81,82], borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', tension: 0.4, fill: true }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100 } } }
-      });
-
-      // Gauges
-      const gauge = (id, value, max, target, unit = '') => {
-        const percent = (value / max) * 100;
-        const good = value <= target;
-        new Chart(document.getElementById(id), {
-          type: 'doughnut',
-          data: { datasets: [{ data: [percent, 100-percent], backgroundColor: [good ? '#22c55e' : '#ef4444', '#e5e7eb'], cutout: '80%' }] },
-          options: { responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: false } } },
-          plugins: [{
-            afterDraw: chart => {
-              const ctx = chart.ctx;
-              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-              const x = chart.width / 2, y = chart.height / 2;
-              ctx.font = 'bold 60px Inter'; ctx.fillStyle = good ? '#22c55e' : '#ef4444';
-              ctx.fillText(value + unit, x, y - 30);
-              ctx.font = '24px Inter'; ctx.fillStyle = '#6b7280';
-              ctx.fillText(good ? 'Good' : 'Needs Work', x, y + 40);
-            }
-          }]
-        });
-      };
-
-      const cwv = data.cwv_data || { lcp: 3200, cls: 0.09, tbt: 380, lcp_target: 2500, cls_target: 0.1, tbt_target: 300 };
-      gauge('lcpGauge', cwv.lcp, 5000, cwv.lcp_target, 'ms');
-      gauge('clsGauge', cwv.cls * 1000, 500, cwv.cls_target * 1000);
-      gauge('tbtGauge', cwv.tbt, 1000, cwv.tbt_target, 'ms');
-    }
-
-    window.onload = loadReport;
-  </script>
+// Init view
+if(token){showView('dashboard');loadDashboard();}else{showView('login');}
+</script>
 </body>
 </html>
