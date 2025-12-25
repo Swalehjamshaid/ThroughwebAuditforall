@@ -1,13 +1,15 @@
 fastapi
-uvicorn
+uvicorn[standard]
+jinja2                  # ← THIS IS THE MISSING ONE
 sqlalchemy
-psycopg2-binary
-httpx
-beautifulsoup4
-pdfkit
-openai
+psycopg2-binary         # For PostgreSQL on Railway
+python-multipart        # For forms (if you have file uploads or forms)
+email-validator
 passlib[bcrypt]
 itsdangerous
-email-validator
 apscheduler
-python-dotenv
+httpx
+beautifulsoup4
+pdfkit                  # If using PDF generation
+openai                  # If using AI summaries
+# Add any others you use (e.g., python-dotenv, etc.)
