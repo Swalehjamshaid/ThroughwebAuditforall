@@ -1,15 +1,15 @@
-fastapi
+fastapi[standard]
 uvicorn[standard]
-jinja2                  # ← THIS IS THE MISSING ONE
+jinja2
 sqlalchemy
-psycopg2-binary         # For PostgreSQL on Railway
-python-multipart        # For forms (if you have file uploads or forms)
-email-validator
+psycopg2-binary
 passlib[bcrypt]
 itsdangerous
+email-validator
 apscheduler
 httpx
 beautifulsoup4
-pdfkit                  # If using PDF generation
-openai                  # If using AI summaries
-# Add any others you use (e.g., python-dotenv, etc.)
+pdfkit
+openai
+stripe                  # ← THIS FIXES THE ERROR
+python-multipart
