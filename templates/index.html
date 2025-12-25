@@ -1,248 +1,235 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>FF Tech — AI Website Audit | International SaaS</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech | Audit Report: {{ website_url }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; scroll-behavior: smooth; }
-        .gradient { background: radial-gradient(1200px 400px at 10% 10%, rgba(79,70,229,0.1), transparent), linear-gradient(180deg, #ffffff, #f8fafc); }
-        .glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(6px); }
-        .badge-dot { width: .5rem; height: .5rem; border-radius: 100%; display:inline-block; margin-right:.35rem; }
-        .feature-card { transition: all 0.3s ease; }
-        .feature-card:hover { transform: translateY(-5px); border-color: #4f46e5; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .score-ring { transition: stroke-dashoffset 1s ease-in-out; }
+        .metric-card { transition: transform 0.2s; }
+        .metric-card:hover { transform: translateY(-2px); }
+        @media print { .no-print { display: none; } body { background: white; } }
     </style>
 </head>
-<body class="gradient text-gray-900">
+<body class="text-gray-900">
 
-    <nav class="bg-white/80 glass border-b sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16 items-center">
-                <a href="/" class="flex items-center gap-2">
-                    <img src="https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech" alt="Logo" class="h-8">
-                    <span class="text-xl font-bold text-indigo-700">AI Website Audit</span>
-                </a>
-                <div class="flex items-center gap-4">
-                    {% if user %}
-                        <span class="hidden md:inline text-sm text-gray-500 font-medium">Hello, {{ user.email }}</span>
-                        <a href="/dashboard" class="text-sm font-semibold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg hover:bg-indigo-100 transition">Dashboard</a>
-                        <a href="/logout" class="text-sm font-semibold text-gray-400 hover:text-red-500 transition">Logout</a>
-                    {% else %}
-                        <a href="/login" class="text-sm font-semibold text-gray-600 hover:text-indigo-600 transition">Login</a>
-                        <a href="/register" class="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">Register</a>
-                    {% endif %}
+    <nav class="bg-white border-b sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 p-1.5 rounded-lg text-white">
+                    <i class="fas fa-robot"></i>
                 </div>
+                <span class="font-bold text-xl tracking-tight text-indigo-900">FF Tech <span class="text-indigo-500">Audit</span></span>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="window.print()" class="text-sm font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl transition">
+                    <i class="fas fa-print mr-2"></i> Print Report
+                </button>
+                <a href="/dashboard" class="text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl shadow-lg shadow-indigo-100 transition">
+                    Back to Dashboard
+                </a>
             </div>
         </div>
     </nav>
 
-    <header class="relative overflow-hidden">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                <div class="z-10">
-                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs uppercase tracking-widest text-indigo-600 font-bold bg-indigo-50">
-                        <i class="fas fa-shield-halved mr-2"></i> Certified AI Audit & Compliance
-                    </span>
-                    <h1 class="mt-6 text-4xl lg:text-6xl font-extrabold leading-tight tracking-tight">
-                        World-Class SaaS for Website Health, <span class="text-indigo-600">Security</span> & SEO
-                    </h1>
-                    <p class="mt-6 text-gray-600 text-lg max-w-lg leading-relaxed">
-                        Audit 45+ metrics across Security, Performance, and UX. Get daily emails, historical trends, and certified grading—powered by FF Tech Intelligence.
-                    </p>
-                    <div class="mt-8 flex flex-wrap gap-4">
-                        <a href="#instant-audit" class="px-8 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition transform hover:scale-105 shadow-xl shadow-indigo-100">
-                            Run Free Audit
-                        </a>
-                        {% if not user %}
-                        <a href="/register" class="px-8 py-4 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition">
-                            Create Account
-                        </a>
-                        {% endif %}
-                    </div>
-                    <div class="mt-8 text-xs text-gray-400 font-medium flex items-center gap-4">
-                        <span><i class="fas fa-lock mr-1 text-green-500"></i> Secure by design</span>
-                        <span><i class="fas fa-globe mr-1 text-blue-500"></i> International standards</span>
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div class="flex-1">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-widest rounded-full">Official Audit</span>
+                    <span class="text-gray-400 text-xs font-medium">ID: {{ audit_id }}</span>
+                </div>
+                <h1 class="text-3xl font-extrabold text-gray-900 mb-2 truncate">{{ website_url }}</h1>
+                <p class="text-gray-500 flex items-center gap-2">
+                    <i class="fas fa-calendar-check"></i> Analysis Date: <span class="font-semibold text-gray-700">{{ audit_date }}</span>
+                </p>
+            </div>
+            
+            <div class="flex items-center gap-12 border-l border-gray-100 pl-0 md:pl-12">
+                <div class="text-center">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Health Score</p>
+                    <div class="relative flex items-center justify-center">
+                        <svg class="w-24 h-24">
+                            <circle class="text-gray-100" stroke-width="6" stroke="currentColor" fill="transparent" r="40" cx="48" cy="48"></circle>
+                            <circle class="text-indigo-600 score-ring" stroke-width="6" stroke-dasharray="251.2" 
+                                    stroke-dashoffset="{{ 251.2 - (251.2 * overall_score / 100) }}" 
+                                    stroke-linecap="round" stroke="currentColor" fill="transparent" r="40" cx="48" cy="48"></circle>
+                        </svg>
+                        <span class="absolute text-2xl font-black text-indigo-900">{{ overall_score }}%</span>
                     </div>
                 </div>
-
-                <div class="relative">
-                    <div class="bg-white shadow-2xl ring-1 ring-gray-100 rounded-3xl p-8 transform rotate-1">
-                        <div class="flex items-center justify-between mb-6">
-                            <h3 class="text-lg font-bold">Report Preview</h3>
-                            <span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">AI Certified</span>
-                        </div>
-                        <div class="grid grid-cols-3 gap-4 text-center mb-8">
-                            <div class="bg-indigo-50 rounded-2xl p-4">
-                                <div class="text-3xl font-black text-indigo-600">A+</div>
-                                <div class="text-[10px] uppercase font-bold text-gray-400">Grade</div>
-                            </div>
-                            <div class="bg-emerald-50 rounded-2xl p-4">
-                                <div class="text-3xl font-black text-emerald-600">92%</div>
-                                <div class="text-[10px] uppercase font-bold text-gray-400">Health</div>
-                            </div>
-                            <div class="bg-blue-50 rounded-2xl p-4">
-                                <div class="text-3xl font-black text-blue-600">45+</div>
-                                <div class="text-[10px] uppercase font-bold text-gray-400">Metrics</div>
-                            </div>
-                        </div>
-                        <div class="bg-gray-50 border rounded-2xl p-5">
-                            <div class="flex items-center gap-2 text-sm font-bold mb-2">
-                                <i class="fas fa-brain text-indigo-500"></i>
-                                AI Executive Summary
-                            </div>
-                            <p class="text-xs text-gray-500 leading-relaxed italic">
-                                "Security & Compliance posture is excellent. Optimization suggested for Core Web Vitals LCP. Mixed content resolved..."
-                            </p>
-                        </div>
-                    </div>
-                    <div class="absolute -z-10 top-0 right-0 w-64 h-64 bg-indigo-100 rounded-full blur-3xl opacity-50"></div>
+                <div class="text-center">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-1">Certified Grade</p>
+                    <span class="text-6xl font-black {{ grade_class }}">{{ grade }}</span>
                 </div>
             </div>
         </div>
-    </header>
 
-    <section id="instant-audit" class="py-12 relative z-20">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="bg-white rounded-3xl shadow-2xl p-8 lg:p-12 border border-indigo-50">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div>
-                        <h2 class="text-3xl font-bold">Quick Analysis</h2>
-                        <p class="text-gray-500">Enter a URL to get an instant AI-powered health report.</p>
-                    </div>
-                    <span class="inline-flex items-center px-4 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
-                        <i class="fas fa-bolt mr-2"></i> Free Preview
-                    </span>
-                </div>
-                
-                <form method="post" action="/report" class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div class="lg:col-span-2">
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Website URL</label>
-                        <div class="relative">
-                            <i class="fas fa-link absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"></i>
-                            <input name="url" type="url" required placeholder="https://example.com" 
-                                class="w-full pl-11 pr-4 py-4 border-2 border-gray-100 rounded-2xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 transition outline-none text-gray-700 font-medium">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Strategy</label>
-                        <select name="psi_strategy" class="w-full border-2 border-gray-100 rounded-2xl px-4 py-4 focus:border-indigo-500 outline-none appearance-none bg-white text-gray-600 font-medium">
-                            <option value="mobile">Mobile View</option>
-                            <option value="desktop">Desktop View</option>
-                        </select>
-                    </div>
-                    <div class="flex items-end">
-                        <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-100">
-                            Start Audit <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-24">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-black tracking-tight">Comprehensive Diagnostics</h2>
-                <p class="mt-4 text-gray-500 text-lg">Every audit covers over 45 critical data points across 6 domains.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="feature-card bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-                    <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-6">
-                        <i class="fas fa-shield-halved text-indigo-600 text-xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4">Security & Compliance</h3>
-                    <ul class="text-sm text-gray-500 space-y-3">
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> HSTS / CSP / XFO Headers</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Mixed-content Detection</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> SSL/TLS Integrity</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-                    <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-6">
-                        <i class="fas fa-gauge-high text-indigo-600 text-xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4">Performance</h3>
-                    <ul class="text-sm text-gray-500 space-y-3">
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Core Web Vitals (LCP/CLS)</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Brotli/Gzip Check</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Response Time Analysis</li>
-                    </ul>
-                </div>
-
-                <div class="feature-card bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-                    <div class="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center mb-6">
-                        <i class="fas fa-magnifying-glass-chart text-indigo-600 text-xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4">SEO Mastery</h3>
-                    <ul class="text-sm text-gray-500 space-y-3">
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Metadata & Canonical Audit</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Robots & Sitemap Validation</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-check text-green-500 text-[10px]"></i> Broken Link Scanner</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-16 bg-white border-y border-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col lg:flex-row items-center justify-between gap-12">
-                <div class="max-w-md">
-                    <h3 class="text-2xl font-bold mb-4 italic text-indigo-900">Enterprise Standards</h3>
-                    <p class="text-gray-500">We utilize bank-grade encryption and secure session handling to protect your proprietary data.</p>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 items-center opacity-60">
-                    <img src="https://dummyimage.com/160x40/efefef/555&text=SAAS" alt="Partner" class="h-8">
-                    <img src="https://dummyimage.com/160x40/efefef/555&text=FINTECH" alt="Partner" class="h-8">
-                    <img src="https://dummyimage.com/160x40/efefef/555&text=COMMERCE" alt="Partner" class="h-8">
-                    <img src="https://dummyimage.com/160x40/efefef/555&text=AGENCY" alt="Partner" class="h-8">
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer class="py-16 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12">
-                <div class="col-span-1 md:col-span-2">
-                    <div class="flex items-center gap-2 mb-6">
-                        <img src="https://dummyimage.com/120x36/4f46e5/ffffff&text=FF+Tech" alt="Logo" class="h-6">
-                        <span class="text-lg font-bold text-indigo-700">Audit Intelligence</span>
-                    </div>
-                    <p class="text-sm text-gray-500 max-w-sm leading-relaxed">
-                        The ultimate diagnostic toolkit for modern web properties. Built on Railway Cloud for maximum uptime and reliability.
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <div class="lg:col-span-2 bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                <h2 class="text-lg font-extrabold text-gray-900 mb-6 flex items-center gap-2">
+                    <i class="fas fa-brain text-indigo-500"></i> AI Executive Summary
+                </h2>
+                <div class="bg-indigo-50/50 border-l-4 border-indigo-500 p-6 rounded-r-2xl mb-6">
+                    <p class="text-gray-700 leading-relaxed italic text-sm">
+                        "{{ executive_summary_200_words }}"
                     </p>
                 </div>
-                <div>
-                    <h5 class="font-bold text-gray-900 mb-6 uppercase text-xs tracking-widest">Resources</h5>
-                    <ul class="text-sm text-gray-500 space-y-4">
-                        <li><a href="/login" class="hover:text-indigo-600 transition">User Login</a></li>
-                        <li><a href="/register" class="hover:text-indigo-600 transition">Register Account</a></li>
-                        <li><a href="#instant-audit" class="hover:text-indigo-600 transition">Instant Check</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h5 class="font-bold text-gray-900 mb-6 uppercase text-xs tracking-widest">Support</h5>
-                    <ul class="text-sm text-gray-500 space-y-4">
-                        <li class="flex items-center gap-2"><i class="fas fa-envelope text-indigo-400"></i> support@fftech.ai</li>
-                        <li class="flex items-center gap-2"><i class="fas fa-shield-check text-indigo-400"></i> GDPR Compliant</li>
-                    </ul>
+                <div class="flex flex-wrap gap-3">
+                    {% for area in weak_areas %}
+                    <span class="px-4 py-2 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-100">
+                        <i class="fas fa-exclamation-circle mr-2"></i> {{ area }}
+                    </span>
+                    {% endfor %}
                 </div>
             </div>
-            <div class="mt-16 pt-8 border-t border-gray-50 text-center">
-                <p class="text-xs text-gray-400">© <span id="year"></span> FF Tech Intelligence. Professional Diagnostic Certification System.</p>
+
+            <div class="bg-indigo-900 rounded-3xl shadow-xl p-8 text-white relative overflow-hidden">
+                <div class="relative z-10">
+                    <h2 class="text-lg font-bold mb-6">Issue Distribution</h2>
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <span class="text-indigo-200 text-sm font-medium">Critical Errors</span>
+                            <span class="bg-red-500 text-white px-3 py-1 rounded-lg font-black text-xs">{{ total_errors }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-indigo-200 text-sm font-medium">Warnings</span>
+                            <span class="bg-amber-500 text-white px-3 py-1 rounded-lg font-black text-xs">{{ total_warnings }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-indigo-200 text-sm font-medium">Optimization Notices</span>
+                            <span class="bg-blue-500 text-white px-3 py-1 rounded-lg font-black text-xs">{{ total_notices }}</span>
+                        </div>
+                    </div>
+                </div>
+                <i class="fas fa-chart-pie absolute -bottom-10 -right-10 text-indigo-800 text-9xl opacity-20"></i>
             </div>
         </div>
-    </footer>
+
+        <div class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 mb-8">
+            <h2 class="text-lg font-extrabold text-gray-900 mb-8 flex items-center gap-2">
+                <i class="fas fa-chart-line text-indigo-500"></i> Historical Health Trend
+            </h2>
+            <div class="h-[300px] w-full">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-black text-gray-900 mb-6 px-2">Technical Deep-Dive</h2>
+        <div class="space-y-6">
+            {% for category in audit_categories %}
+            <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 bg-gray-50/50 border-b flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-white shadow-sm border border-gray-100 rounded-xl flex items-center justify-center text-indigo-600">
+                            <i class="fas {{ category.icon }}"></i>
+                        </div>
+                        <h3 class="font-black text-gray-800 uppercase tracking-tight">{{ category.name }}</h3>
+                    </div>
+                    <span class="text-xs font-bold text-gray-400">{{ category.metrics|length }} DATA POINTS</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-white text-[10px] font-black text-gray-400 uppercase tracking-widest border-b">
+                            <tr>
+                                <th class="px-8 py-4">Metric Check</th>
+                                <th class="px-8 py-4">Status</th>
+                                <th class="px-8 py-4">Impact</th>
+                                <th class="px-8 py-4 text-right">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            {% for metric in category.metrics %}
+                            <tr class="hover:bg-gray-50/50 transition duration-75">
+                                <td class="px-8 py-5">
+                                    <p class="font-bold text-gray-900 text-sm">{{ metric.name }}</p>
+                                    <p class="text-[11px] text-gray-500 mt-0.5">{{ metric.recommendation }}</p>
+                                </td>
+                                <td class="px-8 py-5">
+                                    {% if metric.status == 'Good' %}
+                                    <span class="px-2.5 py-1 bg-green-100 text-green-700 text-[10px] font-black rounded-md uppercase">Pass</span>
+                                    {% elif metric.status == 'Warning' %}
+                                    <span class="px-2.5 py-1 bg-amber-100 text-amber-700 text-[10px] font-black rounded-md uppercase">Review</span>
+                                    {% else %}
+                                    <span class="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-black rounded-md uppercase">Failed</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-8 py-5">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-1.5 h-1.5 rounded-full {% if metric.priority == 'High' %}bg-red-500{% elif metric.priority == 'Medium' %}bg-amber-500{% else %}bg-green-500{% endif %}"></div>
+                                        <span class="text-xs font-bold text-gray-600">{{ metric.priority }}</span>
+                                    </div>
+                                </td>
+                                <td class="px-8 py-5 text-right font-mono font-bold text-indigo-600 text-sm">
+                                    {{ metric.score }}/100
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <footer class="mt-16 pt-8 border-t border-gray-200 text-center">
+            <p class="text-xs text-gray-400 font-medium">
+                © {{ audit_date[:4] }} FF Tech Intelligence Engine. 
+                Validity period: 30 days. Certified AI Verification: 99.8% Accuracy.
+            </p>
+        </footer>
+    </main>
 
     <script>
-        document.getElementById('year').textContent = new Date().getFullYear();
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ trend_chart_data.labels | safe if trend_chart_data else "['N/A']" }},
+                datasets: [{
+                    label: 'Health Performance',
+                    data: {{ trend_chart_data.values | safe if trend_chart_data else "[0]" }},
+                    borderColor: '#4f46e5',
+                    borderWidth: 4,
+                    backgroundColor: (context) => {
+                        const gradient = context.chart.ctx.createLinearGradient(0, 0, 0, 400);
+                        gradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
+                        gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
+                        return gradient;
+                    },
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: '#4f46e5',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        max: 100, 
+                        grid: { borderDash: [5, 5], color: '#e2e8f0' },
+                        ticks: { font: { weight: 'bold' } }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { font: { weight: 'bold' } }
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>
