@@ -44,17 +44,14 @@ PSI_API_KEY = os.getenv("PSI_API_KEY")
 # --- REFINED DATABASE LOGIC FOR RAILWAY ---
 _raw_db_url = os.getenv("DATABASE_URL", "")
 if not _raw_db_url or _raw_db_url.strip() == "":
-    # Safe fallback if environment variable is missing or empty
     DB_URL = "sqlite:///./audits.db"
 else:
-    # SQLALchemy 2.0 requires postgresql:// instead of postgres://
     if _raw_db_url.startswith("postgres://"):
         DB_URL = _raw_db_url.replace("postgres://", "postgresql://", 1)
     else:
         DB_URL = _raw_db_url
 
 SMTP_HOST = os.getenv("SMTP_HOST")
-# Ensure SMTP_PORT is always an integer
 try:
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 except (ValueError, TypeError):
@@ -68,13 +65,13 @@ COOKIE_SECRET = os.getenv("COOKIE_SECRET", secrets.token_hex(16))
 session_signer = URLSafeSerializer(COOKIE_SECRET, salt="fftech-session")
 verify_signer = URLSafeSerializer(COOKIE_SECRET, salt="fftech-verify")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Solves common library version mismatch issues for bcrypt on Python 3.12+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__ident="2b")
 
 # SQLAlchemy
 class Base(DeclarativeBase):
     pass
 
-# Initialize engine with the refined DB_URL
 engine = create_engine(DB_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -153,7 +150,7 @@ LAYOUT_BASE = r"""<!doctype html>
         </a>
         <div class="flex items-center space-x-3">
           {% if user %}
-            <span class="text-sm text-gray-500">Hi, {{ user.email }}{% if user.is_admin %} (Admin){% endif %}</span>
+            <span class="text-sm text-gray-500">Hi, {{ user.email }}</span>
             <a href="/dashboard" class="text-sm px-3 py-1 bg-indigo-50 text-indigo-600 rounded">Dashboard</a>
             <a href="/logout" class="text-sm px-3 py-1 bg-gray-100 text-gray-600 rounded">Logout</a>
           {% else %}
@@ -175,31 +172,175 @@ LAYOUT_BASE = r"""<!doctype html>
 </html>
 """
 
+# REFINED SAAS LANDING PAGE TEMPLATE
 HOME_TEMPLATE = r"""
-<div class="max-w-2xl mx-auto bg-white rounded-xl shadow p-6">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-bold">Certified AI Website Audit</h1>
-    <img src="https://dummyimage.com/120x40/4f46e5/ffffff&text=FF+Tech" alt="FF Tech">
-  </div>
-  <p class="text-sm text-gray-600 mt-2">Run an instant audit or login to manage scheduled reports.</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FF Tech — AI Website Audit | International SaaS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .gradient { background: radial-gradient(1200px 400px at 10% 10%, rgba(79,70,229,0.1), transparent), linear-gradient(180deg, #ffffff, #f8fafc); }
+    .glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(6px); }
+    .badge-dot { width: .5rem; height: .5rem; border-radius: 100%; display:inline-block; margin-right:.35rem; }
+    .feature-card:hover { transform: translateY(-3px); border-color: #4f46e5; }
+  </style>
+</head>
+<body class="gradient text-gray-900">
 
-  <form method="post" action="/report" class="mt-6 space-y-4">
-    <div>
-      <label class="block text-sm font-medium text-gray-700">Website URL</label>
-      <input name="url" required placeholder="https://example.com" class="mt-1 w-full border rounded px-3 py-2 focus:ring focus:border-indigo-500">
+  <nav class="bg-white/80 glass border-b sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <a href="/" class="flex items-center gap-2">
+          <img src="https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech" alt="Logo" class="h-8">
+          <span class="text-xl font-bold text-indigo-700">AI Website Audit</span>
+        </a>
+        <div class="flex items-center gap-3">
+          {% if user %}
+            <a href="/dashboard" class="text-sm font-semibold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-lg">Dashboard</a>
+          {% else %}
+            <a href="/login" class="text-sm font-semibold text-gray-600">Login</a>
+            <a href="/register" class="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">Register</a>
+          {% endif %}
+        </div>
+      </div>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700">PSI Strategy</label>
-      <select name="psi_strategy" class="mt-1 w-full border rounded px-3 py-2">
-        <option value="mobile">mobile</option>
-        <option value="desktop">desktop</option>
-      </select>
-    </div>
-    <button class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">Run Audit</button>
-  </form>
+  </nav>
 
-  <p class="text-xs text-gray-400 mt-4">Tip: set <code>PSI_API_KEY</code> in env for Core Web Vitals & Lighthouse.</p>
-</div>
+  <header class="relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+        <div>
+          <span class="inline-flex items-center text-xs uppercase tracking-widest text-indigo-600 font-bold bg-indigo-50 px-2 py-1 rounded">
+            <i class="fas fa-shield-halved mr-2"></i> Certified AI Audit & Compliance
+          </span>
+          <h1 class="mt-3 text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
+            World-Class SaaS for Website Health, <span class="text-indigo-600">Security</span> & Performance
+          </h1>
+          <p class="mt-4 text-gray-600 text-lg">
+            Audit 45+ metrics across Security, SEO, Performance, Accessibility, UX & Compliance. 
+            Get daily emails, accumulated reports, and a certified grading—powered by FF Tech.
+          </p>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <span class="flex items-center text-xs text-gray-500"><span class="badge-dot bg-green-500"></span>Security headers</span>
+            <span class="flex items-center text-xs text-gray-500"><span class="badge-dot bg-blue-500"></span>Core Web Vitals</span>
+            <span class="flex items-center text-xs text-gray-500"><span class="badge-dot bg-amber-500"></span>Sitemap & Robots</span>
+          </div>
+          <div class="mt-8 flex gap-3">
+            <a href="#instant-audit" class="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200">
+              Run Free Audit
+            </a>
+            <a href="/register" class="px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition">
+              Create Account
+            </a>
+          </div>
+          <div class="mt-6 text-xs text-gray-400">
+            <i class="fas fa-lock mr-1"></i> Secure by design • International standards • Railway cloud-ready
+          </div>
+        </div>
+
+        <div class="relative">
+          <div class="bg-white shadow-2xl ring-1 ring-gray-100 rounded-3xl p-8 transform rotate-1">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-bold">Preview: Certified Report</h3>
+              <span class="text-xs text-indigo-600 font-bold uppercase tracking-widest">FF Tech</span>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center">
+              <div class="border rounded-2xl p-4 bg-indigo-50/50">
+                <div class="text-3xl font-black text-indigo-600">A+</div>
+                <div class="text-[10px] uppercase font-bold text-gray-400">Grade</div>
+              </div>
+              <div class="border rounded-2xl p-4">
+                <div class="text-2xl font-extrabold">92%</div>
+                <div class="text-[10px] uppercase font-bold text-gray-400">Health</div>
+              </div>
+              <div class="border rounded-2xl p-4">
+                <div class="text-2xl font-extrabold">45+</div>
+                <div class="text-[10px] uppercase font-bold text-gray-400">Metrics</div>
+              </div>
+            </div>
+            <div class="mt-6 bg-gray-50 border rounded-2xl p-5">
+              <div class="flex items-center justify-between text-sm mb-2">
+                <span class="text-gray-900 font-bold flex items-center"><i class="fas fa-brain text-indigo-500 mr-2"></i> Executive Summary</span>
+                <span class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">AI Verified</span>
+              </div>
+              <p class="text-gray-600 text-xs leading-relaxed italic">
+                "Security & Compliance posture is robust. Recommendation: enforce HSTS and optimize LCP images to reach 98% health score."
+              </p>
+            </div>
+          </div>
+          <div class="absolute -top-6 -right-6 bg-indigo-600 text-white rounded-full px-4 py-2 text-xs font-bold shadow-xl">
+            <i class="fas fa-certificate mr-1"></i> Official Report
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="instant-audit" class="py-12">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="bg-white rounded-3xl shadow-xl border border-indigo-50 p-8 lg:p-12">
+        <h2 class="text-2xl font-bold mb-6">Run an Instant Audit</h2>
+        <form method="post" action="/report" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Website URL</label>
+            <input name="url" type="url" required placeholder="https://example.com" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-indigo-500 outline-none transition font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">PSI Strategy</label>
+            <select name="psi_strategy" class="w-full border-2 border-gray-100 rounded-xl px-4 py-3 focus:border-indigo-500 outline-none transition font-medium">
+              <option value="mobile">Mobile</option>
+              <option value="desktop">Desktop</option>
+            </select>
+          </div>
+          <div class="md:col-span-3">
+            <button class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition transform hover:-translate-y-1">
+              <i class="fas fa-bolt mr-2 text-amber-400"></i> Start Audit Now
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-24">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-3xl font-extrabold text-gray-900">Enterprise Standards. Railway Cloud.</h2>
+        <p class="mt-4 text-gray-500">Comprehensive auditing across security, performance, and compliance.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-8 shadow-sm transition">
+          <i class="fas fa-shield-halved text-indigo-600 text-3xl mb-4"></i>
+          <h3 class="font-bold text-xl mb-2">Security & Compliance</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Automated checks for HSTS, CSP, Mixed Content, and GDPR/Cookie privacy policies.</p>
+        </div>
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-8 shadow-sm transition">
+          <i class="fas fa-gauge-high text-indigo-600 text-3xl mb-4"></i>
+          <h3 class="font-bold text-xl mb-2">Core Web Vitals</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Integration with Google PSI for LCP, CLS, and TBT analysis with strategy selection.</p>
+        </div>
+        <div class="feature-card bg-white border border-gray-100 rounded-2xl p-8 shadow-sm transition">
+          <i class="fas fa-file-invoice text-indigo-600 text-3xl mb-4"></i>
+          <h3 class="font-bold text-xl mb-2">Certified Reports</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Receive daily emails with health score trends and actionable executive summaries.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="py-12 border-t bg-white text-center">
+    <p class="text-sm text-gray-400">© <span id="year"></span> FF Tech Intelligence. Professional Diagnostic Certification.</p>
+  </footer>
+
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
 """
 
 AUTH_REGISTER_TEMPLATE = r"""
@@ -285,7 +426,7 @@ DASHBOARD_TEMPLATE = r"""
       <div class="mt-4 overflow-x-auto">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b text-gray-500 uppercase text-xs font-bold">
-            <tr><th class="px-3 py-2">Site</th><th class="px-3 py-2">Score</th><th class="px-3 py-2">Grade</th><th class="px-3 py-2">Date</th><th></th></tr>
+            <tr><th class="px-3 py-2 text-left">Site</th><th class="px-3 py-2 text-left">Score</th><th class="px-3 py-2 text-left">Grade</th><th class="px-3 py-2 text-left">Date</th><th></th></tr>
           </thead>
           <tbody class="divide-y">
           {% for a in audits %}
@@ -294,7 +435,7 @@ DASHBOARD_TEMPLATE = r"""
               <td class="px-3 py-2 font-mono">{{ a.overall_score }}</td>
               <td class="px-3 py-2">{{ a.grade }}</td>
               <td class="px-3 py-2">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td>
-              <td class="px-3 py-2 text-right"><a href="/report?id={{ a.id }}" class="text-indigo-600">View</a></td>
+              <td class="px-3 py-2 text-right"><a href="/report?id={{ a.id }}" class="text-indigo-600 font-bold hover:underline">View Report</a></td>
             </tr>
           {% endfor %}
           </tbody>
@@ -328,7 +469,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
         <div class="flex items-center space-x-3">
-          <img src="https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech+Certified" alt="FF Tech">
+          <img src="https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech+Certified" alt="FF Tech" class="h-8">
           <span class="text-2xl font-bold text-indigo-600"><i class="fas fa-robot"></i> {{ app_name }}</span>
         </div>
         <div class="flex space-x-4">
@@ -369,9 +510,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <span class="absolute inset-0 flex items-center justify-center text-3xl font-bold">{{ overall_score }}%</span>
         </div>
         <div class="mt-6 grid grid-cols-3 gap-4 w-full border-t pt-4">
-          <div><span class="block text-red-500 font-bold">{{ total_errors }}</span><span class="text-xs text-gray-400 uppercase">Errors</span></div>
-          <div><span class="block text-amber-500 font-bold">{{ total_warnings }}</span><span class="text-xs text-gray-400 uppercase">Warnings</span></div>
-          <div><span class="block text-blue-500 font-bold">{{ total_notices }}</span><span class="text-xs text-gray-400 uppercase">Notices</span></div>
+          <div><span class="block text-red-500 font-bold">{{ total_errors }}</span><span class="text-[10px] text-gray-400 uppercase font-bold">Errors</span></div>
+          <div><span class="block text-amber-500 font-bold">{{ total_warnings }}</span><span class="text-[10px] text-gray-400 uppercase font-bold">Warnings</span></div>
+          <div><span class="block text-blue-500 font-bold">{{ total_notices }}</span><span class="text-[10px] text-gray-400 uppercase font-bold">Notices</span></div>
         </div>
       </div>
 
@@ -409,7 +550,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="collapsible-content">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
-              <thead class="bg-gray-50 border-b text-gray-500 uppercase text-xs font-bold">
+              <thead class="bg-gray-50 border-b text-gray-500 uppercase text-[10px] font-bold">
                 <tr><th class="px-6 py-3">Metric Name</th><th class="px-6 py-3">Status</th><th class="px-6 py-3">Score</th><th class="px-6 py-3">Priority</th><th class="px-6 py-3">Impact / Recommendation</th></tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
@@ -418,23 +559,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                   <td class="px-6 py-4 font-semibold text-gray-700">{{ metric.name }}</td>
                   <td class="px-6 py-4">
                     {% if metric.status == 'Good' %}
-                      <span class="px-2 py-1 bg-green-100 text-green-700 rounded-md text-xs font-bold">Good</span>
+                      <span class="px-2 py-1 bg-green-100 text-green-700 rounded-md text-[10px] font-bold">Good</span>
                     {% elif metric.status == 'Warning' %}
-                      <span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-bold">Warning</span>
+                      <span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-md text-[10px] font-bold">Warning</span>
                     {% else %}
-                      <span class="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold">Critical</span>
+                      <span class="px-2 py-1 bg-red-100 text-red-700 rounded-md text-[10px] font-bold">Critical</span>
                     {% endif %}
                   </td>
-                  <td class="px-6 py-4 text-right pr-12 font-mono">{{ metric.score }}/100</td>
+                  <td class="px-6 py-4 text-right pr-12 font-mono text-xs">{{ metric.score }}/100</td>
                   <td class="px-6 py-4">
-                    <span class="flex items-center">
+                    <span class="flex items-center text-[10px] uppercase font-bold">
                       <span class="w-2 h-2 rounded-full mr-2 {% if metric.priority == 'High' %}bg-red-500{% elif metric.priority == 'Medium' %}bg-amber-500{% else %}bg-green-500{% endif %}"></span>
                       {{ metric.priority }}
                     </span>
                   </td>
                   <td class="px-6 py-4">
                     <div class="max-w-md">
-                      <p class="text-xs text-gray-400 mb-1 font-medium italic">Impact: {{ metric.impact }}</p>
+                      <p class="text-[10px] text-gray-400 mb-1 font-medium italic">Impact: {{ metric.impact }}</p>
                       <p class="text-gray-600 text-xs">{{ metric.recommendation }}</p>
                     </div>
                   </td>
@@ -727,7 +868,7 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
                     "og": og_present, "twitter": tw_present, "hreflang": hreflangs, "thin": thin
                 },
                 "ux": {"viewport": viewport, "nav_present": nav_present, "intrusive_popup": intrusive_popup,
-                       "lazy_img_count": lazy_img_count, "preload_count": preload_count},
+                        "lazy_img_count": lazy_img_count, "preload_count": preload_count},
                 "accessibility": {"alt_coverage_pct": alt_coverage_pct},
                 "performance": {"gzip_or_br": gzip_or_br, "cache_control": cache_control, "etag": h.get("etag", ""), "cc_cache_ok": cc_cache_ok},
                 "meta": {"charset": meta_charset},
@@ -994,7 +1135,7 @@ def require_admin(user: Optional[User]) -> User:
 # ------------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, user: Optional[User] = Depends(get_current_user)):
-    return render_page(user, env.from_string(HOME_TEMPLATE).render())
+    return render_page(user, env.from_string(HOME_TEMPLATE).render(user=user))
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request, user: Optional[User] = Depends(get_current_user)):
@@ -1063,7 +1204,7 @@ async def logout():
 async def dashboard(request: Request, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
     user = require_auth(user)
     sites = db.query(Site).filter(Site.user_id == user.id).all()
-    audits = db.query(Audit).join(Site).filter(Site.user_id == user.id).limit(20).all()
+    audits = db.query(Audit).join(Site).filter(Site.user_id == user.id).order_by(Audit.created_at.desc()).limit(20).all()
     return render_page(user, env.from_string(DASHBOARD_TEMPLATE).render(sites=sites, audits=audits))
 
 @app.post("/sites/add")
