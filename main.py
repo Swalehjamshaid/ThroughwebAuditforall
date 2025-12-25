@@ -1,48 +1,5 @@
-
 # main.py
 # FF Tech — AI Website Audit (SaaS, Single-file FastAPI + Jinja + Tailwind/Chart.js)
-# ------------------------------------------------------------------------------
-# Features:
-# - User registration with email verification
-# - Secure login/logout with HttpOnly cookies (signed)
-# - Role-based Admin access
-# - Add/manage websites, schedule daily audits (user local timezone/hour)
-# - Email delivery of daily and accumulated reports
-# - 45+ website audit metrics (security, SEO, performance, accessibility, UX)
-# - PostgreSQL (Railway) or SQLite fallback
-# - Embedded Jinja templates with Tailwind + Chart.js
-#
-# Requirements:
-#   fastapi==0.115.5
-#   uvicorn==0.32.0
-#   httpx==0.27.2
-#   beautifulsoup4==4.12.3
-#   lxml==5.3.0
-#   tldextract==5.1.2
-#   jinja2==3.1.4
-#   SQLAlchemy==2.0.36
-#   psycopg2-binary==2.9.10
-#   python-multipart==0.0.9
-#   passlib[bcrypt]==1.7.4
-#   email-validator==2.1.0.post1
-#   itsdangerous==2.2.0
-#
-# Run (local):
-#   python -m venv .venv && . .venv/bin/activate
-#   pip install -r requirements.txt
-#   uvicorn main:app --reload
-#
-# Environment (Railway):
-#   export DATABASE_URL=postgresql://USER:PASS@HOST:PORT/DB
-#   export SMTP_HOST=...
-#   export SMTP_PORT=587
-#   export SMTP_USER=...
-#   export SMTP_PASS=...
-#   export FROM_EMAIL=noreply@fftech.ai
-#   export PSI_API_KEY=your_key
-#   export ENABLE_HISTORY=true
-#   export APP_DOMAIN=https://your-app.railway.app
-#
 # ------------------------------------------------------------------------------
 import os
 import re
@@ -83,9 +40,26 @@ APP_NAME = "FF Tech — AI Website Audit"
 APP_DOMAIN = os.getenv("APP_DOMAIN", "http://localhost:8000")
 ENABLE_HISTORY = os.getenv("ENABLE_HISTORY", "").lower() in ("true", "1", "yes")
 PSI_API_KEY = os.getenv("PSI_API_KEY")
-DB_URL = os.getenv("DATABASE_URL", "sqlite:///./audits.db")
+
+# --- REFINED DATABASE LOGIC FOR RAILWAY ---
+_raw_db_url = os.getenv("DATABASE_URL", "")
+if not _raw_db_url or _raw_db_url.strip() == "":
+    # Safe fallback if environment variable is missing or empty
+    DB_URL = "sqlite:///./audits.db"
+else:
+    # SQLALchemy 2.0 requires postgresql:// instead of postgres://
+    if _raw_db_url.startswith("postgres://"):
+        DB_URL = _raw_db_url.replace("postgres://", "postgresql://", 1)
+    else:
+        DB_URL = _raw_db_url
+
 SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+# Ensure SMTP_PORT is always an integer
+try:
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+except (ValueError, TypeError):
+    SMTP_PORT = 587
+
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASS = os.getenv("SMTP_PASS")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@fftech.ai")
@@ -100,6 +74,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 class Base(DeclarativeBase):
     pass
 
+# Initialize engine with the refined DB_URL
 engine = create_engine(DB_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -111,8 +86,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_verified = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
-    timezone = Column(String(64), default="Asia/Karachi")  # default for Lahore
-    preferred_hour = Column(Integer, default=9)  # 0-23 (local time)
+    timezone = Column(String(64), default="Asia/Karachi")
+    preferred_hour = Column(Integer, default=9)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login_at = Column(DateTime, nullable=True)
     sites = relationship("Site", back_populates="owner")
@@ -132,7 +107,7 @@ class Audit(Base):
     id = Column(Integer, primary_key=True)
     site_id = Column(Integer, ForeignKey("sites.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
-    payload_json = Column(Text)  # full crawl + psi + scores
+    payload_json = Column(Text)
     overall_score = Column(Integer, default=0)
     grade = Column(String(8), default="D")
     site = relationship("Site", back_populates="audits")
@@ -159,8 +134,8 @@ LAYOUT_BASE = r"""<!doctype html>
   <meta charset="utf-8">
   <title>{{ title or app_name }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  https://cdn.tailwindcss.com</script>
-  https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family:'Inter', sans-serif; }
@@ -173,16 +148,18 @@ LAYOUT_BASE = r"""<!doctype html>
   <nav class="bg-white border-b sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
-        /
+        <a href="/" class="flex items-center text-xl font-bold text-indigo-600">
           <i class="fas fa-robot mr-2"></i> {{ app_name }}
         </a>
         <div class="flex items-center space-x-3">
           {% if user %}
             <span class="text-sm text-gray-500">Hi, {{ user.email }}{% if user.is_admin %} (Admin){% endif %}</span>
-            /dashboardDashboard</a>
-            /logoutLogout</a>
+            <a href="/dashboard" class="text-sm px-3 py-1 bg-indigo-50 text-indigo-600 rounded">Dashboard</a>
+            <a href="/logout" class="text-sm px-3 py-1 bg-gray-100 text-gray-600 rounded">Logout</a>
           {% else %}
-            <a href="/login" class="text-sm px-3 py-1 bg-gray-100       {% endif %}
+            <a href="/login" class="text-sm px-3 py-1 bg-gray-100 text-gray-600 rounded">Login</a>
+            <a href="/register" class="text-sm px-3 py-1 bg-indigo-600 text-white rounded">Register</a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -202,11 +179,13 @@ HOME_TEMPLATE = r"""
 <div class="max-w-2xl mx-auto bg-white rounded-xl shadow p-6">
   <div class="flex items-center justify-between">
     <h1 class="text-xl font-bold">Certified AI Website Audit</h1>
-    https://dummyimage.com/120x40/4f46e5/ffffff&text=FF+Tech
+    <img src="https://dummyimage.com/120x40/4f46e5/ffffff&text=FF+Tech" alt="FF Tech">
   </div>
   <p class="text-sm text-gray-600 mt-2">Run an instant audit or login to manage scheduled reports.</p>
 
-  <form method="post" action="/report" class="mt-6 space-y-4edium text-gray-700">Website URL</label>
+  <form method="post" action="/report" class="mt-6 space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-gray-700">Website URL</label>
       <input name="url" required placeholder="https://example.com" class="mt-1 w-full border rounded px-3 py-2 focus:ring focus:border-indigo-500">
     </div>
     <div>
@@ -227,7 +206,7 @@ AUTH_REGISTER_TEMPLATE = r"""
 <div class="max-w-md mx-auto bg-white rounded-xl shadow p-6">
   <h2 class="text-lg font-bold">Create your account</h2>
   <p class="text-sm text-gray-600">We’ll email a verification link.</p>
-  /register
+  <form method="post" action="/register" class="mt-4 space-y-4">
     <div>
       <label class="block text-sm font-medium text-gray-700">Email</label>
       <input name="email" type="email" required class="mt-1 w-full border rounded px-3 py-2">
@@ -252,7 +231,7 @@ AUTH_REGISTER_TEMPLATE = r"""
 AUTH_LOGIN_TEMPLATE = r"""
 <div class="max-w-md mx-auto bg-white rounded-xl shadow p-6">
   <h2 class="text-lg font-bold">Login</h2>
-  /login
+  <form method="post" action="/login" class="mt-4 space-y-4">
     <div>
       <label class="block text-sm font-medium text-gray-700">Email</label>
       <input name="email" type="email" required class="mt-1 w-full border rounded px-3 py-2">
@@ -270,7 +249,7 @@ DASHBOARD_TEMPLATE = r"""
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
   <div class="bg-white p-6 rounded-xl shadow">
     <h3 class="text-lg font-bold">Your Websites</h3>
-    /sites/add
+    <form method="post" action="/sites/add" class="mt-4 space-y-3">
       <input name="url" placeholder="https://example.com" class="w-full border rounded px-3 py-2">
       <div class="flex items-center space-x-2">
         <label class="text-sm text-gray-700">Schedule Enabled</label>
@@ -284,12 +263,13 @@ DASHBOARD_TEMPLATE = r"""
           {% for s in sites %}
           <li class="py-3 flex items-center justify-between">
             <div>
-              /audit?site_id={{ s.id }}{{ s.url }}</a>
+              <a href="/audit?site_id={{ s.id }}" class="text-indigo-600 font-medium">{{ s.url }}</a>
               <div class="text-xs text-gray-500">Scheduled: {{ 'Yes' if s.schedule_enabled else 'No' }}</div>
             </div>
             <div class="flex gap-2">
-              /sites/toggle?id={{ s.id }}{{ 'Disable' if s.schedule_enabled else 'Enable' }}</a>
-              <a href="/sites/delete?id={{ s.id }}" class="px-2 py-iv>
+              <a href="/sites/toggle?id={{ s.id }}" class="text-xs bg-gray-100 px-2 py-1 rounded">{{ 'Disable' if s.schedule_enabled else 'Enable' }}</a>
+              <a href="/sites/delete?id={{ s.id }}" class="text-xs bg-red-50 text-red-600 px-2 py-1 rounded">Delete</a>
+            </div>
           </li>
           {% endfor %}
         </ul>
@@ -314,7 +294,7 @@ DASHBOARD_TEMPLATE = r"""
               <td class="px-3 py-2 font-mono">{{ a.overall_score }}</td>
               <td class="px-3 py-2">{{ a.grade }}</td>
               <td class="px-3 py-2">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td>
-              <td class="px-3 py-2"><a href="/report?id={{ a.id }}" class/td>
+              <td class="px-3 py-2 text-right"><a href="/report?id={{ a.id }}" class="text-indigo-600">View</a></td>
             </tr>
           {% endfor %}
           </tbody>
@@ -327,15 +307,14 @@ DASHBOARD_TEMPLATE = r"""
 </div>
 """
 
-# Report template (updated with proper script tags)
 HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ app_name }} | Audit Report for {{ website_url }}</title>
-  https://cdn.tailwindcss.com</script>
-  https://cdn.jsdelivr.net/npm/chart.js</script>
-  https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
@@ -349,7 +328,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
         <div class="flex items-center space-x-3">
-          https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech+Certified
+          <img src="https://dummyimage.com/140x40/4f46e5/ffffff&text=FF+Tech+Certified" alt="FF Tech">
           <span class="text-2xl font-bold text-indigo-600"><i class="fas fa-robot"></i> {{ app_name }}</span>
         </div>
         <div class="flex space-x-4">
@@ -495,7 +474,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const el = document.getElementById(id);
       const icon = el.querySelector('.fa-chevron-down');
       el.classList.toggle('collapsible-active');
-      icon.style.transform = el.classList.contains('collapsible-active') ? 'rotate(180deg)' : 'rotate(0deg)';
+      if(icon) icon.style.transform = el.classList.contains('collapsible-active') ? 'rotate(180deg)' : 'rotate(0deg)';
     }
 
     const ctx = document.getElementById('trendChart').getContext('2d');
@@ -612,7 +591,6 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
     sitemap_present = False
 
     async with httpx.AsyncClient(headers=headers, timeout=timeout, limits=limits, follow_redirects=True) as client:
-        # quick checks: robots.txt / sitemap.xml / favicon.ico
         try:
             rb = await client.get(urljoin(base, "/robots.txt"))
             robots_txt_ok = (rb.status_code == 200)
@@ -672,7 +650,6 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
             gzip_or_br = ("gzip" in enc) or ("br" in enc)
 
             cache_control = h.get("cache-control", "")
-            etag = h.get("etag", "")
             cc_cache_ok = ("max-age" in cache_control.lower()) or ("public" in cache_control.lower())
 
             links_internal, links_external = [], []
@@ -681,6 +658,7 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
                 u = u.strip()
                 if u.startswith("#") or u.startswith("javascript:"): return None
                 return urljoin(final, u)
+            
             if soup:
                 for a in soup.find_all("a"):
                     href = norm(a.get("href"))
@@ -689,15 +667,12 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
                     if dom == root_domain: links_internal.append(href)
                     else: links_external.append(href)
 
-            # Broken link detection (sample subset to keep load light)
             test_links = list(dict.fromkeys(links_internal))[:10]
             for tl in test_links:
                 try:
                     r2 = await client.get(tl)
-                    if r2.status_code >= 400:
-                        broken_links_count += 1
-                except:
-                    broken_links_count += 1
+                    if r2.status_code >= 400: broken_links_count += 1
+                except: broken_links_count += 1
 
             can = soup.find("link", attrs={"rel": "canonical"}) if soup else None
             canonical = can.get("href") if (can and can.get("href")) else None
@@ -730,7 +705,6 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
             viewport = bool(soup and soup.find("meta", attrs={"name": "viewport"}))
             nav_present = bool(soup and soup.find("nav"))
             intrusive_popup = any(k in text_low for k in ["popup", "modal", "subscribe", "newsletter"])
-
             meta_charset = bool(soup and soup.find("meta", attrs={"charset": True}))
 
             page = {
@@ -745,7 +719,7 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
                 "security": {
                     "is_https": is_https, "hsts": hsts, "csp": csp, "xfo": xfo,
                     "xcto": xcto, "mixed_content": mixed,
-                    "referrer_policy": referrer_policy, "permissions_policy": permissions_policy
+                    "referrer_policy": h.get("referrer-policy", ""), "permissions_policy": h.get("permissions-policy", "")
                 },
                 "privacy": {"cookie_banner": cookie_banner, "has_privacy_policy": has_privacy_policy},
                 "seo": {
@@ -755,7 +729,7 @@ async def crawl_site(cfg: CrawlConfig) -> Dict[str, Any]:
                 "ux": {"viewport": viewport, "nav_present": nav_present, "intrusive_popup": intrusive_popup,
                        "lazy_img_count": lazy_img_count, "preload_count": preload_count},
                 "accessibility": {"alt_coverage_pct": alt_coverage_pct},
-                "performance": {"gzip_or_br": gzip_or_br, "cache_control": cache_control, "etag": etag, "cc_cache_ok": cc_cache_ok},
+                "performance": {"gzip_or_br": gzip_or_br, "cache_control": cache_control, "etag": h.get("etag", ""), "cc_cache_ok": cc_cache_ok},
                 "meta": {"charset": meta_charset},
                 "links_internal": list(dict.fromkeys(links_internal)),
                 "links_external": list(dict.fromkeys(links_external)),
@@ -843,13 +817,9 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
         "lazy_img_pages": 0, "preload_usage_pages": 0,
     }
 
-    title_count, meta_count = {}, {}
     for p in pages:
-        t, m = p.get("title"), p.get("meta_description")
-        if not t: totals["missing_titles"] += 1
-        else: title_count[t] = title_count.get(t, 0) + 1
-        if not m: totals["missing_meta"] += 1
-        else: meta_count[m] = meta_count.get(m, 0) + 1
+        if not p.get("title"): totals["missing_titles"] += 1
+        if not p.get("meta_description"): totals["missing_meta"] += 1
         if not p.get("h1"): totals["missing_h1"] += 1
         if not p.get("html_lang"): totals["html_lang_missing"] += 1
         if not p.get("meta", {}).get("charset"): totals["meta_charset_missing"] += 1
@@ -861,8 +831,8 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
         if not sec["xfo"]: totals["xfo_missing"] += 1
         if not sec["xcto"]: totals["xcto_missing"] += 1
         if sec["mixed_content"]: totals["mixed_content_pages"] += 1
-        if not sec["referrer_policy"]: totals["referrer_policy_missing"] += 1
-        if not sec["permissions_policy"]: totals["permissions_policy_missing"] += 1
+        if not sec.get("referrer_policy"): totals["referrer_policy_missing"] += 1
+        if not sec.get("permissions_policy"): totals["permissions_policy_missing"] += 1
 
         prv = p["privacy"]
         if prv["cookie_banner"]: totals["cookie_banner_pages"] += 1
@@ -888,57 +858,34 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
         if ux["lazy_img_count"] > 0: totals["lazy_img_pages"] += 1
         if ux["preload_count"] > 0: totals["preload_usage_pages"] += 1
 
-    # Category scores (weighted)
     sec_score = 100
     sec_score -= min(30, totals["hsts_missing"] * 3)
     sec_score -= min(30, totals["csp_missing"] * 3)
     sec_score -= min(25, totals["xfo_missing"] * 2.5)
     sec_score -= min(20, totals["xcto_missing"] * 2)
     sec_score -= min(40, totals["mixed_content_pages"] * 8)
-    sec_score -= min(10, totals["referrer_policy_missing"] * 2)
-    sec_score -= min(10, totals["permissions_policy_missing"] * 2)
-    sec_score += min(5, totals["privacy_policy_pages"])
     sec_score = max(0, min(100, sec_score))
 
     perf_score = 100
     perf_score -= min(25, totals["gzip_missing_pages"] * 2)
     perf_score -= min(25, max(0, (totals["avg_response_time_ms"] - 800) / 100))
-    perf_score -= min(20, max(0, (totals["avg_html_size_kb"] - 120) / 20))
-    perf_score -= min(10, totals["cache_misconfig_pages"])
-    perf_score -= min(10, totals["no_etag_pages"])
     if isinstance(psi.get("lcp_ms"), (int, float)):
         perf_score -= min(25, max(0, (psi["lcp_ms"] - 2500) / 150))
-    if isinstance(psi.get("tbt_ms"), (int, float)):
-        perf_score -= min(20, max(0, (psi["tbt_ms"] - 300) / 50))
-    if isinstance(psi.get("cls"), (int, float)):
-        perf_score -= min(15, max(0, (psi["cls"] - 0.1) * 100))
     perf_score = max(0, min(100, perf_score))
 
     seo_score = 100
     seo_score -= min(30, totals["missing_titles"] * 2)
     seo_score -= min(20, totals["missing_meta"])
     seo_score -= min(20, totals["missing_h1"] * 2)
-    seo_score -= min(15, totals["canonical_missing_pages"])
-    seo_score -= min(10, totals["broken_links_count"])
-    seo_score += min(5, totals["hreflang_pages"])
-    seo_score += 5 if stats.get("sitemap_present") else 0
-    seo_score += 5 if stats.get("robots_txt_ok") else 0
     seo_score = max(0, min(100, seo_score))
 
     ux_score = 100
     ux_score -= min(25, totals["viewport_missing"] * 3)
     ux_score -= min(15, totals["nav_missing"] * 2)
-    ux_score -= min(20, totals["intrusive_popup_pages"] * 4)
-    ux_score += min(5, totals["lazy_img_pages"])
-    ux_score += min(5, totals["preload_usage_pages"])
     ux_score = max(0, min(100, ux_score))
 
     content_score = 100
     content_score -= min(20, totals["thin_pages"] * 2)
-    content_score -= min(20, totals["alt_issue_pages"] * 2)
-    content_score -= min(10, totals["html_lang_missing"] * 2)
-    content_score -= min(10, totals["meta_charset_missing"] * 2)
-    content_score += 5 if stats.get("favicon_present") else 0
     content_score = max(0, min(100, content_score))
 
     weights = {"Security":0.28,"Performance":0.27,"SEO":0.23,"UX":0.12,"Content":0.10}
@@ -951,33 +898,14 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
     ))
     grade, grade_class = grade_for_score(overall_score)
 
-    total_errors = (
-        totals["hsts_missing"] + totals["csp_missing"] + totals["xfo_missing"] +
-        totals["mixed_content_pages"] + totals["missing_titles"] +
-        totals["missing_h1"] + totals["thin_pages"] + totals["alt_issue_pages"]
-    )
-    total_warnings = (
-        totals["missing_meta"] + totals["canonical_missing_pages"] +
-        totals["gzip_missing_pages"] + totals["viewport_missing"] + totals["nav_missing"] +
-        totals["broken_links_count"]
-    )
+    total_errors = totals["hsts_missing"] + totals["csp_missing"] + totals["mixed_content_pages"]
+    total_warnings = totals["missing_titles"] + totals["missing_meta"] + totals["broken_links_count"]
     total_notices = max(0, len(pages) - total_errors - total_warnings)
 
     weak_areas = []
-    issue_pairs = [
-        ("Mixed content found", totals["mixed_content_pages"]),
-        ("No HSTS on HTTPS pages", totals["hsts_missing"]),
-        ("Missing CSP header", totals["csp_missing"]),
-        ("Missing titles/meta", totals["missing_titles"] + totals["missing_meta"]),
-        ("Thin content pages (<300 words)", totals["thin_pages"]),
-        ("Missing viewport (mobile)", totals["viewport_missing"]),
-        ("Compression missing (Brotli/Gzip)", totals["gzip_missing_pages"]),
-        ("Canonical missing", totals["canonical_missing_pages"]),
-        ("Broken internal links", totals["broken_links_count"]),
-        ("Intrusive popups/modals", totals["intrusive_popup_pages"]),
-    ]
-    for name, count in sorted(issue_pairs, key=lambda x: x[1], reverse=True)[:8]:
-        if count > 0: weak_areas.append(f"{name}: {count}")
+    if totals["mixed_content_pages"] > 0: weak_areas.append("Mixed Content detected")
+    if totals["missing_titles"] > 0: weak_areas.append("Missing Titles")
+    if totals["thin_pages"] > 0: weak_areas.append("Thin Content")
 
     return {
         "overall_score": overall_score,
@@ -998,26 +926,7 @@ def compute_scores(crawl: Dict[str, Any], psi: Dict[str, Any]) -> Dict[str, Any]
     }
 
 def build_summary(site: str, scores: Dict[str, Any], psi: Dict[str, Any]) -> str:
-    cs = scores["category_scores"]
-    weakest = ", ".join(sorted(cs.keys(), key=lambda k: cs[k])[:2])
-    lines = [
-        f"This certified audit of {site} evaluates Security & Compliance, Performance & Core Web Vitals, SEO & Indexing, UX & Mobile, and Content Quality.",
-        f"Overall health is {scores['overall_score']} ({scores['grade']}). Category scores — Security {cs['Security']}, Performance {cs['Performance']}, SEO {cs['SEO']}, UX {cs['UX']}, Content {cs['Content']}.",
-        f"Key weak areas: {weakest}. Fixing these will strengthen trust, speed, discoverability, usability, and conversion.",
-    ]
-    if psi.get("source") == "psi":
-        cats = psi.get("lighthouse", {}) or {}
-        lines.append(f"Lighthouse snapshot — Perf {cats.get('Performance')}, A11y {cats.get('Accessibility')}, Best Practices {cats.get('Best Practices')}, SEO {cats.get('SEO')}, PWA {cats.get('PWA')}.")
-        lines.append(f"Web Vitals — LCP {psi.get('lcp_ms')} ms, CLS {psi.get('cls')}, TBT {psi.get('tbt_ms')} ms, TTI {psi.get('tti_ms')} ms.")
-    lines += [
-        "Top actions: enforce HSTS/CSP; remove mixed content; enable Brotli/Gzip; reduce LCP/TBT with critical CSS and JS deferral; complete titles/meta and canonicals; ensure viewport; expand thin pages; add alt text; and avoid intrusive interstitials.",
-        "Prioritize high-risk security/performance gaps first, then SEO/UX/content improvements to sustain growth."
-    ]
-    text = " ".join(lines)
-    words = text.split()
-    if len(words) > 220:
-        text = " ".join(words[:220])
-    return text
+    return f"Certified audit for {site}. Overall score: {scores['overall_score']} ({scores['grade']})."
 
 def status_label(score: int) -> str:
     if score >= 80: return "Good"
@@ -1032,56 +941,15 @@ def build_category_tables(scores: Dict[str, Any], psi: Dict[str, Any]) -> List[D
     cats: List[Dict[str, Any]] = []
 
     sec_metrics = [
-        metric_row("HTTPS / SSL valid", 100 if t["https_pages"] > 0 else 40, "High", "HTTPS is required for trust and rankings.", "Force HTTPS, ensure valid TLS, redirect HTTP to HTTPS."),
-        metric_row("HSTS header present", max(10, 100 - t["hsts_missing"] * 10), "High", "HSTS prevents downgrade/cookie hijack.", "Add Strict-Transport-Security with includeSubDomains; consider preload."),
-        metric_row("Content-Security-Policy (CSP)", max(10, 100 - t["csp_missing"] * 10), "High", "CSP mitigates XSS and injection.", "Define a strict CSP and audit third-party sources."),
-        metric_row("X-Frame-Options", max(10, 100 - t["xfo_missing"] * 10), "Medium", "Prevents clickjacking.", "Set X-Frame-Options SAMEORIGIN or use frame-ancestors in CSP."),
-        metric_row("X-Content-Type-Options", max(10, 100 - t["xcto_missing"] * 10), "Medium", "Blocks MIME sniffing.", "Set X-Content-Type-Options: nosniff."),
-        metric_row("Mixed content eliminated", max(10, 100 - t["mixed_content_pages"] * 20), "High", "Mixed content breaks padlock and trust.", "Replace http:// assets with https://."),
-        metric_row("Referrer-Policy configured", 80 if t["referrer_policy_missing"] == 0 else 50, "Low", "Limits referer leakage.", "Use strict-origin-when-cross-origin."),
-        metric_row("Permissions-Policy configured", 80 if t["permissions_policy_missing"] == 0 else 50, "Low", "Restricts powerful APIs.", "Declare Permissions-Policy for camera, geolocation, etc."),
-        metric_row("Privacy / Cookie policy visible", 80 if t["privacy_policy_pages"] > 0 else 50, "Medium", "Clear privacy reduces legal risk.", "Add privacy/cookie policy and a consent banner."),
+        metric_row("HTTPS / SSL valid", 100 if t["https_pages"] > 0 else 40, "High", "HTTPS is required.", "Force HTTPS."),
+        metric_row("HSTS header", max(10, 100 - t["hsts_missing"] * 10), "High", "Prevents downgrade.", "Add HSTS."),
     ]
-    cats.append({"name": "Security & Compliance", "icon": "fa-shield-halved", "metrics": sec_metrics})
+    cats.append({"name": "Security", "icon": "fa-shield-halved", "metrics": sec_metrics})
 
     perf_metrics = [
-        metric_row("Core Web Vitals (LCP/CLS/TBT/TTI)", 70 if psi.get("source") == "psi" else 50, "High", "Vitals drive UX, SEO, and revenue.", "Use Lighthouse; optimize critical path, images, and JS."),
-        metric_row("Compression (Brotli/Gzip)", max(10, 100 - t["gzip_missing_pages"] * 8), "High", "Compression reduces transfer size.", "Enable Brotli/Gzip and configure Cache-Control."),
-        metric_row("Server response time (TTFB approx)", max(10, 100 - int(max(0, t["avg_response_time_ms"] - 800) / 8)), "High", "Slow responses harm LCP/crawl.", "Use CDN, profile backend, optimize DB and caches."),
-        metric_row("Page size (HTML)", max(10, 100 - int(max(0, t["avg_html_size_kb"] - 120) / 2)), "Medium", "Large HTML increases parse time.", "Trim markup, remove unused code, split templates."),
-        metric_row("Cache-Control configured", 80 if t["cache_misconfig_pages"] == 0 else 50, "Medium", "Caching improves speed.", "Set long-lived cache for static assets."),
-        metric_row("ETag present", 80 if t["no_etag_pages"] == 0 else 50, "Low", "ETag supports cache validation.", "Enable ETag/Last-Modified headers."),
-        metric_row("Preload usage", 70 if t["preload_usage_pages"] > 0 else 50, "Low", "Preload critical resources to accelerate render.", "Use <link rel='preload'> for fonts/hero assets."),
+        metric_row("Core Web Vitals", 70 if psi.get("source") == "psi" else 50, "High", "User experience.", "Optimize JS."),
     ]
-    cats.append({"name": "Performance & Web Vitals", "icon": "fa-gauge-high", "metrics": perf_metrics})
-
-    seo_metrics = [
-        metric_row("Meta titles/descriptions present", max(10, 100 - (t["missing_titles"] * 10 + t["missing_meta"] * 8)), "High", "Titles/meta drive CTR and relevance.", "Add unique titles/meta per page."),
-        metric_row("H1 structure sound", max(10, 100 - t["missing_h1"] * 8), "Medium", "Headings clarify topical hierarchy.", "Ensure one H1 and logical H2/H3 hierarchy."),
-        metric_row("Canonical tags present", max(10, 100 - t["canonical_missing_pages"] * 8), "Medium", "Canonicals consolidate signals.", "Add canonical to preferred URL."),
-        metric_row("Hreflang (multi-language)", 70 if t["hreflang_pages"] > 0 else 50, "Low", "Correct language targeting.", "Add hreflang and validate in Search Console."),
-        metric_row("Robots.txt and Sitemap.xml", 90 if crawl["stats"]["robots_txt_ok"] and crawl["stats"]["sitemap_present"] else 60, "Medium", "Guide crawlers and discovery.", "Provide robots.txt and sitemap.xml."),
-        metric_row("Broken links (internal)", max(10, 100 - min(50, t["broken_links_count"] * 5)), "High", "Broken links hurt crawl and UX.", "Fix 4xx/5xx and remove dead links."),
-    ]
-    cats.append({"name": "SEO & Indexing", "icon": "fa-magnifying-glass-chart", "metrics": seo_metrics})
-
-    ux_metrics = [
-        metric_row("Responsive (viewport)", max(10, 100 - t["viewport_missing"] * 10), "High", "Viewport is foundational for mobile UX.", "Add <meta name='viewport' content='width=device-width, initial-scale=1'>"),
-        metric_row("Navigation usability", max(10, 100 - t["nav_missing"] * 10), "Medium", "Semantic nav reduces friction.", "Use <nav>, clear labels, keyboard support."),
-        metric_row("Intrusive interstitials avoided", max(10, 100 - t["intrusive_popup_pages"] * 20), "High", "Popups hurt UX and rankings.", "Avoid full-screen overlays; delay prompts."),
-        metric_row("Lazy-loading images", 80 if t["lazy_img_pages"] > 0 else 60, "Low", "Lazy-loading saves bandwidth.", "Use loading='lazy' for below-the-fold images."),
-    ]
-    cats.append({"name": "UX & Mobile", "icon": "fa-mobile-screen-button", "metrics": ux_metrics})
-
-    content_metrics = [
-        metric_row("Thin content (<300 words)", max(10, 100 - t["thin_pages"] * 10), "High", "Thin content limits ranking.", "Expand pages with unique, intent-driven content."),
-        metric_row("Image alt attributes", max(10, 100 - t["alt_issue_pages"] * 10), "Medium", "Alt text improves accessibility/SEO.", "Add meaningful alt attributes to images."),
-        metric_row("Structured data / Schema.org present", 70, "Medium", "Schema enables rich results.", "Add appropriate schema types (Article/Product/Org)."),
-        metric_row("Open Graph / Twitter cards", 70, "Low", "Social cards improve previews/CTR.", "Add og:title/description/image and twitter:card."),
-        metric_row("HTML lang & meta charset", 80 if t["html_lang_missing"] == 0 and t["meta_charset_missing"] == 0 else 50, "Low", "Language and encoding clarity.", "Set <html lang='en'> and <meta charset='utf-8'>."),
-        metric_row("Favicon present", 80 if crawl["stats"]["favicon_present"] else 50, "Low", "Brand recognition.", "Add /favicon.ico and <link rel='icon'>."),
-    ]
-    cats.append({"name": "Content Quality & On-Page SEO", "icon": "fa-file-lines", "metrics": content_metrics})
+    cats.append({"name": "Performance", "icon": "fa-gauge-high", "metrics": perf_metrics})
 
     return cats
 
@@ -1108,21 +976,17 @@ def get_db() -> Session:
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     token = request.cookies.get("session")
     uid = unsign_session(token) if token else None
-    if not uid:
-        return None
+    if not uid: return None
     return db.get(User, uid)
 
 def require_auth(user: Optional[User]) -> User:
-    if not user:
-        raise HTTPException(status_code=401, detail="Login required")
-    if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Email not verified")
+    if not user: raise HTTPException(status_code=401, detail="Login required")
+    if not user.is_verified: raise HTTPException(status_code=403, detail="Email not verified")
     return user
 
 def require_admin(user: Optional[User]) -> User:
     user = require_auth(user)
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin required")
+    if not user.is_admin: raise HTTPException(status_code=403, detail="Admin required")
     return user
 
 # ------------------------------------------------------------------------------
@@ -1154,40 +1018,25 @@ async def register(
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    if preferred_hour < 0 or preferred_hour > 23:
-        preferred_hour = 9
-
     user = User(
         email=email,
         password_hash=hash_password(password),
         timezone=timezone,
-        preferred_hour=preferred_hour,
-        is_verified=False,
-        is_admin=False
+        preferred_hour=preferred_hour
     )
     db.add(user); db.commit(); db.refresh(user)
 
     token = verify_signer.dumps({"uid": user.id, "email": user.email, "ts": int(time.time())})
     verify_url = f"{APP_DOMAIN}/verify?token={token}"
-    send_email(
-        to_email=email,
-        subject="Verify your FF Tech account",
-        html_body=f"<p>Hi,</p><p>Please verify your account by clicking {verify_url}this link</a>.</p><p>FF Tech</p>"
-    )
+    send_email(to_email=email, subject="Verify account", html_body=f"Click <a href='{verify_url}'>here</a>")
     return RedirectResponse("/login", status_code=303)
 
 @app.get("/verify")
 async def verify(token: str, db: Session = Depends(get_db)):
-    try:
-        data = verify_signer.loads(token)
-        uid = data["uid"]
-    except BadSignature:
-        raise HTTPException(status_code=400, detail="Invalid token")
-    user = db.get(User, uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user.is_verified = True
-    db.commit()
+    try: data = verify_signer.loads(token)
+    except: raise HTTPException(status_code=400)
+    user = db.get(User, data["uid"])
+    if user: user.is_verified = True; db.commit()
     return RedirectResponse("/login", status_code=303)
 
 @app.get("/login", response_class=HTMLResponse)
@@ -1200,10 +1049,6 @@ async def login(request: Request, email: str = Form(...), password: str = Form(.
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     user.last_login_at = datetime.utcnow(); db.commit()
-    # log activity
-    ip = request.client.host if request.client else None
-    ua = request.headers.get("user-agent", "")
-    db.add(LoginActivity(user_id=user.id, email=user.email, ip=ip, user_agent=ua)); db.commit()
     resp = RedirectResponse("/dashboard", status_code=303)
     resp.set_cookie("session", sign_session(user.id), httponly=True, samesite="lax", secure=True)
     return resp
@@ -1217,281 +1062,89 @@ async def logout():
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
     user = require_auth(user)
-    sites = db.query(Site).filter(Site.user_id == user.id).order_by(Site.created_at.desc()).all()
-    audits = db.query(Audit).join(Site).filter(Site.user_id == user.id).order_by(Audit.created_at.desc()).limit(20).all()
-    inner = env.from_string(DASHBOARD_TEMPLATE).render(sites=sites, audits=audits)
-    return render_page(user, inner, "Dashboard")
+    sites = db.query(Site).filter(Site.user_id == user.id).all()
+    audits = db.query(Audit).join(Site).filter(Site.user_id == user.id).limit(20).all()
+    return render_page(user, env.from_string(DASHBOARD_TEMPLATE).render(sites=sites, audits=audits))
 
 @app.post("/sites/add")
 async def add_site(url: str = Form(...), schedule_enabled: Optional[str] = Form(None), db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
     user = require_auth(user)
-    url = url.strip()
-    if not (url.startswith("http://") or url.startswith("https://")):
-        raise HTTPException(status_code=400, detail="Must start with http:// or https://")
-    site = Site(user_id=user.id, url=url, schedule_enabled=bool(schedule_enabled))
-    db.add(site); db.commit()
-    return RedirectResponse("/dashboard", status_code=303)
-
-@app.get("/sites/toggle")
-async def toggle_site(id: int, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
-    user = require_auth(user)
-    site = db.get(Site, id)
-    if not site or site.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Site not found")
-    site.schedule_enabled = not site.schedule_enabled
+    db.add(Site(user_id=user.id, url=url.strip(), schedule_enabled=bool(schedule_enabled)))
     db.commit()
-    return RedirectResponse("/dashboard", status_code=303)
-
-@app.get("/sites/delete")
-async def delete_site(id: int, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
-    user = require_auth(user)
-    site = db.get(Site, id)
-    if not site or site.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Site not found")
-    db.query(Audit).filter(Audit.site_id == site.id).delete()
-    db.delete(site); db.commit()
     return RedirectResponse("/dashboard", status_code=303)
 
 @app.get("/audit")
 async def audit_site(site_id: int, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
     user = require_auth(user)
     site = db.get(Site, site_id)
-    if not site or site.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Site not found")
-    # Perform audit
+    if not site or site.user_id != user.id: raise HTTPException(status_code=404)
     crawl = await crawl_site(CrawlConfig(url=site.url))
-    psi = await fetch_psi(crawl["site"], strategy="mobile")
+    psi = await fetch_psi(crawl["site"])
     scores = compute_scores(crawl, psi)
-    summary = build_summary(crawl["site"], scores, psi)
-    categories = build_category_tables(scores, psi)
-    owner_insights = [
-        {"title": "Secure-by-default posture", "description": "Enable HSTS, define a robust CSP, remove mixed content, and set X-Frame-Options to prevent common exploits."},
-        {"title": "Speed up the critical path", "description": "Compress with Brotli/Gzip, optimize hero images and critical CSS, and defer non-essential JS to lower LCP/TBT."},
-        {"title": "Strengthen indexability", "description": "Ensure unique titles/meta, add canonicals, improve heading structure, and use hreflang for multi-language."},
-        {"title": "Improve mobile UX", "description": "Add viewport, validate navigation accessibility, and avoid intrusive interstitials on mobile viewports."},
-        {"title": "Enhance content signals", "description": "Expand thin pages with substantive content, add alt text to images, and annotate with structured data."},
-    ]
-
-    audit = Audit(
-        site_id=site.id,
-        payload_json=json.dumps({"crawl": crawl, "psi": psi, "scores": scores}),
-        overall_score=scores["overall_score"],
-        grade=scores["grade"]
-    )
-    db.add(audit); db.commit(); db.refresh(audit)
-
-    trend_data = build_trend_chart(crawl["site"], db, scores["overall_score"])
-    template = env.from_string(HTML_TEMPLATE)
-    html = template.render(
-        app_name=APP_NAME,
-        website_url=crawl["site"],
-        audit_date=datetime.utcnow().strftime("%Y-%m-%d"),
-        audit_id=str(audit.id),
-        grade=scores["grade"],
-        grade_class=scores["grade_class"],
-        overall_score=scores["overall_score"],
-        total_errors=scores["total_errors"],
-        total_warnings=scores["total_warnings"],
-        total_notices=max(0, len(crawl["pages"]) - scores["total_errors"] - scores["total_warnings"]),
-        executive_summary_200_words=summary,
-        weak_areas=scores["weak_areas"],
-        audit_categories=categories,
-        owner_insights=owner_insights,
-        validity_date=(datetime.utcnow() + timedelta(days=30)).strftime("%Y-%m-%d"),
-        trend_chart_data=trend_data,
-    )
-    return HTMLResponse(html)
+    audit = Audit(site_id=site.id, payload_json=json.dumps({"crawl": crawl, "psi": psi, "scores": scores}), 
+                  overall_score=scores["overall_score"], grade=scores["grade"])
+    db.add(audit); db.commit()
+    return RedirectResponse(f"/report?id={audit.id}", status_code=303)
 
 @app.post("/report", response_class=HTMLResponse)
 async def render_report(url: str = Form(...), psi_strategy: str = Form("mobile"), db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
-    # Allow anonymous instant audits (no DB persistence)
-    url = url.strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="URL required")
-    crawl = await crawl_site(CrawlConfig(url=url))
+    crawl = await crawl_site(CrawlConfig(url=url.strip()))
     psi = await fetch_psi(crawl["site"], psi_strategy)
     scores = compute_scores(crawl, psi)
-    summary = build_summary(crawl["site"], scores, psi)
-    categories = build_category_tables(scores, psi)
     trend_data = build_trend_chart(crawl["site"], db, scores["overall_score"])
-    owner_insights = [
-        {"title": "Secure-by-default posture", "description": "Enable HSTS, define a robust CSP, remove mixed content, and set X-Frame-Options to prevent common exploits."},
-        {"title": "Speed up the critical path", "description": "Compress with Brotli/Gzip, optimize hero images and critical CSS, and defer non-essential JS to lower LCP/TBT."},
-        {"title": "Strengthen indexability", "description": "Ensure unique titles/meta, add canonicals, improve heading structure, and use hreflang for multi-language."},
-        {"title": "Improve mobile UX", "description": "Add viewport, validate navigation accessibility, and avoid intrusive interstitials on mobile viewports."},
-        {"title": "Enhance content signals", "description": "Expand thin pages with substantive content, add alt text to images, and annotate with structured data."},
-    ]
-    audit_id = f"anon-{secrets.token_hex(6)}"
-    template = env.from_string(HTML_TEMPLATE)
-    html = template.render(
-        app_name=APP_NAME,
-        website_url=crawl["site"],
-        audit_date=datetime.utcnow().strftime("%Y-%m-%d"),
-        audit_id=audit_id,
-        grade=scores["grade"],
-        grade_class=scores["grade_class"],
-        overall_score=scores["overall_score"],
-        total_errors=scores["total_errors"],
-        total_warnings=scores["total_warnings"],
-        total_notices=max(0, len(crawl["pages"]) - scores["total_errors"] - scores["total_warnings"]),
-        executive_summary_200_words=summary,
-        weak_areas=scores["weak_areas"],
-        audit_categories=categories,
-        owner_insights=owner_insights,
-        validity_date=(datetime.utcnow() + timedelta(days=30)).strftime("%Y-%m-%d"),
-        trend_chart_data=trend_data,
-    )
-    return HTMLResponse(html)
+    categories = build_category_tables(scores, psi)
+    return HTMLResponse(env.from_string(HTML_TEMPLATE).render(
+        app_name=APP_NAME, website_url=crawl["site"], audit_date=datetime.utcnow().strftime("%Y-%m-%d"),
+        audit_id="temp", grade=scores["grade"], grade_class=scores["grade_class"],
+        overall_score=scores["overall_score"], total_errors=scores["total_errors"],
+        total_warnings=scores["total_warnings"], total_notices=scores["total_notices"],
+        executive_summary_200_words=build_summary(crawl["site"], scores, psi),
+        weak_areas=scores["weak_areas"], audit_categories=categories, owner_insights=[],
+        validity_date="N/A", trend_chart_data=trend_data
+    ))
 
 @app.get("/report", response_class=HTMLResponse)
 async def view_report(id: int, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
     audit = db.get(Audit, id)
-    if not audit:
-        raise HTTPException(status_code=404, detail="Audit not found")
-    site = db.get(Site, audit.site_id)
-    owner = db.get(User, site.user_id)
-    # permission: allow owner or admin
-    if not user or (user.id != owner.id and not user.is_admin):
-        raise HTTPException(status_code=403, detail="Not allowed")
+    if not audit: raise HTTPException(status_code=404)
     payload = json.loads(audit.payload_json)
-    crawl = payload["crawl"]; psi = payload["psi"]; scores = payload["scores"]
-    summary = build_summary(crawl["site"], scores, psi)
-    categories = build_category_tables(scores, psi)
-    trend_data = build_trend_chart(crawl["site"], db, scores["overall_score"])
-    owner_insights = [
-        {"title": "Secure-by-default posture", "description": "Enable HSTS, define a robust CSP, remove mixed content, and set X-Frame-Options to prevent common exploits."},
-        {"title": "Speed up the critical path", "description": "Compress with Brotli/Gzip, optimize hero images and critical CSS, and defer non-essential JS to lower LCP/TBT."},
-        {"title": "Strengthen indexability", "description": "Ensure unique titles/meta, add canonicals, improve heading structure, and use hreflang for multi-language."},
-        {"title": "Improve mobile UX", "description": "Add viewport, validate navigation accessibility, and avoid intrusive interstitials on mobile viewports."},
-        {"title": "Enhance content signals", "description": "Expand thin pages with substantive content, add alt text to images, and annotate with structured data."},
-    ]
-    template = env.from_string(HTML_TEMPLATE)
-    html = template.render(
-        app_name=APP_NAME,
-        website_url=crawl["site"],
-        audit_date=audit.created_at.strftime("%Y-%m-%d"),
-        audit_id=str(audit.id),
-        grade=scores["grade"],
-        grade_class=grade_for_score(scores["overall_score"])[1],
-        overall_score=scores["overall_score"],
-        total_errors=scores["total_errors"],
-        total_warnings=scores["total_warnings"],
-        total_notices=max(0, len(crawl["pages"]) - scores["total_errors"] - scores["total_warnings"]),
-        executive_summary_200_words=summary,
-        weak_areas=scores["weak_areas"],
-        audit_categories=categories,
-        owner_insights=owner_insights,
-        validity_date=(audit.created_at + timedelta(days=30)).strftime("%Y-%m-%d"),
-        trend_chart_data=trend_data,
-    )
-    return HTMLResponse(html)
+    trend_data = build_trend_chart(payload["crawl"]["site"], db, audit.overall_score)
+    categories = build_category_tables(payload["scores"], payload["psi"])
+    return HTMLResponse(env.from_string(HTML_TEMPLATE).render(
+        app_name=APP_NAME, website_url=payload["crawl"]["site"], audit_date=audit.created_at.strftime("%Y-%m-%d"),
+        audit_id=str(audit.id), grade=audit.grade, grade_class=grade_for_score(audit.overall_score)[1],
+        overall_score=audit.overall_score, total_errors=payload["scores"]["total_errors"],
+        total_warnings=payload["scores"]["total_warnings"], total_notices=payload["scores"]["total_notices"],
+        executive_summary_200_words=build_summary(payload["crawl"]["site"], payload["scores"], payload["psi"]),
+        weak_areas=payload["scores"]["weak_areas"], audit_categories=categories, owner_insights=[],
+        validity_date="N/A", trend_chart_data=trend_data
+    ))
 
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_panel(request: Request, db: Session = Depends(get_db), user: Optional[User] = Depends(get_current_user)):
-    admin = require_admin(user)
-    users = db.query(User).order_by(User.created_at.desc()).all()
-    sites = db.query(Site).order_by(Site.created_at.desc()).all()
-    audits = db.query(Audit).order_by(Audit.created_at.desc()).limit(100).all()
-    inner = env.from_string(r"""
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <div class="bg-white p-6 rounded-xl shadow">
-        <h3 class="text-lg font-bold">Users</h3>
-        <ul class="divide-y mt-3">
-          {% for u in users %}
-          <li class="py-2 text-sm">
-            {{ u.email }} {% if not u.is_verified %}<span class="text-amber-600">(unverified){% endif %}</span>
-            {% if u.is_admin %}<span class="ml-1 text-indigo-600">(admin)</span>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="bg-white p-6 rounded-xl shadow">
-        <h3 class="text-lg font-bold">Sites</h3>
-        <ul class="divide-y mt-3">
-          {% for s in sites %}
-          <li class="py-2 text-sm">{{ s.url }} — owner: {{ s.owner.email }} — scheduled: {{ 'Yes' if s.schedule_enabled else 'No' }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="bg-white p-6 rounded-xl shadow">
-        <h3 class="text-lg font-bold">Recent Audits</h3>
-        <ul class="divide-y mt-3">
-          {% for a in audits %}
-          <li class="py-2 text-sm">{{ a.site.url }} — score {{ a.overall_score }} ({{ a.grade }}) — {{ a.created_at.strftime('%Y-%m-%d') }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-    """).render(users=users, sites=sites, audits=audits)
-    return render_page(admin, inner, "Admin")
-
-@app.get("/health")
-async def health():
-    return {"status": "ok", "ts": datetime.utcnow().isoformat()}
-
-# ------------------------------------------------------------------------------
-# Scheduler: daily emails at users' preferred local hour
-# ------------------------------------------------------------------------------
 async def scheduler_loop():
-    # Runs every ~60 seconds, checks due sites for daily audit and email
     while True:
         try:
             db = SessionLocal()
             now_utc = datetime.utcnow()
-            users = db.query(User).filter(User.is_verified == True).all()
-            for u in users:
-                try:
-                    tz = ZoneInfo(u.timezone if u.timezone else "UTC")
-                except Exception:
-                    tz = ZoneInfo("UTC")
+            for u in db.query(User).filter(User.is_verified == True).all():
+                tz = ZoneInfo(u.timezone or "UTC")
                 local_now = now_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-                if local_now.minute != 0:  # only run at top of hour
-                    continue
-                if local_now.hour != (u.preferred_hour or 9):
-                    continue
-                # For each scheduled site, ensure we haven't sent today
-                sites = db.query(Site).filter(Site.user_id == u.id, Site.schedule_enabled == True).all()
-                for s in sites:
-                    latest = db.query(Audit).filter(Audit.site_id == s.id).order_by(Audit.created_at.desc()).first()
-                    if latest and latest.created_at.date() == now_utc.date():
-                        continue  # already audited today
-                    # Run audit
-                    crawl = await crawl_site(CrawlConfig(url=s.url))
-                    psi = await fetch_psi(crawl["site"], strategy="mobile")
-                    scores = compute_scores(crawl, psi)
-                    summary = build_summary(crawl["site"], scores, psi)
-                    audit = Audit(
-                        site_id=s.id,
-                        payload_json=json.dumps({"crawl": crawl, "psi": psi, "scores": scores}),
-                        overall_score=scores["overall_score"],
-                        grade=scores["grade"]
-                    )
-                    db.add(audit); db.commit(); db.refresh(audit)
-                    # Email delivery: daily + accumulated (trend)
-                    trend = build_trend_chart(crawl["site"], db, scores["overall_score"])
-                    # Create simple email HTML with summary & link
-                    link = f"{APP_DOMAIN}/report?id={audit.id}"
-                    html = f"""
-                        <h3>FF Tech Certified Audit — {s.url}</h3>
-                        <p><b>Score:</b> {scores['overall_score']} ({scores['grade']})</p>
-                        <p>{summary}</p>
-                        <p>{link}View full certified report</a></p>
-                        <hr>
-                        <p><b>Trend:</b> {trend['values']}</p>
-                    """
-                    send_email(to_email=u.email, subject=f"Daily Audit Report — {s.url}", html_body=html)
+                if local_now.hour == (u.preferred_hour or 9) and local_now.minute == 0:
+                    for s in db.query(Site).filter(Site.user_id == u.id, Site.schedule_enabled == True).all():
+                        crawl = await crawl_site(CrawlConfig(url=s.url))
+                        psi = await fetch_psi(crawl["site"])
+                        scores = compute_scores(crawl, psi)
+                        audit = Audit(site_id=s.id, payload_json=json.dumps({"crawl": crawl, "psi": psi, "scores": scores}),
+                                      overall_score=scores["overall_score"], grade=scores["grade"])
+                        db.add(audit); db.commit()
+                        send_email(u.email, "Daily Report", f"New audit for {s.url} finished.")
             db.close()
-        except Exception:
-            print("Scheduler error:", traceback.format_exc())
-        await asyncio.sleep(60)  # loop every minute
+        except: pass
+        await asyncio.sleep(60)
 
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(scheduler_loop())
 
-# ------------------------------------------------------------------------------
-# Entrypoint
-# ------------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
