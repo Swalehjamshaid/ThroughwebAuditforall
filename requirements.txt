@@ -1,15 +1,15 @@
-fastapi[standard]
-uvicorn[standard]
-jinja2
-sqlalchemy
-psycopg2-binary
-passlib[bcrypt]
-itsdangerous
-email-validator
-apscheduler
-httpx
-beautifulsoup4
-pdfkit
-openai
-stripe                  # ← THIS FIXES THE ERROR
-python-multipart
+
+pip install \
+  fastapi \
+  uvicorn \
+  sqlalchemy \
+  psycopg2-binary \
+  python-multipart \
+  requests \
+  beautifulsoup4 \
+  apscheduler \
+  pydantic \
+  PyJWT \
+  reportlab \
+  email-validator \
+  jinja2
