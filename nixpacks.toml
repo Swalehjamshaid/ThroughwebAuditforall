@@ -1,8 +1,19 @@
+
 [phases.setup]
-nixPkgs = ["python3", "gcc", "playwright-driver"]
+# Keep python; remove playwright-driver if it's being auto-detected
+# Nixpacks sometimes detects Playwright from files; this disables it.
+extra_pkgs = ["python3", "gcc"]
 
 [phases.install]
-cmds = ["python -m venv /opt/venv", ". /opt/venv/bin/activate && pip install -r requirements.txt"]
+# Standard Python install
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate && pip install -r requirements.txt"
+]
 
 [phases.build]
-cmds = [". /opt/venv/bin/activate && python -m playwright install chromium"]
+# No playwright here
+cmds = []
+
+[start]
+cmd = "uvicorn main:app --host 0.0.0.0 --port ${PORT}"
