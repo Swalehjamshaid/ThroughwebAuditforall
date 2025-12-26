@@ -1,11 +1,11 @@
 
-# ap.py — FF Tech AI Audit (single-file, HTML-integrated, Railway-ready)
+# ap.py — FF Tech AI Audit (DB-backed, inline HTML, Railway-ready)
 # ---------------------------------------------------------------------
 # - Integrates YOUR provided HTML exactly (embedded as Jinja template).
 # - Adds Start Audit (AJAX) -> runs audit -> redirects to /audit/{id}/report.
 # - Populates the page with audit attributes, charts, issues, metrics, etc.
 # - Download PDF works at /audit/{id}/pdf.
-# - No DB; uses an in-memory store for simplicity.
+# - SQLAlchemy DB-backed (Postgres via DATABASE_URL; SQLite fallback).
 # ---------------------------------------------------------------------
 
 import os
@@ -16,6 +16,7 @@ import socket
 import ssl as sslmod
 import datetime as dt
 from typing import Dict, Any, List, Optional, Tuple
+from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException, Form, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
@@ -30,10 +31,20 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 
+# --- SQLAlchemy ORM ---
+from sqlalchemy import (
+    create_engine, Column, Integer, String, DateTime, Boolean, ForeignKey,
+    Text, Float, JSON as SA_JSON, func, text
+)
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from sqlalchemy.exc import SQLAlchemyError
+
 # --------------------------- Config ----------------------------
 APP_NAME = "FF TECH AI AUDIT"
 ENV = os.getenv("ENV", "development")
 DEFAULT_USER_AGENT = os.getenv("DEFAULT_USER_AGENT", "FFTechAudit/1.0")
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech.db")
 
 # Optional search keys (resolver will still work without them via DuckDuckGo)
 BING_SEARCH_KEY   = os.getenv("BING_SEARCH_KEY")
@@ -44,12 +55,8 @@ TIMEOUT = 20
 RETRIES = 2
 AVOID_DOMAINS = {"facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com", "youtube.com"}
 
-# In-memory audit store
-AUDITS: Dict[int, Dict[str, Any]] = {}
-LATEST_ID = 0
-
 # ----------------------- FastAPI app ---------------------------
-app = FastAPI(title=APP_NAME, version="1.0.0")
+app = FastAPI(title=APP_NAME, version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else ["*"],
@@ -58,7 +65,87 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------------------- Inline HTML (Your template) ---------------------
+# ---------------------- DB setup -------------------------------
+Base = declarative_base()
+try:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+except Exception:
+    engine = create_engine("sqlite:///./fftech.db", pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+class Website(Base):
+    __tablename__ = "websites"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    url = Column(String, index=True)
+    created_at = Column(DateTime, default=func.now())
+    is_active = Column(Boolean, default=True)
+
+class AuditRun(Base):
+    __tablename__ = "audit_runs"
+    id = Column(Integer, primary_key=True)
+    website_id = Column(Integer, ForeignKey("websites.id"))
+    started_at = Column(DateTime, default=func.now())
+    finished_at = Column(DateTime)
+    site_health_score = Column(Float)                  # 0-100
+    grade = Column(String)                             # A+, A, B, C, D
+    metrics_summary = Column(SA_JSON)                  # dict of metrics -> values
+    weaknesses = Column(SA_JSON)                       # list of weaknesses
+    executive_summary = Column(Text)                   # ~summary text
+    competitors = Column(SA_JSON, nullable=True)       # [{name, score}]
+    top_issues = Column(SA_JSON, nullable=True)        # [{name, severity, suggestion}]
+    recommendations = Column(SA_JSON, nullable=True)   # {metric_key: suggestion}
+
+class User(Base):
+    __tablename__ = "users"                            # kept for future RBAC/2FA use
+    id = Column(Integer, primary_key=True)
+    email = Column(String, unique=True, index=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    is_active = Column(Boolean, default=False)
+    role = Column(String, default="user")
+    totp_enabled = Column(Boolean, default=False)
+    totp_secret = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    timezone = Column(String, default="Asia/Karachi")
+
+def get_db() -> Session:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def ensure_columns(conn, table: str, cols: Dict[str, str]):
+    """Auto-add missing columns in Postgres."""
+    for col, sqltype in cols.items():
+        check_sql = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = :tname AND column_name = :cname
+        """)
+        exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
+        if not exists:
+            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
+
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
+    # optional Postgres auto-migration
+    try:
+        with engine.begin() as conn:
+            ensure_columns(conn, "audit_runs", {
+                "competitors": "JSON",
+                "top_issues": "JSON",
+                "recommendations": "JSON"
+            })
+            ensure_columns(conn, "users", {
+                "role": "VARCHAR DEFAULT 'user'",
+                "totp_enabled": "BOOLEAN DEFAULT FALSE",
+                "totp_secret": "VARCHAR"
+            })
+    except Exception:
+        pass
+
+# ---------------------- Inline HTML (YOUR template) ---------------------
 INLINE_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -67,11 +154,14 @@ INLINE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Tailwind CSS -->
-<script/cdn.tailwindcss.com</script>
+https://cdn.tailwindcss.com</script>
 <!-- Chart.js -->
-<script/cdn.jsdelivr.net/npm/chart.js</script>
+https://cdn.jsdelivr.net/npm/chart.js</script>
 <!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet Inter, system-ui; transition: background 0.3s, color 0.3s; }
+https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap
+
+<style>
+body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 .glass { background: rgba(15,23,42,.65); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.08); transition: transform 0.3s; }
 .glass:hover { transform: translateY(-5px); }
 .glow { box-shadow: 0 0 40px rgba(99,102,241,.25); }
@@ -335,11 +425,11 @@ async function startAudit() {
     }
 }
 
-// Download PDF (navigate to endpoint)
+// Download PDF (navigate to endpoint; works on the report page)
 function downloadPDF() {
-  const idEl = document.querySelector('meta[name="audit-id"]');
-  if (idEl && idEl.getAttribute("content")) {
-    const id = idEl.getAttribute("content");
+  const metaEl = document.querySelector('meta[name="audit-id"]');
+  if (metaEl && metaEl.getAttribute("content")) {
+    const id = metaEl.getAttribute("content");
     window.location.href = `/audit/${id}/pdf`;
   } else {
     alert("Run an audit first, then download the PDF from the report page.");
@@ -363,7 +453,7 @@ new Chart(document.getElementById("trendChart"), {
 });
 </script>
 
-<!-- Hint for PDF (used by JS) -->
+<!-- meta used by PDF button -->
 <meta name="audit-id" content="{{ audit.id if audit.id else '' }}">
 </body>
 </html>
@@ -831,12 +921,11 @@ def build_summary(url: str, metrics: Dict[str, Any], weaknesses: List[str]) -> s
         f"FF Tech Audit Summary for {url}:",
         f"The website achieved a health score of {int(score)}% and an overall grade of {grade}.",
         "Our audit examined technical SEO, crawlability, on-page content, performance, mobile usability, and security.",
-        "Key improvement areas include: " + weak_list + ". Addressing these items will reduce risk and improve UX.",
+        "Key improvement areas include: " + weak_list + ". Addressing these will improve resilience and UX.",
     ]
     return " ".join(words)
 
 def pdf_bytes(audit: Dict[str, Any]) -> bytes:
-    buf = bytes()
     from io import BytesIO
     stream = BytesIO()
     c = canvas.Canvas(stream, pagesize=A4)
@@ -869,15 +958,39 @@ def pdf_bytes(audit: Dict[str, Any]) -> bytes:
     stream.seek(0)
     return stream.read()
 
+# ----------------------------- Helpers --------------------------
+def latest_audit(db: Session) -> Optional[AuditRun]:
+    try:
+        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+    except SQLAlchemyError:
+        return None
+
+def audit_to_ctx(run: AuditRun, website_url: str) -> Dict[str, Any]:
+    return {
+        "id": run.id,
+        "finished_at": run.finished_at,
+        "grade": run.grade,
+        "site_health_score": run.site_health_score,
+        "metrics_summary": run.metrics_summary or {},
+        "weaknesses": run.weaknesses or [],
+        "website": {"url": website_url},
+        "competitors": run.competitors or [],
+        "top_issues": run.top_issues or [],
+        "recommendations": run.recommendations or {},
+    }
+
 # ----------------------------- Routes ---------------------------
 @app.get("/", response_class=HTMLResponse)
-def home():
-    # render latest audit if present, else render empty placeholders
-    if AUDITS:
-        latest_id = max(AUDITS.keys())
-        latest = AUDITS[latest_id]
-        prev = AUDITS.get(latest_id - 1)
-        return render_html(latest, prev)
+def home(db: Session = Depends(get_db)):
+    run = latest_audit(db)
+    if run:
+        website = db.query(Website).get(run.website_id)
+        prev = db.query(AuditRun).filter(AuditRun.website_id == website.id, AuditRun.id < run.id)\
+                                 .order_by(AuditRun.id.desc()).first()
+        ctx = audit_to_ctx(run, website.url)
+        prev_ctx = audit_to_ctx(prev, website.url) if prev else None
+        return render_html(ctx, prev_ctx)
+
     # empty state placeholders (avoid Jinja errors)
     empty_audit = {
         "id": "",
@@ -894,7 +1007,7 @@ def home():
     return render_html(empty_audit, None)
 
 @app.post("/audit/run")
-async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] = Form(None)):
+async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] = Form(None), db: Session = Depends(get_db)):
     # Accept JSON or form data
     url_input = (payload or {}).get("website_url") or website_url
     if not url_input:
@@ -906,46 +1019,61 @@ async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] =
     except HTTPException:
         resolved = normalize_url(url_input)
 
+    # Ensure Website record
+    w = db.query(Website).filter(Website.url == resolved).first()
+    if not w:
+        w = Website(user_id=None, url=resolved)
+        db.add(w); db.commit()
+
     # Compute audit
     result = compute_audit(resolved)
-    global LATEST_ID
-    LATEST_ID += 1
+    metrics, weaknesses = result["metrics"], result["weaknesses"]
+    run = AuditRun(
+        website_id=w.id,
+        finished_at=func.now(),
+        site_health_score=metrics["site_health_score"],
+        grade=metrics["grade"],
+        metrics_summary=metrics,
+        weaknesses=weaknesses,
+        executive_summary=build_summary(resolved, metrics, weaknesses),
+        competitors=result["competitors"],
+        top_issues=result["top_issues"],
+        recommendations=result["recommendations"]
+    )
+    db.add(run); db.commit()
 
-    audit = {
-        "id": LATEST_ID,
-        "finished_at": dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "grade": result["metrics"]["grade"],
-        "site_health_score": result["metrics"]["site_health_score"],
-        "metrics_summary": result["metrics"],
-        "weaknesses": result["weaknesses"],
-        "website": {"url": resolved},
-        "competitors": result["competitors"],
-        "top_issues": result["top_issues"],
-        "recommendations": result["recommendations"],
-    }
-    AUDITS[LATEST_ID] = audit
-
-    return JSONResponse({"message": "Audit completed", "audit_id": LATEST_ID, "report_url": f"/audit/{LATEST_ID}/report"})
+    return JSONResponse({"message": "Audit completed", "audit_id": run.id, "report_url": f"/audit/{run.id}/report"})
 
 @app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
-def audit_report(audit_id: int):
-    audit = AUDITS.get(audit_id)
-    if not audit:
+def audit_report(audit_id: int, db: Session = Depends(get_db)):
+    run = db.query(AuditRun).get(audit_id)
+    if not run:
         raise HTTPException(status_code=404, detail="Audit not found")
-    previous = AUDITS.get(audit_id - 1)
-    return render_html(audit, previous)
+    website = db.query(Website).get(run.website_id)
+    prev = db.query(AuditRun).filter(AuditRun.website_id == website.id, AuditRun.id < run.id)\
+                             .order_by(AuditRun.id.desc()).first()
+    ctx = audit_to_ctx(run, website.url)
+    prev_ctx = audit_to_ctx(prev, website.url) if prev else None
+    return render_html(ctx, prev_ctx)
 
 @app.get("/audit/{audit_id}/pdf")
-def audit_pdf(audit_id: int):
-    audit = AUDITS.get(audit_id)
-    if not audit:
+def audit_pdf(audit_id: int, db: Session = Depends(get_db)):
+    run = db.query(AuditRun).get(audit_id)
+    if not run:
         raise HTTPException(status_code=404, detail="Audit not found")
-    pdf = pdf_bytes(audit)
+    website = db.query(Website).get(run.website_id)
+    audit_ctx = audit_to_ctx(run, website.url)
+    pdf = pdf_bytes(audit_ctx)
     return StreamingResponse(iter([pdf]), media_type="application/pdf", headers={
         "Content-Disposition": f"attachment; filename=fftech_audit_{audit_id}.pdf"
     })
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
 
 # --------------------------- Local run --------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("ap:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
+``
