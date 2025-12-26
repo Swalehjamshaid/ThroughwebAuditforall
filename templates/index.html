@@ -3,313 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | AI-Powered Website Audit Command Center</title>
+    <title>FF Tech | AI Website Audit Command Center</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
-
         :root {
             --primary: #00f2ff;
             --secondary: #0062ff;
-            --bg-dark: #0a0a1a;
-            --bg-darker: #00080f;
-            --text-light: #e0f2ff;
-            --glass-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
+            --bg-dark: #050510;
+            --glass: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.08);
         }
-
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark), var(--bg-darker));
-            color: var(--text-light);
+            background: radial-gradient(circle at top right, #0a0a25, #000);
+            color: #e0f2ff;
             min-height: 100vh;
-            overflow-x: hidden;
         }
-
-        .hero {
-            background: linear-gradient(rgba(0,0,30,0.8), rgba(0,10,40,0.9)), url('https://images.unsplash.com/photo-1560869710-7d0c2c7d8ac0?auto=format&fit=crop&q=80') center/cover no-repeat;
-            border-radius: 3rem;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,242,255,0.2);
-        }
-
-        .hero::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(0,242,255,0.15), transparent);
-            animation: scan 4s linear infinite;
-        }
-
-        @keyframes scan {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
+        .orbitron { font-family: 'Orbitron', sans-serif; }
         .glass {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 2rem;
-            transition: all 0.3s ease;
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--border);
+            border-radius: 1.5rem;
+            transition: 0.3s;
         }
-
-        .glass:hover {
-            box-shadow: 0 0 30px rgba(0,242,255,0.3);
-            transform: translateY(-5px);
-        }
-
-        .glow {
-            text-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
-        }
-
-        .orbitron {
-            font-family: 'Orbitron', sans-serif;
-        }
-
-        .metric-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 15px currentColor;
-        }
-
-        .dot-green { background: #00ff88; }
-        .dot-yellow { background: #ffbb00; }
-        .dot-red { background: #ff4d4d; animation: pulse 2s infinite; }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .glass:hover { border-color: var(--primary); box-shadow: 0 0 20px rgba(0, 242, 255, 0.1); }
+        .glow-text { text-shadow: 0 0 15px rgba(0, 242, 255, 0.6); }
+        .pulse-red { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 77, 77, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
         }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- Auth Gate Modal -->
-    <div id="auth-modal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center hidden">
-        <div class="glass p-10 max-w-lg w-full mx-4">
-            <h2 class="text-4xl orbitron glow text-center mb-8">FF Tech Access</h2>
-            <div id="login-section" class="space-y-6">
-                <input type="email" id="login-email" placeholder="Email" class="w-full p-4 glass border border-primary/30 rounded-xl focus:outline-none focus:border-primary">
-                <input type="password" id="login-password" placeholder="Password" class="w-full p-4 glass border border-primary/30 rounded-xl focus:outline-none focus:border-primary">
-                <button onclick="handleLogin()" class="w-full bg-gradient-to-r from-primary to-secondary text-black font-bold p-4 rounded-xl glow">Login</button>
-                <p class="text-center">No account? <a href="#" onclick="switchToRegister()" class="text-primary underline">Register</a></p>
+    <nav class="max-w-7xl mx-auto flex justify-between items-center mb-10">
+        <div class="text-3xl font-black orbitron tracking-tighter">FF<span class="text-primary glow-text">TECH</span></div>
+        <button class="glass px-6 py-2 text-xs font-bold border-primary/30 hover:bg-primary hover:text-black transition uppercase">Re-Scan Site</button>
+    </nav>
+
+    <main class="max-w-7xl mx-auto space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div class="lg:col-span-4 glass p-8 flex flex-col items-center justify-center">
+                <h3 class="orbitron text-[10px] tracking-widest opacity-50 mb-6 uppercase">Site Health Index</h3>
+                <div class="relative w-44 h-44">
+                    <canvas id="healthGauge"></canvas>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-5xl font-black orbitron glow-text" id="ui-score">0</span>
+                        <span class="text-[10px] opacity-50 font-bold uppercase tracking-widest" id="ui-grade">GRADE --</span>
+                    </div>
+                </div>
             </div>
-            <div id="register-section" class="space-y-6 hidden">
-                <input type="email" id="reg-email" placeholder="Business Email" class="w-full p-4 glass border border-primary/30 rounded-xl focus:outline-none focus:border-primary">
-                <button onclick="handleRegister()" class="w-full bg-gradient-to-r from-primary to-secondary text-black font-bold p-4 rounded-xl glow">Send Registration Link</button>
-                <p class="text-center"><a href="#" onclick="switchToLogin()" class="text-primary underline">Back to Login</a></p>
+
+            <div class="lg:col-span-8 glass p-8 border-l-4 border-primary">
+                <div class="flex items-center gap-3 mb-4">
+                    <i class="fa-solid fa-microchip text-primary"></i>
+                    <h2 class="orbitron text-xs tracking-widest text-primary">FF TECH EXECUTIVE SUMMARY</h2>
+                </div>
+                <p id="ui-summary" class="text-lg leading-relaxed text-blue-100/80 italic mb-6">Generating analysis...</p>
+                <div class="flex gap-3">
+                    <span id="ui-weak-area" class="px-4 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-[10px] text-red-400 font-bold uppercase tracking-widest">Weak: --</span>
+                    <span id="ui-strong-area" class="px-4 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-[10px] text-green-400 font-bold uppercase tracking-widest">Strong: --</span>
+                </div>
             </div>
-            <div id="auth-msg" class="text-center mt-4"></div>
         </div>
-    </div>
 
-    <!-- Main Content -->
-    <div id="main-content" class="max-w-7xl mx-auto">
-        <!-- Hero Section -->
-        <section class="hero p-12 md:p-20 text-center mb-12">
-            <h1 class="text-5xl md:text-7xl orbitron glow mb-4">FF Tech Audit Command Center</h1>
-            <p class="text-xl md:text-3xl opacity-80 mb-8">Enterprise-Grade Website Audits Powered by AI</p>
-            <div class="flex justify-center gap-8">
-                <button onclick="showModal()" class="bg-gradient-to-r from-primary to-secondary text-black font-bold py-4 px-8 rounded-full glow">Start Audit</button>
-                <button onclick="showModal(true)" class="border border-primary py-4 px-8 rounded-full hover:bg-primary/20">Register</button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="glass p-8">
+                <h3 class="orbitron text-[10px] mb-6 opacity-50 tracking-widest uppercase">Balance Analysis</h3>
+                <canvas id="radarChart" height="250"></canvas>
             </div>
-        </section>
+            <div class="glass p-8">
+                <h3 class="orbitron text-[10px] mb-6 opacity-50 tracking-widest uppercase">Industry Benchmark (Market Comparison)</h3>
+                
+                <canvas id="benchmarkChart" height="250"></canvas>
+            </div>
+        </div>
 
-        <!-- Dashboard Overview (Shown after Login) -->
-        <section id="dashboard" class="hidden space-y-12">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-                <div class="glass p-6 text-center">
-                    <h3 class="text-2xl orbitron mb-2" id="site-score">—%</h3>
-                    <p class="opacity-80">Site Health Score</p>
-                </div>
-                <div class="glass p-6 text-center">
-                    <h3 class="text-2xl orbitron mb-2" id="site-grade">—</h3>
-                    <p class="opacity-80">FF Tech Grade</p>
-                </div>
-                <div class="glass p-6 text-center">
-                    <h3 class="text-2xl orbitron mb-2" id="total-pages">—</h3>
-                    <p class="opacity-80">Pages Crawled</p>
-                </div>
-                <div class="glass p-6 text-center">
-                    <h3 class="text-2xl orbitron mb-2" id="total-issues">—</h3>
-                    <p class="opacity-80">Total Issues</p>
-                </div>
+        <div id="metrics-container" class="space-y-10 py-10">
             </div>
 
-            <!-- Executive Summary -->
-            <div class="glass p-10">
-                <h2 class="text-3xl orbitron glow mb-6">AI Executive Summary</h2>
-                <p class="text-lg italic opacity-90" id="exec-summary">Loading...</p>
-            </div>
+        <div class="glass p-10 text-center border-2 border-primary/20 bg-gradient-to-b from-primary/5 to-transparent">
+            <h2 class="text-3xl orbitron glow-text mb-4 uppercase">FF Tech Certified</h2>
+            <p class="opacity-50 text-sm mb-8 max-w-xl mx-auto tracking-wide">This audit is timestamped and cryptographically verified. Suitable for compliance documentation and stakeholder reporting.</p>
+            <button class="bg-primary text-black font-black py-4 px-12 rounded-full orbitron tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/30">
+                DOWNLOAD FULL PDF REPORT
+            </button>
+        </div>
+    </main>
 
-            <!-- Metrics Categories -->
-            <div class="space-y-12">
-                <div class="glass p-10">
-                    <h2 class="text-3xl orbitron glow mb-6">1. Overall Site Health</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="cat-overall"></div>
-                </div>
-                <div class="glass p-10">
-                    <h2 class="text-3xl orbitron glow mb-6">2. Crawlability & Indexation</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="cat-crawl"></div>
-                </div>
-                <!-- Add similar divs for all 10 categories with IDs like cat-onpage, cat-performance, etc. -->
-            </div>
-
-            <!-- Charts Section -->
-            <div class="glass p-10">
-                <h2 class="text-3xl orbitron glow mb-6">Performance Trends</h2>
-                <canvas id="trend-chart" height="200"></canvas>
-            </div>
-
-            <!-- Competitor Comparison -->
-            <div class="glass p-10">
-                <h2 class="text-3xl orbitron glow mb-6">Competitor Comparison</h2>
-                <canvas id="comp-chart" height="200"></canvas>
-            </div>
-
-            <!-- Scheduling & Reports -->
-            <div class="glass p-10">
-                <h2 class="text-3xl orbitron glow mb-6">Schedule Audits & Reports</h2>
-                <form class="space-y-4">
-                    <input type="url" placeholder="Add Website URL" class="w-full p-4 glass border border-primary/30 rounded-xl">
-                    <select class="w-full p-4 glass border border-primary/30 rounded-xl">
-                        <option>Daily Report</option>
-                        <option>Weekly Accumulated Report</option>
-                    </select>
-                    <input type="time" placeholder="Schedule Time" class="w-full p-4 glass border border-primary/30 rounded-xl">
-                    <button type="submit" class="w-full bg-gradient-to-r from-primary to-secondary text-black font-bold p-4 rounded-xl glow">Schedule</button>
-                </form>
-            </div>
-
-            <!-- Download Certified Report -->
-            <div class="text-center">
-                <button class="bg-gradient-to-r from-primary to-secondary text-black font-bold py-6 px-12 rounded-full glow text-xl">Download Certified PDF Report</button>
-            </div>
-        </section>
-
-        <!-- Admin Dashboard (Hidden) -->
-        <section id="admin-dashboard" class="hidden glass p-10 mt-12">
-            <h2 class="text-3xl orbitron glow mb-6">Admin Panel</h2>
-            <div class="space-y-4">
-                <p>Monitor user logins, audits, and activities.</p>
-                <!-- Table or list for admin data -->
-                <table class="w-full glass p-4 rounded-xl">
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Last Login</th>
-                            <th>Audits</th>
-                        </tr>
-                    </thead>
-                    <tbody id="admin-logs"></tbody>
-                </table>
-            </div>
-        </section>
-    </div>
-
-    <footer class="text-center opacity-60 py-12">
-        © 2025 FF Tech International | Certified Website Audits | Deployed on Railway Cloud
+    <footer class="py-20 text-center opacity-30 text-[9px] orbitron tracking-[0.6em]">
+        FF TECH INTERNATIONAL // AUDIT ENGINE V2.0 // RAILWAY CLOUD
     </footer>
 
     <script>
-        // All data from Python (e.g., via inline script or fetch)
-        window.appData = {
-            isLoggedIn: false,
-            isAdmin: false,
-            metrics: {
-                overall: [
-                    { name: "Site Health Score (%)", value: "—", status: "green" },
-                    // All 10 metrics for category 1
-                ],
-                crawl: [
-                    { name: "HTTP Status Codes (2xx, 3xx, 4xx, 5xx)", value: "—", status: "yellow" },
-                    // All for category 2
-                ],
-                // ... Add objects for all categories with their metrics
+        /**
+         * PYTHON DATA INPUT
+         * Replace the object below with your Python-generated JSON
+         */
+        window.audit_results = {
+            "score": 84,
+            "grade": "B+",
+            "summary": "Your website shows robust security but critical mobile latency. Largest Contentful Paint (LCP) exceeds recommended thresholds by 2.4s. Internal linking is fragmented with 12 orphan pages detected.",
+            "weak_area": "Performance",
+            "strong_area": "SSL/Security",
+            "radar_data": [84, 65, 98, 70, 88, 72], // SEO, Speed, Security, Mobile, Content, Access
+            "benchmark_data": {
+                "labels": ["Your Site", "Industry Avg", "Top Competitor"],
+                "scores": [84, 72, 91]
             },
-            // Other data: summary, score, grade, etc.
+            "categories": [
+                {
+                    "title": "Technical SEO & Crawl",
+                    "metrics": [
+                        {"name": "Status Codes (2xx)", "value": "98%", "status": "green"},
+                        {"name": "Redirect Loops", "value": "2 Detected", "status": "red"},
+                        {"name": "Broken Links", "value": "14 Found", "status": "yellow"}
+                    ]
+                },
+                {
+                    "title": "Core Web Vitals",
+                    "metrics": [
+                        {"name": "LCP", "value": "4.1s", "status": "red"},
+                        {"name": "CLS", "value": "0.02", "status": "green"},
+                        {"name": "FID", "value": "18ms", "status": "green"}
+                    ]
+                }
+                // Add more categories as needed from Python
+            ]
         };
 
-        function showModal(register = false) {
-            document.getElementById('auth-modal').classList.remove('hidden');
-            if (register) switchToRegister();
-            else switchToLogin();
-        }
+        function initializeDashboard() {
+            const data = window.audit_results;
 
-        function switchToRegister() {
-            document.getElementById('login-section').classList.add('hidden');
-            document.getElementById('register-section').classList.remove('hidden');
-        }
+            // Update UI Labels
+            document.getElementById('ui-score').innerText = data.score;
+            document.getElementById('ui-grade').innerText = `Grade ${data.grade}`;
+            document.getElementById('ui-summary').innerText = `"${data.summary}"`;
+            document.getElementById('ui-weak-area').innerText = `Weak: ${data.weak_area}`;
+            document.getElementById('ui-strong-area').innerText = `Strong: ${data.strong_area}`;
 
-        function switchToLogin() {
-            document.getElementById('register-section').classList.add('hidden');
-            document.getElementById('login-section').classList.remove('hidden');
-        }
-
-        function handleLogin() {
-            // Simulate Python backend call
-            appData.isLoggedIn = true;
-            appData.isAdmin = false; // From backend
-            document.getElementById('auth-modal').classList.add('hidden');
-            renderDashboard();
-        }
-
-        function handleRegister() {
-            // Simulate email send via Python backend
-            document.getElementById('auth-msg').innerHTML = '<p class="text-green-400">Registration link sent to email!</p>';
-        }
-
-        function createMetric(name, value, status) {
-            return `
-                <div class="glass p-6">
-                    <div class="flex justify-between mb-2">
-                        <span>${name}</span>
-                        <span class="metric-dot dot-${status}"></span>
+            // Inject Metrics
+            const container = document.getElementById('metrics-container');
+            container.innerHTML = data.categories.map(cat => `
+                <div>
+                    <h3 class="text-primary text-[10px] font-black mb-4 tracking-[0.3em] uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-primary rounded-full"></span> ${cat.title}
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        ${cat.metrics.map(m => `
+                            <div class="glass p-5 border border-white/5 flex justify-between items-center hover:bg-white/[0.05]">
+                                <div>
+                                    <p class="text-[9px] uppercase opacity-40 font-bold mb-1">${m.name}</p>
+                                    <p class="text-lg font-black orbitron">${m.value}</p>
+                                </div>
+                                <div class="w-3 h-3 rounded-full ${m.status === 'red' ? 'bg-red-500 pulse-red' : m.status === 'yellow' ? 'bg-yellow-500' : 'bg-green-500 shadow-[0_0_10px_#00ff88]'}"></div>
+                            </div>
+                        `).join('')}
                     </div>
-                    <div class="text-xl font-bold">${value}</div>
                 </div>
-            `;
-        }
+            `).join('');
 
-        function renderDashboard() {
-            if (!appData.isLoggedIn) return showModal();
-
-            document.getElementById('dashboard').classList.remove('hidden');
-            if (appData.isAdmin) document.getElementById('admin-dashboard').classList.remove('hidden');
-
-            // Populate from appData
-            document.getElementById('site-score').textContent = appData.metrics.overall[0].value;
-            // Similarly for others
-
-            Object.keys(appData.metrics).forEach(cat => {
-                const container = document.getElementById(`cat-${cat}`);
-                if (container) container.innerHTML = appData.metrics[cat].map(m => createMetric(m.name, m.value, m.status)).join('');
+            // CHARTS
+            // 1. Health Gauge
+            new Chart(document.getElementById('healthGauge'), {
+                type: 'doughnut',
+                data: { datasets: [{ data: [data.score, 100 - data.score], backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.05)'], borderWidth: 0, circumference: 270, rotation: 225, cutout: '85%' }] },
+                options: { plugins: { legend: { display: false } }, events: [] }
             });
 
-            // Charts
-            new Chart(document.getElementById('trend-chart'), {
-                type: 'line',
-                data: { labels: ['Jan', 'Feb'], datasets: [{ label: 'Health Trend', data: [80, 85] }] }
+            // 2. Radar Chart
+            new Chart(document.getElementById('radarChart'), {
+                type: 'radar',
+                data: {
+                    labels: ['SEO', 'Speed', 'Security', 'Mobile', 'Content', 'Access'],
+                    datasets: [{
+                        label: 'Site Balance',
+                        data: data.radar_data,
+                        backgroundColor: 'rgba(0, 242, 255, 0.2)',
+                        borderColor: '#00f2ff',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#00f2ff'
+                    }]
+                },
+                options: {
+                    scales: { r: { angleLines: { color: 'rgba(255,255,255,0.1)' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#fff', font: { family: 'Orbitron', size: 10 } }, ticks: { display: false } } },
+                    plugins: { legend: { display: false } }
+                }
             });
 
-            new Chart(document.getElementById('comp-chart'), {
+            // 3. Benchmark Chart
+            new Chart(document.getElementById('benchmarkChart'), {
                 type: 'bar',
-                data: { labels: ['You', 'Comp A'], datasets: [{ label: 'Score', data: [85, 78] }] }
+                data: {
+                    labels: data.benchmark_data.labels,
+                    datasets: [{
+                        data: data.benchmark_data.scores,
+                        backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.2)'],
+                        borderRadius: 10
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'Orbitron', size: 8 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)' } }
+                    }
+                }
             });
-
-            // Admin logs example
-            document.getElementById('admin-logs').innerHTML = '<tr><td>User1</td><td>2025-12-26</td><td>5</td></tr>';
         }
 
-        // Initial check
-        if (appData.isLoggedIn) renderDashboard();
-        else showModal();
+        window.onload = initializeDashboard;
     </script>
 </body>
 </html>
