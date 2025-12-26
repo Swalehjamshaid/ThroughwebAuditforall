@@ -1,269 +1,255 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full scroll-smooth dark">
+<html lang="en" class="dark">
 <head>
 <meta charset="UTF-8">
+<title>FF Tech Audit Command Center</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FF Tech Elite | Advanced Audit SaaS</title>
 
+<!-- Styling -->
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
 
-<style>
-:root {
-    --neon-indigo: #6366f1;
-    --neon-emerald: #10b981;
-    --neon-rose: #f43f5e;
-    --dark-bg: #020617;
-}
-body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--dark-bg); color: #f8fafc; }
-
-.glass-card { 
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    transition: all 0.3s ease;
-}
-.glass-card:hover { border-color: var(--neon-indigo); transform: translateY(-2px); }
-
-.metric-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-.status-pill {
-    font-size: 0.65rem;
-    padding: 2px 8px;
-    border-radius: 99px;
-    font-weight: 800;
-    text-transform: uppercase;
-}
-.status-pass { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.status-fail { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
-.status-warning { background: rgba(250, 204, 21, 0.1); color: #facc15; }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f172a; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-
-.animate-pulse-fast { animation: pulse 0.8s infinite; }
-</style>
 </head>
-<body class="bg-grid">
+<body class="bg-slate-950 text-slate-200">
 
-<header class="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-white/10 px-6 py-4">
-    <div class="max-w-[1600px] mx-auto flex justify-between items-center">
-        <div class="flex items-center gap-4">
-            <div class="bg-indigo-600 p-2 rounded-lg font-black text-white shadow-lg shadow-indigo-500/20">FF</div>
-            <div>
-                <h1 class="font-black text-xl tracking-tight uppercase">Tech Elite <span class="text-indigo-500 italic text-sm font-bold">Audit SaaS</span></h1>
-            </div>
-        </div>
-        <div class="flex gap-4">
-            <button class="text-xs font-bold text-slate-400 hover:text-white transition">Documentation</button>
-            <div class="h-6 w-[1px] bg-white/10"></div>
-            <button id="toggle-dark" class="bg-slate-900 p-2 rounded-full border border-white/10 hover:bg-slate-800 transition">
-                <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"></path></svg>
-            </button>
-        </div>
-    </div>
+<div class="max-w-7xl mx-auto p-6 space-y-12">
+
+<!-- ================================================= -->
+<!-- HEADER -->
+<!-- ================================================= -->
+<header class="text-center space-y-2">
+<h1 class="text-3xl font-bold">FF Tech Website Audit Command Center</h1>
+<p class="text-slate-400">Strict Scoring • Python Powered • Enterprise Grade</p>
 </header>
 
-<main class="max-w-[1600px] mx-auto p-6 space-y-8">
+<!-- ================================================= -->
+<!-- NORTH STAR + ISSUE MAP -->
+<!-- ================================================= -->
+<section class="grid md:grid-cols-3 gap-6">
 
-<!-- AUDIT INPUT -->
-<section class="p-10 glass-card rounded-[2rem] shadow-2xl border-indigo-500/20">
-    <div class="max-w-4xl mx-auto text-center space-y-6">
-        <h2 class="text-4xl font-black tracking-tight">Deploy Global Audit Intelligence</h2>
-        <p class="text-slate-400 font-medium">Scan 140+ metrics including Core Web Vitals, Security, SEO, and Performance.</p>
-        <div class="flex flex-col md:flex-row gap-3">
-            <input id="audit-url" type="url" placeholder="https://your-competitor.com" 
-            class="flex-1 bg-slate-900 border border-white/10 p-5 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg">
-            <button id="run-audit" class="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-white shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3">
-                START DEEP SCAN <span class="animate-pulse-fast">●</span>
-            </button>
-        </div>
-        <div id="status-bar" class="hidden text-xs font-bold text-indigo-400 uppercase tracking-widest mt-3">
-            System Status: <span id="status-text">Initializing Python Scraper...</span>
-        </div>
-    </div>
+<div class="bg-slate-900 p-6 rounded-xl text-center">
+<h2 class="font-semibold mb-3">Overall Health</h2>
+<canvas id="healthGauge"></canvas>
+<div class="mt-4 text-4xl font-bold" id="healthScore"></div>
+<div class="text-sm text-slate-400" id="healthGrade"></div>
+</div>
+
+<div class="bg-slate-900 p-6 rounded-xl md:col-span-2">
+<h2 class="font-semibold mb-3">Problem Map</h2>
+<canvas id="issuesDonut"></canvas>
+</div>
+
 </section>
 
-<!-- AUDIT RESULTS -->
-<section id="audit-results" class="hidden space-y-8 animate-in fade-in duration-700">
-
-<!-- TOP METRICS CARDS -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-    <div class="p-6 glass-card rounded-3xl border-l-4 border-indigo-500">
-        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Health Score</h4>
-        <div class="text-5xl font-black text-white" id="stat-health">0%</div>
-        <div class="w-full bg-white/5 h-2 rounded-full mt-4"><div id="bar-health" class="h-full bg-indigo-500 rounded-full" style="width: 0%"></div></div>
-    </div>
-    <div class="p-6 glass-card rounded-3xl border-l-4 border-rose-500">
-        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Critical Errors</h4>
-        <div class="text-5xl font-black text-rose-500" id="stat-errors">0</div>
-        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Immediate Action Required</p>
-    </div>
-    <div class="p-6 glass-card rounded-3xl border-l-4 border-amber-500">
-        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Warnings</h4>
-        <div class="text-5xl font-black text-amber-500" id="stat-warnings">0</div>
-        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Optimizations Needed</p>
-    </div>
-    <div class="p-6 glass-card rounded-3xl border-l-4 border-emerald-500">
-        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Crawled Pages</h4>
-        <div class="text-5xl font-black text-emerald-500" id="stat-pages">0</div>
-        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Crawl Efficiency: 100%</p>
-    </div>
-</div>
-
-<!-- EXECUTIVE SUMMARY & WEAK/IMPROVEMENTS -->
-<div class="grid lg:grid-cols-3 gap-8">
-    <div class="lg:col-span-2 p-10 glass-card rounded-[2.5rem] bg-indigo-600/5 border-indigo-500/20">
-        <div class="flex items-center gap-3 mb-6">
-            <span class="bg-indigo-500 text-[10px] px-2 py-1 rounded font-black">AI INSIGHT</span>
-            <h3 class="text-2xl font-black uppercase italic">Executive Summary</h3>
-        </div>
-        <p id="executive-summary" class="text-lg leading-relaxed text-slate-300 font-medium italic">
-            Generating executive summary... (Python backend will generate 200 words)
-        </p>
-        
-        <div class="mt-8 grid md:grid-cols-2 gap-6">
-            <div class="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
-                <h4 class="text-rose-500 font-black text-xs uppercase mb-3 flex items-center gap-2">Weakest Areas</h4>
-                <ul id="weak-areas" class="space-y-2 text-sm font-bold text-slate-400"></ul>
-            </div>
-            <div class="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                <h4 class="text-emerald-500 font-black text-xs uppercase mb-3 flex items-center gap-2">Top Improvements</h4>
-                <ul id="improvements" class="space-y-2 text-sm font-bold text-slate-400"></ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="p-10 bg-gradient-to-br from-indigo-700 to-violet-900 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-        <div class="relative z-10 flex flex-col h-full">
-            <h3 class="text-xl font-black mb-2">AUDIT CERTIFICATION</h3>
-            <p class="text-xs opacity-70 mb-8 uppercase tracking-widest">Global Standards Compliance</p>
-            <div class="flex-1 flex flex-col items-center justify-center">
-                <div class="w-32 h-32 rounded-full border-8 border-white/20 flex items-center justify-center mb-4">
-                    <span id="stat-grade" class="text-6xl font-black">--</span>
-                </div>
-                <p class="font-black text-sm tracking-[0.3em]">GRADE RATING</p>
-            </div>
-            <button class="mt-8 w-full py-4 bg-white text-indigo-900 font-black rounded-xl hover:scale-105 transition shadow-lg">
-                DOWNLOAD CERTIFIED PDF
-            </button>
-        </div>
-        <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-    </div>
-</div>
-
-<!-- FULL METRICS DASHBOARD -->
-<h2 class="text-3xl font-black tracking-tight mt-12 mb-6">THE 140+ POINT INSPECTION</h2>
-<div id="full-metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-    <!-- Python will populate this dynamically -->
-</div>
-
-<div class="p-10 glass-card rounded-[3rem]">
-    <h3 class="text-xl font-black mb-8">Performance Benchmark Trend</h3>
-    <div class="h-[400px]">
-        <canvas id="main-trend-chart"></canvas>
-    </div>
-</div>
+<!-- ================================================= -->
+<!-- CORE WEB VITALS -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">Core Web Vitals (Speedometer)</h2>
+<canvas id="cwvChart"></canvas>
 </section>
 
-</main>
+<!-- ================================================= -->
+<!-- CRAWL STRUCTURE -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">Crawl Depth & Structure</h2>
+<canvas id="crawlTree"></canvas>
+</section>
 
+<!-- ================================================= -->
+<!-- COMPETITOR + MONEY RISK -->
+<!-- ================================================= -->
+<section class="grid md:grid-cols-2 gap-6">
+
+<div class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">Competitor Comparison</h2>
+<canvas id="competitorChart"></canvas>
+</div>
+
+<div class="bg-slate-900 p-6 rounded-xl text-center">
+<h2 class="font-semibold mb-3">Estimated Money at Risk</h2>
+<div id="moneyRisk" class="text-5xl font-bold text-red-400"></div>
+<p class="text-sm text-slate-400 mt-2">Estimated monthly loss due to performance & errors</p>
+</div>
+
+</section>
+
+<!-- ================================================= -->
+<!-- EXECUTIVE SUMMARY -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">AI Executive Summary</h2>
+<p id="executiveSummary" class="leading-relaxed text-slate-300"></p>
+</section>
+
+<!-- ================================================= -->
+<!-- FIX PRIORITY HEATMAP -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">Critical Fix Priority (Impact vs Effort)</h2>
+<table class="w-full text-sm">
+<thead class="border-b border-slate-700">
+<tr>
+<th class="text-left">Metric</th>
+<th>Impact</th>
+<th>Effort</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="heatmapTable"></tbody>
+</table>
+</section>
+
+<!-- ================================================= -->
+<!-- FIX-IT CHECKLIST -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">Fix-It Checklist</h2>
+<ul id="fixList" class="space-y-2"></ul>
+<button class="mt-4 px-4 py-2 bg-emerald-600 rounded">Re-Validate</button>
+</section>
+
+<!-- ================================================= -->
+<!-- MASTER METRICS TABLE -->
+<!-- ================================================= -->
+<section class="bg-slate-900 p-6 rounded-xl">
+<h2 class="font-semibold mb-3">All Metrics (60+)</h2>
+<input id="search" placeholder="Search metrics..."
+class="mb-4 w-full p-2 rounded bg-slate-800">
+
+<table class="w-full text-sm">
+<thead class="border-b border-slate-700">
+<tr>
+<th>Category</th>
+<th>Metric</th>
+<th>Status</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody id="metricsTable"></tbody>
+</table>
+</section>
+
+</div>
+
+<!-- ================================================= -->
+<!-- PYTHON DATA BINDING -->
+<!-- ================================================= -->
 <script>
-const runBtn = document.getElementById('run-audit');
-const resultsArea = document.getElementById('audit-results');
-const statusBar = document.getElementById('status-bar');
+fetch("/api/audit-result")
+.then(res => res.json())
+.then(data => {
 
-runBtn.addEventListener('click', async () => {
-    const targetUrl = document.getElementById('audit-url').value;
-    if(!targetUrl) return alert("Please enter a URL.");
+/* Health Gauge */
+document.getElementById("healthScore").innerText = data.health + "%";
+document.getElementById("healthGrade").innerText = "Grade: " + data.grade;
 
-    runBtn.disabled = true;
-    runBtn.innerText = "SCANNING...";
-    statusBar.classList.remove('hidden');
-
-    // Simulated Python backend integration
-    setTimeout(() => {
-        const data = {
-            health: 92,
-            errors: 3,
-            warnings: 11,
-            pages: 152,
-            grade: 'A',
-            summary: "The audit demonstrates strong technical architecture, excellent Core Web Vitals, and optimized SEO. Minor issues include missing CSP headers, 3 broken internal links, and some thin content pages. Mobile responsiveness is excellent. Optimization suggestions include image compression, render-blocking JS adjustments, and meta description enhancements.",
-            weaknesses: ["Missing CSP Header", "3 Broken Internal Links", "Thin Content Pages"],
-            improvements: ["Enable WebP Images", "Fix Internal Links", "Improve Meta Descriptions"],
-            full_metrics: [
-                { category: "Crawlability & Indexing", name: "HTTP 2xx Success", status: "pass" },
-                { category: "Crawlability & Indexing", name: "Broken Links", status: "fail" },
-                { category: "Core Web Vitals", name: "LCP", status: "pass" },
-                { category: "Core Web Vitals", name: "CLS", status: "pass" },
-                { category: "Security", name: "SSL Validity", status: "pass" },
-                { category: "Security", name: "CSP Header", status: "fail" }
-            ]
-        };
-
-        hydrateDashboard(data);
-        runBtn.disabled = false;
-        runBtn.innerText = "SCAN COMPLETE";
-        resultsArea.classList.remove('hidden');
-        statusBar.classList.add('hidden');
-
-    }, 2000);
+new Chart(healthGauge, {
+type: "doughnut",
+data: {
+datasets: [{
+data: [data.health, 100 - data.health],
+backgroundColor: [data.health_color, "#1e293b"],
+borderWidth: 0
+}]
+},
+options: { cutout: "80%" }
 });
 
-function hydrateDashboard(data){
-    document.getElementById('stat-health').innerText = data.health + '%';
-    document.getElementById('bar-health').style.width = data.health + '%';
-    document.getElementById('stat-errors').innerText = data.errors;
-    document.getElementById('stat-warnings').innerText = data.warnings;
-    document.getElementById('stat-pages').innerText = data.pages;
-    document.getElementById('stat-grade').innerText = data.grade;
-
-    document.getElementById('executive-summary').innerText = data.summary;
-
-    const weakList = document.getElementById('weak-areas');
-    weakList.innerHTML = data.weaknesses.map(w => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-rose-500 rounded-full"></div>${w}</li>`).join('');
-    const impList = document.getElementById('improvements');
-    impList.innerHTML = data.improvements.map(i => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-emerald-500 rounded-full"></div>${i}</li>`).join('');
-
-    const metricsGrid = document.getElementById('full-metrics-grid');
-    metricsGrid.innerHTML = data.full_metrics.map(m => `
-        <div class="p-6 glass-card rounded-[2rem] border-l-4 border-${m.status==='pass'?'emerald-500':'rose-500'}">
-            <h3 class="text-xs font-black uppercase tracking-widest mb-3">${m.category}</h3>
-            <div class="metric-row"><span>${m.name}</span><span class="status-pill status-${m.status}">${m.status.toUpperCase()}</span></div>
-        </div>
-    `).join('');
+/* Issue Map */
+new Chart(issuesDonut, {
+type: "doughnut",
+data: {
+labels: ["Errors","Warnings","Notices"],
+datasets: [{
+data: [data.errors, data.warnings, data.notices],
+backgroundColor: ["#ef4444","#f59e0b","#3b82f6"]
+}]
 }
+});
 
-function renderTrendChart(){
-    const ctx = document.getElementById('main-trend-chart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ['Day 1', 'Day 5', 'Day 10', 'Day 15', 'Day 20', 'Day 30'],
-            datasets: [{
-                label: 'Health Score',
-                data: [65, 70, 78, 85, 88, 92],
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99,102,241,0.1)',
-                fill: true,
-                tension: 0.4,
-                borderWidth: 4,
-                pointRadius: 6,
-                pointBackgroundColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                x: { grid: { display: false }, ticks: { color: '#94a3b8' }
+/* CWV */
+new Chart(cwvChart, {
+type: "bar",
+data: {
+labels: data.cwv.labels,
+datasets: [
+{ label: "Your Site", data: data.cwv.site },
+{ label: "Benchmark", data: data.cwv.benchmark }
+]
+}
+});
+
+/* Crawl Map */
+new Chart(crawlTree, {
+type: "treemap",
+data: {
+datasets: [{
+tree: data.crawl_depth,
+key: "value",
+groups: ["depth"]
+}]
+}
+});
+
+/* Competitors */
+new Chart(competitorChart, {
+type: "bar",
+data: {
+labels: data.competitors.labels,
+datasets: [{
+label: "Health Score",
+data: data.competitors.scores
+}]
+}
+});
+
+/* Money Risk */
+document.getElementById("moneyRisk").innerText =
+"$" + data.money_risk.toLocaleString();
+
+/* Summary */
+document.getElementById("executiveSummary").innerText =
+data.executive_summary;
+
+/* Heatmap */
+data.heatmap.forEach(i => {
+heatmapTable.innerHTML += `
+<tr class="border-b border-slate-800">
+<td>${i.metric}</td>
+<td>${i.impact}</td>
+<td>${i.effort}</td>
+<td>${i.status}</td>
+</tr>`;
+});
+
+/* Fix List */
+data.fix_list.forEach(f => {
+fixList.innerHTML += `
+<li>
+<label>
+<input type="checkbox" class="mr-2"> ${f}
+</label>
+</li>`;
+});
+
+/* Metrics Table */
+data.metrics.forEach(m => {
+metricsTable.innerHTML += `
+<tr class="border-b border-slate-800">
+<td>${m.category}</td>
+<td>${m.metric}</td>
+<td>${m.status}</td>
+<td>${m.impact}</td>
+</tr>`;
+});
+
+});
+</script>
+
+</body>
+</html>
