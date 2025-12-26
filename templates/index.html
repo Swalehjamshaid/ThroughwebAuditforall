@@ -15,17 +15,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 
   <style>
-    body { font-family: Inter, system-ui; }
-    .glass {
-      background: rgba(15,23,42,.65);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,.08);
-    }
+    body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
+    .glass { background: rgba(15,23,42,.65); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.08); transition: transform 0.3s; }
+    .glass:hover { transform: translateY(-5px); }
     .glow { box-shadow: 0 0 40px rgba(99,102,241,.25); }
     .pulse { animation: pulse 2s infinite; }
-    @keyframes pulse {
-      0%{opacity:.4}50%{opacity:1}100%{opacity:.4}
-    }
+    @keyframes pulse { 0%{opacity:.4}50%{opacity:1}100%{opacity:.4} }
+    .severity-high { color: #ef4444; font-weight: 700; }
+    .severity-medium { color: #f59e0b; font-weight: 700; }
+    .severity-low { color: #38bdf8; font-weight: 700; }
+    .collapsible { cursor: pointer; }
+    .content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .tooltip { position: relative; display: inline-block; }
+    .tooltip .tooltiptext { visibility: hidden; width: 180px; background-color: #111827; color: #fff; text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 10; bottom: 125%; left: 50%; margin-left: -90px; opacity: 0; transition: opacity 0.3s; font-size: 12px; }
+    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
   </style>
 </head>
 
@@ -40,9 +43,10 @@
       </h1>
       <p class="text-sm text-slate-400">{{ audit.website.url }}</p>
     </div>
-    <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">
-      ● CERTIFIED REPORT
-    </span>
+    <div class="flex items-center gap-4">
+      <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
+      <button onclick="downloadPDF()" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">Download PDF</button>
+    </div>
   </div>
 </header>
 
@@ -52,23 +56,26 @@
   <!-- Score -->
   <div class="glass glow rounded-3xl p-8 text-center">
     <p class="text-slate-400">Site Health Score</p>
-    <p class="text-7xl font-black text-indigo-400 mt-2">
-      {{ audit.site_health_score }}%
-    </p>
-    <p class="mt-4 text-sm">
-      Grade:
-      <span class="font-bold text-emerald-400">{{ audit.grade }}</span>
-    </p>
+    <p class="text-7xl font-black text-indigo-400 mt-2">{{ audit.site_health_score }}%</p>
+    <p class="mt-4 text-sm">Grade: <span class="font-bold text-emerald-400">{{ audit.grade }}</span></p>
+    <p class="mt-2 text-xs text-slate-400">Compared to last audit: {{ previous_audit.site_health_score if previous_audit else audit.site_health_score }}%</p>
   </div>
 
-  <!-- Animated Progress -->
+  <!-- Audit Timeline -->
   <div class="glass rounded-3xl p-8 col-span-2">
-    <h2 class="text-xl font-bold mb-4">Audit Execution Pipeline</h2>
-    <div class="space-y-3">
+    <h2 class="text-xl font-bold mb-4">Audit Timeline</h2>
+    <div class="space-y-4">
       {% for step in ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"] %}
-      <div class="flex items-center gap-3">
-        <span class="w-3 h-3 bg-emerald-400 rounded-full pulse"></span>
-        <span>{{ step }} completed</span>
+      <div class="flex items-center gap-4">
+        <div class="w-6 h-6 rounded-full border-2 border-indigo-400 flex items-center justify-center">
+          <span class="w-3 h-3 bg-emerald-400 rounded-full pulse"></span>
+        </div>
+        <div>
+          <p class="font-semibold">{{ step }}</p>
+          <div class="w-full bg-slate-800 rounded h-2 mt-1">
+            <div class="bg-indigo-500 h-2 rounded" style="width:{{ (loop.index * 16) }}%"></div>
+          </div>
+        </div>
       </div>
       {% endfor %}
     </div>
@@ -91,13 +98,38 @@
 
 </section>
 
+<!-- ================= TOP 10 ISSUES ================= -->
+<section class="max-w-7xl mx-auto px-6 py-10">
+  <div class="glass rounded-3xl p-8">
+    <h2 class="text-2xl font-extrabold mb-4">Top 10 Issues</h2>
+    <table class="w-full text-left border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-slate-700">
+          <th class="py-2 px-4">Issue</th>
+          <th class="py-2 px-4">Severity</th>
+          <th class="py-2 px-4">Suggestion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in audit.top_issues %}
+        <tr class="border-b border-slate-800 hover:bg-slate-800 transition">
+          <td class="py-2 px-4">{{ issue.name }}</td>
+          <td class="py-2 px-4">
+            <span class="severity-{{ issue.severity }}">{{ issue.severity|capitalize }}</span>
+          </td>
+          <td class="py-2 px-4">{{ issue.suggestion }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <!-- ================= EXECUTIVE SUMMARY ================= -->
 <section class="max-w-7xl mx-auto px-6 py-10">
   <div class="glass rounded-3xl p-8">
     <h2 class="text-2xl font-extrabold mb-4">Executive Summary</h2>
-    <p class="leading-relaxed text-slate-300">
-      {{ audit.executive_summary }}
-    </p>
+    <p class="leading-relaxed text-slate-300">{{ audit.executive_summary }}</p>
   </div>
 </section>
 
@@ -108,18 +140,16 @@
     <div class="grid md:grid-cols-3 gap-6 text-center">
       <div class="p-6 bg-slate-900 rounded-xl">
         <p class="text-sm text-slate-400">Your Website</p>
-        <p class="text-4xl font-black text-indigo-400">
-          {{ audit.site_health_score }}%
-        </p>
+        <p class="text-4xl font-black text-indigo-400">{{ audit.site_health_score }}%</p>
+        <div class="h-2 bg-indigo-400 rounded mt-2" style="width:{{ audit.site_health_score }}%"></div>
       </div>
+      {% for comp in audit.competitors %}
       <div class="p-6 bg-slate-900 rounded-xl opacity-70">
-        <p class="text-sm text-slate-400">Competitor A</p>
-        <p class="text-4xl font-black">78%</p>
+        <p class="text-sm text-slate-400">{{ comp.name }}</p>
+        <p class="text-4xl font-black">{{ comp.score }}%</p>
+        <div class="h-2 bg-gray-500 rounded mt-2" style="width:{{ comp.score }}%"></div>
       </div>
-      <div class="p-6 bg-slate-900 rounded-xl opacity-70">
-        <p class="text-sm text-slate-400">Competitor B</p>
-        <p class="text-4xl font-black">72%</p>
-      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -127,14 +157,11 @@
 <!-- ================= METRICS GRID ================= -->
 <section class="max-w-7xl mx-auto px-6 py-10 grid md:grid-cols-2 xl:grid-cols-3 gap-6">
   {% for k,v in audit.metrics_summary.items() %}
-  <div class="glass rounded-2xl p-6">
-    <p class="text-xs text-slate-400 uppercase">
-      {{ k.replace("_"," ") }}
-    </p>
+  <div class="glass rounded-2xl p-6 tooltip">
+    <p class="text-xs text-slate-400 uppercase">{{ k.replace("_"," ") }}</p>
     <p class="text-2xl font-bold mt-2
-      {% if v is boolean and not v %} text-red-400 {% endif %}">
-      {{ v }}
-    </p>
+      {% if v is boolean and not v %} text-red-400 {% endif %}">{{ v }}</p>
+    <span class="tooltiptext">Detailed info for {{ k.replace("_"," ") }}</span>
   </div>
   {% endfor %}
 </section>
@@ -142,15 +169,12 @@
 <!-- ================= WEAKNESSES ================= -->
 <section class="max-w-7xl mx-auto px-6 py-10">
   <div class="glass rounded-3xl p-8 border border-red-500/30">
-    <h2 class="text-2xl font-extrabold mb-6 text-red-400">
+    <h2 class="text-2xl font-extrabold mb-6 text-red-400 collapsible" onclick="toggleContent('weaknessesContent')">
       Priority Weak Areas
     </h2>
-    <ul class="space-y-3">
+    <ul class="space-y-3 content" id="weaknessesContent">
       {% for w in audit.weaknesses %}
-      <li class="flex gap-3">
-        <span class="text-red-500">●</span>
-        <span>{{ w }}</span>
-      </li>
+      <li class="flex gap-3"><span class="text-red-500">●</span><span>{{ w }}</span></li>
       {% endfor %}
     </ul>
   </div>
@@ -165,6 +189,23 @@
 
 <!-- ================= JS ================= -->
 <script>
+function toggleContent(id) {
+  const el = document.getElementById(id);
+  el.style.maxHeight = el.style.maxHeight === '0px' || !el.style.maxHeight ? el.scrollHeight + 'px' : '0px';
+}
+
+function toggleMode() {
+  document.documentElement.classList.toggle('dark');
+  document.body.classList.toggle('bg-slate-50');
+  document.body.classList.toggle('text-slate-900');
+}
+
+// PDF Download Placeholder
+function downloadPDF() {
+  alert("Download PDF feature coming soon! Implement with jsPDF or backend export.");
+}
+
+// Charts
 new Chart(document.getElementById("issuesChart"), {
   type: "doughnut",
   data: {
@@ -178,7 +219,9 @@ new Chart(document.getElementById("issuesChart"), {
       backgroundColor: ["#ef4444","#f59e0b","#38bdf8"]
     }]
   },
-  options: { plugins:{legend:{labels:{color:"#cbd5f5"}}}}
+  options: {
+    plugins:{legend:{labels:{color:"#cbd5f5"}}, tooltip:{callbacks:{label: ctx=>ctx.label+': '+ctx.raw}}}
+  }
 });
 
 new Chart(document.getElementById("trendChart"), {
@@ -191,14 +234,14 @@ new Chart(document.getElementById("trendChart"), {
         {{ audit.site_health_score }}
       ],
       borderColor: "#6366f1",
-      tension: .4
+      backgroundColor: "rgba(99,102,241,.2)",
+      tension: .4,
+      fill: true,
+      pointRadius:6
     }]
   },
   options: {
-    scales:{
-      x:{ticks:{color:"#cbd5f5"}},
-      y:{ticks:{color:"#cbd5f5"}, min:0, max:100}
-    },
+    scales:{x:{ticks:{color:"#cbd5f5"}},y:{ticks:{color:"#cbd5f5"}, min:0,max:100}},
     plugins:{legend:{display:false}}
   }
 });
