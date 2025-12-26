@@ -8,6 +8,13 @@ Save this file as: app.py
 ENVIRONMENT VARIABLES (Railway-friendly)
 ───────────────────────────────────────────────────────────────────────────────
 # Core
+
+app = FastAPI()
+
+@app.get("/")
+def home():
+    return {"status": "ok"}
+
 DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DBNAME
 SECRET_KEY=change_this_in_production
 APP_DOMAIN=https://yourapp.example.com          # used for email verification links
