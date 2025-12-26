@@ -1,19 +1,18 @@
-
 [phases.setup]
-# Keep python; remove playwright-driver if it's being auto-detected
-# Nixpacks sometimes detects Playwright from files; this disables it.
-extra_pkgs = ["python3", "gcc"]
+# Added libpq-dev for PostgreSQL support
+extra_pkgs = ["python3", "gcc", "libpq-dev"]
 
 [phases.install]
-# Standard Python install
+# Using a local .venv is more standard for Railpack/Nixpacks
 cmds = [
-  "python -m venv /opt/venv",
-  ". /opt/venv/bin/activate && pip install -r requirements.txt"
+  "python3 -m venv .venv",
+  ".venv/bin/pip install --upgrade pip",
+  ".venv/bin/pip install -r requirements.txt"
 ]
 
 [phases.build]
-# No playwright here
 cmds = []
 
 [start]
-cmd = "uvicorn main:app --host 0.0.0.0 --port ${PORT}"
+# IMPORTANT: Use app:app if your file is app.py
+cmd = ".venv/bin/uvicorn app:app --host 0.0.0.0 --port ${PORT}"
