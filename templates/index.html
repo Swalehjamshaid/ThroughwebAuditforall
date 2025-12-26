@@ -8,344 +8,292 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root {
-            --glass: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --accent: #00f2ff;
-            --accent-dark: #0062ff;
-            --green: #00ff88;
-            --yellow: #ffbb00;
-            --red: #ff4d4d;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@300;400;600;700&display=swap');
+
         body {
-            background: radial-gradient(circle at top right, #1a1a2e, #0f0f1a, #050505);
-            color: #e0e0e0;
             font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #001122 50%, #00080f 100%);
+            color: #e0f2ff;
             min-height: 100vh;
         }
-        .glass-card {
-            background: var(--glass);
+
+        .hero-bg {
+            background: linear-gradient(rgba(0,0,30,0.7), rgba(0,10,40,0.9)), url('https://images.unsplash.com/photo-1560869710-7d0c2c7d8ac0?ixlib=rb-4.0.3&auto=format&fit=crop&q=80') center/cover no-repeat;
+            border-radius: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(45deg, rgba(0,242,255,0.1), transparent, rgba(0,100,255,0.15));
+            animation: shimmer 8s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px;
-            transition: all 0.4s ease;
         }
-        .glass-card:hover {
-            border-color: rgba(0, 242, 255, 0.4);
-            box-shadow: 0 0 30px rgba(0, 242, 255, 0.15);
-        }
-        .grade-badge {
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+
+        .glow-text {
+            background: linear-gradient(135deg, #00f2ff, #00aaff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            font-weight: 900;
-            font-size: 5rem;
-            filter: drop-shadow(0 0 15px rgba(0, 242, 255, 0.6));
+            text-shadow: 0 0 20px rgba(0,242,255,0.5);
         }
-        .metric-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 12px currentColor;
+
+        .metric-card {
+            transition: all 0.4s ease;
         }
-        .dot-green { background: var(--green); }
-        .dot-yellow { background: var(--yellow); }
-        .dot-red { background: var(--red); animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+        .metric-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,242,255,0.2);
         }
-        .category-header {
-            background: linear-gradient(90deg, rgba(0,242,255,0.15), transparent);
-            border-left: 5px solid var(--accent);
+
+        .status-green { box-shadow: 0 0 20px rgba(0,255,100,0.3); }
+        .status-yellow { box-shadow: 0 0 20px rgba(255,200,0,0.3); }
+        .status-red { box-shadow: 0 0 20px rgba(255,80,80,0.4); animation: pulse-glow 2s infinite; }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,80,80,0.4); }
+            50% { box-shadow: 0 0 30px rgba(255,80,80,0.6); }
         }
+
+        .orbitron { font-family: 'Orbitron', sans-serif; }
     </style>
 </head>
-<body class="p-6 lg:p-12">
+<body class="p-4 lg:p-8">
 
-    <!-- AUTH GATE: Shown if user not authenticated -->
-    <div id="auth-gate" class="fixed inset-0 bg-black/90 backdrop-blur-lg z-50 flex items-center justify-center">
-        <div class="glass-card p-12 max-w-lg w-full mx-4 shadow-2xl">
-            <h2 class="text-4xl font-black text-center mb-10 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Unlock Premium Audit Report
-            </h2>
-
+    <!-- AUTH GATE -->
+    <div id="auth-gate" class="fixed inset-0 bg-black/95 backdrop-blur-xl z-50 flex items-center justify-center">
+        <div class="glass p-12 max-w-md w-full mx-4 text-center">
+            <h2 class="text-5xl font-bold orbitron glow-text mb-8">FF TECH</h2>
+            <p class="text-xl mb-10 opacity-90">Unlock Your Premium AI Audit Report</p>
             <div id="login-form">
-                <input type="email" id="login-email" placeholder="Your Email" class="w-full px-6 py-4 mb-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-cyan-400 text-white">
-                <input type="password" id="login-password" placeholder="Access Code (if provided)" class="w-full px-6 py-4 mb-8 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-cyan-400 text-white">
-                <button id="btn-login" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-5 rounded-xl text-lg transition shadow-lg">
-                    Access Full Report
+                <input type="email" placeholder="Business Email" class="w-full px-6 py-4 mb-6 glass border border-cyan-500/30 rounded-xl focus:outline-none focus:border-cyan-400">
+                <button id="btn-access" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-5 rounded-xl text-xl shadow-2xl shadow-cyan-500/50">
+                    Access Report
                 </button>
-                <p class="text-center mt-6 text-sm opacity-70">
-                    Need access? <a href="#" id="link-register" class="text-cyan-400 underline font-bold">Request Paid Report</a>
-                </p>
+                <p class="mt-8 text-sm opacity-70">Need access? Request paid report via email.</p>
             </div>
-
-            <div id="register-form" class="hidden">
-                <input type="text" placeholder="Full Name" class="w-full px-6 py-4 mb-4 bg-white/5 border border-white/10 rounded-xl text-white">
-                <input type="email" id="reg-email" placeholder="Business Email" class="w-full px-6 py-4 mb-8 bg-white/5 border border-white/10 rounded-xl text-white">
-                <button id="btn-register" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-5 rounded-xl text-lg transition shadow-lg">
-                    Send Paid Access Link via Email
-                </button>
-                <p class="text-center mt-6 text-sm opacity-70">
-                    <a href="#" id="link-back-login" class="text-cyan-400 underline">Back to Login</a>
-                </p>
-            </div>
-
-            <div id="auth-message" class="mt-6 text-center font-bold"></div>
         </div>
     </div>
 
-    <!-- MAIN REPORT CONTENT (hidden until authenticated) -->
+    <!-- MAIN REPORT -->
     <div id="report-content" class="max-w-7xl mx-auto hidden">
 
-        <nav class="flex justify-between items-center mb-12">
-            <div class="text-4xl font-black tracking-tighter">FF <span class="text-cyan-400">TECH</span></div>
-            <div class="flex items-center gap-10">
-                <span class="text-sm opacity-60">Audit ID: <span id="audit-id">Loading...</span></span>
-                <button id="btn-download-pdf" class="bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-4 px-10 rounded-full text-lg transition shadow-lg shadow-cyan-500/40">
-                    Download PDF Certificate
-                </button>
-            </div>
-        </nav>
-
-        <!-- OVERALL SITE HEALTH -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-16">
-            <div class="glass-card p-12 text-center flex flex-col justify-center">
-                <h3 class="text-gray-400 uppercase tracking-widest text-sm mb-8">Overall Site Health</h3>
-                <div class="relative w-72 h-72 mx-auto">
-                    <svg class="w-full h-full -rotate-90">
-                        <circle cx="144" cy="144" r="128" stroke="rgba(255,255,255,0.1)" stroke-width="20" fill="none"/>
-                        <circle cx="144" cy="144" r="128" stroke="url(#grad)" stroke-width="20" fill="none" 
-                                stroke-dasharray="804" stroke-dashoffset="804" id="health-progress" stroke-linecap="round"/>
-                        <defs>
-                            <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#00f2ff"/>
-                                <stop offset="100%" stop-color="#0062ff"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <div class="grade-badge" id="overall-grade">—</div>
-                        <div class="text-3xl font-bold mt-2" id="overall-score">—%</div>
-                        <div class="text-sm opacity-60 mt-3" id="scoring-mode">Strict Mode</div>
-                    </div>
+        <!-- HERO HEADER -->
+        <div class="hero-bg glass p-12 lg:p-20 mb-12 text-center relative">
+            <h1 class="text-6xl lg:text-8xl font-black orbitron glow-text mb-6">
+                FF TECH<br>AUDIT COMMAND CENTER
+            </h1>
+            <p class="text-2xl lg:text-3xl opacity-90 mb-4" id="domain-name">example.com</p>
+            <p class="text-lg opacity-70" id="audit-date">Audit Completed: December 26, 2025</p>
+            <div class="mt-10 flex justify-center gap-8">
+                <div class="text-center">
+                    <div class="text-5xl font-bold glow-text" id="overall-score">92%</div>
+                    <div class="text-xl opacity-80">Site Health Score</div>
                 </div>
-                <p class="mt-8 text-sm text-gray-400" id="audit-date">Audit Date: Loading...</p>
-            </div>
-
-            <div class="lg:col-span-2 glass-card p-12">
-                <h2 class="text-3xl font-bold mb-8 flex items-center gap-5">
-                    <i class="fa-solid fa-robot text-cyan-400 text-4xl"></i> AI Executive Summary
-                </h2>
-                <p class="text-gray-300 leading-relaxed text-lg italic" id="executive-summary">
-                    Loading analysis...
-                </p>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mt-12">
-                    <div class="text-center">
-                        <div class="text-4xl font-bold text-red-400" id="total-errors">—</div>
-                        <div class="text-sm opacity-70 mt-2">Critical Errors</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-4xl font-bold text-yellow-400" id="total-warnings">—</div>
-                        <div class="text-sm opacity-70 mt-2">Warnings</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-4xl font-bold text-cyan-400" id="total-notices">—</div>
-                        <div class="text-sm opacity-70 mt-2">Notices</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-4xl font-bold text-green-400" id="crawled-pages">—</div>
-                        <div class="text-sm opacity-70 mt-2">Pages Crawled</div>
-                    </div>
+                <div class="text-center">
+                    <div class="text-5xl font-bold text-cyan-300" id="overall-grade">A-</div>
+                    <div class="text-xl opacity-80">FF Tech Grade</div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- ALL 10 CATEGORIES -->
-        <section class="space-y-16">
+        <!-- EXECUTIVE SUMMARY -->
+        <div class="glass p-10 mb-12">
+            <h2 class="text-4xl font-bold orbitron glow-text mb-8 flex items-center gap-4">
+                <i class="fa-solid fa-brain text-cyan-400 text-5xl"></i> AI Executive Summary
+            </h2>
+            <blockquote class="text-xl lg:text-2xl leading-relaxed italic border-l-4 border-cyan-500 pl-8" id="executive-summary">
+                Loading AI analysis...
+            </blockquote>
+        </div>
 
-            <!-- Category 1: Overall Site Health Details -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-heart-pulse text-cyan-400"></i> Overall Site Health
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="category-overall"></div>
+        <!-- KEY METRICS GRID -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
+            <div class="glass metric-card p-8 text-center status-green">
+                <i class="fa-solid fa-spider text-4xl text-green-400 mb-4"></i>
+                <div class="text-4xl font-bold" id="crawled-pages">2,134</div>
+                <div class="text-lg opacity-80">Pages Crawled</div>
+            </div>
+            <div class="glass metric-card p-8 text-center status-red">
+                <i class="fa-solid fa-bug text-4xl text-red-400 mb-4"></i>
+                <div class="text-4xl font-bold" id="total-errors">15</div>
+                <div class="text-lg opacity-80">Critical Errors</div>
+            </div>
+            <div class="glass metric-card p-8 text-center status-yellow">
+                <i class="fa-solid fa-triangle-exclamation text-4xl text-yellow-400 mb-4"></i>
+                <div class="text-4xl font-bold" id="total-warnings">32</div>
+                <div class="text-lg opacity-80">Warnings</div>
+            </div>
+            <div class="glass metric-card p-8 text-center status-green">
+                <i class="fa-solid fa-shield-halved text-4xl text-cyan-400 mb-4"></i>
+                <div class="text-4xl font-bold text-green-400">Top 5%</div>
+                <div class="text-lg opacity-80">Global Security Rank</div>
+            </div>
+        </div>
+
+        <!-- DETAILED CATEGORIES -->
+        <div class="space-y-12 mb-16">
+
+            <!-- Example Category -->
+            <div class="glass p-10">
+                <h3 class="text-3xl font-bold glow-text mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-magnifying-glass-chart text-cyan-400"></i> Core Web Vitals & Performance
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="category-performance"></div>
             </div>
 
-            <!-- Category 2: Crawlability & Indexation -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-spider text-cyan-400"></i> Crawlability & Indexation
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-crawlability"></div>
+            <div class="glass p-10">
+                <h3 class="text-3xl font-bold glow-text mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-sitemap text-cyan-400"></i> Crawlability & Indexation
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="category-crawlability"></div>
             </div>
 
-            <!-- Category 3: On-Page SEO Metrics -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-file-lines text-cyan-400"></i> On-Page SEO Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-onpage"></div>
+            <!-- Add more categories with unique IDs -->
+            <div class="glass p-10">
+                <h3 class="text-3xl font-bold glow-text mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-mobile-screen text-cyan-400"></i> Mobile Experience
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="category-mobile"></div>
             </div>
 
-            <!-- Category 4: Technical & Performance -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-gauge-high text-cyan-400"></i> Technical & Performance Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-performance"></div>
+        </div>
+
+        <!-- COMPETITIVE BENCHMARK -->
+        <div class="glass p-12 mb-16">
+            <h3 class="text-4xl font-bold orbitron glow-text text-center mb-12">
+                Competitive Authority Benchmark
+            </h3>
+            <div class="max-w-3xl mx-auto">
+                <canvas id="benchmark-chart" height="300"></canvas>
             </div>
+        </div>
 
-            <!-- Category 5: Mobile & Usability -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-mobile-screen text-cyan-400"></i> Mobile & Usability Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-mobile"></div>
-            </div>
-
-            <!-- Category 6: Security & HTTPS -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-shield-halved text-cyan-400"></i> Security & HTTPS Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-security"></div>
-            </div>
-
-            <!-- Category 7: International SEO -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-earth-americas text-cyan-400"></i> International / Multi-language SEO
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-international"></div>
-            </div>
-
-            <!-- Category 8: Backlinks & Authority (Optional API) -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-link text-cyan-400"></i> Backlinks & Authority Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-backlinks"></div>
-            </div>
-
-            <!-- Category 9: Advanced / Thematic -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-flask text-cyan-400"></i> Advanced & Thematic Metrics
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-advanced"></div>
-            </div>
-
-            <!-- Category 10: Historical Trends -->
-            <div class="category-header glass-card p-10">
-                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
-                    <i class="fa-solid fa-chart-line text-cyan-400"></i> Historical Trends
-                </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="glass-card p-8">
-                        <canvas id="trend-chart-health" height="200"></canvas>
-                    </div>
-                    <div class="glass-card p-8">
-                        <canvas id="trend-chart-cwv" height="200"></canvas>
-                    </div>
-                </div>
-            </div>
-
-        </section>
-
-        <!-- Competitive Benchmark -->
-        <section class="mt-20 glass-card p-12">
-            <h3 class="text-3xl font-bold mb-10">Competitive Authority Benchmark</h3>
-            <canvas id="benchmark-chart" height="120"></canvas>
-        </section>
+        <!-- DOWNLOAD BUTTON -->
+        <div class="text-center mb-20">
+            <button class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-6 px-16 rounded-full text-2xl shadow-2xl shadow-cyan-500/60 transition transform hover:scale-105">
+                Download PDF Certificate
+            </button>
+        </div>
 
     </div>
 
-    <footer class="max-w-7xl mx-auto mt-32 pt-12 border-t border-white/10 text-center opacity-40 text-sm">
-        © 2025 FF Tech International. Advanced AI-Powered Website Auditing Platform.
+    <footer class="text-center opacity-50 text-sm py-10">
+        © 2025 FF Tech International • Powered by Advanced AI & Cloud Analytics
     </footer>
 
     <script>
-        // Placeholder for Python-injected data
-        window.auditData = null;
+        // Data will be injected by Python
+        window.auditData = {
+            domain: "example.com",
+            score: 92,
+            grade: "A-",
+            summary: "Your website demonstrates exceptional security and crawl efficiency, ranking in the global top 5%. However, mobile Largest Contentful Paint (LCP) at 4.1s is creating a significant conversion bottleneck. Prioritizing image optimization and server response could push you into A+ territory.",
+            errors: 15,
+            warnings: 32,
+            crawled_pages: 2134,
+            metrics: {
+                performance: [
+                    {name: "LCP", value: "4.1s", status: "red"},
+                    {name: "CLS", value: "0.02", status: "green"},
+                    {name: "TTFB", value: "680ms", status: "yellow"}
+                ],
+                crawlability: [
+                    {name: "Orphan Pages", value: "142 (6.7%)", status: "yellow"},
+                    {name: "Broken Links", value: "38", status: "red"},
+                    {name: "Redirect Loops", value: "0", status: "green"}
+                ],
+                mobile: [
+                    {name: "Mobile Friendly", value: "Pass", status: "green"},
+                    {name: "Viewport Config", value: "Correct", status: "green"},
+                    {name: "Tap Targets", value: "2 Issues", status: "yellow"}
+                ]
+            }
+        };
 
-        // Function to render a single metric card
-        function createMetric(name, value, status = 'green') {
-            const div = document.createElement('div');
-            div.className = 'glass-card p-6 hover:scale-105 transition';
-            div.innerHTML = `
-                <div class="flex justify-between items-start mb-4">
-                    <span class="text-sm opacity-90 leading-tight">${name}</span>
-                    <span class="metric-dot dot-${status}"></span>
+        function createMetric(name, value, status) {
+            const colors = { green: 'text-green-400 border-green-500/30', yellow: 'text-yellow-400 border-yellow-500/30', red: 'text-red-400 border-red-500/30' };
+            const icons = { green: 'fa-circle-check', yellow: 'fa-triangle-exclamation', red: 'fa-circle-xmark' };
+
+            return `
+                <div class="glass metric-card p-6 border ${colors[status]} status-${status}">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-lg">${name}</span>
+                        <i class="fa-solid ${icons[status]} text-2xl"></i>
+                    </div>
+                    <div class="text-3xl font-bold">${value}</div>
                 </div>
-                <div class="text-2xl font-bold text-right">${value}</div>
             `;
-            return div;
         }
 
-        // Main function to populate entire report
         function renderReport(data) {
-            // Hide auth, show report
             document.getElementById('auth-gate').classList.add('hidden');
             document.getElementById('report-content').classList.remove('hidden');
 
-            // Overall
-            document.getElementById('audit-id').textContent = data.audit_id || '#FF-XXXXX';
-            document.getElementById('audit-date').textContent = `Audit Date: ${data.date || 'December 26, 2025'}`;
-            document.getElementById('overall-grade').textContent = data.grade || '—';
-            document.getElementById('overall-score').textContent = `${data.score}%` || '—%';
-            document.getElementById('scoring-mode').textContent = data.strict_mode ? 'Strict Mode Active' : 'Standard Mode';
+            document.getElementById('domain-name').textContent = data.domain;
+            document.getElementById('overall-score').textContent = data.score + '%';
+            document.getElementById('overall-grade').textContent = data.grade;
+            document.getElementById('executive-summary').textContent = data.summary;
+            document.getElementById('total-errors').textContent = data.errors;
+            document.getElementById('total-warnings').textContent = data.warnings;
+            document.getElementById('crawled-pages').textContent = data.crawled_pages.toLocaleString();
 
-            const circumference = 804;
-            const offset = circumference - (data.score / 100) * circumference;
-            document.getElementById('health-progress').style.strokeDashoffset = offset;
-
-            document.getElementById('executive-summary').innerHTML = data.summary || 'Loading...';
-            document.getElementById('total-errors').textContent = data.errors || '—';
-            document.getElementById('total-warnings').textContent = data.warnings || '—';
-            document.getElementById('total-notices').textContent = data.notices || '—';
-            document.getElementById('crawled-pages').textContent = data.crawled_pages || '—';
-
-            // Inject metrics into each category
-            const categories = {
-                'category-overall': data.metrics.overall || [],
-                'category-crawlability': data.metrics.crawlability || [],
-                'category-onpage': data.metrics.onpage || [],
-                'category-performance': data.metrics.performance || [],
-                'category-mobile': data.metrics.mobile || [],
-                'category-security': data.metrics.security || [],
-                'category-international': data.metrics.international || [],
-                'category-backlinks': data.metrics.backlinks || [],
-                'category-advanced': data.metrics.advanced || []
-            };
-
-            Object.keys(categories).forEach(catId => {
-                const container = document.getElementById(catId);
-                if (!container) return;
-                container.innerHTML = '';
-                categories[catId].forEach(m => {
-                    container.appendChild(createMetric(m.name, m.value, m.status));
-                });
+            // Inject metrics
+            Object.keys(data.metrics).forEach(cat => {
+                const container = document.getElementById('category-' + cat);
+                if (container) {
+                    container.innerHTML = data.metrics[cat].map(m => createMetric(m.name, m.value, m.status)).join('');
+                }
             });
 
-            // Charts (example - replace with real data)
+            // Radar Chart
             new Chart(document.getElementById('benchmark-chart'), {
-                type: 'bar',
+                type: 'radar',
                 data: {
-                    labels: ['Your Site', 'Competitor A', 'Competitor B', 'Industry Avg'],
-                    datasets: [{ label: 'Score', data: [data.score, 85, 72, 78], backgroundColor: '#00f2ff' }]
+                    labels: ['Performance', 'SEO', 'Security', 'Mobile', 'Authority', 'Speed'],
+                    datasets: [{
+                        label: 'Your Site',
+                        data: [92, 88, 99, 75, 85, 80],
+                        backgroundColor: 'rgba(0,242,255,0.2)',
+                        borderColor: '#00f2ff',
+                        pointBackgroundColor: '#00f2ff',
+                        borderWidth: 3
+                    }, {
+                        label: 'Competitor Avg',
+                        data: [78, 82, 85, 80, 70, 75],
+                        backgroundColor: 'rgba(100,100,100,0.2)',
+                        borderColor: '#888',
+                        borderWidth: 2
+                    }]
                 },
-                options: { responsive: true, plugins: { legend: { display: false } } }
+                options: {
+                    scales: { r: { angleLines: { color: 'rgba(255,255,255,0.2)' }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { backdropColor: 'transparent' } } },
+                    plugins: { legend: { labels: { color: '#e0f2ff' } } }
+                }
             });
         }
 
-        // Simulate receiving data from Python backend
-        // In real app: fetch('/api/report.json') or inline <script>window.auditData = {{ data|tojson }}</script>
-        // Example call:
-        // renderReport(your_python_dict_converted_to_js_object);
+        // Auto-render (in production, call after Python injects data)
+        document.addEventListener('DOMContentLoaded', () => {
+            renderReport(window.auditData);
+        });
+
+        // Simulate login
+        document.getElementById('btn-access')?.addEventListener('click', () => renderReport(window.auditData));
     </script>
 </body>
 </html>
