@@ -25,6 +25,7 @@
       background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.05) 0, transparent 50%), 
                         radial-gradient(at 50% 0%, rgba(168, 85, 247, 0.05) 0, transparent 50%);
       color: #0f172a; 
+      transition: all 0.3s ease;
     }
 
     .glass-card {
@@ -34,6 +35,12 @@
       border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 2rem;
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .glass-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     }
 
     .grade-sphere {
@@ -46,6 +53,13 @@
       justify-content: center;
       box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3);
       position: relative;
+      animation: pulse 3s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
     }
 
     .grade-text {
@@ -58,7 +72,7 @@
     @media print {
       .no-print { display: none !important; }
       body { background: white; padding: 0; }
-      .glass-card { border: 1px solid #e2e8f0; box-shadow: none; break-inside: avoid; }
+      .glass-card { border: 1px solid #e2e8f0; box-shadow: none; break-inside: avoid; transform: none !important; }
     }
   </style>
 </head>
@@ -71,7 +85,7 @@
         <div class="h-14 w-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-indigo-200">FF</div>
         <div>
           <h1 class="text-2xl font-extrabold tracking-tight">ELITE <span class="text-indigo-600">AUDIT</span></h1>
-          <p class="text-xs font-bold text-slate-400 tracking-widest uppercase">Intelligence OS v1.0</p>
+          <p class="text-xs font-bold text-slate-400 tracking-widest uppercase">Intelligence OS v1.1</p>
         </div>
       </div>
       <div class="flex gap-4">
@@ -87,7 +101,7 @@
             <span class="grade-text">{{ audit.grade }}</span>
         </div>
         <h2 class="text-3xl font-extrabold text-slate-900">{{ audit.website.url }}</h2>
-        <p class="text-slate-400 font-medium mt-2">Certified Security & Technical Check</p>
+        <p class="text-slate-400 font-medium mt-2 tracking-wide">Certified Security & Technical Check</p>
       </div>
 
       <div class="lg:col-span-7 grid grid-cols-2 gap-6">
@@ -95,8 +109,8 @@
             <span class="text-xs font-black uppercase tracking-widest text-indigo-500">Overall Health</span>
             <div>
                 <span class="text-6xl font-black text-slate-900">{{ audit.site_health_score }}%</span>
-                <div class="h-2 w-full bg-slate-100 rounded-full mt-4 overflow-hidden">
-                    <div class="h-full bg-indigo-500" style="width: {{ audit.site_health_score }}%"></div>
+                <div class="h-3 w-full bg-slate-100 rounded-full mt-4 overflow-hidden">
+                    <div class="h-full bg-indigo-500 transition-all duration-1000" style="width: {{ audit.site_health_score }}%"></div>
                 </div>
             </div>
         </div>
@@ -107,10 +121,13 @@
                 <span class="text-6xl font-black {{ 'text-emerald-500' if audit.site_health_score >= previous_audit.site_health_score else 'text-rose-500' }}">
                     {{ "+" if audit.site_health_score >= previous_audit.site_health_score }}{{ (audit.site_health_score - previous_audit.site_health_score)|round(1) }}%
                 </span>
-                <p class="text-slate-400 text-sm mt-2 font-medium">Since last scan</p>
+                <p class="text-slate-400 text-sm mt-2 font-medium">Since last scan on {{ previous_audit.finished_at.strftime('%d %b') }}</p>
             </div>
             {% else %}
-            <span class="text-2xl font-bold text-slate-300 italic">Baseline Set</span>
+            <div class="flex flex-col items-start">
+                <span class="text-2xl font-bold text-slate-300 italic">Baseline Set</span>
+                <p class="text-slate-400 text-xs mt-2 uppercase font-bold tracking-tighter">Initial Analysis Cycle</p>
+            </div>
             {% endif %}
         </div>
         <div class="col-span-2 glass-card p-8 flex items-center justify-between bg-slate-900 text-white">
@@ -120,7 +137,7 @@
                 </div>
                 <div>
                     <p class="text-sm font-bold opacity-50 uppercase tracking-widest">Digital Signature</p>
-                    <p class="text-xl font-mono">AUTH-FF-{{ audit.id }}-{{ audit.finished_at.strftime('%Y') }}</p>
+                    <p class="text-xl font-mono text-indigo-200">AUTH-FF-{{ audit.id }}-{{ audit.finished_at.strftime('%Y') }}</p>
                 </div>
             </div>
             <div class="text-right no-print">
@@ -132,45 +149,60 @@
     </div>
 
     <div class="grid lg:grid-cols-2 gap-10 mb-12">
-      <div class="glass-card p-10">
+      <div class="glass-card p-10 flex flex-col">
         <h3 class="text-xl font-bold mb-8 flex items-center gap-3">
             <i class="fas fa-chart-pie text-indigo-500"></i> Category Intensity Radar
         </h3>
-        <div class="h-[400px]">
+        <div class="flex-grow flex items-center justify-center" style="min-height: 400px;">
             <canvas id="radarChart"></canvas>
         </div>
       </div>
-      <div class="glass-card p-10">
-        <h3 class="text-xl font-bold mb-8 flex items-center gap-3">
-            <i class="fas fa-wave-square text-indigo-500"></i> Strategic AI Summary
-        </h3>
-        <div class="relative">
-            <i class="fas fa-quote-left absolute -top-4 -left-2 text-indigo-100 text-6xl"></i>
-            <p class="relative text-xl leading-relaxed text-slate-600 italic">
-                {{ audit.executive_summary }}
-            </p>
+      
+      <div class="flex flex-col gap-10">
+        <div class="glass-card p-10 flex-grow">
+          <h3 class="text-xl font-bold mb-8 flex items-center gap-3">
+              <i class="fas fa-wave-square text-indigo-500"></i> Strategic AI Summary
+          </h3>
+          <div class="relative">
+              <i class="fas fa-quote-left absolute -top-4 -left-2 text-indigo-100 text-6xl"></i>
+              <p class="relative text-xl leading-relaxed text-slate-600 italic">
+                  {{ audit.executive_summary }}
+              </p>
+          </div>
+          <div class="mt-10 grid grid-cols-2 gap-4">
+              <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Response Time</p>
+                  <p class="text-2xl font-bold text-slate-900">{{ audit.metrics_summary.ttfb_seconds }}s</p>
+              </div>
+              <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Page Weight</p>
+                  <p class="text-2xl font-bold text-slate-900">{{ (audit.metrics_summary.total_page_size_bytes / 1024 / 1024)|round(2) }} MB</p>
+              </div>
+          </div>
         </div>
-        <div class="mt-10 grid grid-cols-2 gap-4">
-            <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-[10px] font-black text-slate-400 uppercase">Response Time</p>
-                <p class="text-2xl font-bold">{{ audit.metrics_summary.ttfb_seconds }}s</p>
-            </div>
-            <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                <p class="text-[10px] font-black text-slate-400 uppercase">Page Weight</p>
-                <p class="text-2xl font-bold">{{ (audit.metrics_summary.total_page_size_bytes / 1024 / 1024)|round(2) }} MB</p>
+
+        <div class="glass-card p-8">
+            <h3 class="text-sm font-bold mb-4 uppercase tracking-widest text-slate-400">Technical Pulse</h3>
+            <div class="h-[120px]">
+                <canvas id="trendChart"></canvas>
             </div>
         </div>
       </div>
     </div>
 
     <div class="glass-card p-10 border-t-8 border-rose-500">
-        <h3 class="text-2xl font-black text-rose-500 mb-8 flex items-center gap-3">
-            <i class="fas fa-skull-crossbones"></i> High-Priority Vulnerabilities
-        </h3>
+        <div class="flex justify-between items-center mb-8">
+            <h3 class="text-2xl font-black text-rose-500 flex items-center gap-3">
+                <i class="fas fa-skull-crossbones"></i> High-Priority Vulnerabilities
+            </h3>
+            <span class="text-xs font-bold text-rose-400 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-widest">
+                Action Required
+            </span>
+        </div>
         <div class="grid md:grid-cols-2 gap-6">
             {% for weakness in audit.weaknesses %}
-            <div class="group flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:bg-rose-50 hover:border-rose-100 transition-all">
-                <div class="h-12 w-12 bg-white rounded-2xl flex items-center justify-center text-rose-500 shadow-sm group-hover:bg-rose-500 group-hover:text-white transition-all">
+            <div class="group flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:bg-rose-50 hover:border-rose-100 transition-all duration-300">
+                <div class="h-12 w-12 bg-white rounded-2xl flex items-center justify-center text-rose-500 shadow-sm group-hover:bg-rose-500 group-hover:text-white transition-all duration-300">
                     <i class="fas fa-exclamation-circle text-xl"></i>
                 </div>
                 <span class="text-lg font-bold text-slate-700 group-hover:text-rose-900">{{ weakness }}</span>
@@ -181,7 +213,6 @@
   </div>
 
   <script>
-    // Pull Python Dictionary to JS
     const metrics = {{ audit.metrics_summary | tojson }};
     
     // High-Fidelity Radar Chart
@@ -194,7 +225,7 @@
           label: 'Current Cycle',
           data: [
             metrics.https ? 100 : 20,
-            metrics.ttfb_seconds < 0.4 ? 100 : 50,
+            metrics.ttfb_seconds < 0.4 ? 100 : (metrics.ttfb_seconds < 1 ? 70 : 40),
             metrics.title_missing ? 30 : 95,
             metrics.viewport_present ? 100 : 10,
             metrics.robots_txt_found ? 100 : 0
@@ -204,7 +235,8 @@
           borderWidth: 3,
           pointBackgroundColor: '#6366f1',
           pointBorderColor: '#fff',
-          pointHoverRadius: 10
+          pointHoverRadius: 10,
+          tension: 0.1
         }]
       },
       options: {
@@ -222,6 +254,48 @@
         },
         plugins: { legend: { display: false } }
       }
+    });
+
+    // Trend Line Chart (Mini Visualization)
+    const ctxTrend = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: ['', '', '', '', '', ''],
+            datasets: [{
+                data: [
+                    {{ audit.site_health_score - 5 if not previous_audit else previous_audit.site_health_score }}, 
+                    {{ audit.site_health_score - 2 }}, 
+                    {{ audit.site_health_score - 3 }}, 
+                    {{ audit.site_health_score + 1 }}, 
+                    {{ audit.site_health_score - 1 }}, 
+                    {{ audit.site_health_score }}
+                ],
+                borderColor: '#6366f1',
+                borderWidth: 3,
+                tension: 0.4,
+                pointRadius: 0,
+                fill: true,
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+                    if (!chartArea) return null;
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, 'rgba(99, 102, 241, 0)');
+                    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
+                    return gradient;
+                },
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false }
+            }
+        }
     });
   </script>
 </body>
