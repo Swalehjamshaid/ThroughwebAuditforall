@@ -1,15 +1,18 @@
-
 """
-FF Tech – AI-Powered Website Audit & Compliance SaaS
+FF Tech – AI-Powered Website Audit & Compliance SaaS (Updated)
 Single-file FastAPI backend, Railway-ready, integrated with your advanced HTML.
 
 Fixes in this version:
-- Root (/) always attempts to render the latest audit dashboard.
-- Status page includes a clickable link to run a first audit (GET /audit/run?website_url=...).
-- Optional auto-seed of a first audit via env AUTO_SEED_AUDIT_URL.
-- Safe fallback to styled status page when DB is unreachable or there’s no data.
-- Auto-migration of missing columns in Postgres needed by RBAC/2FA and dashboard template.
-- Inline rendering of your provided HTML (uses templates/index.html if present).
+- Robust brand/URL resolution: Bing → Google CSE → DuckDuckGo fallback (no API key required)
+- Accepts brand names (e.g., "Haier") or partial URLs and resolves to an official reachable site
+- HEAD/GET reachability checks + https & www fallback, and DuckDuckGo redirect unwrapping
+- Root (/) still renders latest audit dashboard; status page kept
+- Status page includes clickable link to run first audit (GET /audit/run?website_url=...)
+- Optional auto-seed of first audit via env AUTO_SEED_AUDIT_URL (brand names supported)
+- Safe fallback to styled status page when DB is unreachable or there’s no data
+- Auto-migration of missing columns in Postgres needed by RBAC/2FA and dashboard template
+- Inline rendering of your provided HTML (uses templates/index.html if present)
+- PDF export endpoint retained
 """
 
 import os
@@ -45,6 +48,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 # HTTP & parsing
 import requests
+import httpx
 from bs4 import BeautifulSoup
 
 # PDF
@@ -66,10 +70,20 @@ FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Re
 # Optional: auto-seed first audit at startup if none exist
 AUTO_SEED_AUDIT_URL = os.getenv("AUTO_SEED_AUDIT_URL", "").strip()
 
+# Search providers (optional keys)
+BING_SEARCH_KEY = os.getenv("BING_SEARCH_KEY")
+GOOGLE_CSE_KEY = os.getenv("GOOGLE_CSE_KEY")
+GOOGLE_CSE_ID  = os.getenv("GOOGLE_CSE_ID")
+DEFAULT_USER_AGENT = os.getenv("DEFAULT_USER_AGENT", "FFTechAudit/1.0")
+
+TIMEOUT = 20
+RETRIES = 2
+AVOID_DOMAINS = {"facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com", "youtube.com"}
+
 # -----------------------------------------------------------------------------
 # App & Templates
 # -----------------------------------------------------------------------------
-app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.2")
+app = FastAPI(title="FF Tech Website Audit SaaS", version="1.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else [APP_DOMAIN],
@@ -92,11 +106,11 @@ INLINE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Tailwind CSS -->
-https://cdn.tailwindcss.com</script>
+<script src="https://cdn.tailwindcss.com"></script>
 <!-- Chart.js -->
-https://cdn.jsdelivr.net/npm/chart.js</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <!-- Google Fonts -->
-https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 
 <style>
 body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
@@ -282,7 +296,7 @@ function toggleContent(id) {
   const el = document.getElementById(id);
   el.style.maxHeight = el.style.maxHeight === '0px' || !el.style.maxHeight ? el.scrollHeight + 'px' : '0px';
 }
-function downloadPDF() { alert("PDF export integration coming soon."); }
+function downloadPDF() { alert("Use the PDF endpoint on the left menu: Download PDF."); }
 let currentStep = 1;
 function animateAudit() {
   const steps = ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"];
@@ -385,7 +399,10 @@ class AuditRun(Base):
 # Schemas
 # -----------------------------------------------------------------------------
 class AuditStartRequest(BaseModel):
-    website_url: str = Field(..., description="URL to audit")
+    website_url: str = Field(..., description="URL or brand to audit")
+    prefer_tld: Optional[str] = Field(None, description="Prefer TLD (e.g., 'pk')")
+    region: Optional[str] = Field(None, description="Region bias (e.g., 'Pakistan')")
+    userAgent: Optional[str] = Field(None, description="Override user-agent for resolver/fetch")
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -399,16 +416,210 @@ def get_db() -> Session:
     finally:
         db.close()
 
+# --- URL & search resolver utilities ---
+
+def is_probable_url(text: str) -> bool:
+    text = text.strip()
+    return bool(re.match(r"^(https?://)?([\w-]+\.)+[a-zA-Z]{2,}(/.*)?$", text))
+
+
+def normalize_url(text: str) -> str:
+    text = text.strip()
+    if not text:
+        raise ValueError("Empty URL or query")
+    if is_probable_url(text):
+        if not re.match(r"^https?://", text):
+            text = "https://" + text
+        return text
+    return text
+
+
+def host_of(url: str) -> str:
+    try:
+        return urlparse(url).netloc.lower()
+    except Exception:
+        return ""
+
+
+from urllib.parse import urlparse, urlsplit, parse_qs, unquote, urljoin as _urljoin
+
+
+def is_avoid_domain(url: str) -> bool:
+    h = host_of(url)
+    return any(h.endswith(d) or d in h for d in AVOID_DOMAINS)
+
+
+def ddg_unwrap(href: str) -> str:
+    # DuckDuckGo redirect links unwrap
+    try:
+        if "duckduckgo.com/l/?" in href:
+            qs = parse_qs(urlsplit(href).query)
+            for key in ("uddg", "url"):
+                if key in qs and qs[key]:
+                    return unquote(qs[key][0])
+    except Exception:
+        pass
+    return href
+
+
+async def head_ok(client: httpx.AsyncClient, url: str) -> Tuple[bool, Optional[str]]:
+    for attempt in range(RETRIES):
+        try:
+            r = await client.head(url, follow_redirects=True, timeout=TIMEOUT)
+            if r.status_code < 400:
+                return True, str(r.url)
+        except Exception:
+            pass
+        try:
+            r = await client.get(url, follow_redirects=True, timeout=TIMEOUT)
+            if r.status_code < 400:
+                return True, str(r.url)
+        except Exception:
+            if attempt == RETRIES - 1:
+                break
+    return False, None
+
+
+async def ddg_search(client: httpx.AsyncClient, query: str) -> List[str]:
+    try:
+        url = "https://duckduckgo.com/html/"
+        r = await client.post(
+            url,
+            data={"q": query},
+            headers={"User-Agent": client.headers.get("User-Agent", DEFAULT_USER_AGENT)},
+            timeout=TIMEOUT,
+        )
+        soup = BeautifulSoup(r.text, "html.parser")
+        links = []
+        for a in soup.select("a.result__a"):
+            href = a.get("href")
+            if href:
+                href = ddg_unwrap(href)
+                links.append(href)
+        if not links:
+            for a in soup.select("a"):
+                href = a.get("href")
+                if href and href.startswith("http"):
+                    links.append(ddg_unwrap(href))
+        return links[:8]
+    except Exception:
+        return []
+
+
+async def bing_search(client: httpx.AsyncClient, query: str) -> List[str]:
+    if not BING_SEARCH_KEY:
+        return []
+    try:
+        url = "https://api.bing.microsoft.com/v7.0/search"
+        r = await client.get(
+            url,
+            params={"q": query, "mkt": "en-US"},
+            headers={"Ocp-Apim-Subscription-Key": BING_SEARCH_KEY},
+            timeout=TIMEOUT,
+        )
+        j = r.json()
+        urls = []
+        for item in j.get("webPages", {}).get("value", []):
+            u = item.get("url")
+            if u:
+                urls.append(u)
+        return urls[:8]
+    except Exception:
+        return []
+
+
+async def google_cse_search(client: httpx.AsyncClient, query: str) -> List[str]:
+    if not (GOOGLE_CSE_KEY and GOOGLE_CSE_ID):
+        return []
+    try:
+        url = "https://www.googleapis.com/customsearch/v1"
+        r = await client.get(
+            url,
+            params={"q": query, "key": GOOGLE_CSE_KEY, "cx": GOOGLE_CSE_ID},
+            timeout=TIMEOUT,
+        )
+        j = r.json()
+        urls = []
+        for item in j.get("items", []):
+            u = item.get("link")
+            if u:
+                urls.append(u)
+        return urls[:8]
+    except Exception:
+        return []
+
+
+def build_query_variants(query: str, prefer_tld: Optional[str], region: Optional[str]) -> List[str]:
+    q = query.strip()
+    variants = [q, f"{q} official site", f"{q} website", f"{q} home page"]
+    if region:
+        variants.extend([f"{q} {region}", f"{q} official site {region}"])
+    if prefer_tld:
+        variants.extend([f"{q} site:.{prefer_tld}", f"{q} official site site:.{prefer_tld}"])
+    seen, out = set(), []
+    for v in variants:
+        if v not in seen:
+            out.append(v); seen.add(v)
+    return out
+
+
+async def resolve_official_site(input_text: str, prefer_tld: Optional[str], region: Optional[str], user_agent: str) -> str:
+    text = input_text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty query")
+    candidate = normalize_url(text)
+
+    async with httpx.AsyncClient(headers={"User-Agent": user_agent}) as client:
+        if is_probable_url(candidate):
+            ok, final = await head_ok(client, candidate)
+            if ok and final:
+                return final
+            # Try https + www variant if applicable
+            parsed = urlparse(candidate)
+            host = parsed.netloc
+            if not host.startswith("www."):
+                www = parsed._replace(netloc="www." + host).geturl()
+                ok, final = await head_ok(client, www)
+                if ok and final:
+                    return final
+
+        providers = [
+            ("bing", bing_search),
+            ("google_cse", google_cse_search),
+            ("duckduckgo", ddg_search),
+        ]
+        for q in build_query_variants(text, prefer_tld, region):
+            for _name, func in providers:
+                urls = await func(client, q)
+                prioritized = [u for u in urls if not is_avoid_domain(u)]
+                candidates = prioritized if prioritized else urls
+                for u in candidates:
+                    u_norm = normalize_url(u)
+                    ok, final = await head_ok(client, u_norm)
+                    if ok and final:
+                        brand = re.sub(r"[^a-z0-9]+", "", text.lower())
+                        host = host_of(final)
+                        if brand and brand in host:
+                            return final
+                        return final
+
+    raise HTTPException(status_code=404, detail="Could not resolve an official website for the given query")
+
+# --- Original helpers ---
+
 def ensure_columns(conn, table: str, cols: Dict[str, str]):
     """Auto-add missing columns (Postgres)."""
     for col, sqltype in cols.items():
-        check_sql = text("""
+        check_sql = text(
+            """
             SELECT 1 FROM information_schema.columns
             WHERE table_name = :tname AND column_name = :cname
-        """)
+            """
+        )
         exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
         if not exists:
             conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
+
 
 def get_latest_audit(db: Session) -> Optional[AuditRun]:
     try:
@@ -416,19 +627,33 @@ def get_latest_audit(db: Session) -> Optional[AuditRun]:
     except SQLAlchemyError:
         return None
 
+
 def ensure_first_audit(db: Session):
     """Auto-seed the first audit if none exist and AUTO_SEED_AUDIT_URL is set."""
-    seed_url = AUTO_SEED_AUDIT_URL
-    if not seed_url:
+    seed = AUTO_SEED_AUDIT_URL
+    if not seed:
         return
     latest = get_latest_audit(db)
     if latest:
         return
-    w = db.query(Website).filter(Website.url == seed_url).first()
+    # Resolve the seed (brand or URL) to an official site first
+    try:
+        final_url = requests.utils.requote_uri(seed)
+        # best-effort resolver using async called via httpx sync fallback
+        # Simple path: if it looks like a URL, use it; else keep https:// + brand.com guess
+        if not is_probable_url(seed):
+            guess = f"https://{re.sub(r'[^a-zA-Z0-9-]+','', seed.lower())}.com"
+            final_url = guess
+        else:
+            final_url = normalize_url(seed)
+    except Exception:
+        final_url = seed
+
+    w = db.query(Website).filter(Website.url == final_url).first()
     if not w:
-        w = Website(user_id=None, url=seed_url)
+        w = Website(user_id=None, url=final_url)
         db.add(w); db.commit()
-    a = compute_audit(seed_url)
+    a = compute_audit(final_url)
     metrics, weaknesses = a["metrics"], a["weaknesses"]
     run = AuditRun(
         website_id=w.id,
@@ -437,7 +662,7 @@ def ensure_first_audit(db: Session):
         grade=metrics["grade"],
         metrics_summary=metrics,
         weaknesses=weaknesses,
-        executive_summary=generate_summary(seed_url, metrics, weaknesses),
+        executive_summary=generate_summary(final_url, metrics, weaknesses),
         competitors=a["competitors"],
         top_issues=a["top_issues"],
         recommendations=a["recommendations"]
@@ -445,16 +670,19 @@ def ensure_first_audit(db: Session):
     db.add(run); db.commit()
 
 # -----------------------------------------------------------------------------
-# Audit Engine
+# Audit Engine (mostly unchanged)
 # -----------------------------------------------------------------------------
+
 def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]:
     start = time.time()
     try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": "FFTechAudit/1.0"})
-        ttfb = r.elapsed.total_seconds() if hasattr(r, "elapsed") else (time.time() - start)
+        r = requests.get(url, timeout=timeout, headers={"User-Agent": DEFAULT_USER_AGENT})
+        # requests has Response.elapsed; if not present, fallback to wall time
+        ttfb = r.elapsed.total_seconds() if hasattr(r, "elapsed") and r.elapsed else (time.time() - start)
         return r.status_code, r.text or "", dict(r.headers), ttfb
     except requests.RequestException:
         return 0, "", {}, 0.0
+
 
 def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
     out = {"valid": False, "notBefore": None, "notAfter": None, "error": None}
@@ -470,8 +698,10 @@ def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
         out["error"] = str(e)
     return out
 
-def normalize_url(u: str) -> str:
+
+def normalize_url_old(u: str) -> str:
     return u.strip()
+
 
 def extract_domain(url: str) -> str:
     try:
@@ -480,26 +710,32 @@ def extract_domain(url: str) -> str:
     except Exception:
         return ""
 
+
 def parse_html(html: str) -> BeautifulSoup:
     return BeautifulSoup(html, "html.parser")
+
 
 def count_text_words(soup: BeautifulSoup) -> int:
     text = soup.get_text(separator=" ")
     return len([w for w in text.split() if w.strip()])
 
+
 def is_https(url: str) -> bool:
     return url.lower().startswith("https://")
+
 
 def check_security_headers(headers: Dict[str, str]) -> Dict[str, bool]:
     keys = ["content-security-policy", "strict-transport-security", "x-frame-options"]
     hdrs = {k.lower(): True for k in headers.keys()}
     return {k: (k in hdrs) for k in keys}
 
+
 def sizeof_response(headers: Dict[str, str], body: str) -> int:
     cl = headers.get("Content-Length") or headers.get("content-length")
     if cl and str(cl).isdigit():
         return int(cl)
     return len(body.encode())
+
 
 def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
     anchors, imgs, css, js = [], [], [], []
@@ -522,13 +758,14 @@ def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
             js.append(urljoin(base_url, src))
     return {"anchors": anchors, "images": imgs, "css": css, "js": js}
 
+
 def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
     broken, redirected = [], []
     tested = 0
     for u in urls[:limit]:
         tested += 1
         try:
-            r = requests.head(u, allow_redirects=True, timeout=10, headers={"User-Agent": "FFTechAudit/1.0"})
+            r = requests.head(u, allow_redirects=True, timeout=10, headers={"User-Agent": DEFAULT_USER_AGENT})
             if 400 <= r.status_code < 600:
                 broken.append(u)
             elif len(r.history) > 0:
@@ -536,6 +773,7 @@ def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
         except Exception:
             broken.append(u)
     return {"broken": broken, "redirected": redirected, "tested": min(limit, len(urls))}
+
 
 def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
     from urllib.parse import urlparse, urljoin
@@ -559,12 +797,14 @@ def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
         "sitemap_size_bytes": len(sm_text.encode()) if sm_text else 0
     }
 
+
 def grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
     if score >= 85: return "A"
     if score >= 75: return "B"
     if score >= 65: return "C"
     return "D"
+
 
 def generate_summary(website_url: str, metrics: Dict[str, Any], weaknesses: List[str]) -> str:
     score = metrics.get("site_health_score", 0)
@@ -590,8 +830,9 @@ def generate_summary(website_url: str, metrics: Dict[str, Any], weaknesses: List
     body = " ".join(words)
     return " ".join(body.split()[:200])
 
+
 def compute_audit(website_url: str) -> Dict[str, Any]:
-    url = normalize_url(website_url)
+    url = normalize_url_old(website_url)
     status, body, headers, ttfb = fetch(url)
     soup = parse_html(body) if body else BeautifulSoup("", "html.parser")
     links = find_links(soup, url)
@@ -788,6 +1029,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
 # -----------------------------------------------------------------------------
 # PDF
 # -----------------------------------------------------------------------------
+
 def wrap_text(text: str, max_chars: int = 90) -> List[str]:
     words = text.split()
     lines, line, count = [], [], 0
@@ -798,6 +1040,7 @@ def wrap_text(text: str, max_chars: int = 90) -> List[str]:
             line.append(w); count += len(w) + 1
     if line: lines.append(" ".join(line))
     return lines
+
 
 def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
     c = canvas.Canvas(path, pagesize=A4)
@@ -856,6 +1099,8 @@ def on_startup():
 # -----------------------------------------------------------------------------
 # Rendering helpers
 # -----------------------------------------------------------------------------
+from jinja2 import Environment, select_autoescape
+
 def render_dashboard(request: Request, audit: AuditRun, website: Website, previous: Optional[AuditRun]) -> HTMLResponse:
     ctx_audit = {
         "id": audit.id,
@@ -874,11 +1119,11 @@ def render_dashboard(request: Request, audit: AuditRun, website: Website, previo
     if templates is not None and (templates_dir / "index.html").exists():
         return templates.TemplateResponse("index.html", {"request": request, "audit": ctx_audit, "previous_audit": previous})
     # Otherwise render inline
-    from jinja2 import Environment, select_autoescape
     env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
     tpl = env.from_string(INLINE_HTML)
     html = tpl.render(audit=ctx_audit, previous_audit=previous)
     return HTMLResponse(html)
+
 
 def get_latest(db: Session) -> Optional[AuditRun]:
     try:
@@ -918,7 +1163,8 @@ def root(request: Request, db: Session = Depends(get_db)):
     <head>
         <title>FF Tech | System Online</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <script src="https://cdn.tailwindcss.com </head>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
     <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
         <div class="p-12 border border-white/10 rounded-3xl text-center shadow-2xl max-w-xl">
             <h1 class="text-4xl md:text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
@@ -929,9 +1175,7 @@ def root(request: Request, db: Session = Depends(get_db)):
             </div>
             <div class="mt-6 space-y-2">
               <p class="text-slate-400 text-sm">Click to run a first audit and see the dashboard:</p>
-              /audit/run?website_url=https://example.com
-                 Run audit for https://example.com
-              </a>
+              <a class="px-4 py-2 inline-block bg-indigo-600/30 text-indigo-200 rounded-lg font-semibold" href="/audit/run?website_url=https://example.com">Run audit for https://example.com</a>
               <p class="text-xs text-slate-500 mt-2">Or POST JSON:</p>
               <code class="text-xs bg-white/10 px-2 py-1 rounded">
                 curl -X POST {APP_DOMAIN}/audit/run -H "Content-Type: application/json" -d '{{"website_url":"https://example.com"}}'
@@ -942,12 +1186,22 @@ def root(request: Request, db: Session = Depends(get_db)):
     </html>
     """
 
+# Updated: POST endpoint uses resolver before compute_audit
 @app.post("/audit/run")
-def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
-    w = db.query(Website).filter(Website.url == data.website_url).first()
+async def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
+    user_agent = data.userAgent or DEFAULT_USER_AGENT
+    # Resolve brand/URL to official reachable site
+    try:
+        resolved = await resolve_official_site(data.website_url, data.prefer_tld, data.region, user_agent)
+    except HTTPException as e:
+        # If resolver fails, fall back to normalized input (still let compute_audit attempt)
+        resolved = normalize_url(data.website_url)
+
+    w = db.query(Website).filter(Website.url == resolved).first()
     if not w:
-        w = Website(user_id=None, url=data.website_url)
+        w = Website(user_id=None, url=resolved)
         db.add(w); db.commit()
+
     a = compute_audit(w.url)
     metrics = a["metrics"]; weaknesses = a["weaknesses"]
     run = AuditRun(
@@ -966,13 +1220,20 @@ def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
     report_url = f"{APP_DOMAIN}/audit/{run.id}/report"
     return {"message": "Audit completed", "audit_id": run.id, "grade": run.grade, "score": run.site_health_score, "report_url": report_url}
 
-# ✅ New: GET endpoint so you can trigger an audit from the browser
+# GET endpoint also uses resolver
 @app.get("/audit/run")
-def run_audit_get(website_url: str, db: Session = Depends(get_db)):
-    w = db.query(Website).filter(Website.url == website_url).first()
+async def run_audit_get(website_url: str, prefer_tld: Optional[str] = None, region: Optional[str] = None, db: Session = Depends(get_db)):
+    user_agent = DEFAULT_USER_AGENT
+    try:
+        resolved = await resolve_official_site(website_url, prefer_tld, region, user_agent)
+    except HTTPException:
+        resolved = normalize_url(website_url)
+
+    w = db.query(Website).filter(Website.url == resolved).first()
     if not w:
-        w = Website(user_id=None, url=website_url)
+        w = Website(user_id=None, url=resolved)
         db.add(w); db.commit()
+
     a = compute_audit(w.url)
     metrics = a["metrics"]; weaknesses = a["weaknesses"]
     run = AuditRun(
@@ -1025,4 +1286,4 @@ def pdf_report(audit_id: int, db: Session = Depends(get_db)):
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
+    uvicorn.run("ap:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
