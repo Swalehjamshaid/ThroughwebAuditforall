@@ -258,6 +258,7 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
             "weaknesses":[e["name"] for e in errors],
             "finished_at": datetime.now().strftime("%b %d, %Y %H:%M"),
             "executive_summary":"Homepage is unreachable; fix availability, server configuration, DNS and TLS.",
+            "improvements": ["Fix availability issues", "Validate TLS certificate"],
         }
         return {"audit": audit, "previous_audit": None}
 
@@ -270,8 +271,6 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     h1_tags = soup.find_all("h1"); h1_count = len(h1_tags)
     canonical_link = soup.find("link", rel=lambda v: v and "canonical" in v.lower())
     lang_attr = soup.html.get("lang") if soup.html else None
-    robots_meta_tag = soup.find("meta", attrs={"name":"robots"})
-    robots_meta = (robots_meta_tag.get("content") or "").lower().strip() if robots_meta_tag else ""
     img_tags = soup.find_all("img"); total_imgs = len(img_tags)
     imgs_without_alt = len([i for i in img_tags if not (i.get("alt") and i.get("alt").strip())])
     ld_json_count = len(soup.find_all("script", attrs={"type":"application/ld+json"}))
@@ -280,7 +279,7 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
 
     # Links
     a_tags = soup.find_all("a"); host = urlparse(final_url).netloc
-    internal_links = external_links = broken_internal = broken_external = 0
+    internal_links = external_links = broken_internal = 0
     for a in a_tags:
         href = a.get("href") or ""
         if not href: continue
@@ -291,7 +290,6 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
         head = safe_request(abs_url, "HEAD")
         if not head or (head.status_code and head.status_code >= 400):
             if netloc == host or href.startswith("#"): broken_internal += 1
-            else: broken_external += 1
 
     # Performance
     script_tags = soup.find_all("script")
@@ -308,10 +306,6 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     # Security
     hsts = headers.get("Strict-Transport-Security")
     csp  = headers.get("Content-Security-Policy")
-    xfo  = headers.get("X-Frame-Options")
-    xcto = headers.get("X-Content-Type-Options")
-    refpol = headers.get("Referrer-Policy")
-    perm_pol = headers.get("Permissions-Policy")
     mixed_content = detect_mixed_content(soup, scheme)
 
     # robots/sitemap
@@ -321,38 +315,19 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     has_robots  = bool(robots_resp and robots_resp.status_code < 400)
     has_sitemap = bool(sitemap_resp and sitemap_resp.status_code < 400)
 
-    # hreflang
-    hreflang_check = validate_hreflang(soup)
-    errors   += hreflang_check["errors"]; notices = hreflang_check["notices"]
-
-    # Deep crawl
+    # Deep crawl (short stats)
     crawled = crawl_internal(final_url, max_pages=deep_crawl_pages)
     total_crawled_pages = len(crawled)
-    status_counts = {"2xx":0,"3xx":0,"4xx":0,"5xx":0,"none":0}
-    redirect_chains = slow_pages = large_pages = 0
-    for item in crawled:
-        s = item["status"]
-        if s is None: status_counts["none"] += 1
-        elif 200 <= s < 300: status_counts["2xx"] += 1
-        elif 300 <= s < 400: status_counts["3xx"] += 1
-        elif 400 <= s < 500: status_counts["4xx"] += 1
-        elif 500 <= s < 600: status_counts["5xx"] += 1
-        redirect_chains += (1 if item["redirects"] >= 2 else 0)
-        slow_pages += (1 if item["ttfb_ms"] > 1500 else 0)
-        large_pages += (1 if item["size_bytes"] > 1_000_000 else 0)
+    redirect_chains = sum(1 for i in crawled if (i["redirects"] or 0) >= 2)
 
-    # Issue building (shorten for brevity)
-    # ... (same checks as above used to produce scores and suggestions)
-
-    # Strict scoring
+    # Strict scoring (compact)
     seo_score = 100; perf_score = 100; a11y_score = 100; bp_score = 100; sec_score = 100
     if not title_tag: seo_score -= 25
     if title_tag and (len(title_tag) < 10 or len(title_tag) > 65): seo_score -= 8
     if not meta_desc: seo_score -= 18
-    if meta_desc and (len(meta_desc) < 50 or len(meta_desc) > 170): seo_score -= 6
     if h1_count != 1: seo_score -= 12
     if not canonical_link: seo_score -= 6
-    if imgs_without_alt > 0 and pct(imgs_without_alt, total_imgs) > 20: seo_score -= 12
+    if imgs_without_alt > 0 and (total_imgs and imgs_without_alt/total_imgs > 0.2): seo_score -= 12
     if ld_json_count == 0: seo_score -= 6
     if broken_internal > 0: seo_score -= min(20, broken_internal * 2)
 
@@ -363,28 +338,21 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     if blocking_script_count > 3: perf_score -= 18
     elif blocking_script_count > 0: perf_score -= 10
     if stylesheet_count > 4: perf_score -= 6
-    perf_score -= min(15, slow_pages * 2)
-    perf_score -= min(15, large_pages * 2)
 
     if not lang_attr: a11y_score -= 12
     if imgs_without_alt > 0:
-        alt_ratio = pct(imgs_without_alt, total_imgs)
-        if alt_ratio > 30: a11y_score -= 20
-        elif alt_ratio > 10: a11y_score -= 12
+        ratio = (imgs_without_alt/total_imgs*100) if total_imgs else 0
+        if ratio > 30: a11y_score -= 20
+        elif ratio > 10: a11y_score -= 12
         else: a11y_score -= 6
 
     if scheme != "https": bp_score -= 35
     if mixed_content: bp_score -= 15
-    if any((s.get("type") == "text/javascript") for s in script_tags): bp_score -= 4
     if not has_sitemap: bp_score -= 6
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     if not hsts: sec_score -= 22
     if not csp: sec_score -= 18
-    if not xfo: sec_score -= 10
-    if not xcto: sec_score -= 10
-    if not refpol: sec_score -= 6
-    if not perm_pol: sec_score -= 6
     if mixed_content: sec_score -= 25
 
     site_health_score = round(0.26*seo_score + 0.28*perf_score + 0.14*a11y_score + 0.12*bp_score + 0.20*sec_score)
@@ -393,7 +361,7 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     first_input_delay_ms        = min(500, int(20 + blocking_script_count*30))
     pass_rate                   = max(0, min(100, int(100 - (size_mb*18 + blocking_script_count*7 + (ttfb_ms/120)))))
 
-    # Top issues (short list for weakness display)
+    # Top issues & lists for Weakest Areas / Improvements
     top_issues = []
     if broken_internal > 0:
         top_issues.append({"name": f"Broken internal links: {broken_internal}", "severity": "high", "suggestion": "Fix or remove broken links."})
@@ -404,31 +372,13 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
     if imgs_without_alt > 0:
         top_issues.append({"name": f"Images without alt: {imgs_without_alt}", "severity": "low", "suggestion": "Provide descriptive alt attributes."})
 
-    metrics_summary = {
-        "total_errors": 1 if site_health_score < 50 else 0,  # simplified flag
-        "total_warnings": 1 if site_health_score < 75 else 0,
-        "total_notices": len(top_issues),
-        "performance_score": max(0, perf_score), "seo_score": max(0, seo_score),
-        "accessibility_score": max(0, a11y_score), "best_practices_score": max(0, bp_score),
-        "security_score": max(0, sec_score),
-        "pages_crawled": total_crawled_pages,
-        "largest_contentful_paint_ms": largest_contentful_paint_ms,
-        "first_input_delay_ms": first_input_delay_ms,
-        "core_web_vitals_pass_rate_%": pass_rate,
-        "http_4xx": 0, "http_5xx": 0,  # simplified
-        "broken_internal_links": broken_internal,
-        "redirect_chains": redirect_chains,
-        "mobile_friendly": int(mobile_friendly),
-        "has_sitemap": int(has_sitemap),
-        "has_robots": int(has_robots),
-    }
-
     weaknesses = [i["name"] for i in top_issues]
     improvements = [
         "Enable Brotli/GZIP compression",
         "Defer/async non-critical JS",
         "Optimize hero images (WebP/AVIF)",
         "Add CSP, HSTS and Referrer-Policy",
+        "Fix broken internal links",
     ]
 
     exec_summary = (
@@ -441,6 +391,24 @@ def audit_website(url: str, deep_crawl_pages: int = 15) -> dict:
         f"Focus on compressing assets, deferring scripts, enabling essential security headers, and fixing broken links "
         f"to improve rankings, speed, and trust."
     )
+
+    metrics_summary = {
+        "total_errors": 1 if site_health_score < 50 else 0,
+        "total_warnings": 1 if site_health_score < 75 else 0,
+        "total_notices": len(top_issues),
+        "performance_score": max(0, perf_score), "seo_score": max(0, seo_score),
+        "accessibility_score": max(0, a11y_score), "best_practices_score": max(0, bp_score),
+        "security_score": max(0, sec_score),
+        "pages_crawled": total_crawled_pages,
+        "largest_contentful_paint_ms": largest_contentful_paint_ms,
+        "first_input_delay_ms": first_input_delay_ms,
+        "core_web_vitals_pass_rate_%": pass_rate,
+        "broken_internal_links": broken_internal,
+        "redirect_chains": redirect_chains,
+        "mobile_friendly": int(mobile_friendly),
+        "has_sitemap": int(has_sitemap),
+        "has_robots": int(has_robots),
+    }
 
     audit = {
         "website": {"url": final_url},
@@ -502,7 +470,6 @@ def generate_certified_pdf_5pages(audit: dict) -> bytes:
               "broken_internal_links","redirect_chains","mobile_friendly","has_sitemap","has_robots"]:
         v = ms.get(k)
         rows.append([k.replace("_"," ").title(), ("Yes" if v==1 else ("No" if v==0 else v))])
-    from reportlab.platypus import Table
     tbl = Table(rows, colWidths=[8*cm, 8*cm])
     tbl.setStyle(TableStyle([
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#6366F1")),
@@ -534,13 +501,14 @@ def generate_certified_pdf_5pages(audit: dict) -> bytes:
     # Page 5: Recommendations & Weak Areas
     c.setFont("Helvetica-Bold", 16); c.setFillColor(colors.HexColor("#10b981"))
     c.drawString(2*cm, H - 3*cm, "Recommendations & Weak Areas")
-    from reportlab.platypus import Paragraph, Frame
     style_body = ParagraphStyle(name="Body", fontName="Helvetica", fontSize=12, leading=16, alignment=TA_LEFT)
     rec_text  = "\n".join([f"• {v}" for v in audit.get("recommendations", {}).values()])
     weak_text = "\n".join([f"• {w}" for w in audit.get("weaknesses", [])])
     frame3 = Frame(2*cm, 3*cm, W - 4*cm, H - 10*cm, showBoundary=0)
-    frame3.addFromList([Paragraph("<b>Recommendations</b>", title), Paragraph(rec_text, style_body),
-                        Paragraph("<b>Weak Areas</b>", title), Paragraph(weak_text, style_body)], c)
+    frame3.addFromList([Paragraph("<b>Recommendations</b>", ParagraphStyle(name="Tit", fontName="Helvetica-Bold", fontSize=14)),
+                        Paragraph(rec_text, style_body),
+                        Paragraph("<b>Weak Areas</b>", ParagraphStyle(name="Tit2", fontName="Helvetica-Bold", fontSize=14)),
+                        Paragraph(weak_text, style_body)], c)
     c.showPage()
 
     c.save(); buf.seek(0)
@@ -686,7 +654,6 @@ def api_audit_pdf(url: str, db: Session = Depends(get_db)) -> StreamingResponse:
     if dl.downloads >= dl.allowed:
         raise HTTPException(status_code=429, detail="PDF download limit reached (3 per audit).")
 
-    # Build audit dict for PDF
     audit_dict = {
         "website": {"url": audit_row.url},
         "site_health_score": audit_row.site_health_score,
