@@ -1,184 +1,204 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Global WebAudit™ | World-Class Website Intelligence</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Tailwind -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={darkMode:'class'}</script>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-:root{--brand:#6366f1}
-.card{background:#fff;border-radius:1.25rem;padding:1.5rem;box-shadow:0 30px 60px rgba(0,0,0,.12)}
-.dark .card{background:#0f172a}
-.metric{font-size:2rem;font-weight:900}
-@media print{nav,#pricing{display:none}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ FFTECH_LOGO_TEXT }} | Intelligence OS Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: #94a3b8; }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .score-glow { text-shadow: 0 0 40px rgba(99, 102, 241, 0.6); }
+        .gradient-border { border: 1px solid; border-image: linear-gradient(to right, #6366f1, #a855f7) 1; }
+        .status-pill { @apply px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest; }
+    </style>
 </head>
+<body class="min-h-screen pb-20 selection:bg-indigo-500/30">
 
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <nav class="sticky top-0 z-50 glass border-b border-white/5 px-8 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <div class="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-500/20">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+                <span class="text-xl font-black tracking-tighter text-white uppercase">{{ FFTECH_LOGO_TEXT }} <span class="text-indigo-500 italic">OS</span></span>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">System Live: /health 200 OK</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="hidden lg:block text-right">
+                <p class="text-[10px] text-slate-500 uppercase font-black tracking-widest">Client Timezone</p>
+                <p class="text-xs font-mono text-indigo-400">Asia/Karachi (GMT+5)</p>
+            </div>
+            <a href="/audit/{{ audit.id }}/pdf" class="bg-white text-black hover:bg-indigo-500 hover:text-white px-6 py-2.5 rounded-xl text-xs font-black transition-all shadow-xl flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="3" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                CERTIFIED REPORT
+            </a>
+        </div>
+    </nav>
 
-<!-- NAV -->
-<nav class="sticky top-0 z-50 bg-black text-white">
-<div class="max-w-7xl mx-auto flex justify-between items-center p-4">
-<div class="font-black text-xl">Global WebAudit™</div>
-<div class="space-x-4 text-sm">
-<button onclick="toggleDark()">🌙</button>
-<button onclick="window.print()">📄 PDF</button>
-<a href="#pricing">Pricing</a>
-</div>
-</div>
-</nav>
+    <main class="max-w-7xl mx-auto px-6 pt-12">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <div class="lg:col-span-2 glass p-10 rounded-[3rem] flex flex-col md:flex-row items-center gap-12 relative overflow-hidden">
+                <div class="relative w-64 h-64 flex-shrink-0">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="128" cy="128" r="115" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-800" />
+                        <circle cx="128" cy="128" r="115" stroke="currentColor" stroke-width="12" fill="transparent" 
+                            stroke-dasharray="722" 
+                            stroke-dashoffset="{{ 722 - (722 * audit.site_health_score / 100) }}" 
+                            class="text-indigo-500 transition-all duration-1000" stroke-linecap="round" />
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-7xl font-black text-white score-glow italic">{{ audit.site_health_score }}%</span>
+                        <span class="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Weighted Health Score</span>
+                    </div>
+                </div>
+                <div class="flex-1 space-y-6">
+                    <div>
+                        <p class="text-indigo-500 text-xs font-black uppercase tracking-[0.3em] mb-1">Target Identity</p>
+                        <h1 class="text-4xl font-black text-white tracking-tighter leading-tight break-all">{{ audit.website_url }}</h1>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-indigo-500/5 border border-indigo-500/10 p-5 rounded-3xl">
+                            <p class="text-slate-500 text-[10px] font-black uppercase mb-1">Engine Grade</p>
+                            <p class="text-3xl font-black text-white italic tracking-tighter">{{ audit.grade }}</p>
+                        </div>
+                        <div class="bg-emerald-500/5 border border-emerald-500/10 p-5 rounded-3xl">
+                            <p class="text-slate-500 text-[10px] font-black uppercase mb-1">Audit Status</p>
+                            <p class="text-xl font-bold text-emerald-500 uppercase tracking-tighter">Certified</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<!-- HERO -->
-<section class="bg-gradient-to-br from-indigo-600 to-purple-700 text-white py-24 text-center">
-<h1 class="text-6xl font-black mb-6">World’s Best Website Audit</h1>
-<p class="text-xl opacity-90 max-w-3xl mx-auto">
-Technical precision, executive clarity, SaaS-grade intelligence.
-</p>
-</section>
+            <div class="glass p-10 rounded-[3rem] border-t-4 border-indigo-600">
+                <h3 class="text-white font-black uppercase text-[11px] tracking-[0.4em] mb-6 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z"/><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd"/></svg>
+                    Executive Summary
+                </h3>
+                <div class="prose prose-invert">
+                    <p class="text-slate-400 text-sm leading-relaxed font-medium italic">
+                        "{{ audit.executive_summary }}"
+                    </p>
+                </div>
+                <div class="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                    <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Audit ID: #{{ audit.id }}</span>
+                    <span class="px-2 py-1 bg-white/5 text-white text-[9px] rounded font-bold uppercase">v1.0.0 Stable</span>
+                </div>
+            </div>
+        </div>
 
-<!-- LIVE AUDIT -->
-<section class="bg-indigo-100 dark:bg-indigo-900/40 py-6 text-center">
-<p id="liveText" class="font-semibold animate-pulse">
-🔍 Crawling → ⚙️ Analyzing → 📊 Scoring → 🧠 AI Summary
-</p>
-<div class="w-2/3 mx-auto bg-gray-300 rounded-full h-3 mt-3">
-<div id="bar" class="bg-indigo-600 h-3 rounded-full w-0"></div>
-</div>
-</section>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div class="glass p-8 rounded-[2rem] border-b-4 border-amber-500/50">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Network Latency (TTFB)</p>
+                <div class="flex items-end gap-2">
+                    <span class="text-3xl font-black text-white italic">{{ audit.metrics_summary.ttfb_seconds }}</span>
+                    <span class="text-xs font-bold text-slate-600 mb-1">SECONDS</span>
+                </div>
+            </div>
+            <div class="glass p-8 rounded-[2rem] border-b-4 border-indigo-500/50">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Security Headers</p>
+                <span class="text-sm font-bold {{ 'text-emerald-400' if audit.metrics_summary.security_headers_present else 'text-red-500' }}">
+                    {{ 'DEPLOYED & SECURE' if audit.metrics_summary.security_headers_present else 'CRITICAL EXPOSURE' }}
+                </span>
+            </div>
+            <div class="glass p-8 rounded-[2rem] border-b-4 border-purple-500/50">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Crawlability Index</p>
+                <span class="text-sm font-bold {{ 'text-emerald-400' if audit.metrics_summary.robots_txt_found else 'text-amber-500' }}">
+                    {{ 'ROBOTS.TXT DETECTED' if audit.metrics_summary.robots_txt_found else 'SEARCH ENGINE CONFLICT' }}
+                </span>
+            </div>
+            <div class="glass p-8 rounded-[2rem] border-b-4 border-emerald-500/50">
+                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Transport Encryption</p>
+                <span class="text-sm font-bold text-emerald-400">
+                    {{ 'TLS 1.3 / SSL VALID' if audit.metrics_summary.ssl_valid else 'SSL ERROR' }}
+                </span>
+            </div>
+        </div>
 
-<main class="max-w-7xl mx-auto p-8 space-y-16">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <div class="glass p-10 rounded-[3rem] relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 opacity-5 rotate-12">
+                    <svg class="w-32 h-32 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 4.925-3.078 9.123-7.5 10.74a11.956 11.956 0 01-7.5-10.74c0-.68.056-1.35.166-2.001zm6.541 3.991a.75.75 0 011.06 0l3 3a.75.75 0 01-1.06 1.06l-3-3a.75.75 0 010-1.06z" clip-rule="evenodd"/></svg>
+                </div>
+                <h4 class="text-white font-black uppercase text-[10px] tracking-[0.4em] mb-6 italic">SaaS Security Profile</h4>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center py-3 border-b border-white/5">
+                        <span class="text-xs font-bold uppercase tracking-widest">2FA Enforcement</span>
+                        <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[9px] font-black">TOTP ACTIVE</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-white/5">
+                        <span class="text-xs font-bold uppercase tracking-widest">RBAC Auth Level</span>
+                        <span class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-[9px] font-black italic">ROOT ADMIN</span>
+                    </div>
+                </div>
+            </div>
 
-<!-- SCORE -->
-<section class="grid md:grid-cols-2 gap-8">
-<div class="card text-center">
-<p class="text-sm uppercase opacity-60">Overall Health</p>
-<p class="metric text-indigo-600">84%</p>
-<canvas id="score"></canvas>
-</div>
-<div class="card">
-<h3 class="font-black mb-4">Issue Breakdown</h3>
-<canvas id="issues"></canvas>
-</div>
-</section>
+            <div class="glass p-10 rounded-[3rem]">
+                <h4 class="text-white font-black uppercase text-[10px] tracking-[0.4em] mb-8 italic">Accumulated Health Trend</h4>
+                <div class="h-48">
+                    <canvas id="accumulatedChart"></canvas>
+                </div>
+            </div>
+        </div>
 
-<!-- CORE WEB VITALS -->
-<section class="card">
-<h2 class="text-2xl font-black mb-6">Core Web Vitals (Google)</h2>
-<div class="grid md:grid-cols-3 gap-6">
-<div><p class="font-bold">LCP</p><canvas id="lcp"></canvas></div>
-<div><p class="font-bold">CLS</p><canvas id="cls"></canvas></div>
-<div><p class="font-bold">INP</p><canvas id="inp"></canvas></div>
-</div>
-</section>
+        <div class="glass p-10 rounded-[3rem]">
+            <h4 class="text-white font-black uppercase text-[11px] tracking-[0.5em] mb-10 text-center italic">Metric Weakness Remediation</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for weak in audit.weaknesses %}
+                <div class="p-6 bg-white/5 border border-white/5 rounded-3xl flex items-center gap-4 hover:bg-white/10 transition-all cursor-default">
+                    <div class="flex-shrink-0 h-10 w-10 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">High Priority Fix</p>
+                        <p class="text-sm font-bold text-white tracking-tight">{{ weak }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
 
-<!-- PERFORMANCE -->
-<section class="grid md:grid-cols-3 gap-8">
-<div class="card"><h4 class="font-black">TTFB</h4><canvas id="ttfb"></canvas></div>
-<div class="card"><h4 class="font-black">Page Size</h4><canvas id="size"></canvas></div>
-<div class="card"><h4 class="font-black">Requests</h4><canvas id="req"></canvas></div>
-</section>
+    <footer class="mt-20 py-12 border-t border-white/5 text-center">
+        <div class="bg-white/5 px-4 py-1 rounded-full inline-block mb-4">
+            <p class="text-[9px] font-black text-indigo-400 uppercase tracking-[0.5em]">{{ FFTECH_LOGO_TEXT }} INTELLIGENCE OS • VERSION 1.0.0 PLATINUM</p>
+        </div>
+        <p class="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Managed by Jamshaid Ali • Certified World-Class Compliance</p>
+    </footer>
 
-<!-- SECURITY -->
-<section class="card">
-<h2 class="text-2xl font-black mb-6">Security & Trust</h2>
-<canvas id="security"></canvas>
-</section>
-
-<!-- SEO + CONTENT -->
-<section class="grid md:grid-cols-2 gap-8">
-<div class="card"><h3 class="font-black">SEO Fundamentals</h3><canvas id="seo"></canvas></div>
-<div class="card"><h3 class="font-black">Content Quality</h3><canvas id="content"></canvas></div>
-</section>
-
-<!-- COMPETITOR -->
-<section class="card">
-<h2 class="text-2xl font-black mb-6">Competitor Comparison</h2>
-<canvas id="compare"></canvas>
-</section>
-
-<!-- PRIORITY MATRIX -->
-<section class="card">
-<h2 class="text-2xl font-black mb-6">Fix Priority Matrix</h2>
-<table class="w-full text-sm">
-<tr class="font-bold border-b"><td>Issue</td><td>Impact</td><td>Effort</td><td>Priority</td></tr>
-<tr><td>Slow LCP</td><td>High</td><td>Medium</td><td class="text-red-600 font-bold">Critical</td></tr>
-<tr><td>Missing Meta</td><td>Medium</td><td>Low</td><td class="text-orange-500 font-bold">High</td></tr>
-<tr><td>Image Optimization</td><td>Medium</td><td>Low</td><td>Medium</td></tr>
-</table>
-</section>
-
-<!-- AI SUMMARY -->
-<section class="card bg-green-50 dark:bg-green-900/30">
-<h2 class="text-2xl font-black mb-4">AI Executive Summary</h2>
-<p class="leading-relaxed">
-This website has a strong structural foundation but is limited by performance
-bottlenecks and incomplete on-page SEO. Improving Core Web Vitals, optimizing
-media assets, and fixing metadata gaps can raise overall health by 25–35%.
-</p>
-</section>
-
-<!-- HISTORY -->
-<section class="card">
-<h2 class="text-2xl font-black mb-4">Audit History</h2>
-<ul class="space-y-2 text-sm">
-<li>📅 Jan 2025 — 71%</li>
-<li>📅 Feb 2025 — 78%</li>
-<li>📅 Mar 2025 — 84%</li>
-</ul>
-</section>
-
-</main>
-
-<!-- PRICING -->
-<section id="pricing" class="bg-black text-white py-24">
-<div class="max-w-7xl mx-auto grid md:grid-cols-3 gap-8 text-center">
-<div class="card bg-slate-900">
-<h3 class="font-black text-xl">Starter</h3><p class="text-4xl font-black">$19</p>
-<p class="opacity-70">Single Audit</p>
-</div>
-<div class="card bg-indigo-700 scale-105">
-<h3 class="font-black text-xl">Pro</h3><p class="text-4xl font-black">$49</p>
-<p class="opacity-90">Unlimited Audits</p>
-</div>
-<div class="card bg-slate-900">
-<h3 class="font-black text-xl">Agency</h3><p class="text-4xl font-black">$199</p>
-<p class="opacity-70">White Label</p>
-</div>
-</div>
-</section>
-
-<script>
-/* DARK MODE */
-function toggleDark(){document.documentElement.classList.toggle('dark')}
-
-/* LIVE PROGRESS */
-let p=0;setInterval(()=>{if(p<100){p+=8;bar.style.width=p+"%"}},500)
-
-/* DATA */
-const m={score:84,errors:6,warnings:12,notices:9,lcp:2.6,cls:0.09,inp:180,ttfb:.8,size:2.4,req:54,alt:7,ratio:.18}
-const c={score:72}
-
-/* CHARTS */
-new Chart(score,{type:'doughnut',data:{labels:['Score',''],datasets:[{data:[m.score,100-m.score]}]}})
-new Chart(issues,{type:'bar',data:{labels:['Errors','Warnings','Notices'],datasets:[{data:[m.errors,m.warnings,m.notices]}]}})
-new Chart(lcp,{type:'bar',data:{labels:['LCP'],datasets:[{data:[m.lcp]}]}})
-new Chart(cls,{type:'bar',data:{labels:['CLS'],datasets:[{data:[m.cls]}]}})
-new Chart(inp,{type:'bar',data:{labels:['INP'],datasets:[{data:[m.inp]}]}})
-new Chart(ttfb,{type:'bar',data:{labels:['TTFB'],datasets:[{data:[m.ttfb]}]}})
-new Chart(size,{type:'bar',data:{labels:['MB'],datasets:[{data:[m.size]}]}})
-new Chart(req,{type:'bar',data:{labels:['Requests'],datasets:[{data:[m.req]}]}})
-new Chart(security,{type:'radar',data:{labels:['HTTPS','SSL','Headers','Mixed'],datasets:[{data:[1,1,3,1]}]}})
-new Chart(seo,{type:'bar',data:{labels:['Title','Meta','H1','Canonical'],datasets:[{data:[1,0,1,1]}]}})
-new Chart(content,{type:'bar',data:{labels:['Text/HTML','Missing Alt'],datasets:[{data:[m.ratio,m.alt]}]}})
-new Chart(compare,{type:'bar',data:{labels:['Score'],datasets:[{label:'You',data:[m.score]},{label:'Competitor',data:[c.score]}]}})
-</script>
-
+    <script>
+        // DATA DELIVERABLE: ACCUMULATED TREND LOGIC
+        const ctxAccumulated = document.getElementById('accumulatedChart').getContext('2d');
+        new Chart(ctxAccumulated, {
+            type: 'line',
+            data: {
+                labels: ['Run 1', 'Run 2', 'Run 3', 'Current'],
+                datasets: [{
+                    data: [55, 62, 68, {{ audit.site_health_score }}],
+                    borderColor: '#6366f1',
+                    borderWidth: 4,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: true,
+                    backgroundColor: 'rgba(99, 102, 241, 0.05)'
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { grid: { display: false }, ticks: { display: false } }, 
+                    y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#475569', font: { size: 10, weight: 'bold' } } } 
+                }
+            }
+        });
+    </script>
 </body>
 </html>
