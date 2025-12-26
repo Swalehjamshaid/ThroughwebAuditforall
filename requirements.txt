@@ -1,25 +1,17 @@
-# requirements.txt — Complete & Updated Dependencies for FF Tech SaaS
-# Railway-ready | All features working (audit, PDF, email, scheduler, auth, DB)
 
-fastapi[standard]          # Includes uvicorn, jinja2, python-multipart
-sqlalchemy==2.0.35
-psycopg2-binary==2.9.9     # PostgreSQL driver (critical for Railway)
-passlib[bcrypt]==1.7.4     # Secure password hashing
-itsdangerous==2.2.0        # Signed tokens for email verification
-email-validator==2.2.0     # Email format validation
-apscheduler==3.10.4        # Background scheduler for daily reports
-requests==2.32.3           # HTTP fetching for audit engine
-beautifulsoup4==4.12.3     # HTML parsing
-lxml==5.3.0                # Faster parser for BeautifulSoup
-reportlab==4.2.5           # PDF report generation (certified reports)
-PyJWT==2.9.0               # JWT authentication
-python-dotenv==1.0.1       # Optional: local .env loading (dev only)
-
-# Optional but Recommended for Production
-gunicorn==23.0.0           # Better production server (if not using uvicorn directly)
-
-# If adding Stripe subscription later
-# stripe==10.11.0
-
-# If adding OpenAI for enhanced summaries
-# openai==1.51.0
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+python-multipart
+requests
+beautifulsoup4
+apscheduler
+pydantic
+PyJWT
+reportlab
+email-validator
+jinja2
+passlib[bcrypt]
+urllib3
+tldextract
