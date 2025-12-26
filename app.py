@@ -4,10 +4,11 @@ FF Tech – AI-Powered Website Audit & Compliance SaaS
 Single-file FastAPI backend, Railway-ready, integrated with your advanced HTML.
 
 Fixes in this version:
-- Root route (/) now always attempts to render the latest audit dashboard.
-- Optional auto-seed on startup using env AUTO_SEED_AUDIT_URL if no audits exist.
-- Safe fallback to styled status page when DB is unreachable or data is empty.
-- Auto-migration of missing columns in Postgres (RBAC/2FA + template extras).
+- Root (/) always attempts to render the latest audit dashboard.
+- Status page includes a clickable link to run a first audit (GET /audit/run?website_url=...).
+- Optional auto-seed of a first audit via env AUTO_SEED_AUDIT_URL.
+- Safe fallback to styled status page when DB is unreachable or there’s no data.
+- Auto-migration of missing columns in Postgres needed by RBAC/2FA and dashboard template.
 - Inline rendering of your provided HTML (uses templates/index.html if present).
 """
 
@@ -16,46 +17,43 @@ import hmac
 import json
 import base64
 import time
-import smtplib
-import ssl as sslmod
-import socket
 import hashlib
 import secrets
+import socket
+import ssl as sslmod
 import datetime as dt
 from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 
-# FastAPI & deps
+# FastAPI
 from fastapi import FastAPI, HTTPException, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
-import jwt
 
-# DB
+# Pydantic
+from pydantic import BaseModel, Field
+
+# DB / ORM
 from sqlalchemy import (
     create_engine, Column, Integer, String, DateTime, Boolean, ForeignKey,
     Text, Float, JSON, func, text
 )
-from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from sqlalchemy.exc import SQLAlchemyError
 
-# HTTP, parsing
+# HTTP & parsing
 import requests
 from bs4 import BeautifulSoup
 
-# Scheduler (optional use)
-from apscheduler.schedulers.background import BackgroundScheduler
-
-# PDF reporting
+# PDF
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 
 # -----------------------------------------------------------------------------
-# Config (Railway-friendly via env vars)
+# Env & Config
 # -----------------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "change_me_dev_only")
 APP_DOMAIN = os.getenv("APP_DOMAIN", "http://localhost:8000")
@@ -71,7 +69,7 @@ AUTO_SEED_AUDIT_URL = os.getenv("AUTO_SEED_AUDIT_URL", "").strip()
 # -----------------------------------------------------------------------------
 # App & Templates
 # -----------------------------------------------------------------------------
-app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.1")
+app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.2")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else [APP_DOMAIN],
@@ -84,7 +82,7 @@ templates_dir = Path("templates")
 templates = Jinja2Templates(directory=str(templates_dir)) if templates_dir.exists() else None
 
 # -----------------------------------------------------------------------------
-# Inline HTML (your provided advanced template)
+# Inline HTML (advanced dashboard template)
 # -----------------------------------------------------------------------------
 INLINE_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -94,7 +92,7 @@ INLINE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Tailwind CSS -->
-<script/cdn.tailwindcss.com</script>
+https://cdn.tailwindcss.com</script>
 <!-- Chart.js -->
 https://cdn.jsdelivr.net/npm/chart.js</script>
 <!-- Google Fonts -->
@@ -122,7 +120,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 </style>
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen">
-
 <header class="border-b border-white/10">
 <div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
   <div>
@@ -322,7 +319,7 @@ new Chart(document.getElementById("trendChart"), {
 """
 
 # -----------------------------------------------------------------------------
-# DB setup (hardened)
+# DB setup
 # -----------------------------------------------------------------------------
 Base = declarative_base()
 try:
@@ -333,7 +330,7 @@ except Exception:
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # -----------------------------------------------------------------------------
-# Models (minimal set required by template & routes)
+# Models
 # -----------------------------------------------------------------------------
 class User(Base):
     __tablename__ = "users"
@@ -379,7 +376,7 @@ class AuditRun(Base):
     metrics_summary = Column(JSON)             # dict of metrics -> values
     weaknesses = Column(JSON)                  # list of weaknesses
     executive_summary = Column(Text)           # ~200 words
-    # Optional fields used by your template:
+    # Extras used by template:
     competitors = Column(JSON, nullable=True)  # [{name, score}]
     top_issues = Column(JSON, nullable=True)   # [{name, severity, suggestion}]
     recommendations = Column(JSON, nullable=True)  # {metric_key: suggestion}
@@ -391,18 +388,9 @@ class AuditStartRequest(BaseModel):
     website_url: str = Field(..., description="URL to audit")
 
 # -----------------------------------------------------------------------------
-# Helpers (security, email)
+# Helpers
 # -----------------------------------------------------------------------------
 bearer = HTTPBearer()
-
-def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
-    return f"pbkdf2$sha256$100000${salt}${base64.b64encode(dk).decode()}"
-
-def send_email(to_email: str, subject: str, html_body: str, plain_body: str = ""):
-    # optional SMTP integration; omitted here for simplicity
-    pass
 
 def get_db() -> Session:
     db = SessionLocal()
@@ -411,8 +399,53 @@ def get_db() -> Session:
     finally:
         db.close()
 
+def ensure_columns(conn, table: str, cols: Dict[str, str]):
+    """Auto-add missing columns (Postgres)."""
+    for col, sqltype in cols.items():
+        check_sql = text("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = :tname AND column_name = :cname
+        """)
+        exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
+        if not exists:
+            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
+
+def get_latest_audit(db: Session) -> Optional[AuditRun]:
+    try:
+        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+    except SQLAlchemyError:
+        return None
+
+def ensure_first_audit(db: Session):
+    """Auto-seed the first audit if none exist and AUTO_SEED_AUDIT_URL is set."""
+    seed_url = AUTO_SEED_AUDIT_URL
+    if not seed_url:
+        return
+    latest = get_latest_audit(db)
+    if latest:
+        return
+    w = db.query(Website).filter(Website.url == seed_url).first()
+    if not w:
+        w = Website(user_id=None, url=seed_url)
+        db.add(w); db.commit()
+    a = compute_audit(seed_url)
+    metrics, weaknesses = a["metrics"], a["weaknesses"]
+    run = AuditRun(
+        website_id=w.id,
+        finished_at=func.now(),
+        site_health_score=metrics["site_health_score"],
+        grade=metrics["grade"],
+        metrics_summary=metrics,
+        weaknesses=weaknesses,
+        executive_summary=generate_summary(seed_url, metrics, weaknesses),
+        competitors=a["competitors"],
+        top_issues=a["top_issues"],
+        recommendations=a["recommendations"]
+    )
+    db.add(run); db.commit()
+
 # -----------------------------------------------------------------------------
-# Audit Engine (core checks + strict scoring)
+# Audit Engine
 # -----------------------------------------------------------------------------
 def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]:
     start = time.time()
@@ -491,7 +524,9 @@ def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
 
 def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
     broken, redirected = [], []
+    tested = 0
     for u in urls[:limit]:
+        tested += 1
         try:
             r = requests.head(u, allow_redirects=True, timeout=10, headers={"User-Agent": "FFTechAudit/1.0"})
             if 400 <= r.status_code < 600:
@@ -724,7 +759,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "mixed_content_count": len(mixed_content),
     }
 
-    # Extras for your template
+    # Extras for template
     competitors = [
         {"name": "Competitor A", "score": max(20, int(metrics["site_health_score"] - 10))},
         {"name": "Competitor B", "score": max(15, int(metrics["site_health_score"] - 5))},
@@ -751,7 +786,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
     }
 
 # -----------------------------------------------------------------------------
-# PDF Report (Certified)
+# PDF
 # -----------------------------------------------------------------------------
 def wrap_text(text: str, max_chars: int = 90) -> List[str]:
     words = text.split()
@@ -796,50 +831,6 @@ def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
 # -----------------------------------------------------------------------------
 # Startup: create schema + auto-migrate + auto-seed
 # -----------------------------------------------------------------------------
-def ensure_columns(conn, table: str, cols: Dict[str, str]):
-    for col, sqltype in cols.items():
-        check_sql = text("""
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = :tname AND column_name = :cname
-        """)
-        exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
-        if not exists:
-            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
-
-def get_latest_audit(db: Session) -> Optional[AuditRun]:
-    try:
-        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
-    except SQLAlchemyError:
-        return None
-
-def ensure_first_audit(db: Session):
-    """Auto-seed the first audit if none exist and AUTO_SEED_AUDIT_URL is set."""
-    seed_url = AUTO_SEED_AUDIT_URL
-    if not seed_url:
-        return
-    latest = get_latest_audit(db)
-    if latest:
-        return
-    w = db.query(Website).filter(Website.url == seed_url).first()
-    if not w:
-        w = Website(user_id=None, url=seed_url)
-        db.add(w); db.commit()
-    a = compute_audit(seed_url)
-    metrics, weaknesses = a["metrics"], a["weaknesses"]
-    run = AuditRun(
-        website_id=w.id,
-        finished_at=func.now(),
-        site_health_score=metrics["site_health_score"],
-        grade=metrics["grade"],
-        metrics_summary=metrics,
-        weaknesses=weaknesses,
-        executive_summary=generate_summary(seed_url, metrics, weaknesses),
-        competitors=a["competitors"],
-        top_issues=a["top_issues"],
-        recommendations=a["recommendations"]
-    )
-    db.add(run); db.commit()
-
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
@@ -854,7 +845,7 @@ def on_startup():
             "top_issues": "JSON",
             "recommendations": "JSON"
         })
-    # Auto-seed first audit if required
+    # Auto-seed first audit if requested
     try:
         db = SessionLocal()
         ensure_first_audit(db)
@@ -863,12 +854,8 @@ def on_startup():
         except Exception: pass
 
 # -----------------------------------------------------------------------------
-# Routes
+# Rendering helpers
 # -----------------------------------------------------------------------------
-@app.get("/health")
-def health():
-    return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
-
 def render_dashboard(request: Request, audit: AuditRun, website: Website, previous: Optional[AuditRun]) -> HTMLResponse:
     ctx_audit = {
         "id": audit.id,
@@ -893,12 +880,25 @@ def render_dashboard(request: Request, audit: AuditRun, website: Website, previo
     html = tpl.render(audit=ctx_audit, previous_audit=previous)
     return HTMLResponse(html)
 
+def get_latest(db: Session) -> Optional[AuditRun]:
+    try:
+        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+    except SQLAlchemyError:
+        return None
+
+# -----------------------------------------------------------------------------
+# Routes
+# -----------------------------------------------------------------------------
+@app.get("/health")
+def health():
+    return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
+
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, db: Session = Depends(get_db)):
     port_label = os.getenv("PORT", "8080")
-    # Always try to show the latest audit at '/'
+    # Always try to show the latest dashboard at '/'
     try:
-        latest = get_latest_audit(db)
+        latest = get_latest(db)
         if latest:
             website = db.query(Website).get(latest.website_id)
             previous = (
@@ -911,15 +911,14 @@ def root(request: Request, db: Session = Depends(get_db)):
     except SQLAlchemyError:
         pass  # fall through to status page
 
-    # Styled status page (Tailwind tag FIXED)
+    # Styled status page + clickable link to run audit
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>FF Tech | System Online</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        https://cdn.tailwindcss.com</script>
-    </head>
+        <script src="https://cdn.tailwindcss.com </head>
     <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
         <div class="p-12 border border-white/10 rounded-3xl text-center shadow-2xl max-w-xl">
             <h1 class="text-4xl md:text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
@@ -928,11 +927,15 @@ def root(request: Request, db: Session = Depends(get_db)):
                 <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">● LIVE</span>
                 <span class="px-4 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">PORT: {port_label}</span>
             </div>
-            <div class="mt-6">
-                <p class="text-slate-400 text-sm">Run a first audit to see the dashboard:</p>
-                <code class="text-xs bg-white/10 px-2 py-1 rounded">
-                    curl -X POST {APP_DOMAIN}/audit/run -H "Content-Type: application/json" -d '{{"website_url":"https://example.com"}}'
-                </code>
+            <div class="mt-6 space-y-2">
+              <p class="text-slate-400 text-sm">Click to run a first audit and see the dashboard:</p>
+              /audit/run?website_url=https://example.com
+                 Run audit for https://example.com
+              </a>
+              <p class="text-xs text-slate-500 mt-2">Or POST JSON:</p>
+              <code class="text-xs bg-white/10 px-2 py-1 rounded">
+                curl -X POST {APP_DOMAIN}/audit/run -H "Content-Type: application/json" -d '{{"website_url":"https://example.com"}}'
+              </code>
             </div>
         </div>
     </body>
@@ -962,6 +965,30 @@ def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
     db.add(run); db.commit()
     report_url = f"{APP_DOMAIN}/audit/{run.id}/report"
     return {"message": "Audit completed", "audit_id": run.id, "grade": run.grade, "score": run.site_health_score, "report_url": report_url}
+
+# ✅ New: GET endpoint so you can trigger an audit from the browser
+@app.get("/audit/run")
+def run_audit_get(website_url: str, db: Session = Depends(get_db)):
+    w = db.query(Website).filter(Website.url == website_url).first()
+    if not w:
+        w = Website(user_id=None, url=website_url)
+        db.add(w); db.commit()
+    a = compute_audit(w.url)
+    metrics = a["metrics"]; weaknesses = a["weaknesses"]
+    run = AuditRun(
+        website_id=w.id,
+        finished_at=func.now(),
+        site_health_score=metrics["site_health_score"],
+        grade=metrics["grade"],
+        metrics_summary=metrics,
+        weaknesses=weaknesses,
+        executive_summary=generate_summary(w.url, metrics, weaknesses),
+        competitors=a["competitors"],
+        top_issues=a["top_issues"],
+        recommendations=a["recommendations"]
+    )
+    db.add(run); db.commit()
+    return {"message": "Audit completed", "report_url": f"{APP_DOMAIN}/audit/{run.id}/report"}
 
 @app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
 def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db)):
@@ -994,20 +1021,7 @@ def pdf_report(audit_id: int, db: Session = Depends(get_db)):
         except Exception: pass
 
 # -----------------------------------------------------------------------------
-# Optional Scheduler (running but no jobs unless you add them)
-# -----------------------------------------------------------------------------
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.start()
-
-def schedule_audit_job(website_url: str):
-    db = SessionLocal()
-    try:
-        run_audit(AuditStartRequest(website_url=website_url), db)
-    finally:
-        db.close()
-
-# -----------------------------------------------------------------------------
-# Local run helper
+# Local run
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
