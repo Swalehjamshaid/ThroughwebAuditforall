@@ -1,12 +1,13 @@
 
-# ap.py — FF Tech AI Audit (DB-backed, inline HTML, Railway-ready)
-# ---------------------------------------------------------------------
+# ap.py — FF Tech AI Audit (DB-backed, inline HTML, Admin/Paid auth, Railway-ready)
+# ---------------------------------------------------------------------------------
 # - Integrates YOUR provided HTML exactly (embedded as Jinja template).
 # - Adds Start Audit (AJAX) -> runs audit -> redirects to /audit/{id}/report.
 # - Populates the page with audit attributes, charts, issues, metrics, etc.
-# - Download PDF works at /audit/{id}/pdf.
+# - PDF export restricted to PAID users; Admin can mark users paid.
 # - SQLAlchemy DB-backed (Postgres via DATABASE_URL; SQLite fallback).
-# ---------------------------------------------------------------------
+# - Simple session-based auth (Starlette SessionMiddleware).
+# ---------------------------------------------------------------------------------
 
 import os
 import re
@@ -21,6 +22,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Form, Depends
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 import requests
 import httpx
@@ -42,6 +44,7 @@ from sqlalchemy.exc import SQLAlchemyError
 # --------------------------- Config ----------------------------
 APP_NAME = "FF TECH AI AUDIT"
 ENV = os.getenv("ENV", "development")
+SECRET_KEY = os.getenv("SECRET_KEY", "change_me_dev_only")  # for session cookies
 DEFAULT_USER_AGENT = os.getenv("DEFAULT_USER_AGENT", "FFTechAudit/1.0")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech.db")
@@ -56,7 +59,7 @@ RETRIES = 2
 AVOID_DOMAINS = {"facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com", "youtube.com"}
 
 # ----------------------- FastAPI app ---------------------------
-app = FastAPI(title=APP_NAME, version="2.0.0")
+app = FastAPI(title=APP_NAME, version="3.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else ["*"],
@@ -64,6 +67,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # ---------------------- DB setup -------------------------------
 Base = declarative_base()
@@ -72,6 +76,16 @@ try:
 except Exception:
     engine = create_engine("sqlite:///./fftech.db", pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)          # sha256
+    role = Column(String, default="user")                   # user, paid, admin
+    is_paid = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
 
 class Website(Base):
     __tablename__ = "websites"
@@ -85,6 +99,7 @@ class AuditRun(Base):
     __tablename__ = "audit_runs"
     id = Column(Integer, primary_key=True)
     website_id = Column(Integer, ForeignKey("websites.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     started_at = Column(DateTime, default=func.now())
     finished_at = Column(DateTime)
     site_health_score = Column(Float)                  # 0-100
@@ -95,18 +110,6 @@ class AuditRun(Base):
     competitors = Column(SA_JSON, nullable=True)       # [{name, score}]
     top_issues = Column(SA_JSON, nullable=True)        # [{name, severity, suggestion}]
     recommendations = Column(SA_JSON, nullable=True)   # {metric_key: suggestion}
-
-class User(Base):
-    __tablename__ = "users"                            # kept for future RBAC/2FA use
-    id = Column(Integer, primary_key=True)
-    email = Column(String, unique=True, index=True, nullable=True)
-    password_hash = Column(String, nullable=True)
-    is_active = Column(Boolean, default=False)
-    role = Column(String, default="user")
-    totp_enabled = Column(Boolean, default=False)
-    totp_secret = Column(String, nullable=True)
-    created_at = Column(DateTime, default=func.now())
-    timezone = Column(String, default="Asia/Karachi")
 
 def get_db() -> Session:
     db = SessionLocal()
@@ -129,18 +132,18 @@ def ensure_columns(conn, table: str, cols: Dict[str, str]):
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
-    # optional Postgres auto-migration
     try:
         with engine.begin() as conn:
             ensure_columns(conn, "audit_runs", {
                 "competitors": "JSON",
                 "top_issues": "JSON",
-                "recommendations": "JSON"
+                "recommendations": "JSON",
+                "user_id": "INTEGER"
             })
             ensure_columns(conn, "users", {
                 "role": "VARCHAR DEFAULT 'user'",
-                "totp_enabled": "BOOLEAN DEFAULT FALSE",
-                "totp_secret": "VARCHAR"
+                "is_paid": "BOOLEAN DEFAULT FALSE",
+                "is_active": "BOOLEAN DEFAULT TRUE"
             })
     except Exception:
         pass
@@ -154,13 +157,11 @@ INLINE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Tailwind CSS -->
-https://cdn.tailwindcss.com</script>
+<script/cdn.tailwindcss.com</script>
 <!-- Chart.js -->
 https://cdn.jsdelivr.net/npm/chart.js</script>
 <!-- Google Fonts -->
-https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap
-
-<style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=>
 body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 .glass { background: rgba(15,23,42,.65); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.08); transition: transform 0.3s; }
 .glass:hover { transform: translateY(-5px); }
@@ -189,9 +190,13 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   <div>
     <h1 class="text-3xl font-black">FF TECH <span class="text-indigo-400">AI AUDIT</span></h1>
     <p class="text-sm text-slate-400" id="currentWebsite">{{ audit.website.url }}</p>
+    <p class="text-xs text-slate-500">User: {{ user.email if user else 'Guest' }} · Role: {{ user.role if user else 'guest' }} · Paid: {{ 'yes' if user and user.is_paid else 'no' }}</p>
   </div>
   <div class="flex items-center gap-4">
-    <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
+    {% if user %}
+    /logoutLogout</a>
+    {% else %}
+    <a href="/login" class="px-3 py-1 bg-slate-700/40 text-slate- <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
     <button onclick="downloadPDF()" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">Download PDF</button>
   </div>
 </div>
@@ -425,7 +430,7 @@ async function startAudit() {
     }
 }
 
-// Download PDF (navigate to endpoint; works on the report page)
+// Download PDF (navigate to endpoint; only PAID users will be allowed)
 function downloadPDF() {
   const metaEl = document.querySelector('meta[name="audit-id"]');
   if (metaEl && metaEl.getAttribute("content")) {
@@ -436,7 +441,7 @@ function downloadPDF() {
   }
 }
 
-// Charts
+// Charts (placeholders use real values from Jinja context)
 new Chart(document.getElementById("issuesChart"), {
   type: "doughnut",
   data: {
@@ -453,18 +458,110 @@ new Chart(document.getElementById("trendChart"), {
 });
 </script>
 
-<!-- meta used by PDF button -->
+<!-- meta used by PDF button & JS -->
 <meta name="audit-id" content="{{ audit.id if audit.id else '' }}">
 </body>
 </html>
 """
 
-# ----------------------- Jinja render helper ---------------------
-def render_html(audit: Dict[str, Any], previous: Optional[Dict[str, Any]]) -> HTMLResponse:
+LOGIN_HTML = r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+https://cdn.tailwindcss.com</script>
+<title>Login | FF Tech AI Audit</title>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center">
+<div class="p-8 rounded-xl border border-white/10 w-full max-w-md">
+  <h1 class="text-2xl font-black mb-4">Login</h1>
+  /login
+    <input name="email" type="email" placeholder="Email" class="w-full px-4 py-2 rounded-lg text-black" required />
+    <input name="password" type="password" placeholder="Password" class="w-full px-4 py-2 rounded-lg text-black" required />
+    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-lg font-bold w-full">Login</button>
+  </form>
+  <p class="text-xs mt-3">No account? /registerRegister</a></p>
+</div>
+</body>
+</html>
+"""
+
+REGISTER_HTML = r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+https://cdn.tailwindcss.com</script>
+<title>Register | FF Tech AI Audit</title>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center">
+<div class="p-8 rounded-xl border border-white/10 w-full max-w-md">
+  <h1 class="text-2xl font-black mb-4">Register</h1>
+  <form method="post" action"email" type="email" placeholder="Email" class="w-full px-4 py-2 rounded-lg text-black" required />
+    <input name="password" type="password" placeholder="Password" class="w-full px-4 py-2 rounded-lg text-black" required />
+    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-lg font-bold w-full">Create Account</button>
+  </form>
+  <p class="text-xs mt-3">Already have an account? /loginLogin</a></p>
+</div>
+</body>
+</html>
+"""
+
+ADMIN_HTML = r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+https://cdn.tailwindcss.com</script>
+<title>Admin | FF Tech AI Audit</title>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+<div class="max-w-4xl mx-auto p-6">
+  <h1 class="text-2xl font-black mb-4">Admin · Users</h1>
+  <table class="w-full text-left border-collapse">
+    <thead><tr class="border-b border-slate-700"><th class="py-2 px-2">Email</th><th class="py-2 px-2">Role</th><th class="py-2 px-2">Paid</th><th class="py-2 px-2">Actions</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+      <tr class="border-b border-slate-800">
+        <td class="py-2 px-2">{{ u.email }}</td>
+        <td class="py-2 px-2">{{ u.role }}</td>
+        <td class="py-2 px-2">{{ 'yes' if u.is_paid else 'no' }}</td>
+        <td class="py-2 px-2">
+          /admin/toggle-paid
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button class="px-3 py-1 bg-indigo-600 rounded text-white text-sm">{{ 'Set Unpaid' if u.is_paid else 'Set Paid' }}</button>
+          </form>
+          /admin/set-role
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <select name="role" class="text-black px-2 py-1 rounded">
+              <option value="user" {% if u.role=='user' %}selected{% endif %}>user</option>
+              <option value="paid" {% if u.role=='paid' %}selected{% endif %}>paid</option>
+              <option value="admin" {% if u.role=='admin' %}selected{% endif %}>admin</option>
+            </select>
+            <button class="px-3 py-1 bg-slate-600 rounded text-white text-sm">Update Role</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="mt-4">/Back to dashboard</a></div>
+</div>
+</body>
+</html>
+"""
+
+# ----------------------- Jinja render helpers -------------------
+def render_html(audit: Dict[str, Any], previous: Optional[Dict[str, Any]], user: Optional[User]) -> HTMLResponse:
     env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
     tpl = env.from_string(INLINE_HTML)
-    html = tpl.render(audit=audit, previous_audit=previous)
+    html = tpl.render(audit=audit, previous_audit=previous, user=user)
     return HTMLResponse(html)
+
+def render_page(tpl_str: str, ctx: Dict[str, Any]) -> HTMLResponse:
+    env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
+    tpl = env.from_string(tpl_str)
+    return HTMLResponse(tpl.render(**ctx))
 
 # ----------------------- Resolver & audit engine -----------------
 from urllib.parse import urlparse, urlsplit, parse_qs, unquote
@@ -852,7 +949,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "broken_internal_external_links": len(link_check["broken"]),
         "robots_txt_found": rob_smap["robots_found"],
         "sitemap_status_code": rob_smap["sitemap_status"],
-        "sitemap_size_bytes": rob_smap["sitemap_size_bytes"],
+        "sitemap_size_bytes": rob_smap["sitemap_size_bytes"] if "sitemap_size_bytes" in rob_smap else 0,
 
         "title_missing": title_missing,
         "meta_desc_missing": meta_desc_missing,
@@ -865,7 +962,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "missing_alt_count": missing_alt,
 
         "ttfb_seconds": round(ttfb, 3),
-        "total_page_size_bytes": total_size_bytes,
+        "total_page_size_bytes": sizeof_response(headers, body),
         "num_requests_estimate": num_requests,
         "compression_enabled": compression_enabled,
 
@@ -979,9 +1076,24 @@ def audit_to_ctx(run: AuditRun, website_url: str) -> Dict[str, Any]:
         "recommendations": run.recommendations or {},
     }
 
+def sha256(s: str) -> str:
+    import hashlib
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+def current_user(request: Request, db: Session) -> Optional[User]:
+    uid = request.session.get("uid")
+    if not uid:
+        return None
+    return db.query(User).get(uid)
+
+def require_admin(user: Optional[User]):
+    if not user or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin required")
+
 # ----------------------------- Routes ---------------------------
 @app.get("/", response_class=HTMLResponse)
-def home(db: Session = Depends(get_db)):
+def home(request: Request, db: Session = Depends(get_db)):
+    user = current_user(request, db)
     run = latest_audit(db)
     if run:
         website = db.query(Website).get(run.website_id)
@@ -989,7 +1101,7 @@ def home(db: Session = Depends(get_db)):
                                  .order_by(AuditRun.id.desc()).first()
         ctx = audit_to_ctx(run, website.url)
         prev_ctx = audit_to_ctx(prev, website.url) if prev else None
-        return render_html(ctx, prev_ctx)
+        return render_html(ctx, prev_ctx, user)
 
     # empty state placeholders (avoid Jinja errors)
     empty_audit = {
@@ -997,17 +1109,18 @@ def home(db: Session = Depends(get_db)):
         "finished_at": "",
         "grade": "",
         "site_health_score": 0,
-        "metrics_summary": {},
+        "metrics_summary": {"total_errors":0,"total_warnings":0,"total_notices":0},
         "weaknesses": [],
         "website": {"url": ""},
         "competitors": [],
         "top_issues": [],
         "recommendations": {},
     }
-    return render_html(empty_audit, None)
+    return render_html(empty_audit, None, user)
 
 @app.post("/audit/run")
-async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] = Form(None), db: Session = Depends(get_db)):
+async def run_audit(request: Request, payload: Dict[str, Any] = None, website_url: Optional[str] = Form(None), db: Session = Depends(get_db)):
+    user = current_user(request, db)
     # Accept JSON or form data
     url_input = (payload or {}).get("website_url") or website_url
     if not url_input:
@@ -1022,7 +1135,7 @@ async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] =
     # Ensure Website record
     w = db.query(Website).filter(Website.url == resolved).first()
     if not w:
-        w = Website(user_id=None, url=resolved)
+        w = Website(user_id=(user.id if user else None), url=resolved)
         db.add(w); db.commit()
 
     # Compute audit
@@ -1030,6 +1143,7 @@ async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] =
     metrics, weaknesses = result["metrics"], result["weaknesses"]
     run = AuditRun(
         website_id=w.id,
+        user_id=(user.id if user else None),
         finished_at=func.now(),
         site_health_score=metrics["site_health_score"],
         grade=metrics["grade"],
@@ -1045,7 +1159,8 @@ async def run_audit(payload: Dict[str, Any] = None, website_url: Optional[str] =
     return JSONResponse({"message": "Audit completed", "audit_id": run.id, "report_url": f"/audit/{run.id}/report"})
 
 @app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
-def audit_report(audit_id: int, db: Session = Depends(get_db)):
+def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db)):
+    user = current_user(request, db)
     run = db.query(AuditRun).get(audit_id)
     if not run:
         raise HTTPException(status_code=404, detail="Audit not found")
@@ -1054,13 +1169,24 @@ def audit_report(audit_id: int, db: Session = Depends(get_db)):
                              .order_by(AuditRun.id.desc()).first()
     ctx = audit_to_ctx(run, website.url)
     prev_ctx = audit_to_ctx(prev, website.url) if prev else None
-    return render_html(ctx, prev_ctx)
+
+    # Inject meta audit id for JS downloadPDF()
+    html_resp = render_html(ctx, prev_ctx, user)
+    # Add meta tag via small injection (safe here)
+    body = html_resp.body.decode("utf-8")
+    body = body.replace("</head>", f'<meta name="audit-id" content="{run.id}"></head>')
+    return HTMLResponse(body)
 
 @app.get("/audit/{audit_id}/pdf")
-def audit_pdf(audit_id: int, db: Session = Depends(get_db)):
+def audit_pdf(audit_id: int, request: Request, db: Session = Depends(get_db)):
+    user = current_user(request, db)
     run = db.query(AuditRun).get(audit_id)
     if not run:
         raise HTTPException(status_code=404, detail="Audit not found")
+    # Paid-only download
+    if not user or (user.role != "admin" and not user.is_paid and user.role != "paid"):
+        raise HTTPException(status_code=403, detail="Paid account required to download PDF")
+
     website = db.query(Website).get(run.website_id)
     audit_ctx = audit_to_ctx(run, website.url)
     pdf = pdf_bytes(audit_ctx)
@@ -1072,8 +1198,69 @@ def audit_pdf(audit_id: int, db: Session = Depends(get_db)):
 def health():
     return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
 
+# ---------- Auth (Login / Register / Logout / Admin) -------------
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return render_page(LOGIN_HTML, {})
+
+@app.post("/login")
+def login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    u = db.query(User).filter(User.email == email).first()
+    if not u or sha256(password) != u.password_hash:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    request.session["uid"] = u.id
+    return RedirectResponse("/", status_code=303)
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page():
+    return render_page(REGISTER_HTML, {})
+
+@app.post("/register")
+def register(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Email already exists")
+    u = User(email=email, password_hash=sha256(password), role="user", is_paid=False)
+    db.add(u); db.commit()
+    request.session["uid"] = u.id
+    return RedirectResponse("/", status_code=303)
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_page(request: Request, db: Session = Depends(get_db)):
+    user = current_user(request, db)
+    require_admin(user)
+    users = db.query(User).order_by(User.id.desc()).all()
+    return render_page(ADMIN_HTML, {"users": users})
+
+@app.post("/admin/toggle-paid")
+def admin_toggle_paid(request: Request, user_id: int = Form(...), db: Session = Depends(get_db)):
+    user = current_user(request, db)
+    require_admin(user)
+    target = db.query(User).get(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    target.is_paid = not target.is_paid
+    if target.is_paid and target.role == "user":
+        target.role = "paid"
+    db.commit()
+    return RedirectResponse("/admin", status_code=303)
+
+@app.post("/admin/set-role")
+def admin_set_role(request: Request, user_id: int = Form(...), role: str = Form(...), db: Session = Depends(get_db)):
+    user = current_user(request, db)
+    require_admin(user)
+    target = db.query(User).get(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    target.role = role
+    db.commit()
+    return RedirectResponse("/admin", status_code=303)
+
 # --------------------------- Local run --------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("ap:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
-``
