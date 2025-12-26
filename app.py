@@ -1,27 +1,19 @@
 """
-FF Tech – AI-Powered Website Audit & Compliance SaaS (Updated)
+FF Tech – AI-Powered Website Audit & Compliance SaaS (Updated Form-enabled)
 Single-file FastAPI backend, Railway-ready, integrated with your advanced HTML.
 
-Fixes in this version:
-- Robust brand/URL resolution: Bing → Google CSE → DuckDuckGo fallback (no API key required)
-- Accepts brand names (e.g., "Haier") or partial URLs and resolves to an official reachable site
-- HEAD/GET reachability checks + https & www fallback, and DuckDuckGo redirect unwrapping
-- Root (/) still renders latest audit dashboard; status page kept
-- Status page includes clickable link to run first audit (GET /audit/run?website_url=...)
-- Optional auto-seed of first audit via env AUTO_SEED_AUDIT_URL (brand names supported)
-- Safe fallback to styled status page when DB is unreachable or there’s no data
-- Auto-migration of missing columns in Postgres needed by RBAC/2FA and dashboard template
-- Inline rendering of your provided HTML (uses templates/index.html if present)
-- PDF export endpoint retained
+Key additions in this version:
+- Website input form embedded in the header (HTML) to trigger audits directly from UI.
+- New POST /audit/start endpoint that accepts form submission, resolves brand/URL, runs audit,
+  and redirects to populated dashboard /audit/{id}/report.
+- Existing JSON endpoints /audit/run (POST & GET) remain for programmatic use.
+- Robust brand/URL resolution: Bing → Google CSE → DuckDuckGo fallback (no API key required).
 """
 
 import os
-import hmac
+import re
 import json
-import base64
 import time
-import hashlib
-import secrets
 import socket
 import ssl as sslmod
 import datetime as dt
@@ -29,10 +21,10 @@ from typing import Optional, List, Dict, Any, Tuple
 from pathlib import Path
 
 # FastAPI
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, Response, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 # Pydantic
@@ -66,8 +58,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech.db")
 DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Karachi")
 FFTECH_LOGO_TEXT = os.getenv("FFTECH_LOGO_TEXT", "FF Tech")
 FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Report")
-
-# Optional: auto-seed first audit at startup if none exist
 AUTO_SEED_AUDIT_URL = os.getenv("AUTO_SEED_AUDIT_URL", "").strip()
 
 # Search providers (optional keys)
@@ -83,7 +73,7 @@ AVOID_DOMAINS = {"facebook.com", "twitter.com", "x.com", "instagram.com", "linke
 # -----------------------------------------------------------------------------
 # App & Templates
 # -----------------------------------------------------------------------------
-app = FastAPI(title="FF Tech Website Audit SaaS", version="1.1.0")
+app = FastAPI(title="FF Tech Website Audit SaaS", version="1.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else [APP_DOMAIN],
@@ -96,21 +86,21 @@ templates_dir = Path("templates")
 templates = Jinja2Templates(directory=str(templates_dir)) if templates_dir.exists() else None
 
 # -----------------------------------------------------------------------------
-# Inline HTML (advanced dashboard template)
+# Inline HTML (advanced dashboard template + website input form)
 # -----------------------------------------------------------------------------
 INLINE_HTML = r"""<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang=\"en\" class=\"dark\">
 <head>
-<meta charset="UTF-8">
+<meta charset=\"UTF-8\">
 <title>FF Tech AI Website Audit | {{ audit.website.url }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
 
 <!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
+<script src=\"https://cdn.tailwindcss.com\"></script>
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>
 <!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+<link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap\" rel=\"stylesheet\">
 
 <style>
 body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
@@ -131,61 +121,67 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 .tab-button.active { background-color: #6366f1; color:white; }
 .progress-bar { background: linear-gradient(90deg, #6366f1, #4f46e5); height: 8px; border-radius: 4px; transition: width 0.5s ease-in-out; }
 .fadeIn { animation: fadeIn 0.8s ease-in-out; }
+.input { background: #0b1220; border: 1px solid rgba(255,255,255,.12); color: #cbd5f5; }
 </style>
 </head>
-<body class="bg-slate-950 text-slate-200 min-h-screen">
-<header class="border-b border-white/10">
-<div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
+<body class=\"bg-slate-950 text-slate-200 min-h-screen\">
+<header class=\"border-b border-white/10\">
+<div class=\"max-w-7xl mx-auto px-6 py-6 flex justify-between items-center\">
   <div>
-    <h1 class="text-3xl font-black">FF TECH <span class="text-indigo-400">AI AUDIT</span></h1>
-    <p class="text-sm text-slate-400">{{ audit.website.url }}</p>
+    <h1 class=\"text-3xl font-black\">FF TECH <span class=\"text-indigo-400\">AI AUDIT</span></h1>
+    <p class=\"text-sm text-slate-400\">{{ audit.website.url }}</p>
   </div>
-  <div class="flex items-center gap-4">
-    <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
-    <button onclick="downloadPDF()" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">Download PDF</button>
+  <div class=\"flex items-center gap-3\">
+    <!-- Website input form -->
+    <form method=\"post\" action=\"/audit/start\" class=\"flex gap-2 items-center\">
+      <input name=\"website_url\" type=\"text\" placeholder=\"Enter website or brand\" class=\"input px-3 py-2 rounded-lg text-sm\" style=\"width: 260px;\" required>
+      <button type=\"submit\" class=\"px-3 py-2 bg-indigo-500/20 text-indigo-300 rounded-lg text-sm font-bold\">Run Audit</button>
+    </form>
+    <button onclick=\"toggleMode()\" class=\"px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold\">Toggle Dark/Light</button>
+    <a href=\"/audit/{{ audit.id }}/pdf\" class=\"px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold\">Download PDF</a>
   </div>
 </div>
 </header>
 
-<div class="max-w-7xl mx-auto px-6 py-2">
-  <div id="liveBanner" class="bg-indigo-600/20 text-indigo-400 rounded-full px-4 py-2 font-bold flex items-center gap-2">
+<div class=\"max-w-7xl mx-auto px-6 py-2\">
+  <div id=\"liveBanner\" class=\"bg-indigo-600/20 text-indigo-400 rounded-full px-4 py-2 font-bold flex items-center gap-2\">
     <span>Audit in Progress</span>
-    <span class="animate-pulse">●</span>
+    <span class=\"animate-pulse\">●</span>
   </div>
 </div>
 
-<div class="max-w-7xl mx-auto px-6 py-6">
-  <div class="flex gap-4 flex-wrap">
-    <button class="tab-button active" onclick="showTab('overview')">Overview</button>
-    <button class="tab-button" onclick="showTab('seo')">SEO</button>
-    <button class="tab-button" onclick="showTab('performance')">Performance</button>
-    <button class="tab-button" onclick="showTab('security')">Security</button>
-    <button class="tab-button" onclick="showTab('compliance')">Compliance</button>
-    <button class="tab-button" onclick="showTab('recommendations')">Recommendations</button>
+<div class=\"max-w-7xl mx-auto px-6 py-6\">
+  <div class=\"flex gap-4 flex-wrap\">
+    <button class=\"tab-button active\" onclick=\"showTab('overview')\">Overview</button>
+    <button class=\"tab-button\" onclick=\"showTab('seo')\">SEO</button>
+    <button class=\"tab-button\" onclick=\"showTab('performance')\">Performance</button>
+    <button class=\"tab-button\" onclick=\"showTab('security')\">Security</button>
+    <button class=\"tab-button\" onclick=\"showTab('compliance')\">Compliance</button>
+    <button class=\"tab-button\" onclick=\"showTab('recommendations')\">Recommendations</button>
   </div>
 </div>
 
-<div class="max-w-7xl mx-auto px-6">
-  <div id="overview" class="tab-content fadeIn">
-    <section class="grid lg:grid-cols-3 gap-8 py-6">
-      <div class="glass glow rounded-3xl p-8 text-center">
-        <p class="text-slate-400">Site Health Score</p>
-        <p class="text-7xl font-black text-indigo-400 mt-2" id="siteScore">{{ audit.site_health_score }}%</p>
-        <p class="mt-4 text-sm">Grade: <span class="font-bold text-emerald-400" id="siteGrade">{{ audit.grade }}</span></p>
-        <p class="mt-2 text-xs text-slate-400">Compared to last audit: {{ previous_audit.site_health_score if previous_audit else audit.site_health_score }}%</p>
+<div class=\"max-w-7xl mx-auto px-6\">
+  <div id=\"overview\" class=\"tab-content fadeIn\">
+    <section class=\"grid lg:grid-cols-3 gap-8 py-6\">
+      <div class=\"glass glow rounded-3xl p-8 text-center\">
+        <p class=\"text-slate-400\">Site Health Score</p>
+        <p class=\"text-7xl font-black text-indigo-400 mt-2\" id=\"siteScore\">{{ audit.site_health_score }}%</p>
+        <p class=\"mt-4 text-sm\">Grade: <span class=\"font-bold text-emerald-400\" id=\"siteGrade\">{{ audit.grade }}</span></p>
+        <p class=\"mt-2 text-xs text-slate-400\">Compared to last audit: {{ previous_audit.site_health_score if previous_audit else audit.site_health_score }}%</p>
       </div>
-      <div class="glass rounded-3xl p-8 col-span-2">
-        <h2 class="text-xl font-bold mb-4">Audit Timeline</h2>
-        <div class="space-y-4" id="auditTimeline">
+      <div class=\"glass rounded-3xl p-8 col-span-2\">
+        <h2 class=\"text-xl font-bold mb-4\">Audit Timeline</h2>
+        <div class=\"space-y-4\" id=\"auditTimeline\">
           {% for step in ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"] %}
-          <div class="flex items-center gap-4">
-            <div class="w-6 h-6 rounded-full border-2 border-indigo-400 flex items-center justify-center">
-              <span class="w-3 h-3 bg-emerald-400 rounded-full pulse" id="pulse-{{ loop.index }}"></span>
+          <div class=\"flex items-center gap-4\">
+            <div class=\"w-6 h-6 rounded-full border-2 border-indigo-400 flex items-center justify-center\">
+              <span class=\"w-3 h-3 bg-emerald-400 rounded-full pulse\" id=\"pulse-{{ loop.index }}\"></span>
             </div>
-            <div class="flex-1">
-              <p class="font-semibold">{{ step }}</p>
-              <div class="w-full bg-slate-800 rounded h-2 mt-1">
-                <div class="progress-bar" style="width:0%" id="progress-{{ loop.index }}"></div>
+            <div class=\"flex-1\">
+              <p class=\"font-semibold\">{{ step }}</p>
+              <div class=\"w-full bg-slate-800 rounded h-2 mt-1\">
+                <div class=\"progress-bar\" style=\"width:0%\" id=\"progress-{{ loop.index }}\"></div>
               </div>
             </div>
           </div>
@@ -194,56 +190,56 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <section class="grid lg:grid-cols-2 gap-8 py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-xl font-bold mb-4">Issue Distribution</h2>
-        <canvas id="issuesChart"></canvas>
+    <section class=\"grid lg:grid-cols-2 gap-8 py-6\">
+      <div class=\"glass rounded-3xl p-8\">
+        <h2 class=\"text-xl font-bold mb-4\">Issue Distribution</h2>
+        <canvas id=\"issuesChart\"></canvas>
       </div>
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-xl font-bold mb-4">Health Trend</h2>
-        <canvas id="trendChart"></canvas>
+      <div class=\"glass rounded-3xl p-8\">
+        <h2 class=\"text-xl font-bold mb-4\">Health Trend</h2>
+        <canvas id=\"trendChart\"></canvas>
       </div>
     </section>
 
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-2xl font-extrabold mb-6">Competitor Comparison</h2>
-        <div class="grid md:grid-cols-3 gap-6 text-center">
-          <div class="p-6 bg-slate-900 rounded-xl">
-            <p class="text-sm text-slate-400">Your Website</p>
-            <p class="text-4xl font-black text-indigo-400">{{ audit.site_health_score }}%</p>
-            <div class="h-2 bg-indigo-400 rounded mt-2" style="width:{{ audit.site_health_score }}%"></div>
+    <section class=\"py-6\">
+      <div class=\"glass rounded-3xl p-8\">
+        <h2 class=\"text-2xl font-extrabold mb-6\">Competitor Comparison</h2>
+        <div class=\"grid md:grid-cols-3 gap-6 text-center\">
+          <div class=\"p-6 bg-slate-900 rounded-xl\">
+            <p class=\"text-sm text-slate-400\">Your Website</p>
+            <p class=\"text-4xl font-black text-indigo-400\">{{ audit.site_health_score }}%</p>
+            <div class=\"h-2 bg-indigo-400 rounded mt-2\" style=\"width:{{ audit.site_health_score }}%\"></div>
           </div>
           {% for comp in audit.competitors %}
-          <div class="p-6 bg-slate-900 rounded-xl opacity-70">
-            <p class="text-sm text-slate-400">{{ comp.name }}</p>
-            <p class="text-4xl font-black">{{ comp.score }}%</p>
-            <div class="h-2 bg-gray-500 rounded mt-2" style="width:{{ comp.score }}%"></div>
+          <div class=\"p-6 bg-slate-900 rounded-xl opacity-70\">
+            <p class=\"text-sm text-slate-400\">{{ comp.name }}</p>
+            <p class=\"text-4xl font-black\">{{ comp.score }}%</p>
+            <div class=\"h-2 bg-gray-500 rounded mt-2\" style=\"width:{{ comp.score }}%\"></div>
           </div>
           {% endfor %}
         </div>
       </div>
     </section>
 
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-2xl font-extrabold mb-4">Top 10 Issues</h2>
-        <table class="w-full text-left border-collapse text-sm">
+    <section class=\"py-6\">
+      <div class=\"glass rounded-3xl p-8\">
+        <h2 class=\"text-2xl font-extrabold mb-4\">Top 10 Issues</h2>
+        <table class=\"w-full text-left border-collapse text-sm\">
           <thead>
-            <tr class="border-b border-slate-700">
-              <th class="py-2 px-4">Issue</th>
-              <th class="py-2 px-4">Severity</th>
-              <th class="py-2 px-4">Suggestion</th>
+            <tr class=\"border-b border-slate-700\">
+              <th class=\"py-2 px-4\">Issue</th>
+              <th class=\"py-2 px-4\">Severity</th>
+              <th class=\"py-2 px-4\">Suggestion</th>
             </tr>
           </thead>
           <tbody>
             {% for issue in audit.top_issues %}
-            <tr class="border-b border-slate-800 hover:bg-slate-800 transition">
-              <td class="py-2 px-4">{{ issue.name }}</td>
-              <td class="py-2 px-4">
-                <span class="severity-{{ issue.severity }}">{{ issue.severity|capitalize }}</span>
+            <tr class=\"border-b border-slate-800 hover:bg-slate-800 transition\">
+              <td class=\"py-2 px-4\">{{ issue.name }}</td>
+              <td class=\"py-2 px-4\">
+                <span class=\"severity-{{ issue.severity }}\">{{ issue.severity|capitalize }}</span>
               </td>
-              <td class="py-2 px-4">{{ issue.suggestion }}</td>
+              <td class=\"py-2 px-4\">{{ issue.suggestion }}</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -251,22 +247,22 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <section class="py-6 grid md:grid-cols-2 xl:grid-cols-3 gap-6">
+    <section class=\"py-6 grid md:grid-cols-2 xl:grid-cols-3 gap-6\">
       {% for k,v in audit.metrics_summary.items() %}
-      <div class="glass rounded-2xl p-6 tooltip" data-value="{{ v }}" data-key="{{ k }}">
-        <p class="text-xs text-slate-400 uppercase">{{ k.replace("_"," ") }}</p>
-        <p class="text-2xl font-bold mt-2">{{ v }}</p>
-        <span class="tooltiptext">{{ audit.recommendations.get(k, "No recommendation available") }}</span>
+      <div class=\"glass rounded-2xl p-6 tooltip\" data-value=\"{{ v }}\" data-key=\"{{ k }}\">
+        <p class=\"text-xs text-slate-400 uppercase\">{{ k.replace('_',' ') }}</p>
+        <p class=\"text-2xl font-bold mt-2\">{{ v }}</p>
+        <span class=\"tooltiptext\">{{ audit.recommendations.get(k, 'No recommendation available') }}</span>
       </div>
       {% endfor %}
     </section>
 
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8 border border-red-500/30">
-        <h2 class="text-2xl font-extrabold mb-6 text-red-400 collapsible" onclick="toggleContent('weaknessesContent')">Priority Weak Areas</h2>
-        <ul class="space-y-3 content" id="weaknessesContent">
+    <section class=\"py-6\">
+      <div class=\"glass rounded-3xl p-8 border border-red-500/30\">
+        <h2 class=\"text-2xl font-extrabold mb-6 text-red-400 collapsible\" onclick=\"toggleContent('weaknessesContent')\">Priority Weak Areas</h2>
+        <ul class=\"space-y-3 content\" id=\"weaknessesContent\">
           {% for w in audit.weaknesses %}
-          <li class="flex gap-3"><span class="text-red-500">●</span><span>{{ w }}</span></li>
+          <li class=\"flex gap-3\"><span class=\"text-red-500\">●</span><span>{{ w }}</span></li>
           {% endfor %}
         </ul>
       </div>
@@ -274,8 +270,8 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   </div>
 </div>
 
-<footer class="border-t border-white/10 mt-20">
-<div class="max-w-7xl mx-auto px-6 py-8 text-center text-sm text-slate-500">
+<footer class=\"border-t border-white/10 mt-20\">
+<div class=\"max-w-7xl mx-auto px-6 py-8 text-center text-sm text-slate-500\">
 FF Tech © AI Website Audit Platform · Generated {{ audit.finished_at }}
 </div>
 </footer>
@@ -296,7 +292,6 @@ function toggleContent(id) {
   const el = document.getElementById(id);
   el.style.maxHeight = el.style.maxHeight === '0px' || !el.style.maxHeight ? el.scrollHeight + 'px' : '0px';
 }
-function downloadPDF() { alert("Use the PDF endpoint on the left menu: Download PDF."); }
 let currentStep = 1;
 function animateAudit() {
   const steps = ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"];
@@ -352,12 +347,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     is_active = Column(Boolean, default=False)
-    role = Column(String, default="user")                   # RBAC
-    totp_enabled = Column(Boolean, default=False)           # 2FA flag
-    totp_secret = Column(String, nullable=True)             # base32 secret
+    role = Column(String, default="user")
+    totp_enabled = Column(Boolean, default=False)
+    totp_secret = Column(String, nullable=True)
     created_at = Column(DateTime, default=func.now())
     timezone = Column(String, default=DEFAULT_TIMEZONE)
-
 
 class LoginActivity(Base):
     __tablename__ = "login_activities"
@@ -369,7 +363,6 @@ class LoginActivity(Base):
     reason = Column(String, nullable=True)
     timestamp = Column(DateTime, default=func.now())
 
-
 class Website(Base):
     __tablename__ = "websites"
     id = Column(Integer, primary_key=True)
@@ -378,22 +371,20 @@ class Website(Base):
     created_at = Column(DateTime, default=func.now())
     is_active = Column(Boolean, default=True)
 
-
 class AuditRun(Base):
     __tablename__ = "audit_runs"
     id = Column(Integer, primary_key=True)
     website_id = Column(Integer, ForeignKey("websites.id"))
     started_at = Column(DateTime, default=func.now())
     finished_at = Column(DateTime)
-    site_health_score = Column(Float)          # 0-100
-    grade = Column(String)                     # A+, A, B, C, D
-    metrics_summary = Column(JSON)             # dict of metrics -> values
-    weaknesses = Column(JSON)                  # list of weaknesses
-    executive_summary = Column(Text)           # ~200 words
-    # Extras used by template:
-    competitors = Column(JSON, nullable=True)  # [{name, score}]
-    top_issues = Column(JSON, nullable=True)   # [{name, severity, suggestion}]
-    recommendations = Column(JSON, nullable=True)  # {metric_key: suggestion}
+    site_health_score = Column(Float)
+    grade = Column(String)
+    metrics_summary = Column(JSON)
+    weaknesses = Column(JSON)
+    executive_summary = Column(Text)
+    competitors = Column(JSON, nullable=True)
+    top_issues = Column(JSON, nullable=True)
+    recommendations = Column(JSON, nullable=True)
 
 # -----------------------------------------------------------------------------
 # Schemas
@@ -416,12 +407,12 @@ def get_db() -> Session:
     finally:
         db.close()
 
-# --- URL & search resolver utilities ---
+# URL & search utilities
+from urllib.parse import urlparse, urlsplit, parse_qs, unquote
 
 def is_probable_url(text: str) -> bool:
     text = text.strip()
     return bool(re.match(r"^(https?://)?([\w-]+\.)+[a-zA-Z]{2,}(/.*)?$", text))
-
 
 def normalize_url(text: str) -> str:
     text = text.strip()
@@ -433,24 +424,17 @@ def normalize_url(text: str) -> str:
         return text
     return text
 
-
 def host_of(url: str) -> str:
     try:
         return urlparse(url).netloc.lower()
     except Exception:
         return ""
 
-
-from urllib.parse import urlparse, urlsplit, parse_qs, unquote, urljoin as _urljoin
-
-
 def is_avoid_domain(url: str) -> bool:
     h = host_of(url)
     return any(h.endswith(d) or d in h for d in AVOID_DOMAINS)
 
-
 def ddg_unwrap(href: str) -> str:
-    # DuckDuckGo redirect links unwrap
     try:
         if "duckduckgo.com/l/?" in href:
             qs = parse_qs(urlsplit(href).query)
@@ -460,7 +444,6 @@ def ddg_unwrap(href: str) -> str:
     except Exception:
         pass
     return href
-
 
 async def head_ok(client: httpx.AsyncClient, url: str) -> Tuple[bool, Optional[str]]:
     for attempt in range(RETRIES):
@@ -479,7 +462,6 @@ async def head_ok(client: httpx.AsyncClient, url: str) -> Tuple[bool, Optional[s
                 break
     return False, None
 
-
 async def ddg_search(client: httpx.AsyncClient, query: str) -> List[str]:
     try:
         url = "https://duckduckgo.com/html/"
@@ -494,8 +476,7 @@ async def ddg_search(client: httpx.AsyncClient, query: str) -> List[str]:
         for a in soup.select("a.result__a"):
             href = a.get("href")
             if href:
-                href = ddg_unwrap(href)
-                links.append(href)
+                links.append(ddg_unwrap(href))
         if not links:
             for a in soup.select("a"):
                 href = a.get("href")
@@ -504,7 +485,6 @@ async def ddg_search(client: httpx.AsyncClient, query: str) -> List[str]:
         return links[:8]
     except Exception:
         return []
-
 
 async def bing_search(client: httpx.AsyncClient, query: str) -> List[str]:
     if not BING_SEARCH_KEY:
@@ -527,7 +507,6 @@ async def bing_search(client: httpx.AsyncClient, query: str) -> List[str]:
     except Exception:
         return []
 
-
 async def google_cse_search(client: httpx.AsyncClient, query: str) -> List[str]:
     if not (GOOGLE_CSE_KEY and GOOGLE_CSE_ID):
         return []
@@ -548,7 +527,6 @@ async def google_cse_search(client: httpx.AsyncClient, query: str) -> List[str]:
     except Exception:
         return []
 
-
 def build_query_variants(query: str, prefer_tld: Optional[str], region: Optional[str]) -> List[str]:
     q = query.strip()
     variants = [q, f"{q} official site", f"{q} website", f"{q} home page"]
@@ -562,7 +540,6 @@ def build_query_variants(query: str, prefer_tld: Optional[str], region: Optional
             out.append(v); seen.add(v)
     return out
 
-
 async def resolve_official_site(input_text: str, prefer_tld: Optional[str], region: Optional[str], user_agent: str) -> str:
     text = input_text.strip()
     if not text:
@@ -574,7 +551,6 @@ async def resolve_official_site(input_text: str, prefer_tld: Optional[str], regi
             ok, final = await head_ok(client, candidate)
             if ok and final:
                 return final
-            # Try https + www variant if applicable
             parsed = urlparse(candidate)
             host = parsed.netloc
             if not host.startswith("www."):
@@ -605,21 +581,17 @@ async def resolve_official_site(input_text: str, prefer_tld: Optional[str], regi
 
     raise HTTPException(status_code=404, detail="Could not resolve an official website for the given query")
 
-# --- Original helpers ---
+# Original helpers
 
 def ensure_columns(conn, table: str, cols: Dict[str, str]):
-    """Auto-add missing columns (Postgres)."""
     for col, sqltype in cols.items():
-        check_sql = text(
-            """
+        check_sql = text("""
             SELECT 1 FROM information_schema.columns
             WHERE table_name = :tname AND column_name = :cname
-            """
-        )
+        """)
         exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
         if not exists:
-            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
-
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {sqltype}"))
 
 def get_latest_audit(db: Session) -> Optional[AuditRun]:
     try:
@@ -627,62 +599,18 @@ def get_latest_audit(db: Session) -> Optional[AuditRun]:
     except SQLAlchemyError:
         return None
 
-
-def ensure_first_audit(db: Session):
-    """Auto-seed the first audit if none exist and AUTO_SEED_AUDIT_URL is set."""
-    seed = AUTO_SEED_AUDIT_URL
-    if not seed:
-        return
-    latest = get_latest_audit(db)
-    if latest:
-        return
-    # Resolve the seed (brand or URL) to an official site first
-    try:
-        final_url = requests.utils.requote_uri(seed)
-        # best-effort resolver using async called via httpx sync fallback
-        # Simple path: if it looks like a URL, use it; else keep https:// + brand.com guess
-        if not is_probable_url(seed):
-            guess = f"https://{re.sub(r'[^a-zA-Z0-9-]+','', seed.lower())}.com"
-            final_url = guess
-        else:
-            final_url = normalize_url(seed)
-    except Exception:
-        final_url = seed
-
-    w = db.query(Website).filter(Website.url == final_url).first()
-    if not w:
-        w = Website(user_id=None, url=final_url)
-        db.add(w); db.commit()
-    a = compute_audit(final_url)
-    metrics, weaknesses = a["metrics"], a["weaknesses"]
-    run = AuditRun(
-        website_id=w.id,
-        finished_at=func.now(),
-        site_health_score=metrics["site_health_score"],
-        grade=metrics["grade"],
-        metrics_summary=metrics,
-        weaknesses=weaknesses,
-        executive_summary=generate_summary(final_url, metrics, weaknesses),
-        competitors=a["competitors"],
-        top_issues=a["top_issues"],
-        recommendations=a["recommendations"]
-    )
-    db.add(run); db.commit()
-
 # -----------------------------------------------------------------------------
-# Audit Engine (mostly unchanged)
+# Audit Engine
 # -----------------------------------------------------------------------------
 
 def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]:
     start = time.time()
     try:
         r = requests.get(url, timeout=timeout, headers={"User-Agent": DEFAULT_USER_AGENT})
-        # requests has Response.elapsed; if not present, fallback to wall time
         ttfb = r.elapsed.total_seconds() if hasattr(r, "elapsed") and r.elapsed else (time.time() - start)
         return r.status_code, r.text or "", dict(r.headers), ttfb
     except requests.RequestException:
         return 0, "", {}, 0.0
-
 
 def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
     out = {"valid": False, "notBefore": None, "notAfter": None, "error": None}
@@ -698,44 +626,35 @@ def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
         out["error"] = str(e)
     return out
 
-
 def normalize_url_old(u: str) -> str:
     return u.strip()
 
-
 def extract_domain(url: str) -> str:
     try:
-        from urllib.parse import urlparse
         return urlparse(url).netloc
     except Exception:
         return ""
 
-
 def parse_html(html: str) -> BeautifulSoup:
     return BeautifulSoup(html, "html.parser")
-
 
 def count_text_words(soup: BeautifulSoup) -> int:
     text = soup.get_text(separator=" ")
     return len([w for w in text.split() if w.strip()])
 
-
 def is_https(url: str) -> bool:
     return url.lower().startswith("https://")
-
 
 def check_security_headers(headers: Dict[str, str]) -> Dict[str, bool]:
     keys = ["content-security-policy", "strict-transport-security", "x-frame-options"]
     hdrs = {k.lower(): True for k in headers.keys()}
     return {k: (k in hdrs) for k in keys}
 
-
 def sizeof_response(headers: Dict[str, str], body: str) -> int:
     cl = headers.get("Content-Length") or headers.get("content-length")
     if cl and str(cl).isdigit():
         return int(cl)
     return len(body.encode())
-
 
 def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
     anchors, imgs, css, js = [], [], [], []
@@ -758,7 +677,6 @@ def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
             js.append(urljoin(base_url, src))
     return {"anchors": anchors, "images": imgs, "css": css, "js": js}
 
-
 def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
     broken, redirected = [], []
     tested = 0
@@ -773,7 +691,6 @@ def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
         except Exception:
             broken.append(u)
     return {"broken": broken, "redirected": redirected, "tested": min(limit, len(urls))}
-
 
 def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
     from urllib.parse import urlparse, urljoin
@@ -797,14 +714,12 @@ def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
         "sitemap_size_bytes": len(sm_text.encode()) if sm_text else 0
     }
 
-
 def grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
     if score >= 85: return "A"
     if score >= 75: return "B"
     if score >= 65: return "C"
     return "D"
-
 
 def generate_summary(website_url: str, metrics: Dict[str, Any], weaknesses: List[str]) -> str:
     score = metrics.get("site_health_score", 0)
@@ -829,7 +744,6 @@ def generate_summary(website_url: str, metrics: Dict[str, Any], weaknesses: List
     ]
     body = " ".join(words)
     return " ".join(body.split()[:200])
-
 
 def compute_audit(website_url: str) -> Dict[str, Any]:
     url = normalize_url_old(website_url)
@@ -969,14 +883,12 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "total_warnings": len(warnings),
         "total_notices": len(notices),
         "audit_completion": "complete",
-
         "http_status": status,
         "redirected_links_count": len(link_check["redirected"]),
         "broken_internal_external_links": len(link_check["broken"]),
         "robots_txt_found": rob_smap["robots_found"],
         "sitemap_status_code": rob_smap["sitemap_status"],
         "sitemap_size_bytes": rob_smap["sitemap_size_bytes"],
-
         "title_missing": title_missing,
         "meta_desc_missing": meta_desc_missing,
         "h1_missing": h1_missing,
@@ -987,20 +899,17 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "hreflang_missing": hreflang_missing,
         "missing_alt_count": missing_alt,
         "text_to_html_ratio": round(text_html_ratio, 3),
-
         "ttfb_seconds": round(ttfb, 3),
         "total_page_size_bytes": total_size_bytes,
         "num_requests_estimate": num_requests,
         "compression_enabled": compression_enabled,
         "resource_load_errors": resource_load_errors,
-
         "https": https_ok,
         "ssl_valid": ssl_info.get("valid", False),
         "security_headers_present": check_security_headers(headers),
         "mixed_content_count": len(mixed_content),
     }
 
-    # Extras for template
     competitors = [
         {"name": "Competitor A", "score": max(20, int(metrics["site_health_score"] - 10))},
         {"name": "Competitor B", "score": max(15, int(metrics["site_health_score"] - 5))},
@@ -1029,6 +938,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
 # -----------------------------------------------------------------------------
 # PDF
 # -----------------------------------------------------------------------------
+from reportlab.pdfgen import canvas
 
 def wrap_text(text: str, max_chars: int = 90) -> List[str]:
     words = text.split()
@@ -1040,7 +950,6 @@ def wrap_text(text: str, max_chars: int = 90) -> List[str]:
             line.append(w); count += len(w) + 1
     if line: lines.append(" ".join(line))
     return lines
-
 
 def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
     c = canvas.Canvas(path, pagesize=A4)
@@ -1088,13 +997,6 @@ def on_startup():
             "top_issues": "JSON",
             "recommendations": "JSON"
         })
-    # Auto-seed first audit if requested
-    try:
-        db = SessionLocal()
-        ensure_first_audit(db)
-    finally:
-        try: db.close()
-        except Exception: pass
 
 # -----------------------------------------------------------------------------
 # Rendering helpers
@@ -1115,10 +1017,8 @@ def render_dashboard(request: Request, audit: AuditRun, website: Website, previo
         "top_issues": audit.top_issues or [],
         "recommendations": audit.recommendations or {},
     }
-    # Prefer file-based template if available
     if templates is not None and (templates_dir / "index.html").exists():
         return templates.TemplateResponse("index.html", {"request": request, "audit": ctx_audit, "previous_audit": previous})
-    # Otherwise render inline
     env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
     tpl = env.from_string(INLINE_HTML)
     html = tpl.render(audit=ctx_audit, previous_audit=previous)
@@ -1140,68 +1040,78 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, db: Session = Depends(get_db)):
-    port_label = os.getenv("PORT", "8080")
-    # Always try to show the latest dashboard at '/'
-    try:
-        latest = get_latest(db)
-        if latest:
-            website = db.query(Website).get(latest.website_id)
-            previous = (
-                db.query(AuditRun)
-                .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
-                .order_by(AuditRun.id.desc())
-                .first()
-            )
-            return render_dashboard(request, latest, website, previous)
-    except SQLAlchemyError:
-        pass  # fall through to status page
-
-    # Styled status page + clickable link to run audit
-    return f"""
+    latest = get_latest(db)
+    if latest:
+        website = db.query(Website).get(latest.website_id)
+        previous = (
+            db.query(AuditRun)
+            .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
+            .order_by(AuditRun.id.desc())
+            .first()
+        )
+        return render_dashboard(request, latest, website, previous)
+    # Show a simple page with the form when no audits yet
+    return HTMLResponse("""
     <!DOCTYPE html>
     <html>
     <head>
-        <title>FF Tech | System Online</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <script src="https://cdn.tailwindcss.com"></script>
+      <meta charset='utf-8'>
+      <meta name='viewport' content='width=device-width, initial-scale=1'>
+      <script src='https://cdn.tailwindcss.com'></script>
     </head>
-    <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
-        <div class="p-12 border border-white/10 rounded-3xl text-center shadow-2xl max-w-xl">
-            <h1 class="text-4xl md:text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
-            <p class="text-slate-400 text-lg">Audit Engine is listening for instructions...</p>
-            <div class="mt-6 flex gap-3 justify-center">
-                <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">● LIVE</span>
-                <span class="px-4 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">PORT: {port_label}</span>
-            </div>
-            <div class="mt-6 space-y-2">
-              <p class="text-slate-400 text-sm">Click to run a first audit and see the dashboard:</p>
-              <a class="px-4 py-2 inline-block bg-indigo-600/30 text-indigo-200 rounded-lg font-semibold" href="/audit/run?website_url=https://example.com">Run audit for https://example.com</a>
-              <p class="text-xs text-slate-500 mt-2">Or POST JSON:</p>
-              <code class="text-xs bg-white/10 px-2 py-1 rounded">
-                curl -X POST {APP_DOMAIN}/audit/run -H "Content-Type: application/json" -d '{{"website_url":"https://example.com"}}'
-              </code>
-            </div>
-        </div>
+    <body class='bg-slate-900 text-white min-h-screen flex items-center justify-center'>
+      <div class='p-8 rounded-xl border border-white/10 max-w-xl w-full'>
+        <h1 class='text-2xl font-black mb-4'>FF TECH <span class='text-indigo-400'>AI AUDIT</span></h1>
+        <p class='text-slate-400 mb-4'>Start your first audit:</p>
+        <form method='post' action='/audit/start' class='space-y-4'>
+          <input name='website_url' type='text' placeholder='Enter website or brand' class='w-full px-4 py-2 rounded-lg text-black' required />
+          <button type='submit' class='px-4 py-2 bg-indigo-600 rounded-lg font-bold'>Run Audit</button>
+        </form>
+      </div>
     </body>
     </html>
-    """
+    """)
 
-# Updated: POST endpoint uses resolver before compute_audit
-@app.post("/audit/run")
-async def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
-    user_agent = data.userAgent or DEFAULT_USER_AGENT
-    # Resolve brand/URL to official reachable site
+# New: Form submission -> run audit -> redirect to dashboard
+@app.post("/audit/start")
+async def audit_start(website_url: str = Form(...), db: Session = Depends(get_db)):
     try:
-        resolved = await resolve_official_site(data.website_url, data.prefer_tld, data.region, user_agent)
-    except HTTPException as e:
-        # If resolver fails, fall back to normalized input (still let compute_audit attempt)
-        resolved = normalize_url(data.website_url)
-
+        resolved = await resolve_official_site(website_url, None, None, DEFAULT_USER_AGENT)
+    except HTTPException:
+        resolved = normalize_url(website_url)
     w = db.query(Website).filter(Website.url == resolved).first()
     if not w:
         w = Website(user_id=None, url=resolved)
         db.add(w); db.commit()
+    a = compute_audit(w.url)
+    metrics, weaknesses = a["metrics"], a["weaknesses"]
+    run = AuditRun(
+        website_id=w.id,
+        finished_at=func.now(),
+        site_health_score=metrics["site_health_score"],
+        grade=metrics["grade"],
+        metrics_summary=metrics,
+        weaknesses=weaknesses,
+        executive_summary=generate_summary(w.url, metrics, weaknesses),
+        competitors=a["competitors"],
+        top_issues=a["top_issues"],
+        recommendations=a["recommendations"]
+    )
+    db.add(run); db.commit()
+    return RedirectResponse(url=f"/audit/{run.id}/report", status_code=303)
 
+# Existing JSON endpoints (keep for programmatic use)
+@app.post("/audit/run")
+async def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
+    user_agent = data.userAgent or DEFAULT_USER_AGENT
+    try:
+        resolved = await resolve_official_site(data.website_url, data.prefer_tld, data.region, user_agent)
+    except HTTPException:
+        resolved = normalize_url(data.website_url)
+    w = db.query(Website).filter(Website.url == resolved).first()
+    if not w:
+        w = Website(user_id=None, url=resolved)
+        db.add(w); db.commit()
     a = compute_audit(w.url)
     metrics = a["metrics"]; weaknesses = a["weaknesses"]
     run = AuditRun(
@@ -1220,7 +1130,6 @@ async def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
     report_url = f"{APP_DOMAIN}/audit/{run.id}/report"
     return {"message": "Audit completed", "audit_id": run.id, "grade": run.grade, "score": run.site_health_score, "report_url": report_url}
 
-# GET endpoint also uses resolver
 @app.get("/audit/run")
 async def run_audit_get(website_url: str, prefer_tld: Optional[str] = None, region: Optional[str] = None, db: Session = Depends(get_db)):
     user_agent = DEFAULT_USER_AGENT
@@ -1228,12 +1137,10 @@ async def run_audit_get(website_url: str, prefer_tld: Optional[str] = None, regi
         resolved = await resolve_official_site(website_url, prefer_tld, region, user_agent)
     except HTTPException:
         resolved = normalize_url(website_url)
-
     w = db.query(Website).filter(Website.url == resolved).first()
     if not w:
         w = Website(user_id=None, url=resolved)
         db.add(w); db.commit()
-
     a = compute_audit(w.url)
     metrics = a["metrics"]; weaknesses = a["weaknesses"]
     run = AuditRun(
