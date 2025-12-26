@@ -3,223 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | AI Website Audit Command Center</title>
+    <title>FF Tech | 140+ Metrics Audit Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;600;700&display=swap');
-        :root {
-            --primary: #00f2ff;
-            --secondary: #0062ff;
-            --bg-dark: #050510;
-            --glass: rgba(255, 255, 255, 0.03);
-            --border: rgba(255, 255, 255, 0.08);
-        }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@300;400;600;700&display=swap');
+
         body {
-            font-family: 'Inter', sans-serif;
-            background: radial-gradient(circle at top right, #0a0a25, #000);
+            background: linear-gradient(135deg, #0a001f, #001122);
             color: #e0f2ff;
-            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
         }
-        .orbitron { font-family: 'Orbitron', sans-serif; }
+
         .glass {
-            background: var(--glass);
-            backdrop-filter: blur(15px);
-            border: 1px solid var(--border);
-            border-radius: 1.5rem;
-            transition: 0.3s;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0,242,255,0.2);
+            border-radius: 24px;
+            transition: all 0.4s ease;
         }
-        .glass:hover { border-color: var(--primary); box-shadow: 0 0 20px rgba(0, 242, 255, 0.1); }
-        .glow-text { text-shadow: 0 0 15px rgba(0, 242, 255, 0.6); }
-        .pulse-red { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 77, 77, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+
+        .glass:hover {
+            box-shadow: 0 0 40px rgba(0,242,255,0.3);
+            transform: translateY(-8px);
+        }
+
+        .glow-primary {
+            text-shadow: 0 0 20px #00f2ff;
+        }
+
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+
+        .metric-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 50%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0,242,255,0.1), transparent);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .status-green { border-left: 5px solid #00ff88; }
+        .status-yellow { border-left: 5px solid #ffbb00; }
+        .status-red { border-left: 5px solid #ff4d4d; animation: pulse-border 2s infinite; }
+
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 20px rgba(255,77,77,0.4); }
+            50% { box-shadow: 0 0 30px rgba(255,77,77,0.7); }
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-8">
 
-    <nav class="max-w-7xl mx-auto flex justify-between items-center mb-10">
-        <div class="text-3xl font-black orbitron tracking-tighter">FF<span class="text-primary glow-text">TECH</span></div>
-        <button class="glass px-6 py-2 text-xs font-bold border-primary/30 hover:bg-primary hover:text-black transition uppercase">Re-Scan Site</button>
-    </nav>
+    <div class="max-w-7xl mx-auto">
 
-    <main class="max-w-7xl mx-auto space-y-6">
-        
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-4 glass p-8 flex flex-col items-center justify-center">
-                <h3 class="orbitron text-[10px] tracking-widest opacity-50 mb-6 uppercase">Site Health Index</h3>
-                <div class="relative w-44 h-44">
-                    <canvas id="healthGauge"></canvas>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-5xl font-black orbitron glow-text" id="ui-score">0</span>
-                        <span class="text-[10px] opacity-50 font-bold uppercase tracking-widest" id="ui-grade">GRADE --</span>
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-6xl orbitron glow-primary mb-4">FF Tech 140+ Metrics Dashboard</h1>
+            <p class="text-2xl opacity-80">Comprehensive Enterprise-Grade Website Audit</p>
+            <p class="text-xl mt-4" id="domain">Domain: <span id="domain-name">example.com</span> | Audit Date: <span id="audit-date">December 26, 2025</span></p>
+        </div>
+
+        <!-- Overall Score -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+            <div class="glass p-8 text-center status-green">
+                <h3 class="text-4xl orbitron" id="score">92%</h3>
+                <p>Site Health Score</p>
+            </div>
+            <div class="glass p-8 text-center status-green">
+                <h3 class="text-4xl orbitron" id="grade">A-</h3>
+                <p>FF Tech Grade</p>
+            </div>
+            <div class="glass p-8 text-center">
+                <h3 class="text-4xl orbitron" id="errors">15</h3>
+                <p>Critical Errors</p>
+            </div>
+            <div class="glass p-8 text-center">
+                <h3 class="text-4xl orbitron" id="pages">2,134</h3>
+                <p>Pages Crawled</p>
+            </div>
+        </div>
+
+        <!-- All 10 Categories with Full 140+ Metrics -->
+        <div class="space-y-16">
+
+            <!-- 1. Overall Site Health (Metrics 1-10) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">1. Overall Site Health</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-1"></div>
+            </section>
+
+            <!-- 2. Crawlability & Indexation (11-30) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">2. Crawlability & Indexation</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-2"></div>
+            </section>
+
+            <!-- 3. On-Page SEO Metrics (31-65) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">3. On-Page SEO Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-3"></div>
+            </section>
+
+            <!-- 4. Technical & Performance Metrics (66-86) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">4. Technical & Performance Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-4"></div>
+            </section>
+
+            <!-- 5. Mobile & Usability Metrics (87-95) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">5. Mobile & Usability Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-5"></div>
+            </section>
+
+            <!-- 6. Security & HTTPS Metrics (96-103) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">6. Security & HTTPS Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-6"></div>
+            </section>
+
+            <!-- 7. International SEO (104-108) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">7. International / Multi-language SEO</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-7"></div>
+            </section>
+
+            <!-- 8. Backlinks & Authority (109-116) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">8. Backlinks & Authority Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-8"></div>
+            </section>
+
+            <!-- 9. Advanced / Thematic Metrics (117-133) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">9. Advanced & Thematic Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="cat-9"></div>
+            </section>
+
+            <!-- 10. Trend / Historical Metrics (134-140) -->
+            <section class="glass p-10">
+                <h2 class="text-3xl orbitron glow-primary mb-8">10. Trend & Historical Metrics</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="glass p-6">
+                        <canvas id="health-trend"></canvas>
+                    </div>
+                    <div class="glass p-6">
+                        <canvas id="cwv-trend"></canvas>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="lg:col-span-8 glass p-8 border-l-4 border-primary">
-                <div class="flex items-center gap-3 mb-4">
-                    <i class="fa-solid fa-microchip text-primary"></i>
-                    <h2 class="orbitron text-xs tracking-widest text-primary">FF TECH EXECUTIVE SUMMARY</h2>
-                </div>
-                <p id="ui-summary" class="text-lg leading-relaxed text-blue-100/80 italic mb-6">Generating analysis...</p>
-                <div class="flex gap-3">
-                    <span id="ui-weak-area" class="px-4 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-[10px] text-red-400 font-bold uppercase tracking-widest">Weak: --</span>
-                    <span id="ui-strong-area" class="px-4 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-[10px] text-green-400 font-bold uppercase tracking-widest">Strong: --</span>
-                </div>
-            </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="glass p-8">
-                <h3 class="orbitron text-[10px] mb-6 opacity-50 tracking-widest uppercase">Balance Analysis</h3>
-                <canvas id="radarChart" height="250"></canvas>
-            </div>
-            <div class="glass p-8">
-                <h3 class="orbitron text-[10px] mb-6 opacity-50 tracking-widest uppercase">Industry Benchmark (Market Comparison)</h3>
-                
-                <canvas id="benchmarkChart" height="250"></canvas>
-            </div>
-        </div>
-
-        <div id="metrics-container" class="space-y-10 py-10">
-            </div>
-
-        <div class="glass p-10 text-center border-2 border-primary/20 bg-gradient-to-b from-primary/5 to-transparent">
-            <h2 class="text-3xl orbitron glow-text mb-4 uppercase">FF Tech Certified</h2>
-            <p class="opacity-50 text-sm mb-8 max-w-xl mx-auto tracking-wide">This audit is timestamped and cryptographically verified. Suitable for compliance documentation and stakeholder reporting.</p>
-            <button class="bg-primary text-black font-black py-4 px-12 rounded-full orbitron tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/30">
-                DOWNLOAD FULL PDF REPORT
+        <!-- Download Button -->
+        <div class="text-center mt-16">
+            <button class="bg-gradient-to-r from-cyan-500 to-blue-600 text-black font-bold py-6 px-16 rounded-full text-2xl glow-primary shadow-2xl shadow-cyan-500/50 hover:scale-105 transition">
+                Download Certified PDF Report
             </button>
         </div>
-    </main>
-
-    <footer class="py-20 text-center opacity-30 text-[9px] orbitron tracking-[0.6em]">
-        FF TECH INTERNATIONAL // AUDIT ENGINE V2.0 // RAILWAY CLOUD
-    </footer>
+    </div>
 
     <script>
-        /**
-         * PYTHON DATA INPUT
-         * Replace the object below with your Python-generated JSON
-         */
-        window.audit_results = {
-            "score": 84,
-            "grade": "B+",
-            "summary": "Your website shows robust security but critical mobile latency. Largest Contentful Paint (LCP) exceeds recommended thresholds by 2.4s. Internal linking is fragmented with 12 orphan pages detected.",
-            "weak_area": "Performance",
-            "strong_area": "SSL/Security",
-            "radar_data": [84, 65, 98, 70, 88, 72], // SEO, Speed, Security, Mobile, Content, Access
-            "benchmark_data": {
-                "labels": ["Your Site", "Industry Avg", "Top Competitor"],
-                "scores": [84, 72, 91]
-            },
-            "categories": [
-                {
-                    "title": "Technical SEO & Crawl",
-                    "metrics": [
-                        {"name": "Status Codes (2xx)", "value": "98%", "status": "green"},
-                        {"name": "Redirect Loops", "value": "2 Detected", "status": "red"},
-                        {"name": "Broken Links", "value": "14 Found", "status": "yellow"}
-                    ]
-                },
-                {
-                    "title": "Core Web Vitals",
-                    "metrics": [
-                        {"name": "LCP", "value": "4.1s", "status": "red"},
-                        {"name": "CLS", "value": "0.02", "status": "green"},
-                        {"name": "FID", "value": "18ms", "status": "green"}
-                    ]
-                }
-                // Add more categories as needed from Python
-            ]
+        // FULL 140+ METRICS DATA STRUCTURE - ALL INJECTED FROM PYTHON
+        window.auditMetrics = {
+            overall: [ // Category 1: Metrics 1-10
+                {num: "1", name: "Site Health Score (%)", value: "92%", status: "green"},
+                {num: "2", name: "Total Errors", value: "15", status: "red"},
+                {num: "3", name: "Total Warnings", value: "32", status: "yellow"},
+                {num: "4", name: "Total Notices", value: "58", status: "green"},
+                {num: "5", name: "Total Crawled Pages", value: "2,134", status: "green"},
+                {num: "6", name: "Total Indexed Pages", value: "1,987", status: "green"},
+                {num: "7", name: "Trend of Issues (new vs fixed)", value: "+5 New / -12 Fixed", status: "yellow"},
+                {num: "8", name: "Crawl Budget Efficiency", value: "87%", status: "green"},
+                {num: "9", name: "Percentage of Orphan Pages", value: "6.7%", status: "yellow"},
+                {num: "10", name: "Site Audit Completion Status", value: "100%", status: "green"}
+            ],
+            crawlability: [ // Category 2: 11-30
+                {num: "11", name: "HTTP Status Codes (2xx/3xx/4xx/5xx)", value: "1,950 / 150 / 32 / 2", status: "yellow"},
+                {num: "12", name: "Redirect Chains Detected", value: "18", status: "yellow"},
+                {num: "13", name: "Redirect Loops", value: "0", status: "green"},
+                {num: "14", name: "Broken Internal Links", value: "38", status: "red"},
+                {num: "15", name: "Broken External Links", value: "12", status: "red"},
+                // ... continue up to metric 30
+            ],
+            // Add full arrays for all categories (3 to 10) with exact metric names and numbers
+            // Example placeholder for category 3
+            onpage: [
+                {num: "31", name: "Missing Title Tags", value: "0", status: "green"},
+                {num: "32", name: "Duplicate Title Tags", value: "5", status: "yellow"},
+                // ... up to 65
+            ],
+            performance: [
+                {num: "66", name: "Largest Contentful Paint (LCP)", value: "2.8s", status: "yellow"},
+                {num: "67", name: "First Contentful Paint (FCP)", value: "1.4s", status: "green"},
+                // ... up to 86
+            ],
+            // Continue for mobile (87-95), security (96-103), international (104-108),
+            // backlinks (109-116), advanced (117-133), trends (134-140)
         };
 
-        function initializeDashboard() {
-            const data = window.audit_results;
-
-            // Update UI Labels
-            document.getElementById('ui-score').innerText = data.score;
-            document.getElementById('ui-grade').innerText = `Grade ${data.grade}`;
-            document.getElementById('ui-summary').innerText = `"${data.summary}"`;
-            document.getElementById('ui-weak-area').innerText = `Weak: ${data.weak_area}`;
-            document.getElementById('ui-strong-area').innerText = `Strong: ${data.strong_area}`;
-
-            // Inject Metrics
-            const container = document.getElementById('metrics-container');
-            container.innerHTML = data.categories.map(cat => `
-                <div>
-                    <h3 class="text-primary text-[10px] font-black mb-4 tracking-[0.3em] uppercase flex items-center gap-2">
-                        <span class="w-2 h-2 bg-primary rounded-full"></span> ${cat.title}
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        ${cat.metrics.map(m => `
-                            <div class="glass p-5 border border-white/5 flex justify-between items-center hover:bg-white/[0.05]">
-                                <div>
-                                    <p class="text-[9px] uppercase opacity-40 font-bold mb-1">${m.name}</p>
-                                    <p class="text-lg font-black orbitron">${m.value}</p>
-                                </div>
-                                <div class="w-3 h-3 rounded-full ${m.status === 'red' ? 'bg-red-500 pulse-red' : m.status === 'yellow' ? 'bg-yellow-500' : 'bg-green-500 shadow-[0_0_10px_#00ff88]'}"></div>
-                            </div>
-                        `).join('')}
+        function createMetricCard(metric) {
+            const icon = metric.status === 'green' ? 'check-circle' : metric.status === 'yellow' ? 'exclamation-triangle' : 'times-circle';
+            return `
+                <div class="metric-card glass p-6 status-${metric.status}">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <span class="text-sm opacity-70">#${metric.num}</span>
+                            <p class="font-semibold mt-1">${metric.name}</p>
+                        </div>
+                        <i class="fa-solid fa-${icon} text-3xl opacity-80"></i>
                     </div>
+                    <div class="text-2xl font-bold text-right">${metric.value}</div>
                 </div>
-            `).join('');
-
-            // CHARTS
-            // 1. Health Gauge
-            new Chart(document.getElementById('healthGauge'), {
-                type: 'doughnut',
-                data: { datasets: [{ data: [data.score, 100 - data.score], backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.05)'], borderWidth: 0, circumference: 270, rotation: 225, cutout: '85%' }] },
-                options: { plugins: { legend: { display: false } }, events: [] }
-            });
-
-            // 2. Radar Chart
-            new Chart(document.getElementById('radarChart'), {
-                type: 'radar',
-                data: {
-                    labels: ['SEO', 'Speed', 'Security', 'Mobile', 'Content', 'Access'],
-                    datasets: [{
-                        label: 'Site Balance',
-                        data: data.radar_data,
-                        backgroundColor: 'rgba(0, 242, 255, 0.2)',
-                        borderColor: '#00f2ff',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#00f2ff'
-                    }]
-                },
-                options: {
-                    scales: { r: { angleLines: { color: 'rgba(255,255,255,0.1)' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#fff', font: { family: 'Orbitron', size: 10 } }, ticks: { display: false } } },
-                    plugins: { legend: { display: false } }
-                }
-            });
-
-            // 3. Benchmark Chart
-            new Chart(document.getElementById('benchmarkChart'), {
-                type: 'bar',
-                data: {
-                    labels: data.benchmark_data.labels,
-                    datasets: [{
-                        data: data.benchmark_data.scores,
-                        backgroundColor: ['#00f2ff', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0.2)'],
-                        borderRadius: 10
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: { 
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.5)', font: { family: 'Orbitron', size: 8 } } },
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.5)' } }
-                    }
-                }
-            });
+            `;
         }
 
-        window.onload = initializeDashboard;
+        // Render all categories
+        ['overall', 'crawlability', 'onpage', 'performance' /* add others */].forEach(cat => {
+            const container = document.getElementById('cat-' + cat.slice(0,1) + (cat === 'overall' ? '-1' : ''));
+            if (container && window.auditMetrics[cat]) {
+                container.innerHTML = window.auditMetrics[cat].map(createMetricCard).join('');
+            }
+        });
+
+        // Example trend charts
+        new Chart(document.getElementById('health-trend'), {
+            type: 'line',
+            data: {
+                labels: ['Oct', 'Nov', 'Dec'],
+                datasets: [{ label: 'Site Health', data: [85, 89, 92], borderColor: '#00f2ff', tension: 0.4 }]
+            }
+        });
+
+        new Chart(document.getElementById('cwv-trend'), {
+            type: 'line',
+            data: {
+                labels: ['Oct', 'Nov', 'Dec'],
+                datasets: [
+                    { label: 'LCP (s)', data: [3.5, 3.1, 2.8], borderColor: '#ffbb00' },
+                    { label: 'CLS', data: [0.08, 0.05, 0.02], borderColor: '#00ff88' }
+                ]
+            }
+        });
     </script>
 </body>
 </html>
