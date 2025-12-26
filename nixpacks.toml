@@ -1,18 +1,26 @@
+# nixpacks.toml — Optimized for FF Tech SaaS (app.py)
+# Railway-ready | PostgreSQL + FastAPI + PDF + Scheduler
+
 [phases.setup]
-# Added libpq-dev for PostgreSQL support
-extra_pkgs = ["python3", "gcc", "libpq-dev"]
+# Essential system packages for PostgreSQL driver and build tools
+nixPkgs = ["python312", "gcc", "libpq-dev", "pkg-config"]
 
 [phases.install]
-# Using a local .venv is more standard for Railpack/Nixpacks
+# Create virtual environment and install Python dependencies
 cmds = [
   "python3 -m venv .venv",
-  ".venv/bin/pip install --upgrade pip",
+  ".venv/bin/pip install --upgrade pip setuptools wheel",
   ".venv/bin/pip install -r requirements.txt"
 ]
 
 [phases.build]
+# No build step needed (pure Python)
 cmds = []
 
 [start]
-# IMPORTANT: Use app:app if your file is app.py
-cmd = ".venv/bin/uvicorn app:app --host 0.0.0.0 --port ${PORT}"
+# Start command — activates venv and runs uvicorn
+cmd = ".venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1"
+
+# Optional: Better production performance
+# [start]
+# cmd = ".venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
