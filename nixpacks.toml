@@ -1,12 +1,12 @@
-# nixpacks.toml — Optimized for FF Tech SaaS (app.py)
-# Railway-ready | PostgreSQL + FastAPI + PDF + Scheduler
+# nixpacks.toml — Fixed & Optimized for FF Tech SaaS (app.py)
+# Railway Nixpacks | PostgreSQL support for psycopg2-binary
 
 [phases.setup]
-# Essential system packages for PostgreSQL driver and build tools
-nixPkgs = ["python312", "gcc", "libpq-dev", "pkg-config"]
+# Correct Nix packages: postgresql provides libpq + headers
+nixPkgs = ["python312", "gcc", "postgresql", "pkg-config"]
 
 [phases.install]
-# Create virtual environment and install Python dependencies
+# Create venv and install dependencies
 cmds = [
   "python3 -m venv .venv",
   ".venv/bin/pip install --upgrade pip setuptools wheel",
@@ -14,13 +14,9 @@ cmds = [
 ]
 
 [phases.build]
-# No build step needed (pure Python)
+# No build commands needed
 cmds = []
 
 [start]
-# Start command — activates venv and runs uvicorn
+# Start uvicorn with proper host/port
 cmd = ".venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT --workers 1"
-
-# Optional: Better production performance
-# [start]
-# cmd = ".venv/bin/gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
