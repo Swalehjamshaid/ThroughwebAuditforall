@@ -1,1266 +1,479 @@
 
-# ap.py — FF Tech AI Audit (DB-backed, inline HTML, Admin/Paid auth, Railway-ready)
-# ---------------------------------------------------------------------------------
-# - Integrates YOUR provided HTML exactly (embedded as Jinja template).
-# - Adds Start Audit (AJAX) -> runs audit -> redirects to /audit/{id}/report.
-# - Populates the page with audit attributes, charts, issues, metrics, etc.
-# - PDF export restricted to PAID users; Admin can mark users paid.
-# - SQLAlchemy DB-backed (Postgres via DATABASE_URL; SQLite fallback).
-# - Simple session-based auth (Starlette SessionMiddleware).
-# ---------------------------------------------------------------------------------
-
+# app.py
 import os
-import re
-import time
-import json
-import socket
-import ssl as sslmod
-import datetime as dt
-from typing import Dict, Any, List, Optional, Tuple
-from pathlib import Path
-
-from fastapi import FastAPI, Request, HTTPException, Form, Depends
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+import io
+from datetime import datetime
+from urllib.parse import urlparse, urljoin
 
 import requests
-import httpx
 from bs4 import BeautifulSoup
-from jinja2 import Environment, select_autoescape
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
-
-# --- SQLAlchemy ORM ---
-from sqlalchemy import (
-    create_engine, Column, Integer, String, DateTime, Boolean, ForeignKey,
-    Text, Float, JSON as SA_JSON, func, text
-)
-from sqlalchemy.orm import sessionmaker, declarative_base, Session
-from sqlalchemy.exc import SQLAlchemyError
-
-# --------------------------- Config ----------------------------
-APP_NAME = "FF TECH AI AUDIT"
-ENV = os.getenv("ENV", "development")
-SECRET_KEY = os.getenv("SECRET_KEY", "change_me_dev_only")  # for session cookies
-DEFAULT_USER_AGENT = os.getenv("DEFAULT_USER_AGENT", "FFTechAudit/1.0")
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech.db")
-
-# Optional search keys (resolver will still work without them via DuckDuckGo)
-BING_SEARCH_KEY   = os.getenv("BING_SEARCH_KEY")
-GOOGLE_CSE_KEY    = os.getenv("GOOGLE_CSE_KEY")
-GOOGLE_CSE_ID     = os.getenv("GOOGLE_CSE_ID")
-
-TIMEOUT = 20
-RETRIES = 2
-AVOID_DOMAINS = {"facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com", "youtube.com"}
-
-# ----------------------- FastAPI app ---------------------------
-app = FastAPI(title=APP_NAME, version="3.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"] if ENV != "production" else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
-
-# ---------------------- DB setup -------------------------------
-Base = declarative_base()
+# Optional: Pillow for fallback favicon generation
 try:
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    from PIL import Image, ImageDraw
+    PIL_AVAILABLE = True
 except Exception:
-    engine = create_engine("sqlite:///./fftech.db", pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    PIL_AVAILABLE = False
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)          # sha256
-    role = Column(String, default="user")                   # user, paid, admin
-    is_paid = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=func.now())
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
-class Website(Base):
-    __tablename__ = "websites"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    url = Column(String, index=True)
-    created_at = Column(DateTime, default=func.now())
-    is_active = Column(Boolean, default=True)
+# Mount /static if present
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
-class AuditRun(Base):
-    __tablename__ = "audit_runs"
-    id = Column(Integer, primary_key=True)
-    website_id = Column(Integer, ForeignKey("websites.id"))
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    started_at = Column(DateTime, default=func.now())
-    finished_at = Column(DateTime)
-    site_health_score = Column(Float)                  # 0-100
-    grade = Column(String)                             # A+, A, B, C, D
-    metrics_summary = Column(SA_JSON)                  # dict of metrics -> values
-    weaknesses = Column(SA_JSON)                       # list of weaknesses
-    executive_summary = Column(Text)                   # ~summary text
-    competitors = Column(SA_JSON, nullable=True)       # [{name, score}]
-    top_issues = Column(SA_JSON, nullable=True)        # [{name, severity, suggestion}]
-    recommendations = Column(SA_JSON, nullable=True)   # {metric_key: suggestion}
+# Simple in-memory store for previous scores
+PREVIOUS_AUDITS: dict[str, dict] = {}
 
-def get_db() -> Session:
-    db = SessionLocal()
+
+# ----------------- Helpers -----------------
+
+def normalize_url(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return raw
+    parsed = urlparse(raw)
+    if not parsed.scheme:
+        raw = "https://" + raw
+    return raw
+
+def safe_request(url: str, method: str = "GET", **kwargs) -> requests.Response | None:
     try:
-        yield db
-    finally:
-        db.close()
-
-def ensure_columns(conn, table: str, cols: Dict[str, str]):
-    """Auto-add missing columns in Postgres."""
-    for col, sqltype in cols.items():
-        check_sql = text("""
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = :tname AND column_name = :cname
-        """)
-        exists = conn.execute(check_sql, {"tname": table, "cname": col}).fetchone()
-        if not exists:
-            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
-
-@app.on_event("startup")
-def on_startup():
-    Base.metadata.create_all(bind=engine)
-    try:
-        with engine.begin() as conn:
-            ensure_columns(conn, "audit_runs", {
-                "competitors": "JSON",
-                "top_issues": "JSON",
-                "recommendations": "JSON",
-                "user_id": "INTEGER"
-            })
-            ensure_columns(conn, "users", {
-                "role": "VARCHAR DEFAULT 'user'",
-                "is_paid": "BOOLEAN DEFAULT FALSE",
-                "is_active": "BOOLEAN DEFAULT TRUE"
-            })
+        kwargs.setdefault("timeout", (6, 12))  # connect, read
+        kwargs.setdefault("allow_redirects", True)
+        kwargs.setdefault("headers", {
+            "User-Agent": "FFTech-AuditBot/1.0 (+https://fftech.example)"
+        })
+        return requests.request(method.upper(), url, **kwargs)
     except Exception:
-        pass
+        return None
 
-# ---------------------- Inline HTML (YOUR template) ---------------------
-INLINE_HTML = r"""<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-<meta charset="UTF-8">
-<title>FF Tech AI Website Audit | {{ audit.website.url }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+def grade_from_score(score: int) -> str:
+    if score >= 90: return "A"
+    if score >= 80: return "B"
+    if score >= 70: return "C"
+    if score >= 60: return "D"
+    if score >= 50: return "E"
+    return "F"
 
-<!-- Tailwind CSS -->
-<script/cdn.tailwindcss.com</script>
-<!-- Chart.js -->
-https://cdn.jsdelivr.net/npm/chart.js</script>
-<!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=>
-body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
-.glass { background: rgba(15,23,42,.65); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,.08); transition: transform 0.3s; }
-.glass:hover { transform: translateY(-5px); }
-.glow { box-shadow: 0 0 40px rgba(99,102,241,.25); }
-.pulse { animation: pulse 2s infinite; }
-@keyframes pulse { 0%{opacity:.4}50%{opacity:1}100%{opacity:.4} }
-.severity-high { color: #ef4444; font-weight: 700; }
-.severity-medium { color: #f59e0b; font-weight: 700; }
-.severity-low { color: #38bdf8; font-weight: 700; }
-.collapsible { cursor: pointer; }
-.content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-.tooltip { position: relative; display: inline-block; }
-.tooltip .tooltiptext { visibility: hidden; width: 220px; background-color: #111827; color: #fff; text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 10; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 12px; }
-.tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
-.tab-button { padding:0.5rem 1rem; border-radius: 0.5rem; font-weight:600; transition: all 0.3s; }
-.tab-button.active { background-color: #6366f1; color:white; }
-.progress-bar { background: linear-gradient(90deg, #6366f1, #4f46e5); height: 8px; border-radius: 4px; transition: width 0.5s ease-in-out; }
-.fadeIn { animation: fadeIn 0.8s ease-in-out; }
-</style>
-</head>
-<body class="bg-slate-950 text-slate-200 min-h-screen">
+def pct(n: int, d: int) -> float:
+    return (n / d * 100.0) if d else 0.0
 
-<!-- HEADER -->
-<header class="border-b border-white/10">
-<div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
-  <div>
-    <h1 class="text-3xl font-black">FF TECH <span class="text-indigo-400">AI AUDIT</span></h1>
-    <p class="text-sm text-slate-400" id="currentWebsite">{{ audit.website.url }}</p>
-    <p class="text-xs text-slate-500">User: {{ user.email if user else 'Guest' }} · Role: {{ user.role if user else 'guest' }} · Paid: {{ 'yes' if user and user.is_paid else 'no' }}</p>
-  </div>
-  <div class="flex items-center gap-4">
-    {% if user %}
-    /logoutLogout</a>
-    {% else %}
-    <a href="/login" class="px-3 py-1 bg-slate-700/40 text-slate- <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
-    <button onclick="downloadPDF()" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">Download PDF</button>
-  </div>
-</div>
-</header>
+def detect_mixed_content(soup: BeautifulSoup, page_scheme: str) -> bool:
+    if page_scheme != "https":
+        return False
+    for tag in soup.find_all(["img", "script", "link", "iframe", "video", "audio", "source"]):
+        for attr in ["src", "href", "data", "poster"]:
+            val = tag.get(attr)
+            if isinstance(val, str) and val.startswith("http://"):
+                return True
+    return False
 
-<!-- URL INPUT SECTION -->
-<div class="max-w-3xl mx-auto px-6 py-6">
-  <div class="glass rounded-3xl p-6 flex flex-col md:flex-row items-center gap-4">
-    <input type="url" id="websiteUrl" placeholder="Enter website URL..."
-           class="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-slate-200 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-    <button onclick="startAudit()"
-            class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl transition">Start Audit</button>
-  </div>
-</div>
-
-<!-- LIVE AUDIT BANNER -->
-<div class="max-w-7xl mx-auto px-6 py-2">
-  <div id="liveBanner" class="bg-indigo-600/20 text-indigo-400 rounded-full px-4 py-2 font-bold flex items-center gap-2">
-    <span>Audit in Progress</span>
-    <span class="animate-pulse">●</span>
-  </div>
-</div>
-
-<!-- TABS -->
-<div class="max-w-7xl mx-auto px-6 py-6">
-  <div class="flex gap-4 flex-wrap">
-    <button class="tab-button active" onclick="showTab('overview')">Overview</button>
-    <button class="tab-button" onclick="showTab('seo')">SEO</button>
-    <button class="tab-button" onclick="showTab('performance')">Performance</button>
-    <button class="tab-button" onclick="showTab('security')">Security</button>
-    <button class="tab-button" onclick="showTab('compliance')">Compliance</button>
-    <button class="tab-button" onclick="showTab('recommendations')">Recommendations</button>
-  </div>
-</div>
-
-<!-- TAB CONTENT -->
-<div class="max-w-7xl mx-auto px-6">
-  <!-- OVERVIEW TAB -->
-  <div id="overview" class="tab-content fadeIn">
-    <!-- Score & Timeline -->
-    <section class="grid lg:grid-cols-3 gap-8 py-6">
-      <div class="glass glow rounded-3xl p-8 text-center">
-        <p class="text-slate-400">Site Health Score</p>
-        <p class="text-7xl font-black text-indigo-400 mt-2" id="siteScore">{{ audit.site_health_score }}%</p>
-        <p class="mt-4 text-sm">Grade: <span class="font-bold text-emerald-400" id="siteGrade">{{ audit.grade }}</span></p>
-        <p class="mt-2 text-xs text-slate-400">Compared to last audit: {{ previous_audit.site_health_score if previous_audit else audit.site_health_score }}%</p>
-      </div>
-      <div class="glass rounded-3xl p-8 col-span-2">
-        <h2 class="text-xl font-bold mb-4">Audit Timeline</h2>
-        <div class="space-y-4" id="auditTimeline">
-          {% for step in ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"] %}
-          <div class="flex items-center gap-4">
-            <div class="w-6 h-6 rounded-full border-2 border-indigo-400 flex items-center justify-center">
-              <span class="w-3 h-3 bg-emerald-400 rounded-full pulse" id="pulse-{{ loop.index }}"></span>
-            </div>
-            <div class="flex-1">
-              <p class="font-semibold">{{ step }}</p>
-              <div class="w-full bg-slate-800 rounded h-2 mt-1">
-                <div class="progress-bar" style="width:0%" id="progress-{{ loop.index }}"></div>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    <!-- Charts -->
-    <section class="grid lg:grid-cols-2 gap-8 py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-xl font-bold mb-4">Issue Distribution</h2>
-        <canvas id="issuesChart"></canvas>
-      </div>
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-xl font-bold mb-4">Health Trend</h2>
-        <canvas id="trendChart"></canvas>
-      </div>
-    </section>
-
-    <!-- Competitor Comparison -->
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-2xl font-extrabold mb-6">Competitor Comparison</h2>
-        <div class="grid md:grid-cols-3 gap-6 text-center">
-          <!-- Your Website -->
-          <div class="p-6 bg-slate-900 rounded-xl">
-            <p class="text-sm text-slate-400">Your Website</p>
-            <p class="text-4xl font-black text-indigo-400">{{ audit.site_health_score }}%</p>
-            <div class="h-2 bg-indigo-400 rounded mt-2" style="width:{{ audit.site_health_score }}%"></div>
-          </div>
-          <!-- Competitors -->
-          {% for comp in audit.competitors %}
-          <div class="p-6 bg-slate-900 rounded-xl opacity-70">
-            <p class="text-sm text-slate-400">{{ comp.name }}</p>
-            <p class="text-4xl font-black">{{ comp.score }}%</p>
-            <div class="h-2 bg-gray-500 rounded mt-2" style="width:{{ comp.score }}%"></div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    <!-- Top Issues -->
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8">
-        <h2 class="text-2xl font-extrabold mb-4">Top 10 Issues</h2>
-        <table class="w-full text-left border-collapse text-sm">
-          <thead>
-            <tr class="border-b border-slate-700">
-              <th class="py-2 px-4">Issue</th>
-              <th class="py-2 px-4">Severity</th>
-              <th class="py-2 px-4">Suggestion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for issue in audit.top_issues %}
-            <tr class="border-b border-slate-800 hover:bg-slate-800 transition">
-              <td class="py-2 px-4">{{ issue.name }}</td>
-              <td class="py-2 px-4">
-                <span class="severity-{{ issue.severity }}">{{ issue.severity|capitalize }}</span>
-              </td>
-              <td class="py-2 px-4">{{ issue.suggestion }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Metrics Grid -->
-    <section class="py-6 grid md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {% for k,v in audit.metrics_summary.items() %}
-      <div class="glass rounded-2xl p-6 tooltip" data-value="{{ v }}" data-key="{{ k }}">
-        <p class="text-xs text-slate-400 uppercase">{{ k.replace("_"," ") }}</p>
-        <p class="text-2xl font-bold mt-2">{{ v }}</p>
-        <span class="tooltiptext">{{ audit.recommendations[k] }}</span>
-      </div>
-      {% endfor %}
-    </section>
-
-    <!-- Weaknesses -->
-    <section class="py-6">
-      <div class="glass rounded-3xl p-8 border border-red-500/30">
-        <h2 class="text-2xl font-extrabold mb-6 text-red-400 collapsible" onclick="toggleContent('weaknessesContent')">Priority Weak Areas</h2>
-        <ul class="space-y-3 content" id="weaknessesContent">
-          {% for w in audit.weaknesses %}
-          <li class="flex gap-3"><span class="text-red-500">●</span><span>{{ w }}</span></li>
-          {% endfor %}
-        </ul>
-      </div>
-    </section>
-  </div>
-
-  <!-- OTHER TABS (SEO, Performance, Security, Compliance, Recommendations) -->
-  <!-- Add similar sections as per previous code -->
-
-</div>
-
-<!-- FOOTER -->
-<footer class="border-t border-white/10 mt-20">
-<div class="max-w-7xl mx-auto px-6 py-8 text-center text-sm text-slate-500">
-FF Tech © AI Website Audit Platform · Generated {{ audit.finished_at }}
-</div>
-</footer>
-
-<script>
-// TAB FUNCTION
-function showTab(tabId){
-  document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-  document.getElementById(tabId).classList.remove('hidden');
-  document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-}
-
-// DARK/LIGHT MODE
-function toggleMode() {
-  document.documentElement.classList.toggle('dark');
-  document.body.classList.toggle('bg-slate-50');
-  document.body.classList.toggle('text-slate-900');
-}
-
-// COLLAPSIBLE CONTENT
-function toggleContent(id) {
-  const el = document.getElementById(id);
-  el.style.maxHeight = el.style.maxHeight === '0px' || !el.style.maxHeight ? el.scrollHeight + 'px' : '0px';
-}
-
-// Animate Audit Timeline (visual only)
-let currentStep = 1;
-function animateAudit() {
-  const steps = ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"];
-  if(currentStep > steps.length) return;
-  const bar = document.getElementById('progress-' + currentStep);
-  let width = 0;
-  const interval = setInterval(() => {
-    if(width >= (currentStep*16)) clearInterval(interval);
-    bar.style.width = width + '%';
-    width++;
-  }, 20);
-  currentStep++;
-  setTimeout(animateAudit, 800);
-}
-
-// START AUDIT FUNCTION (calls backend, then redirects to report page)
-async function startAudit() {
-    const url = document.getElementById("websiteUrl").value.trim();
-    if(!url) {
-        alert("Please enter a valid website URL or brand.");
-        return;
-    }
-    document.getElementById("currentWebsite").innerText = url;
-    const banner = document.getElementById("liveBanner");
-    banner.innerHTML = `<span>Audit in Progress for ${url}</span> <span class="animate-pulse">●</span>`;
-    animateAudit();
-
-    try {
-      const res = await fetch("/audit/run", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ website_url: url })
-      });
-      const j = await res.json();
-      if (j && j.report_url) {
-        window.location.href = j.report_url;
-      } else {
-        alert("Audit failed to start. Please try again.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Network error. Please try again.");
-    }
-}
-
-// Download PDF (navigate to endpoint; only PAID users will be allowed)
-function downloadPDF() {
-  const metaEl = document.querySelector('meta[name="audit-id"]');
-  if (metaEl && metaEl.getAttribute("content")) {
-    const id = metaEl.getAttribute("content");
-    window.location.href = `/audit/${id}/pdf`;
-  } else {
-    alert("Run an audit first, then download the PDF from the report page.");
-  }
-}
-
-// Charts (placeholders use real values from Jinja context)
-new Chart(document.getElementById("issuesChart"), {
-  type: "doughnut",
-  data: {
-    labels: ["Errors","Warnings","Notices"],
-    datasets: [{data:[{{ audit.metrics_summary.total_errors | default(0) }},{{ audit.metrics_summary.total_warnings | default(0) }},{{ audit.metrics_summary.total_notices | default(0) }}],backgroundColor:["#ef4444","#f59e0b","#38bdf8"]}]
-  },
-  options:{plugins:{legend:{labels:{color:"#cbd5f5"}}}}
-});
-
-new Chart(document.getElementById("trendChart"), {
-  type:"line",
-  data:{labels:["Previous","Current"],datasets:[{data:[{{ previous_audit.site_health_score if previous_audit else audit.site_health_score }},{{ audit.site_health_score }}],borderColor:"#6366f1",backgroundColor:"rgba(99,102,241,.2)",tension:.4,fill:true,pointRadius:6}]},
-  options:{scales:{x:{ticks:{color:"#cbd5f5"}},y:{ticks:{color:"#cbd5f5"},min:0,max:100}},plugins:{legend:{display:false}}}
-});
-</script>
-
-<!-- meta used by PDF button & JS -->
-<meta name="audit-id" content="{{ audit.id if audit.id else '' }}">
-</body>
-</html>
-"""
-
-LOGIN_HTML = r"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-https://cdn.tailwindcss.com</script>
-<title>Login | FF Tech AI Audit</title>
-</head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center">
-<div class="p-8 rounded-xl border border-white/10 w-full max-w-md">
-  <h1 class="text-2xl font-black mb-4">Login</h1>
-  /login
-    <input name="email" type="email" placeholder="Email" class="w-full px-4 py-2 rounded-lg text-black" required />
-    <input name="password" type="password" placeholder="Password" class="w-full px-4 py-2 rounded-lg text-black" required />
-    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-lg font-bold w-full">Login</button>
-  </form>
-  <p class="text-xs mt-3">No account? /registerRegister</a></p>
-</div>
-</body>
-</html>
-"""
-
-REGISTER_HTML = r"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-https://cdn.tailwindcss.com</script>
-<title>Register | FF Tech AI Audit</title>
-</head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center">
-<div class="p-8 rounded-xl border border-white/10 w-full max-w-md">
-  <h1 class="text-2xl font-black mb-4">Register</h1>
-  <form method="post" action"email" type="email" placeholder="Email" class="w-full px-4 py-2 rounded-lg text-black" required />
-    <input name="password" type="password" placeholder="Password" class="w-full px-4 py-2 rounded-lg text-black" required />
-    <button type="submit" class="px-4 py-2 bg-indigo-600 rounded-lg font-bold w-full">Create Account</button>
-  </form>
-  <p class="text-xs mt-3">Already have an account? /loginLogin</a></p>
-</div>
-</body>
-</html>
-"""
-
-ADMIN_HTML = r"""<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-https://cdn.tailwindcss.com</script>
-<title>Admin | FF Tech AI Audit</title>
-</head>
-<body class="bg-slate-900 text-white min-h-screen">
-<div class="max-w-4xl mx-auto p-6">
-  <h1 class="text-2xl font-black mb-4">Admin · Users</h1>
-  <table class="w-full text-left border-collapse">
-    <thead><tr class="border-b border-slate-700"><th class="py-2 px-2">Email</th><th class="py-2 px-2">Role</th><th class="py-2 px-2">Paid</th><th class="py-2 px-2">Actions</th></tr></thead>
-    <tbody>
-      {% for u in users %}
-      <tr class="border-b border-slate-800">
-        <td class="py-2 px-2">{{ u.email }}</td>
-        <td class="py-2 px-2">{{ u.role }}</td>
-        <td class="py-2 px-2">{{ 'yes' if u.is_paid else 'no' }}</td>
-        <td class="py-2 px-2">
-          /admin/toggle-paid
-            <input type="hidden" name="user_id" value="{{ u.id }}">
-            <button class="px-3 py-1 bg-indigo-600 rounded text-white text-sm">{{ 'Set Unpaid' if u.is_paid else 'Set Paid' }}</button>
-          </form>
-          /admin/set-role
-            <input type="hidden" name="user_id" value="{{ u.id }}">
-            <select name="role" class="text-black px-2 py-1 rounded">
-              <option value="user" {% if u.role=='user' %}selected{% endif %}>user</option>
-              <option value="paid" {% if u.role=='paid' %}selected{% endif %}>paid</option>
-              <option value="admin" {% if u.role=='admin' %}selected{% endif %}>admin</option>
-            </select>
-            <button class="px-3 py-1 bg-slate-600 rounded text-white text-sm">Update Role</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="mt-4">/Back to dashboard</a></div>
-</div>
-</body>
-</html>
-"""
-
-# ----------------------- Jinja render helpers -------------------
-def render_html(audit: Dict[str, Any], previous: Optional[Dict[str, Any]], user: Optional[User]) -> HTMLResponse:
-    env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
-    tpl = env.from_string(INLINE_HTML)
-    html = tpl.render(audit=audit, previous_audit=previous, user=user)
-    return HTMLResponse(html)
-
-def render_page(tpl_str: str, ctx: Dict[str, Any]) -> HTMLResponse:
-    env = Environment(autoescape=select_autoescape(enabled_extensions=("html",)))
-    tpl = env.from_string(tpl_str)
-    return HTMLResponse(tpl.render(**ctx))
-
-# ----------------------- Resolver & audit engine -----------------
-from urllib.parse import urlparse, urlsplit, parse_qs, unquote
-
-def is_probable_url(text: str) -> bool:
-    text = text.strip()
-    return bool(re.match(r"^(https?://)?([\w-]+\.)+[a-zA-Z]{2,}(/.*)?$", text))
-
-def normalize_url(text: str) -> str:
-    text = text.strip()
-    if not text:
-        raise ValueError("Empty URL or query")
-    if is_probable_url(text):
-        if not re.match(r"^https?://", text):
-            text = "https://" + text
-        return text
-    return text
-
-def host_of(url: str) -> str:
-    try:
-        return urlparse(url).netloc.lower()
-    except Exception:
-        return ""
-
-def ddg_unwrap(href: str) -> str:
-    try:
-        if "duckduckgo.com/l/?" in href:
-            qs = parse_qs(urlsplit(href).query)
-            for key in ("uddg", "url"):
-                if key in qs and qs[key]:
-                    return unquote(qs[key][0])
-    except Exception:
-        pass
-    return href
-
-async def head_ok(client: httpx.AsyncClient, url: str) -> Tuple[bool, Optional[str]]:
-    for attempt in range(RETRIES):
-        try:
-            r = await client.head(url, follow_redirects=True, timeout=TIMEOUT)
-            if r.status_code < 400:
-                return True, str(r.url)
-        except Exception:
-            pass
-        try:
-            r = await client.get(url, follow_redirects=True, timeout=TIMEOUT)
-            if r.status_code < 400:
-                return True, str(r.url)
-        except Exception:
-            if attempt == RETRIES - 1:
-                break
-    return False, None
-
-async def ddg_search(client: httpx.AsyncClient, query: str) -> List[str]:
-    try:
-        url = "https://duckduckgo.com/html/"
-        r = await client.post(
-            url,
-            data={"q": query},
-            headers={"User-Agent": DEFAULT_USER_AGENT},
-            timeout=TIMEOUT,
-        )
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = []
-        for a in soup.select("a.result__a"):
-            href = a.get("href")
-            if href:
-                links.append(ddg_unwrap(href))
-        if not links:
-            for a in soup.select("a"):
-                href = a.get("href")
-                if href and href.startswith("http"):
-                    links.append(ddg_unwrap(href))
-        return links[:8]
-    except Exception:
-        return []
-
-async def bing_search(client: httpx.AsyncClient, query: str) -> List[str]:
-    if not BING_SEARCH_KEY:
-        return []
-    try:
-        url = "https://api.bing.microsoft.com/v7.0/search"
-        r = await client.get(
-            url,
-            params={"q": query, "mkt": "en-US"},
-            headers={"Ocp-Apim-Subscription-Key": BING_SEARCH_KEY},
-            timeout=TIMEOUT,
-        )
-        j = r.json()
-        urls = []
-        for item in j.get("webPages", {}).get("value", []):
-            u = item.get("url")
-            if u:
-                urls.append(u)
-        return urls[:8]
-    except Exception:
-        return []
-
-async def google_cse_search(client: httpx.AsyncClient, query: str) -> List[str]:
-    if not (GOOGLE_CSE_KEY and GOOGLE_CSE_ID):
-        return []
-    try:
-        url = "https://www.googleapis.com/customsearch/v1"
-        r = await client.get(
-            url,
-            params={"q": query, "key": GOOGLE_CSE_KEY, "cx": GOOGLE_CSE_ID},
-            timeout=TIMEOUT,
-        )
-        j = r.json()
-        urls = []
-        for item in j.get("items", []):
-            u = item.get("link")
-            if u:
-                urls.append(u)
-        return urls[:8]
-    except Exception:
-        return []
-
-def build_query_variants(query: str) -> List[str]:
-    q = query.strip()
-    variants = [q, f"{q} official site", f"{q} website", f"{q} home page"]
-    seen, out = set(), []
-    for v in variants:
-        if v not in seen:
-            out.append(v); seen.add(v)
-    return out
-
-async def resolve_official_site(input_text: str, user_agent: str) -> str:
-    text = input_text.strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="Empty query")
-    candidate = normalize_url(text)
-
-    async with httpx.AsyncClient(headers={"User-Agent": user_agent}) as client:
-        # If it already looks like a URL try it
-        if is_probable_url(candidate):
-            ok, final = await head_ok(client, candidate)
-            if ok and final:
-                return final
-            # Try www variant
-            parsed = urlparse(candidate)
-            host = parsed.netloc
-            if not host.startswith("www."):
-                www = parsed._replace(netloc="www." + host).geturl()
-                ok, final = await head_ok(client, www)
-                if ok and final:
-                    return final
-
-        # Otherwise search (Bing -> Google CSE -> DuckDuckGo)
-        providers = [
-            ("bing", bing_search),
-            ("google_cse", google_cse_search),
-            ("duckduckgo", ddg_search),
-        ]
-        for q in build_query_variants(text):
-            for _name, func in providers:
-                urls = await func(client, q)
-                # Avoid social domains
-                candidates = [u for u in urls if host_of(u) not in AVOID_DOMAINS] or urls
-                for u in candidates:
-                    u_norm = normalize_url(u)
-                    ok, final = await head_ok(client, u_norm)
-                    if ok and final:
-                        return final
-
-    # As last resort, guess https://<brand>.com
-    if not is_probable_url(text):
-        guessed = f"https://{re.sub(r'[^a-zA-Z0-9-]+','', text.lower())}.com"
-        async with httpx.AsyncClient(headers={"User-Agent": user_agent}) as client:
-            ok, final = await head_ok(client, guessed)
-            if ok and final:
-                return final
-
-    raise HTTPException(status_code=404, detail="Could not resolve website")
-
-# ------------------------- Audit engine -------------------------
-def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]:
-    start = time.time()
-    try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent": DEFAULT_USER_AGENT})
-        ttfb = r.elapsed.total_seconds() if hasattr(r, "elapsed") and r.elapsed else (time.time() - start)
-        return r.status_code, r.text or "", dict(r.headers), ttfb
-    except requests.RequestException:
-        return 0, "", {}, 0.0
-
-def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
-    out = {"valid": False, "notBefore": None, "notAfter": None, "error": None}
-    try:
-        ctx = sslmod.create_default_context()
-        with socket.create_connection((hostname, port), timeout=10) as sock:
-            with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
-                cert = ssock.getpeercertificate()
-                out["notBefore"] = cert.get("notBefore")
-                out["notAfter"] = cert.get("notAfter")
-                out["valid"] = True
-    except Exception as e:
-        out["error"] = str(e)
-    return out
-
-def extract_domain(url: str) -> str:
-    try:
-        return urlparse(url).netloc
-    except Exception:
-        return ""
-
-def parse_html(html: str) -> BeautifulSoup:
-    return BeautifulSoup(html, "html.parser")
-
-def is_https(url: str) -> bool:
-    return url.lower().startswith("https://")
-
-def check_security_headers(headers: Dict[str, str]) -> Dict[str, bool]:
-    keys = ["content-security-policy", "strict-transport-security", "x-frame-options"]
-    hdrs = {k.lower(): True for k in headers.keys()}
-    return {k: (k in hdrs) for k in keys}
-
-def sizeof_response(headers: Dict[str, str], body: str) -> int:
-    cl = headers.get("Content-Length") or headers.get("content-length")
-    if cl and str(cl).isdigit():
-        return int(cl)
-    return len(body.encode())
-
-def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
-    anchors, imgs, css, js = [], [], [], []
-    from urllib.parse import urljoin
-    for a in soup.find_all("a"):
-        href = a.get("href")
-        if href:
-            anchors.append(urljoin(base_url, href))
-    for i in soup.find_all("img"):
-        src = i.get("src")
-        if src:
-            imgs.append(urljoin(base_url, src))
-    for l in soup.find_all("link", rel=lambda x: x in ["stylesheet", "preload"] if x else False):
-        href = l.get("href")
-        if href:
-            css.append(urljoin(base_url, href))
-    for s in soup.find_all("script"):
-        src = s.get("src")
-        if src:
-            js.append(urljoin(base_url, src))
-    return {"anchors": anchors, "images": imgs, "css": css, "js": js}
-
-def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
-    broken, redirected = [], []
-    for u in urls[:limit]:
-        try:
-            r = requests.head(u, allow_redirects=True, timeout=10, headers={"User-Agent": DEFAULT_USER_AGENT})
-            if 400 <= r.status_code < 600:
-                broken.append(u)
-            elif len(r.history) > 0:
-                redirected.append(u)
-        except Exception:
-            broken.append(u)
-    return {"broken": broken, "redirected": redirected, "tested": min(limit, len(urls))}
-
-def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
-    from urllib.parse import urlparse, urljoin
-    p = urlparse(base_url)
-    robots_url = f"{p.scheme}://{p.netloc}/robots.txt"
-    sitemap = None
-    robots_status, robots_text, _, _ = fetch(robots_url)
-    if robots_status == 200 and robots_text:
-        for line in robots_text.splitlines():
-            if line.lower().startswith("sitemap:"):
-                parts = line.split(":", 1)
-                if len(parts) == 2:
-                    sitemap = parts[1].strip()
-    if not sitemap:
-        sitemap = urljoin(base_url, "/sitemap.xml")
-    sm_status, sm_text, _, _ = fetch(sitemap)
+def _default_recommendations() -> dict:
     return {
-        "robots_found": robots_status == 200,
-        "sitemap_url": sitemap,
-        "sitemap_status": sm_status,
-        "sitemap_size_bytes": len(sm_text.encode()) if sm_text else 0
+        "total_errors": "Fix errors first; they block indexing or break UX.",
+        "total_warnings": "Address warnings next; they impact performance and ranking.",
+        "total_notices": "Optional improvements for incremental gains.",
+        "performance_score": "Optimize images, enable compression, reduce render‑blocking scripts, and cache aggressively.",
+        "seo_score": "Ensure unique titles, meta descriptions, H1, canonical tags, and structured data.",
+        "accessibility_score": "Provide alt text, set language attribute, and use proper landmarks/labels.",
+        "best_practices_score": "Prefer HTTPS, avoid mixed content, and use modern resource patterns.",
+        "security_score": "Add HSTS, CSP, XFO, XCTO, and Referrer/Permissions policies.",
+        "pages_crawled": "Expand coverage via sitemaps and internal linking.",
+        "largest_contentful_paint_ms": "Inline critical CSS; preconnect; optimize hero assets.",
+        "first_input_delay_ms": "Defer heavy JS; split bundles; reduce main-thread tasks.",
+        "core_web_vitals_pass_rate_%": "Focus on LCP/CLS/INP; measure with RUM and lab tools.",
     }
 
-def grade_from_score(score: float) -> str:
-    if score >= 95: return "A+"
-    if score >= 85: return "A"
-    if score >= 75: return "B"
-    if score >= 65: return "C"
-    return "D"
+def generate_favicon_bytes() -> bytes:
+    if PIL_AVAILABLE:
+        img = Image.new("RGBA", (32, 32), (99, 102, 241, 255))  # Indigo
+        draw = ImageDraw.Draw(img)
+        draw.ellipse((6, 6, 26, 26), outline=(255, 255, 255, 220), width=2)
+        buf = io.BytesIO()
+        img.save(buf, format="ICO")
+        buf.seek(0)
+        return buf.getvalue()
+    return b"\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00\x04\x00(\x01\x00\x00\x16\x00\x00\x00" + b"\x00" * 64
 
-def compute_audit(website_url: str) -> Dict[str, Any]:
-    status, body, headers, ttfb = fetch(website_url)
-    soup = parse_html(body) if body else BeautifulSoup("", "html.parser")
-    links = find_links(soup, website_url)
 
-    https_ok = is_https(website_url)
-    domain = extract_domain(website_url)
-    ssl_info = resolve_ssl(domain) if https_ok else {"valid": False, "error": "Not HTTPS"}
-    sec_headers = check_security_headers(headers)
+# ----------------- Core Audit Logic -----------------
 
-    title_tag = soup.find("title")
-    meta_desc = soup.find("meta", attrs={"name": "description"})
-    canonical = soup.find("link", rel="canonical")
-    viewport = soup.find("meta", attrs={"name": "viewport"})
-    hreflangs = soup.find_all("link", rel="alternate")
-    h1 = soup.find_all("h1")
-    imgs = soup.find_all("img")
+def audit_website(url: str) -> dict:
+    """Fetch homepage, parse HTML & headers, compute heuristic scores and issues."""
+    url = normalize_url(url)
+    resp = safe_request(url, "GET")
+    errors: list[dict] = []
+    warnings: list[dict] = []
+    notices: list[dict] = []
 
-    link_check = check_broken_links(links["anchors"], limit=150)
-    img_check  = check_broken_links(links["images"],  limit=100)
-    js_check   = check_broken_links(links["js"],      limit=60)
-    css_check  = check_broken_links(links["css"],     limit=60)
-    rob_smap   = check_robot_sitemap(website_url)
+    status_code = resp.status_code if resp else None
+    final_url = resp.url if resp else url
+    headers = dict(resp.headers) if resp else {}
+    elapsed_ms = int(resp.elapsed.total_seconds() * 1000) if resp else 0
+    html = resp.text if (resp and resp.text) else ""
+    page_size_bytes = len(resp.content) if resp else 0
+    page_scheme = urlparse(final_url).scheme or "https"
 
-    mixed_content = []
-    if https_ok:
-        for group in ("anchors", "images", "css", "js"):
-            mixed_content += [u for u in links[group] if u.startswith("http://")]
+    # On failure, return minimal audit
+    if not resp or (status_code and status_code >= 400):
+        errors.append({
+            "name": "Site unreachable or error status",
+            "severity": "high",
+            "suggestion": "Verify DNS, TLS certificate, and that the server responds with 2xx for the homepage."
+        })
+        site_health_score = 0
+        audit = {
+            "website": {"url": url},
+            "site_health_score": site_health_score,
+            "grade": grade_from_score(site_health_score),
+            "competitors": [],
+            "top_issues": errors,
+            "metrics_summary": {
+                "total_errors": len(errors),
+                "total_warnings": 0,
+                "total_notices": 0,
+                "performance_score": 0,
+                "seo_score": 0,
+                "accessibility_score": 0,
+                "best_practices_score": 0,
+                "security_score": 0,
+                "pages_crawled": 1,
+                "largest_contentful_paint_ms": 0,
+                "first_input_delay_ms": 0,
+                "core_web_vitals_pass_rate_%": 0,
+            },
+            "recommendations": _default_recommendations(),
+            "weaknesses": [e["name"] for e in errors],
+            "finished_at": datetime.now().strftime("%b %d, %Y %H:%M"),
+        }
+        previous_audit = PREVIOUS_AUDITS.get(url)
+        PREVIOUS_AUDITS[url] = {"site_health_score": site_health_score, "timestamp": audit["finished_at"]}
+        return {"audit": audit, "previous_audit": previous_audit}
 
-    content_encoding = headers.get("Content-Encoding", headers.get("content-encoding", "")).lower()
-    compression_enabled = ("gzip" in content_encoding) or ("br" in content_encoding)
-    total_size_bytes = sizeof_response(headers, body)
+    # Parse HTML
+    soup = BeautifulSoup(html, "html.parser")
 
-    title_missing = (title_tag is None)
-    meta_desc_missing = (meta_desc is None)
-    h1_missing = (len(h1) == 0)
-    multiple_h1 = (len(h1) > 1)
-    viewport_present = viewport is not None
-    canonical_missing = canonical is None
-    canonical_incorrect = False
-    if canonical and canonical.get("href"):
-        canonical_url = canonical["href"]
-        canonical_incorrect = extract_domain(canonical_url) != domain
+    # --------- SEO ---------
+    title_tag = soup.title.string.strip() if soup.title and soup.title.string else ""
+    meta_desc_tag = soup.find("meta", attrs={"name": "description"})
+    meta_desc = (meta_desc_tag.get("content") or "").strip() if meta_desc_tag else ""
+    h1_tags = soup.find_all("h1")
+    h1_count = len(h1_tags)
+    canonical_link = soup.find("link", rel=lambda v: v and "canonical" in v.lower())
+    lang_attr = soup.html.get("lang") if soup.html else None
+    robots_meta_tag = soup.find("meta", attrs={"name": "robots"})
+    robots_meta = (robots_meta_tag.get("content") or "").lower().strip() if robots_meta_tag else ""
 
-    hreflang_missing = (len(hreflangs) == 0)
-    missing_alt = sum(1 for i in imgs if not i.get("alt"))
+    a_tags = soup.find_all("a")
+    total_links = len(a_tags)
+    parsed_netloc = urlparse(final_url).netloc
+    internal_links = 0
+    external_links = 0
+    for a in a_tags:
+        href = a.get("href") or ""
+        abs_url = urljoin(final_url, href)
+        netloc = urlparse(abs_url).netloc
+        if not href:
+            continue
+        if href.startswith("#"):
+            internal_links += 1
+        elif netloc == parsed_netloc:
+            internal_links += 1
+        else:
+            external_links += 1
 
-    errors, warnings, notices = [], [], []
-    if status == 0 or status >= 500: errors.append("Server error or unreachable")
-    elif status >= 400: errors.append(f"Page returned HTTP {status}")
+    img_tags = soup.find_all("img")
+    total_imgs = len(img_tags)
+    imgs_without_alt = len([i for i in img_tags if not (i.get("alt") and i.get("alt").strip())])
 
-    if title_missing: warnings.append("Missing title tag")
-    if meta_desc_missing: warnings.append("Missing meta description")
-    if h1_missing: warnings.append("Missing H1")
-    if multiple_h1: notices.append("Multiple H1 tags found")
-    if canonical_missing: warnings.append("Missing canonical tag")
-    if canonical_incorrect: warnings.append("Canonical tag points to different domain")
-    if not viewport_present: warnings.append("Missing viewport meta tag (mobile)")
-    if hreflang_missing: notices.append("Hreflang tags missing")
-    if not compression_enabled: warnings.append("Compression (GZIP/Brotli) not enabled")
-    if not https_ok: errors.append("Site not served over HTTPS")
-    if https_ok and not ssl_info.get("valid"): warnings.append("SSL certificate retrieval failed or invalid")
+    ld_json_count = len(soup.find_all("script", attrs={"type": "application/ld+json"}))
+    hreflang_count = len(soup.find_all("link", attrs={"rel": "alternate", "hreflang": True}))
+    viewport_tag = soup.find("meta", attrs={"name": "viewport"})
+    favicon_link = soup.find("link", rel=lambda v: v and ("icon" in v.lower() or "shortcut icon" in v.lower()))
 
-    if len(link_check["broken"]) > 0: errors.append(f"Broken links detected: {len(link_check['broken'])}")
-    if len(img_check["broken"])  > 0: warnings.append(f"Broken images detected: {len(img_check['broken'])}")
-    if len(js_check["broken"])   > 0: warnings.append(f"Broken JS references detected: {len(js_check['broken'])}")
-    if len(css_check["broken"])  > 0: warnings.append(f"Broken CSS references detected: {len(css_check['broken'])}")
+    # --------- Performance (heuristics) ---------
+    script_tags = soup.find_all("script")
+    link_stylesheets = soup.find_all("link", rel=lambda v: v and "stylesheet" in v.lower())
 
-    if len(mixed_content) > 0: warnings.append(f"Mixed content (HTTP on HTTPS) resources: {len(mixed_content)}")
+    def is_blocking_script(tag) -> bool:
+        if tag.name != "script":
+            return False
+        if tag.get("type") == "module":
+            return False
+        return not (bool(tag.get("async")) or bool(tag.get("defer")))
 
-    # simple scoring
-    score = 100.0
-    score -= min(50.0, 10.0 * len(errors))
-    score -= min(30.0,  2.0 * len(warnings))
-    score -= min(10.0,  0.5 * len(notices))
-    score -= min(15.0,  0.02 * len(link_check["broken"]))
-    num_requests = len(links["images"]) + len(links["js"]) + len(links["css"]) + len(links["anchors"])
-    score -= min(6.0,   0.01 * num_requests)
-    score -= 5.0 if not viewport_present else 0.0
-    score -= 6.0 if not compression_enabled else 0.0
-    score -= 8.0 if not https_ok else 0.0
-    score = max(0.0, min(100.0, score))
-    grade = grade_from_score(score)
+    blocking_script_count = sum(1 for s in script_tags if is_blocking_script(s))
+    stylesheet_count = len(link_stylesheets)
 
-    weaknesses = []
-    weaknesses += errors
-    weaknesses += warnings[:10]
-    if len(mixed_content) > 0: weaknesses.append("Mixed content risks")
-    if missing_alt > 0: weaknesses.append(f"Images missing alt: {missing_alt}")
-    if canonical_incorrect: weaknesses.append("Incorrect canonical domain")
+    size_mb = (page_size_bytes / 1024.0 / 1024.0)
+    ttfb_ms = elapsed_ms
 
-    metrics = {
-        "site_health_score": round(score, 2),
-        "grade": grade,
+    # --------- Security headers ---------
+    hsts = headers.get("Strict-Transport-Security")
+    csp = headers.get("Content-Security-Policy")
+    xfo = headers.get("X-Frame-Options")
+    xcto = headers.get("X-Content-Type-Options")
+    refpol = headers.get("Referrer-Policy")
+    perm_pol = headers.get("Permissions-Policy")
+    mixed_content = detect_mixed_content(soup, page_scheme)
+
+    # --------- robots/sitemap ---------
+    origin = f"{urlparse(final_url).scheme}://{urlparse(final_url).netloc}"
+    robots_resp = safe_request(urljoin(origin, "/robots.txt"), "HEAD")
+    sitemap_resp = safe_request(urljoin(origin, "/sitemap.xml"), "HEAD")
+    has_robots = bool(robots_resp and robots_resp.status_code < 400)
+    has_sitemap = bool(sitemap_resp and sitemap_resp.status_code < 400)
+
+    # --------- Build issues ---------
+    if not title_tag:
+        errors.append({"name": "Missing <title>", "severity": "high",
+                       "suggestion": "Add a concise, descriptive title (50–60 chars) including primary keyword."})
+    elif len(title_tag) < 10 or len(title_tag) > 65:
+        warnings.append({"name": "Suboptimal title length", "severity": "medium",
+                         "suggestion": "Aim for ~50–60 characters to avoid truncation and ensure clarity."})
+
+    if not meta_desc:
+        warnings.append({"name": "Missing meta description", "severity": "medium",
+                         "suggestion": "Add a compelling description (120–160 chars) with key phrases."})
+    elif len(meta_desc) < 50 or len(meta_desc) > 170:
+        notices.append({"name": "Meta description length outside ideal range", "severity": "low",
+                        "suggestion": "Keep descriptions between ~120–160 characters."})
+
+    if h1_count != 1:
+        warnings.append({"name": f"H1 count is {h1_count}", "severity": "medium",
+                         "suggestion": "Use exactly one H1 per page, reflecting the main topic."})
+
+    if not canonical_link:
+        notices.append({"name": "Missing canonical link", "severity": "low",
+                        "suggestion": "Add <link rel='canonical'> to avoid duplicate content issues."})
+
+    if imgs_without_alt > 0:
+        ratio = pct(imgs_without_alt, total_imgs)
+        sev = "medium" if ratio > 20 else "low"
+        (warnings if sev == "medium" else notices).append({
+            "name": f"{imgs_without_alt} images without alt",
+            "severity": sev,
+            "suggestion": "Provide descriptive alt text for accessibility and SEO."
+        })
+
+    if ld_json_count == 0:
+        notices.append({"name": "No structured data (JSON-LD)", "severity": "low",
+                        "suggestion": "Add JSON‑LD (e.g., Organization, Breadcrumb, Product) on key pages."})
+
+    if not lang_attr:
+        warnings.append({"name": "Missing <html lang> attribute", "severity": "medium",
+                         "suggestion": "Set <html lang='en'> (or appropriate) for accessibility/SEO."})
+
+    if "noindex" in robots_meta:
+        warnings.append({"name": "robots meta includes noindex", "severity": "medium",
+                         "suggestion": "Ensure indexable pages don’t include noindex."})
+
+    # Performance
+    if size_mb > 2.0:
+        errors.append({"name": f"Large page payload (~{size_mb:.2f} MB)", "severity": "high",
+                       "suggestion": "Compress images (WebP/AVIF), minify assets, and lazy-load non-critical content."})
+    elif size_mb > 1.0:
+        warnings.append({"name": f"Page size is heavy (~{size_mb:.2f} MB)", "severity": "medium",
+                         "suggestion": "Optimize media, bundle/minify CSS/JS, enable server-side compression."})
+
+    if ttfb_ms > 1500:
+        errors.append({"name": f"Slow TTFB (~{ttfb_ms} ms)", "severity": "high",
+                       "suggestion": "Use CDN/edge caching, optimize origin, enable HTTP/2/3."})
+    elif ttfb_ms > 800:
+        warnings.append({"name": f"Elevated TTFB (~{ttfb_ms} ms)", "severity": "medium",
+                         "suggestion": "Improve caching and server performance; preconnect to critical origins."})
+
+    if blocking_script_count > 3:
+        warnings.append({"name": f"Many render‑blocking scripts ({blocking_script_count})", "severity": "medium",
+                         "suggestion": "Defer/async non-critical JS; split bundles; consider type='module'."})
+    elif blocking_script_count > 0:
+        notices.append({"name": f"Some blocking scripts ({blocking_script_count})", "severity": "low",
+                        "suggestion": "Add async/defer to reduce main-thread blocking."})
+
+    if stylesheet_count > 4:
+        notices.append({"name": f"Many stylesheets ({stylesheet_count})", "severity": "low",
+                        "suggestion": "Bundle/minify CSS; inline critical CSS; defer non-critical."})
+
+    # Security
+    if page_scheme != "https":
+        errors.append({"name": "Page served over HTTP", "severity": "high",
+                       "suggestion": "Redirect to HTTPS and issue a valid TLS certificate."})
+    if not hsts:
+        warnings.append({"name": "Missing HSTS", "severity": "medium",
+                         "suggestion": "Add Strict-Transport-Security to enforce HTTPS."})
+    if not csp:
+        warnings.append({"name": "Missing CSP", "severity": "medium",
+                         "suggestion": "Add Content-Security-Policy to restrict sources and mitigate XSS."})
+    if not xfo:
+        notices.append({"name": "Missing X-Frame-Options", "severity": "low",
+                        "suggestion": "Add X-Frame-Options: SAMEORIGIN (or CSP frame-ancestors)."})
+    if not xcto:
+        notices.append({"name": "Missing X-Content-Type-Options", "severity": "low",
+                        "suggestion": "Add X-Content-Type-Options: nosniff."})
+    if not refpol:
+        notices.append({"name": "Missing Referrer-Policy", "severity": "low",
+                        "suggestion": "Add a Referrer-Policy (e.g., no-referrer or strict forms)."})
+    if not perm_pol:
+        notices.append({"name": "Missing Permissions-Policy", "severity": "low",
+                        "suggestion": "Declare Permissions-Policy for powerful features."})
+    if mixed_content:
+        errors.append({"name": "Mixed content detected", "severity": "high",
+                       "suggestion": "Ensure all resources load via HTTPS; update hardcoded http:// links."})
+
+    # Discoverability
+    if not has_robots:
+        notices.append({"name": "robots.txt not found", "severity": "low",
+                        "suggestion": "Add robots.txt to control crawl behavior."})
+    if not has_sitemap:
+        notices.append({"name": "sitemap.xml not found", "severity": "low",
+                        "suggestion": "Generate a sitemap and reference it in robots.txt."})
+
+    # --------- Scores (heuristics) ---------
+    seo_score = 100
+    perf_score = 100
+    a11y_score = 100
+    bp_score = 100
+    sec_score = 100
+
+    # SEO penalties
+    if not title_tag: seo_score -= 20
+    if title_tag and (len(title_tag) < 10 or len(title_tag) > 65): seo_score -= 5
+    if not meta_desc: seo_score -= 15
+    if meta_desc and (len(meta_desc) < 50 or len(meta_desc) > 170): seo_score -= 5
+    if h1_count != 1: seo_score -= 10
+    if not canonical_link: seo_score -= 5
+    if imgs_without_alt > 0 and pct(imgs_without_alt, total_imgs) > 20: seo_score -= 10
+    if ld_json_count == 0: seo_score -= 5
+
+    # Performance penalties
+    if size_mb > 2.0: perf_score -= 30
+    elif size_mb > 1.0: perf_score -= 15
+    if ttfb_ms > 1500: perf_score -= 30
+    elif ttfb_ms > 800: perf_score -= 15
+    if blocking_script_count > 3: perf_score -= 20
+    elif blocking_script_count > 0: perf_score -= 10
+    if stylesheet_count > 4: perf_score -= 5
+
+    # Accessibility penalties
+    if not lang_attr: a11y_score -= 10
+    if imgs_without_alt > 0:
+        alt_ratio = pct(imgs_without_alt, total_imgs)
+        if alt_ratio > 30: a11y_score -= 20
+        elif alt_ratio > 10: a11y_score -= 10
+        else: a11y_score -= 5
+
+    # Best practices penalties
+    if page_scheme != "https": bp_score -= 30
+    if mixed_content: bp_score -= 10
+    if any((s.get("type") == "text/javascript") for s in script_tags): bp_score -= 2
+
+    # Security penalties
+    if not hsts: sec_score -= 20
+    if not csp: sec_score -= 15
+    if not xfo: sec_score -= 10
+    if not xcto: sec_score -= 10
+    if not refpol: sec_score -= 5
+    if not perm_pol: sec_score -= 5
+    if mixed_content: sec_score -= 20
+
+    site_health_score = round(
+        0.28 * seo_score +
+        0.26 * perf_score +
+        0.18 * a11y_score +
+        0.12 * bp_score +
+        0.16 * sec_score
+    )
+
+    # CWV placeholders based on proxies
+    largest_contentful_paint_ms = min(6000, int(1500 + size_mb * 1200 + blocking_script_count * 250))
+    first_input_delay_ms = min(500, int(20 + blocking_script_count * 30))
+    pass_rate = max(0, min(100, int(100 - (size_mb * 20 + blocking_script_count * 8 + (ttfb_ms / 100)))))
+
+    # Top issues (limit 10; high -> medium -> low)
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    top_issues = []
+    for i in errors:
+        i["severity"] = "high"
+        top_issues.append(i)
+    for i in warnings:
+        i["severity"] = "medium"
+        top_issues.append(i)
+    for i in notices:
+        i["severity"] = "low"
+        top_issues.append(i)
+    top_issues.sort(key=lambda i: severity_order.get(i["severity"], 2))
+    top_issues = top_issues[:10]
+
+    metrics_summary = {
         "total_errors": len(errors),
         "total_warnings": len(warnings),
         "total_notices": len(notices),
-
-        "http_status": status,
-        "redirected_links_count": len(link_check["redirected"]),
-        "broken_internal_external_links": len(link_check["broken"]),
-        "robots_txt_found": rob_smap["robots_found"],
-        "sitemap_status_code": rob_smap["sitemap_status"],
-        "sitemap_size_bytes": rob_smap["sitemap_size_bytes"] if "sitemap_size_bytes" in rob_smap else 0,
-
-        "title_missing": title_missing,
-        "meta_desc_missing": meta_desc_missing,
-        "h1_missing": h1_missing,
-        "multiple_h1": multiple_h1,
-        "canonical_missing": canonical_missing,
-        "canonical_incorrect": canonical_incorrect,
-        "viewport_present": viewport_present,
-        "hreflang_missing": hreflang_missing,
-        "missing_alt_count": missing_alt,
-
-        "ttfb_seconds": round(ttfb, 3),
-        "total_page_size_bytes": sizeof_response(headers, body),
-        "num_requests_estimate": num_requests,
-        "compression_enabled": compression_enabled,
-
-        "https": https_ok,
-        "ssl_valid": ssl_info.get("valid", False),
-        "security_headers_present": check_security_headers(headers),
-        "mixed_content_count": len(mixed_content),
+        "performance_score": max(0, perf_score),
+        "seo_score": max(0, seo_score),
+        "accessibility_score": max(0, a11y_score),
+        "best_practices_score": max(0, bp_score),
+        "security_score": max(0, sec_score),
+        "pages_crawled": 1,
+        "largest_contentful_paint_ms": largest_contentful_paint_ms,
+        "first_input_delay_ms": first_input_delay_ms,
+        "core_web_vitals_pass_rate_%": pass_rate,
     }
 
-    # extras for UI
-    competitors = [
-        {"name": "Competitor A", "score": max(20, int(metrics["site_health_score"] - 10))},
-        {"name": "Competitor B", "score": max(15, int(metrics["site_health_score"] - 5))},
+    weaknesses = [i["name"] for i in errors] + [
+        i["name"] for i in warnings if ("TTFB" in i["name"] or "render" in i["name"].lower())
     ]
-    top_issues = []
-    for msg in weaknesses[:10]:
-        sev = "high" if "error" in msg.lower() else ("medium" if "warning" in msg.lower() else "low")
-        top_issues.append({"name": msg, "severity": sev, "suggestion": "Investigate and remediate."})
 
-    recommendations = {
-        "compression_enabled": "Enable GZIP/Brotli at server/CDN.",
-        "viewport_present": "Add <meta name='viewport' ...> for mobile responsiveness.",
-        "ttfb_seconds": "Reduce TTFB via caching, DB optimization, CDN.",
-        "mixed_content_count": "Serve all resources via HTTPS to avoid mixed content.",
-        "missing_alt_count": "Add alt attributes to images for accessibility."
-    }
-
-    return {
-        "metrics": metrics,
-        "weaknesses": weaknesses,
-        "competitors": competitors,
+    audit = {
+        "website": {"url": final_url},
+        "site_health_score": site_health_score,
+        "grade": grade_from_score(site_health_score),
+        "competitors": [],  # Ready for future population
         "top_issues": top_issues,
-        "recommendations": recommendations
+        "metrics_summary": metrics_summary,
+        "recommendations": _default_recommendations(),
+        "weaknesses": weaknesses,
+        "finished_at": datetime.now().strftime("%b %d, %Y %H:%M"),
     }
 
-# ------------------------- PDF generation -----------------------
-def wrap_text(text: str, max_chars: int = 90) -> List[str]:
-    words = text.split()
-    lines, line, count = [], [], 0
-    for w in words:
-        if count + len(w) + 1 > max_chars:
-            lines.append(" ".join(line)); line = [w]; count = len(w)
-        else:
-            line.append(w); count += len(w) + 1
-    if line: lines.append(" ".join(line))
-    return lines
+    previous_audit = PREVIOUS_AUDITS.get(url)
+    PREVIOUS_AUDITS[url] = {"site_health_score": site_health_score, "timestamp": audit["finished_at"]}
+    return {"audit": audit, "previous_audit": previous_audit}
 
-def build_summary(url: str, metrics: Dict[str, Any], weaknesses: List[str]) -> str:
-    score = metrics.get("site_health_score", 0)
-    grade = metrics.get("grade", "N/A")
-    weak_list = ", ".join(weaknesses[:6]) if weaknesses else "No critical weaknesses detected"
-    words = [
-        f"FF Tech Audit Summary for {url}:",
-        f"The website achieved a health score of {int(score)}% and an overall grade of {grade}.",
-        "Our audit examined technical SEO, crawlability, on-page content, performance, mobile usability, and security.",
-        "Key improvement areas include: " + weak_list + ". Addressing these will improve resilience and UX.",
-    ]
-    return " ".join(words)
 
-def pdf_bytes(audit: Dict[str, Any]) -> bytes:
-    from io import BytesIO
-    stream = BytesIO()
-    c = canvas.Canvas(stream, pagesize=A4)
-    width, height = A4
-    c.setFillColorRGB(0.1, 0.2, 0.5); c.rect(0, height - 2.5*cm, width, 2.5*cm, fill=True, stroke=False)
-    c.setFillColorRGB(1, 1, 1); c.setFont("Helvetica-Bold", 16)
-    c.drawString(1.5*cm, height - 1.5*cm, "FF Tech • Certified Audit Report")
-    c.setFillColorRGB(0,0,0)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(2*cm, height - 3.5*cm, f"Website: {audit['website']['url']}")
-    c.drawString(2*cm, height - 4.2*cm, f"Date: {dt.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}")
-    m = audit["metrics_summary"]
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(2*cm, height - 5.2*cm, f"Grade: {audit.get('grade','N/A')}  |  Score: {audit.get('site_health_score',0)}%")
-    c.setFont("Helvetica", 10)
-    y = height - 6.2*cm
-    for k in ["http_status","ttfb_seconds","compression_enabled","robots_txt_found","sitemap_status_code",
-              "mixed_content_count","total_page_size_bytes","num_requests_estimate","title_missing",
-              "meta_desc_missing","h1_missing","canonical_missing","ssl_valid","viewport_present","missing_alt_count"]:
-        v = m.get(k)
-        c.drawString(2*cm, y, f"{k.replace('_',' ').title()}: {v}"); y -= 0.5*cm
-        if y < 2.5*cm: c.showPage(); y = height - 2.5*cm; c.setFont("Helvetica", 10)
-    c.setFont("Helvetica-Bold", 12); c.drawString(2*cm, y, "Executive Summary"); y -= 0.6*cm
-    c.setFont("Helvetica", 10)
-    summary = build_summary(audit["website"]["url"], m, audit.get("weaknesses", []))
-    for line in wrap_text(summary, max_chars=95):
-        c.drawString(2*cm, y, line); y -= 0.45*cm
-        if y < 2.5*cm: c.showPage(); y = height - 2.5*cm; c.setFont("Helvetica", 10)
-    c.showPage(); c.save()
-    stream.seek(0)
-    return stream.read()
-
-# ----------------------------- Helpers --------------------------
-def latest_audit(db: Session) -> Optional[AuditRun]:
-    try:
-        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
-    except SQLAlchemyError:
-        return None
-
-def audit_to_ctx(run: AuditRun, website_url: str) -> Dict[str, Any]:
-    return {
-        "id": run.id,
-        "finished_at": run.finished_at,
-        "grade": run.grade,
-        "site_health_score": run.site_health_score,
-        "metrics_summary": run.metrics_summary or {},
-        "weaknesses": run.weaknesses or [],
-        "website": {"url": website_url},
-        "competitors": run.competitors or [],
-        "top_issues": run.top_issues or [],
-        "recommendations": run.recommendations or {},
-    }
-
-def sha256(s: str) -> str:
-    import hashlib
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
-def current_user(request: Request, db: Session) -> Optional[User]:
-    uid = request.session.get("uid")
-    if not uid:
-        return None
-    return db.query(User).get(uid)
-
-def require_admin(user: Optional[User]):
-    if not user or user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin required")
-
-# ----------------------------- Routes ---------------------------
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    run = latest_audit(db)
-    if run:
-        website = db.query(Website).get(run.website_id)
-        prev = db.query(AuditRun).filter(AuditRun.website_id == website.id, AuditRun.id < run.id)\
-                                 .order_by(AuditRun.id.desc()).first()
-        ctx = audit_to_ctx(run, website.url)
-        prev_ctx = audit_to_ctx(prev, website.url) if prev else None
-        return render_html(ctx, prev_ctx, user)
-
-    # empty state placeholders (avoid Jinja errors)
-    empty_audit = {
-        "id": "",
-        "finished_at": "",
-        "grade": "",
-        "site_health_score": 0,
-        "metrics_summary": {"total_errors":0,"total_warnings":0,"total_notices":0},
-        "weaknesses": [],
-        "website": {"url": ""},
-        "competitors": [],
-        "top_issues": [],
-        "recommendations": {},
-    }
-    return render_html(empty_audit, None, user)
-
-@app.post("/audit/run")
-async def run_audit(request: Request, payload: Dict[str, Any] = None, website_url: Optional[str] = Form(None), db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    # Accept JSON or form data
-    url_input = (payload or {}).get("website_url") or website_url
-    if not url_input:
-        raise HTTPException(status_code=400, detail="Provide 'website_url'")
-
-    # Resolve brand/URL to a reachable official site
-    try:
-        resolved = await resolve_official_site(url_input, DEFAULT_USER_AGENT)
-    except HTTPException:
-        resolved = normalize_url(url_input)
-
-    # Ensure Website record
-    w = db.query(Website).filter(Website.url == resolved).first()
-    if not w:
-        w = Website(user_id=(user.id if user else None), url=resolved)
-        db.add(w); db.commit()
-
-    # Compute audit
-    result = compute_audit(resolved)
-    metrics, weaknesses = result["metrics"], result["weaknesses"]
-    run = AuditRun(
-        website_id=w.id,
-        user_id=(user.id if user else None),
-        finished_at=func.now(),
-        site_health_score=metrics["site_health_score"],
-        grade=metrics["grade"],
-        metrics_summary=metrics,
-        weaknesses=weaknesses,
-        executive_summary=build_summary(resolved, metrics, weaknesses),
-        competitors=result["competitors"],
-        top_issues=result["top_issues"],
-        recommendations=result["recommendations"]
-    )
-    db.add(run); db.commit()
-
-    return JSONResponse({"message": "Audit completed", "audit_id": run.id, "report_url": f"/audit/{run.id}/report"})
-
-@app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
-def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    run = db.query(AuditRun).get(audit_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Audit not found")
-    website = db.query(Website).get(run.website_id)
-    prev = db.query(AuditRun).filter(AuditRun.website_id == website.id, AuditRun.id < run.id)\
-                             .order_by(AuditRun.id.desc()).first()
-    ctx = audit_to_ctx(run, website.url)
-    prev_ctx = audit_to_ctx(prev, website.url) if prev else None
-
-    # Inject meta audit id for JS downloadPDF()
-    html_resp = render_html(ctx, prev_ctx, user)
-    # Add meta tag via small injection (safe here)
-    body = html_resp.body.decode("utf-8")
-    body = body.replace("</head>", f'<meta name="audit-id" content="{run.id}"></head>')
-    return HTMLResponse(body)
-
-@app.get("/audit/{audit_id}/pdf")
-def audit_pdf(audit_id: int, request: Request, db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    run = db.query(AuditRun).get(audit_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Audit not found")
-    # Paid-only download
-    if not user or (user.role != "admin" and not user.is_paid and user.role != "paid"):
-        raise HTTPException(status_code=403, detail="Paid account required to download PDF")
-
-    website = db.query(Website).get(run.website_id)
-    audit_ctx = audit_to_ctx(run, website.url)
-    pdf = pdf_bytes(audit_ctx)
-    return StreamingResponse(iter([pdf]), media_type="application/pdf", headers={
-        "Content-Disposition": f"attachment; filename=fftech_audit_{audit_id}.pdf"
-    })
+# ----------------- Routes -----------------
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
+def health() -> JSONResponse:
+    return JSONResponse({"status": "ok"})
 
-# ---------- Auth (Login / Register / Logout / Admin) -------------
-@app.get("/login", response_class=HTMLResponse)
-def login_page():
-    return render_page(LOGIN_HTML, {})
+@app.get("/", response_class=HTMLResponse)
+def home(request: Request, url: str | None = None) -> HTMLResponse:
+    """
+    Server-side render your provided template with audit data.
+    Use /?url=https://example.com to audit a specific site.
+    """
+    target_url = url or "https://example.com"
+    data = audit_website(target_url)
+    context = {"request": request, **data}
+    return templates.TemplateResponse("index.html", context)
 
-@app.post("/login")
-def login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    u = db.query(User).filter(User.email == email).first()
-    if not u or sha256(password) != u.password_hash:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    request.session["uid"] = u.id
-    return RedirectResponse("/", status_code=303)
+@app.get("/api/audit")
+def api_audit(url: str) -> JSONResponse:
+    """
+    JSON audit endpoint for client-side use (optional).
+    """
+    data = audit_website(url)
+    return JSONResponse(data)
 
-@app.get("/register", response_class=HTMLResponse)
-def register_page():
-    return render_page(REGISTER_HTML, {})
-
-@app.post("/register")
-def register(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=400, detail="Email already exists")
-    u = User(email=email, password_hash=sha256(password), role="user", is_paid=False)
-    db.add(u); db.commit()
-    request.session["uid"] = u.id
-    return RedirectResponse("/", status_code=303)
-
-@app.get("/logout")
-def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse("/", status_code=303)
-
-@app.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request, db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    require_admin(user)
-    users = db.query(User).order_by(User.id.desc()).all()
-    return render_page(ADMIN_HTML, {"users": users})
-
-@app.post("/admin/toggle-paid")
-def admin_toggle_paid(request: Request, user_id: int = Form(...), db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    require_admin(user)
-    target = db.query(User).get(user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-    target.is_paid = not target.is_paid
-    if target.is_paid and target.role == "user":
-        target.role = "paid"
-    db.commit()
-    return RedirectResponse("/admin", status_code=303)
-
-@app.post("/admin/set-role")
-def admin_set_role(request: Request, user_id: int = Form(...), role: str = Form(...), db: Session = Depends(get_db)):
-    user = current_user(request, db)
-    require_admin(user)
-    target = db.query(User).get(user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-    target.role = role
-    db.commit()
-    return RedirectResponse("/admin", status_code=303)
-
-# --------------------------- Local run --------------------------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("ap:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon() -> Response:
+    static_path = os.path.join("static", "favicon.ico")
+    if os.path.isfile(static_path):
+        with open(static_path, "rb") as f:
+            return Response(content=f.read(), media_type="image/x-icon")
+    return Response(content=generate_favicon_bytes(), media_type="image/x-icon")
