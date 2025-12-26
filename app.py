@@ -83,6 +83,9 @@ FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Re
 ADMIN_BOOTSTRAP_EMAIL = os.getenv("ADMIN_BOOTSTRAP_EMAIL", "")
 ADMIN_BOOTSTRAP_PASSWORD = os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "")
 
+# Toggle: show latest dashboard at "/" if available
+SHOW_DASHBOARD_AT_ROOT = os.getenv("SHOW_DASHBOARD_AT_ROOT", "false").lower() in ("1", "true", "yes")
+
 # -----------------------------------------------------------------------------
 # App & Templates
 # -----------------------------------------------------------------------------
@@ -827,7 +830,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
 
         "https": https_ok,
         "ssl_valid": ssl_info.get("valid", False),
-        "security_headers_present": sec_headers,
+        "security_headers_present": check_security_headers(headers),
         "mixed_content_count": len(mixed_content),
     }
 
@@ -985,9 +988,35 @@ def on_startup():
         import logging
         logging.exception("Startup tasks failed: %s", e)
 
-# Professional landing page (guarantees 200 OK at `/`)
+# Professional landing page OR latest dashboard (controlled by env)
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+def root(request: Request, db: Session = Depends(get_db)):
+    if SHOW_DASHBOARD_AT_ROOT:
+        # Try to render the latest audit dashboard
+        latest = db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+        if latest:
+            website = db.query(Website).get(latest.website_id)
+            previous = (
+                db.query(AuditRun)
+                .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
+                .order_by(AuditRun.id.desc())
+                .first()
+            )
+            audit_obj = {
+                "id": latest.id,
+                "finished_at": latest.finished_at,
+                "grade": latest.grade,
+                "site_health_score": latest.site_health_score,
+                "metrics_summary": latest.metrics_summary,
+                "weaknesses": latest.weaknesses,
+                "executive_summary": latest.executive_summary,
+                "website": {"url": website.url},
+                "website_url": website.url
+            }
+            return templates.TemplateResponse("index.html", {"request": request, "audit": audit_obj, "previous_audit": previous})
+        # If no audits yet, fall through to status page
+
+    # Status page (Tailwind script tag FIXED)
     port_label = os.getenv("PORT", "8080")
     return f"""
     <!DOCTYPE html>
@@ -1014,6 +1043,11 @@ def health():
     return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
 
 # --- Authentication ---
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    timezone: Optional[str] = DEFAULT_TIMEZONE
+
 @app.post("/auth/register")
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     try:
@@ -1061,10 +1095,8 @@ def verify(token: str, db: Session = Depends(get_db)):
 @app.post("/auth/login")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
-    success = False
     if user and verify_password(data.password, user.password_hash) and user.is_active:
         token = create_jwt({"uid": user.id, "email": user.email})
-        success = True
         db.add(LoginActivity(
             user_id=user.id,
             ip=request.client.host if request.client else None,
@@ -1220,7 +1252,7 @@ def pdf_report(audit_id: int, user: User = Depends(current_user), db: Session = 
         except Exception:
             pass
 
-# HTML report (Tailwind + Chart.js template you provided)
+# HTML report (Tailwind + Chart.js template)
 @app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
 def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db)):
     run = db.query(AuditRun).get(audit_id)
@@ -1233,7 +1265,6 @@ def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db))
         .order_by(AuditRun.id.desc())
         .first()
     )
-    # Build a simple object so template can use audit.website.url
     audit_obj = {
         "id": run.id,
         "finished_at": run.finished_at,
