@@ -1,72 +1,17 @@
 
 """
-FF Tech - AI-Powered Website Audit & Compliance Platform (Single File)
+FF Tech – AI-Powered Website Audit & Compliance SaaS
+FastAPI single-file backend, Railway-ready.
+
+Features:
+- 140+ metrics catalog; 60+ computed checks; strict scoring & grading
+- User registration with email verification; JWT auth; Admin panel
+- Website management; run audits; PDF certified report with FF Tech branding
+- Timezone-aware scheduler for daily and accumulated reports (email delivery)
+- Professional landing page at '/', healthcheck at '/health'
+- HTML Tailwind dashboard at '/audit/{id}/report' via Jinja2
 
 Save this file as: app.py
-
-───────────────────────────────────────────────────────────────────────────────
-ENVIRONMENT VARIABLES (Railway-friendly)
-───────────────────────────────────────────────────────────────────────────────
-# Core
-DATABASE_URL=postgresql+psycopg2://USER:PASSWORD@HOST:PORT/DBNAME
-SECRET_KEY=change_this_in_production
-APP_DOMAIN=https://yourapp.example.com          # used for email verification links
-ENV=production                                  # or development
-
-# Email (SMTP)
-SMTP_HOST=smtp.yourprovider.com
-SMTP_PORT=587
-SMTP_USER=your_smtp_username
-SMTP_PASS=your_smtp_password
-SMTP_FROM=cert@fftech.example.com               # sender address shown to users
-
-# Scheduler
-DEFAULT_TIMEZONE=Asia/Karachi                    # user's timezone fallback
-
-# Branding
-FFTECH_LOGO_TEXT=FF Tech                        # used in PDF banner
-FFTECH_CERT_STAMP_TEXT=Certified Audit Report   # used in PDF stamp
-
-# Admin bootstrap
-ADMIN_BOOTSTRAP_EMAIL=admin@fftech.example.com
-ADMIN_BOOTSTRAP_PASSWORD=Strong!Passw0rd
-
-───────────────────────────────────────────────────────────────────────────────
-DEPENDENCIES (pip install)
-───────────────────────────────────────────────────────────────────────────────
-fastapi
-uvicorn
-sqlalchemy
-psycopg2-binary
-python-multipart
-requests
-beautifulsoup4
-apscheduler
-pydantic
-PyJWT
-reportlab
-email-validator
-
-# Optional (recommended)
-passlib[bcrypt]      # secure password hashing
-urllib3              # robust HTTP
-tldextract           # domain analysis
-
-───────────────────────────────────────────────────────────────────────────────
-RUN (local)
-───────────────────────────────────────────────────────────────────────────────
-uvicorn app:app --host 0.0.0.0 --port 8000
-
-ON RAILWAY:
-- Create a new service with this repository containing `app.py`
-- Add the environment variables above in Railway Settings
-- Set Start Command: uvicorn app:app --host 0.0.0.0 --port $PORT
-- Provision a PostgreSQL database and wire DATABASE_URL
-
-NOTE:
-- This file includes a 60+ metric audit engine; a catalog of 140+ metrics is
-  defined with placeholders (marked "requires external API") so you can later
-  integrate Lighthouse/GSC/SEMrush/Ahrefs/etc. without schema changes.
 """
 
 import os
@@ -74,7 +19,6 @@ import hmac
 import json
 import base64
 import time
-import math
 import smtplib
 import ssl as sslmod
 import socket
@@ -84,9 +28,13 @@ import datetime as dt
 from typing import Optional, List, Dict, Any, Tuple
 
 # FastAPI & deps
-from fastapi import FastAPI, HTTPException, Depends, Body, Query, status, BackgroundTasks, Request
+from fastapi import (
+    FastAPI, HTTPException, Depends, Request
+)
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field
 import jwt
 
@@ -115,7 +63,7 @@ from reportlab.lib.units import cm
 from email_validator import validate_email, EmailNotValidError
 
 # -----------------------------------------------------------------------------
-# Config
+# Config (Railway-friendly via env vars)
 # -----------------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "change_me_dev_only")
 APP_DOMAIN = os.getenv("APP_DOMAIN", "http://localhost:8000")
@@ -136,7 +84,7 @@ ADMIN_BOOTSTRAP_EMAIL = os.getenv("ADMIN_BOOTSTRAP_EMAIL", "")
 ADMIN_BOOTSTRAP_PASSWORD = os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "")
 
 # -----------------------------------------------------------------------------
-# App
+# App & Templates
 # -----------------------------------------------------------------------------
 app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.0")
 app.add_middleware(
@@ -146,29 +94,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+templates = Jinja2Templates(directory="templates")
 
 # -----------------------------------------------------------------------------
-# DB setup
+# DB setup (hardened)
 # -----------------------------------------------------------------------------
 Base = declarative_base()
-
-# Create engine carefully; don't crash the app on invalid DATABASE_URL
 try:
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-except Exception as e:
-    # Fallback to local sqlite so the server still starts and passes healthcheck
+except Exception:
+    # Fallback to local sqlite to keep server alive for healthcheck
     engine = create_engine("sqlite:///./fftech.db", pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 # -----------------------------------------------------------------------------
-# Security helpers
+# Security helpers (JWT + PBKDF2 password hashing)
 # -----------------------------------------------------------------------------
 bearer = HTTPBearer()
 
 def hash_password(password: str) -> str:
     """
-    Uses PBKDF2-HMAC-SHA256. For production, bcrypt/Argon2 via passlib is recommended.
+    PBKDF2-HMAC-SHA256. (For prod, passlib/Argon2 is recommended; PBKDF2 is robust.)
     """
     salt = secrets.token_hex(16)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100_000)
@@ -197,7 +144,7 @@ def decode_jwt(token: str) -> dict:
 
 def sign_link(data: dict, ttl_seconds: int = 3600 * 24) -> str:
     """
-    HMAC signed one-time link payload, base64 encoded.
+    HMAC-signed, base64 encoded link payload for email verification.
     """
     payload = dict(data)
     payload["exp"] = int(time.time()) + ttl_seconds
@@ -273,7 +220,7 @@ class Schedule(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     website_id = Column(Integer, ForeignKey("websites.id"))
-    cron_expr = Column(String)                 # e.g., "0 9 * * *" (daily at 09:00)
+    cron_expr = Column(String)                 # e.g., "0 9 * * *"
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     user = relationship("User", back_populates="schedules")
@@ -302,7 +249,7 @@ class ScheduleCreateRequest(BaseModel):
     minute: int = Field(ge=0, le=59)
 
 # -----------------------------------------------------------------------------
-# Utilities
+# Helpers
 # -----------------------------------------------------------------------------
 def get_db() -> Session:
     db = SessionLocal()
@@ -326,7 +273,7 @@ def send_email(to_email: str, subject: str, html_body: str, plain_body: str = ""
                 server.login(SMTP_USER, SMTP_PASS)
             server.send_message(msg)
     except Exception:
-        # Do not crash the request path if SMTP is not configured
+        # Fail-soft for dev/first deploys
         pass
 
 def bootstrap_admin(db: Session):
@@ -343,9 +290,6 @@ def bootstrap_admin(db: Session):
             db.add(u)
             db.commit()
 
-# -----------------------------------------------------------------------------
-# Auth dependencies
-# -----------------------------------------------------------------------------
 def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer),
                  db: Session = Depends(get_db)) -> User:
     payload = decode_jwt(credentials.credentials)
@@ -553,15 +497,14 @@ trend = [
     "Keyword Rank Changes"
 ]
 for name in trend:
-    add_metric(name, "Trend", name in ["Issue Count Trend (Errors, Warnings, Notices)", "Site Health Trend Graph"])
+    add_metric(name, "Trend", name in [
+        "Issue Count Trend (Errors, Warnings, Notices)", "Site Health Trend Graph"
+    ])
 
 # -----------------------------------------------------------------------------
 # Audit Engine (60+ real checks)
 # -----------------------------------------------------------------------------
 def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]:
-    """
-    Returns: (status_code, text, headers, ttfb_seconds)
-    """
     start = time.time()
     try:
         r = requests.get(url, timeout=timeout, headers={"User-Agent": "FFTechAudit/1.0"})
@@ -571,19 +514,14 @@ def fetch(url: str, timeout: int = 20) -> Tuple[int, str, Dict[str, str], float]
         return 0, "", {}, 0.0
 
 def resolve_ssl(hostname: str, port: int = 443) -> Dict[str, Any]:
-    """
-    Check SSL certificate validity dates via socket + SSL.
-    """
     out = {"valid": False, "notBefore": None, "notAfter": None, "error": None}
     try:
         ctx = sslmod.create_default_context()
         with socket.create_connection((hostname, port), timeout=10) as sock:
             with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
                 cert = ssock.getpeercertificate()
-                nb = cert.get("notBefore")
-                na = cert.get("notAfter")
-                out["notBefore"] = nb
-                out["notAfter"] = na
+                out["notBefore"] = cert.get("notBefore")
+                out["notAfter"] = cert.get("notAfter")
                 out["valid"] = True
     except Exception as e:
         out["error"] = str(e)
@@ -618,11 +556,12 @@ def is_https(url: str) -> bool:
 
 def check_security_headers(headers: Dict[str, str]) -> Dict[str, bool]:
     keys = ["content-security-policy", "strict-transport-security", "x-frame-options"]
-    return {k: (k in {x.lower(): True for x in headers.keys()}) for k in keys}
+    hdrs = {k.lower(): True for k in headers.keys()}
+    return {k: (k in hdrs) for k in keys}
 
 def sizeof_response(headers: Dict[str, str], body: str) -> int:
     cl = headers.get("Content-Length") or headers.get("content-length")
-    if cl and cl.isdigit():
+    if cl and str(cl).isdigit():
         return int(cl)
     return len(body.encode())
 
@@ -632,29 +571,25 @@ def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
         href = a.get("href")
         if href:
             u = absolute_url(base_url, href)
-            if u:
-                anchors.append(u)
+            if u: anchors.append(u)
     for i in soup.find_all("img"):
         src = i.get("src")
         if src:
             u = absolute_url(base_url, src)
-            if u:
-                imgs.append(u)
+            if u: imgs.append(u)
     for l in soup.find_all("link", rel=lambda x: x in ["stylesheet", "preload"] if x else False):
         href = l.get("href")
         if href:
             u = absolute_url(base_url, href)
-            if u:
-                css.append(u)
+            if u: css.append(u)
     for s in soup.find_all("script"):
         src = s.get("src")
         if src:
             u = absolute_url(base_url, src)
-            if u:
-                js.append(u)
+            if u: js.append(u)
     return {"anchors": anchors, "images": imgs, "css": css, "js": js}
 
-def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, List[str]]:
+def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
     broken, redirected = [], []
     tested = 0
     for u in urls[:limit]:
@@ -743,7 +678,6 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
     viewport = soup.find("meta", attrs={"name": "viewport"})
     hreflangs = soup.find_all("link", rel="alternate")
     h1 = soup.find_all("h1")
-    h2 = soup.find_all("h2")
     imgs = soup.find_all("img")
 
     link_check = check_broken_links(links["anchors"], limit=150)
@@ -790,26 +724,16 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
     elif status >= 400:
         errors.append(f"Page returned HTTP {status}")
 
-    if title_missing:
-        warnings.append("Missing title tag")
-    if meta_desc_missing:
-        warnings.append("Missing meta description")
-    if h1_missing:
-        warnings.append("Missing H1")
-    if multiple_h1:
-        notices.append("Multiple H1 tags found")
-    if canonical_missing:
-        warnings.append("Missing canonical tag")
-    if canonical_incorrect:
-        warnings.append("Canonical tag points to different domain")
-    if not viewport_present:
-        warnings.append("Missing viewport meta tag (mobile)")
-    if hreflang_missing:
-        notices.append("Hreflang tags missing")
-    if not compression_enabled:
-        warnings.append("Compression (GZIP/Brotli) not enabled")
-    if not https_ok:
-        errors.append("Site not served over HTTPS")
+    if title_missing: warnings.append("Missing title tag")
+    if meta_desc_missing: warnings.append("Missing meta description")
+    if h1_missing: warnings.append("Missing H1")
+    if multiple_h1: notices.append("Multiple H1 tags found")
+    if canonical_missing: warnings.append("Missing canonical tag")
+    if canonical_incorrect: warnings.append("Canonical tag points to different domain")
+    if not viewport_present: warnings.append("Missing viewport meta tag (mobile)")
+    if hreflang_missing: notices.append("Hreflang tags missing")
+    if not compression_enabled: warnings.append("Compression (GZIP/Brotli) not enabled")
+    if not https_ok: errors.append("Site not served over HTTPS")
     if https_ok and not ssl_info.get("valid"):
         warnings.append("SSL certificate retrieval failed or invalid")
 
@@ -838,7 +762,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
     if num_requests > 200:
         notices.append("High number of resource requests (>200)")
 
-    sec_missing = [k for k, present in check_security_headers(headers).items() if not present]
+    sec_missing = [k for k, present in sec_headers.items() if not present]
     if sec_missing:
         warnings.append(f"Missing security headers: {', '.join(sec_missing)}")
 
@@ -876,7 +800,6 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "total_warnings": len(warnings),
         "total_notices": len(notices),
         "audit_completion": "complete",
-        "trend_placeholder": {"errors": len(errors), "warnings": len(warnings)},
 
         "http_status": status,
         "redirected_links_count": len(link_check["redirected"]),
@@ -904,7 +827,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
 
         "https": https_ok,
         "ssl_valid": ssl_info.get("valid", False),
-        "security_headers_present": check_security_headers(headers),
+        "security_headers_present": sec_headers,
         "mixed_content_count": len(mixed_content),
     }
 
@@ -917,22 +840,42 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
     }
 
 # -----------------------------------------------------------------------------
-# PDF Report
+# PDF Report (Certified)
 # -----------------------------------------------------------------------------
+def wrap_text(text: str, max_chars: int = 90) -> List[str]:
+    words = text.split()
+    lines = []
+    line = []
+    count = 0
+    for w in words:
+        if count + len(w) + 1 > max_chars:
+            lines.append(" ".join(line))
+            line = [w]
+            count = len(w)
+        else:
+            line.append(w)
+            count += len(w) + 1
+    if line:
+        lines.append(" ".join(line))
+    return lines
+
 def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
 
+    # Header banner
     c.setFillColorRGB(0.1, 0.2, 0.5)
     c.rect(0, height - 2.5*cm, width, 2.5*cm, fill=True, stroke=False)
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 16)
     c.drawString(1.5*cm, height - 1.5*cm, FFTECH_LOGO_TEXT + " • Certified Audit Report")
 
+    # Certification stamp
     c.setFillColorRGB(0.1, 0.6, 0.1)
     c.setFont("Helvetica-Bold", 12)
     c.drawRightString(width - 1.5*cm, height - 1.5*cm, FFTECH_CERT_STAMP_TEXT)
 
+    # Body
     c.setFillColorRGB(0,0,0)
     c.setFont("Helvetica-Bold", 13)
     c.drawString(2*cm, height - 3.5*cm, f"Website: {website_url}")
@@ -960,6 +903,7 @@ def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
         if y < 2.5*cm:
             c.showPage(); y = height - 2.5*cm; c.setFont("Helvetica", 10)
 
+    # Executive summary
     c.setFont("Helvetica-Bold", 12)
     c.drawString(2*cm, y, "Executive Summary")
     y -= 0.6*cm
@@ -974,33 +918,16 @@ def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
     c.showPage()
     c.save()
 
-def wrap_text(text: str, max_chars: int = 90) -> List[str]:
-    words = text.split()
-    lines = []
-    line = []
-    count = 0
-    for w in words:
-        if count + len(w) + 1 > max_chars:
-            lines.append(" ".join(line))
-            line = [w]
-            count = len(w)
-        else:
-            line.append(w)
-            count += len(w) + 1
-    if line:
-        lines.append(" ".join(line))
-    return lines
-
 # -----------------------------------------------------------------------------
-# Scheduler jobs
+# Scheduler
 # -----------------------------------------------------------------------------
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()
 
+def cron_str(hour: int, minute: int) -> str:
+    return f"{minute} {hour} * * *"
+
 def schedule_audit_job(schedule_id: int):
-    """
-    APScheduler will call this to perform the audit and email the user.
-    """
     db = SessionLocal()
     try:
         sched = db.query(Schedule).get(schedule_id)
@@ -1024,13 +951,12 @@ def schedule_audit_job(schedule_id: int):
         db.add(run)
         db.commit()
 
-        # Email the daily report (best-effort, don't fail the job)
+        # Email the daily report
         subject = f"FF Tech Daily Audit Report • {website.url}"
         html = f"""
         <h2>FF Tech Certified Audit</h2>
         <p><strong>Website:</strong> {website.url}</p>
-        <p><strong>Grade:</strong> {audit_data['metrics']['grade']} |
-           <strong>Score:</strong> {audit_data['metrics']['site_health_score']}%</p>
+        <p><strong>Grade:</strong> {audit_data['metrics']['grade']} | <strong>Score:</strong> {audit_data['metrics']['site_health_score']}%</p>
         <p><strong>Summary:</strong> {run.executive_summary}</p>
         <p>Weaknesses: {', '.join(run.weaknesses[:6])}</p>
         <p>For the full certified PDF, sign in and download from your dashboard.</p>
@@ -1042,15 +968,12 @@ def schedule_audit_job(schedule_id: int):
     finally:
         db.close()
 
-def cron_str(hour: int, minute: int) -> str:
-    return f"{minute} {hour} * * *"
-
 # -----------------------------------------------------------------------------
 # Routes
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
 def on_startup():
-    # Do not crash the app on migration/bootstrap errors; log and continue
+    # Harden startup: never crash server (keeps /health and / alive)
     try:
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
@@ -1062,11 +985,30 @@ def on_startup():
         import logging
         logging.exception("Startup tasks failed: %s", e)
 
-@app.get("/")
-def home():
-    return {"message": "Welcome to FF Tech SaaS Audit Platform", "version": "1.0.0"}
+# Professional landing page (guarantees 200 OK at `/`)
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    port_label = os.getenv("PORT", "8080")
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>FF Tech | System Online</title>
+        https://cdn.tailwindcss.com</script>
+    </head>
+    <body class="bg-slate-900 text-white flex items-center justify-center h-screen">
+        <div class="glass-card p-20 border border-white/10 rounded-3xl text-center shadow-2xl">
+            <h1 class="text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
+            <p class="text-slate-400 text-xl">Audit Engine is listening for instructions...</p>
+            <div class="mt-8 flex gap-4 justify-center">
+                <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">● LIVE</span>
+                <span class="px-4 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">PORT: {port_label}</span>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
-# Healthcheck endpoint used by Railway
 @app.get("/health")
 def health():
     return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
@@ -1081,6 +1023,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
@@ -1089,6 +1032,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(user)
     db.commit()
+
     token = sign_link({"email": data.email, "type": "verify"})
     verify_link = f"{APP_DOMAIN}/auth/verify?token={token}"
     html = f"""
@@ -1100,6 +1044,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         send_email(data.email, "Verify your FF Tech account", html, "Visit the verification link to activate.")
     except Exception:
         pass
+
     return {"message": "Registration initiated. Check your email for verification link."}
 
 @app.get("/auth/verify")
@@ -1116,8 +1061,10 @@ def verify(token: str, db: Session = Depends(get_db)):
 @app.post("/auth/login")
 def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
+    success = False
     if user and verify_password(data.password, user.password_hash) and user.is_active:
         token = create_jwt({"uid": user.id, "email": user.email})
+        success = True
         db.add(LoginActivity(
             user_id=user.id,
             ip=request.client.host if request.client else None,
@@ -1202,7 +1149,9 @@ def run_audit(data: AuditStartRequest, user: User = Depends(current_user), db: S
     )
     db.add(run)
     db.commit()
-    return {"message": "Audit completed", "audit_id": run.id, "grade": run.grade, "score": run.site_health_score}
+
+    report_url = f"{APP_DOMAIN}/audit/{run.id}/report"
+    return {"message": "Audit completed", "audit_id": run.id, "grade": run.grade, "score": run.site_health_score, "report_url": report_url}
 
 @app.get("/audit/{audit_id}")
 def get_audit(audit_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
@@ -1248,7 +1197,6 @@ def accumulated(website_id: int, user: User = Depends(current_user), db: Session
     trend = [{"id": r.id, "score": r.site_health_score, "grade": r.grade, "date": r.finished_at} for r in runs]
     return {"count": len(runs), "trend": trend}
 
-# --- PDF Report ---
 @app.get("/audit/{audit_id}/pdf")
 def pdf_report(audit_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
     run = db.query(AuditRun).get(audit_id)
@@ -1272,6 +1220,33 @@ def pdf_report(audit_id: int, user: User = Depends(current_user), db: Session = 
         except Exception:
             pass
 
+# HTML report (Tailwind + Chart.js template you provided)
+@app.get("/audit/{audit_id}/report", response_class=HTMLResponse)
+def audit_report(audit_id: int, request: Request, db: Session = Depends(get_db)):
+    run = db.query(AuditRun).get(audit_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    website = db.query(Website).get(run.website_id)
+    previous = (
+        db.query(AuditRun)
+        .filter(AuditRun.website_id == website.id, AuditRun.id < audit_id)
+        .order_by(AuditRun.id.desc())
+        .first()
+    )
+    # Build a simple object so template can use audit.website.url
+    audit_obj = {
+        "id": run.id,
+        "finished_at": run.finished_at,
+        "grade": run.grade,
+        "site_health_score": run.site_health_score,
+        "metrics_summary": run.metrics_summary,
+        "weaknesses": run.weaknesses,
+        "executive_summary": run.executive_summary,
+        "website": {"url": website.url},
+        "website_url": website.url
+    }
+    return templates.TemplateResponse("index.html", {"request": request, "audit": audit_obj, "previous_audit": previous})
+
 # --- Metrics Catalog ---
 @app.get("/metrics/catalog")
 def metrics_catalog():
@@ -1286,11 +1261,14 @@ def admin_users(admin: User = Depends(admin_user), db: Session = Depends(get_db)
 @app.get("/admin/audits")
 def admin_audits(admin: User = Depends(admin_user), db: Session = Depends(get_db)):
     audits = db.query(AuditRun).order_by(AuditRun.id.desc()).limit(200).all()
-    return [{
-        "id": a.id, "website_id": a.website_id,
-        "score": a.site_health_score, "grade": a.grade,
-        "finished_at": a.finished_at
-    } for a in audits]
+    out = []
+    for a in audits:
+        website = db.query(Website).get(a.website_id)
+        out.append({
+            "id": a.id, "website_id": a.website_id, "website_url": website.url if website else None,
+            "score": a.site_health_score, "grade": a.grade, "finished_at": a.finished_at
+        })
+    return out
 
 @app.get("/admin/logins")
 def admin_logins(admin: User = Depends(admin_user), db: Session = Depends(get_db)):
@@ -1305,4 +1283,4 @@ def admin_logins(admin: User = Depends(admin_user), db: Session = Depends(get_db
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")), reload=True)
