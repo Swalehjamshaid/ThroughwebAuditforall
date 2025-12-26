@@ -1,14 +1,6 @@
 
-# nixpacks.toml — minimal, safe for Python FastAPI (only needed if builder=NIXPACKS)
-
-[phases.setup]
-# No extra packages required for simple FastAPI; Railway provides Python.
-# If you need system libraries for Postgres under Nixpacks, uncomment and adjust:
-# nixPkgs = ["postgresql"]
-
 [phases.build]
-# If you use a lock file or custom build steps, add them here.
-# cmds = ["pip install -r requirements.txt"]
+cmds = ["pip install -r requirements.txt"]
 
 [start]
 cmd = "uvicorn app:app --host 0.0.0.0 --port $PORT"
