@@ -3,12 +3,12 @@
 FF Tech – AI-Powered Website Audit & Compliance SaaS
 Single-file FastAPI backend, Railway-ready, integrated with your advanced HTML.
 
-Highlights:
-- Inline rendering of your provided HTML dashboard (no template file required).
-- Uses file template if templates/index.html exists; else inline fallback.
-- Root route shows dashboard if SHOW_DASHBOARD_AT_ROOT=true and audit exists; else status page.
-- Auto-fixes Postgres schema for RBAC/2FA columns on startup if missing.
-- Core routes: /health, /, /audit/run, /audit/{id}/report, /audit/{id}/pdf
+Fixes in this version:
+- Root route (/) now always attempts to render the latest audit dashboard.
+- Optional auto-seed on startup using env AUTO_SEED_AUDIT_URL if no audits exist.
+- Safe fallback to styled status page when DB is unreachable or data is empty.
+- Auto-migration of missing columns in Postgres (RBAC/2FA + template extras).
+- Inline rendering of your provided HTML (uses templates/index.html if present).
 """
 
 import os
@@ -42,14 +42,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 from sqlalchemy.exc import SQLAlchemyError
 
-# HTTP, parsing, validation
+# HTTP, parsing
 import requests
 from bs4 import BeautifulSoup
-from email.message import EmailMessage
 
 # Scheduler (optional use)
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 # PDF reporting
 from reportlab.lib.pagesizes import A4
@@ -63,18 +61,17 @@ SECRET_KEY = os.getenv("SECRET_KEY", "change_me_dev_only")
 APP_DOMAIN = os.getenv("APP_DOMAIN", "http://localhost:8000")
 ENV = os.getenv("ENV", "development")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech.db")
-
 DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Karachi")
 FFTECH_LOGO_TEXT = os.getenv("FFTECH_LOGO_TEXT", "FF Tech")
 FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Report")
 
-# Toggle: show latest dashboard at "/" if available
-SHOW_DASHBOARD_AT_ROOT = os.getenv("SHOW_DASHBOARD_AT_ROOT", "false").lower() in ("1", "true", "yes")
+# Optional: auto-seed first audit at startup if none exist
+AUTO_SEED_AUDIT_URL = os.getenv("AUTO_SEED_AUDIT_URL", "").strip()
 
 # -----------------------------------------------------------------------------
 # App & Templates
 # -----------------------------------------------------------------------------
-app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.0")
+app = FastAPI(title="FF Tech Website Audit SaaS", version="1.0.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if ENV != "production" else [APP_DOMAIN],
@@ -83,12 +80,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# We support file-based templates if present; otherwise inline.
 templates_dir = Path("templates")
 templates = Jinja2Templates(directory=str(templates_dir)) if templates_dir.exists() else None
 
 # -----------------------------------------------------------------------------
-# Inline HTML (your provided template)
+# Inline HTML (your provided advanced template)
 # -----------------------------------------------------------------------------
 INLINE_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -98,11 +94,11 @@ INLINE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <!-- Tailwind CSS -->
-https://cdn.tailwindcss.com</script>
+<script/cdn.tailwindcss.com</script>
 <!-- Chart.js -->
 https://cdn.jsdelivr.net/npm/chart.js</script>
 <!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@800;900&display=swap
+https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap
 
 <style>
 body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
@@ -127,7 +123,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 </head>
 <body class="bg-slate-950 text-slate-200 min-h-screen">
 
-<!-- HEADER -->
 <header class="border-b border-white/10">
 <div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
   <div>
@@ -141,7 +136,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 </div>
 </header>
 
-<!-- LIVE AUDIT BANNER -->
 <div class="max-w-7xl mx-auto px-6 py-2">
   <div id="liveBanner" class="bg-indigo-600/20 text-indigo-400 rounded-full px-4 py-2 font-bold flex items-center gap-2">
     <span>Audit in Progress</span>
@@ -149,7 +143,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   </div>
 </div>
 
-<!-- TABS -->
 <div class="max-w-7xl mx-auto px-6 py-6">
   <div class="flex gap-4 flex-wrap">
     <button class="tab-button active" onclick="showTab('overview')">Overview</button>
@@ -161,11 +154,8 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   </div>
 </div>
 
-<!-- TAB CONTENT -->
 <div class="max-w-7xl mx-auto px-6">
-  <!-- OVERVIEW TAB -->
   <div id="overview" class="tab-content fadeIn">
-    <!-- Score & Timeline -->
     <section class="grid lg:grid-cols-3 gap-8 py-6">
       <div class="glass glow rounded-3xl p-8 text-center">
         <p class="text-slate-400">Site Health Score</p>
@@ -193,7 +183,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <!-- Charts -->
     <section class="grid lg:grid-cols-2 gap-8 py-6">
       <div class="glass rounded-3xl p-8">
         <h2 class="text-xl font-bold mb-4">Issue Distribution</h2>
@@ -205,18 +194,15 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <!-- Competitor Comparison -->
     <section class="py-6">
       <div class="glass rounded-3xl p-8">
         <h2 class="text-2xl font-extrabold mb-6">Competitor Comparison</h2>
         <div class="grid md:grid-cols-3 gap-6 text-center">
-          <!-- Your Website -->
           <div class="p-6 bg-slate-900 rounded-xl">
             <p class="text-sm text-slate-400">Your Website</p>
             <p class="text-4xl font-black text-indigo-400">{{ audit.site_health_score }}%</p>
             <div class="h-2 bg-indigo-400 rounded mt-2" style="width:{{ audit.site_health_score }}%"></div>
           </div>
-          <!-- Competitors -->
           {% for comp in audit.competitors %}
           <div class="p-6 bg-slate-900 rounded-xl opacity-70">
             <p class="text-sm text-slate-400">{{ comp.name }}</p>
@@ -228,7 +214,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <!-- Top Issues -->
     <section class="py-6">
       <div class="glass rounded-3xl p-8">
         <h2 class="text-2xl font-extrabold mb-4">Top 10 Issues</h2>
@@ -255,7 +240,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       </div>
     </section>
 
-    <!-- Metrics Grid -->
     <section class="py-6 grid md:grid-cols-2 xl:grid-cols-3 gap-6">
       {% for k,v in audit.metrics_summary.items() %}
       <div class="glass rounded-2xl p-6 tooltip" data-value="{{ v }}" data-key="{{ k }}">
@@ -266,7 +250,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
       {% endfor %}
     </section>
 
-    <!-- Weaknesses -->
     <section class="py-6">
       <div class="glass rounded-3xl p-8 border border-red-500/30">
         <h2 class="text-2xl font-extrabold mb-6 text-red-400 collapsible" onclick="toggleContent('weaknessesContent')">Priority Weak Areas</h2>
@@ -280,7 +263,6 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   </div>
 </div>
 
-<!-- FOOTER -->
 <footer class="border-t border-white/10 mt-20">
 <div class="max-w-7xl mx-auto px-6 py-8 text-center text-sm text-slate-500">
 FF Tech © AI Website Audit Platform · Generated {{ audit.finished_at }}
@@ -288,31 +270,22 @@ FF Tech © AI Website Audit Platform · Generated {{ audit.finished_at }}
 </footer>
 
 <script>
-// TAB FUNCTION
 function showTab(tabId){
   document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
   document.getElementById(tabId).classList.remove('hidden');
   document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
   event.currentTarget.classList.add('active');
 }
-
-// DARK/LIGHT MODE
 function toggleMode() {
   document.documentElement.classList.toggle('dark');
   document.body.classList.toggle('bg-slate-50');
   document.body.classList.toggle('text-slate-900');
 }
-
-// COLLAPSIBLE CONTENT
 function toggleContent(id) {
   const el = document.getElementById(id);
   el.style.maxHeight = el.style.maxHeight === '0px' || !el.style.maxHeight ? el.scrollHeight + 'px' : '0px';
 }
-
-// PDF Placeholder
 function downloadPDF() { alert("PDF export integration coming soon."); }
-
-// Animate Audit Timeline
 let currentStep = 1;
 function animateAudit() {
   const steps = ["Crawling","SEO Analysis","Performance","Security","Compliance","Scoring"];
@@ -329,7 +302,6 @@ function animateAudit() {
 }
 animateAudit();
 
-// Charts
 new Chart(document.getElementById("issuesChart"), {
   type: "doughnut",
   data: {
@@ -374,31 +346,26 @@ class User(Base):
     totp_secret = Column(String, nullable=True)             # base32 secret
     created_at = Column(DateTime, default=func.now())
     timezone = Column(String, default=DEFAULT_TIMEZONE)
-    login_activities = relationship("LoginActivity", back_populates="user")
-    websites = relationship("Website", back_populates="user")
 
 
 class LoginActivity(Base):
     __tablename__ = "login_activities"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     ip = Column(String)
     user_agent = Column(String)
     success = Column(Boolean, default=True)
     reason = Column(String, nullable=True)
     timestamp = Column(DateTime, default=func.now())
-    user = relationship("User", back_populates="login_activities")
 
 
 class Website(Base):
     __tablename__ = "websites"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     url = Column(String, index=True)
     created_at = Column(DateTime, default=func.now())
     is_active = Column(Boolean, default=True)
-    user = relationship("User", back_populates="websites")
-    audits = relationship("AuditRun", back_populates="website")
 
 
 class AuditRun(Base):
@@ -416,15 +383,12 @@ class AuditRun(Base):
     competitors = Column(JSON, nullable=True)  # [{name, score}]
     top_issues = Column(JSON, nullable=True)   # [{name, severity, suggestion}]
     recommendations = Column(JSON, nullable=True)  # {metric_key: suggestion}
-    website = relationship("Website", back_populates="audits")
-
 
 # -----------------------------------------------------------------------------
 # Schemas
 # -----------------------------------------------------------------------------
 class AuditStartRequest(BaseModel):
-    website_url: str
-
+    website_url: str = Field(..., description="URL to audit")
 
 # -----------------------------------------------------------------------------
 # Helpers (security, email)
@@ -437,7 +401,7 @@ def hash_password(password: str) -> str:
     return f"pbkdf2$sha256$100000${salt}${base64.b64encode(dk).decode()}"
 
 def send_email(to_email: str, subject: str, html_body: str, plain_body: str = ""):
-    # optional: configure SMTP via env vars; omitted for single-file simplicity
+    # optional SMTP integration; omitted here for simplicity
     pass
 
 def get_db() -> Session:
@@ -510,30 +474,24 @@ def find_links(soup: BeautifulSoup, base_url: str) -> Dict[str, List[str]]:
     for a in soup.find_all("a"):
         href = a.get("href")
         if href:
-            u = urljoin(base_url, href)
-            anchors.append(u)
+            anchors.append(urljoin(base_url, href))
     for i in soup.find_all("img"):
         src = i.get("src")
         if src:
-            u = urljoin(base_url, src)
-            imgs.append(u)
+            imgs.append(urljoin(base_url, src))
     for l in soup.find_all("link", rel=lambda x: x in ["stylesheet", "preload"] if x else False):
         href = l.get("href")
         if href:
-            u = urljoin(base_url, href)
-            css.append(u)
+            css.append(urljoin(base_url, href))
     for s in soup.find_all("script"):
         src = s.get("src")
         if src:
-            u = urljoin(base_url, src)
-            js.append(u)
+            js.append(urljoin(base_url, src))
     return {"anchors": anchors, "images": imgs, "css": css, "js": js}
 
 def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
     broken, redirected = [], []
-    tested = 0
     for u in urls[:limit]:
-        tested += 1
         try:
             r = requests.head(u, allow_redirects=True, timeout=10, headers={"User-Agent": "FFTechAudit/1.0"})
             if 400 <= r.status_code < 600:
@@ -542,7 +500,7 @@ def check_broken_links(urls: List[str], limit: int = 100) -> Dict[str, Any]:
                 redirected.append(u)
         except Exception:
             broken.append(u)
-    return {"broken": broken, "redirected": redirected, "tested": tested}
+    return {"broken": broken, "redirected": redirected, "tested": min(limit, len(urls))}
 
 def check_robot_sitemap(base_url: str) -> Dict[str, Any]:
     from urllib.parse import urlparse, urljoin
@@ -766,7 +724,7 @@ def compute_audit(website_url: str) -> Dict[str, Any]:
         "mixed_content_count": len(mixed_content),
     }
 
-    # Derive presentation extras used by your template
+    # Extras for your template
     competitors = [
         {"name": "Competitor A", "score": max(20, int(metrics["site_health_score"] - 10))},
         {"name": "Competitor B", "score": max(15, int(metrics["site_health_score"] - 5))},
@@ -836,10 +794,9 @@ def generate_pdf(report: Dict[str, Any], website_url: str, path: str):
     c.showPage(); c.save()
 
 # -----------------------------------------------------------------------------
-# Startup: create schema + auto-migrate missing columns
+# Startup: create schema + auto-migrate + auto-seed
 # -----------------------------------------------------------------------------
 def ensure_columns(conn, table: str, cols: Dict[str, str]):
-    # cols: {"column_name": "SQL type with default clause if needed"}
     for col, sqltype in cols.items():
         check_sql = text("""
             SELECT 1 FROM information_schema.columns
@@ -849,22 +806,61 @@ def ensure_columns(conn, table: str, cols: Dict[str, str]):
         if not exists:
             conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {sqltype}'))
 
+def get_latest_audit(db: Session) -> Optional[AuditRun]:
+    try:
+        return db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+    except SQLAlchemyError:
+        return None
+
+def ensure_first_audit(db: Session):
+    """Auto-seed the first audit if none exist and AUTO_SEED_AUDIT_URL is set."""
+    seed_url = AUTO_SEED_AUDIT_URL
+    if not seed_url:
+        return
+    latest = get_latest_audit(db)
+    if latest:
+        return
+    w = db.query(Website).filter(Website.url == seed_url).first()
+    if not w:
+        w = Website(user_id=None, url=seed_url)
+        db.add(w); db.commit()
+    a = compute_audit(seed_url)
+    metrics, weaknesses = a["metrics"], a["weaknesses"]
+    run = AuditRun(
+        website_id=w.id,
+        finished_at=func.now(),
+        site_health_score=metrics["site_health_score"],
+        grade=metrics["grade"],
+        metrics_summary=metrics,
+        weaknesses=weaknesses,
+        executive_summary=generate_summary(seed_url, metrics, weaknesses),
+        competitors=a["competitors"],
+        top_issues=a["top_issues"],
+        recommendations=a["recommendations"]
+    )
+    db.add(run); db.commit()
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
-        # Users table columns needed for RBAC/2FA
         ensure_columns(conn, "users", {
             "role": "VARCHAR DEFAULT 'user'",
             "totp_enabled": "BOOLEAN DEFAULT FALSE",
             "totp_secret": "VARCHAR"
         })
-        # Optional extra fields used by your template
         ensure_columns(conn, "audit_runs", {
             "competitors": "JSON",
             "top_issues": "JSON",
             "recommendations": "JSON"
         })
+    # Auto-seed first audit if required
+    try:
+        db = SessionLocal()
+        ensure_first_audit(db)
+    finally:
+        try: db.close()
+        except Exception: pass
 
 # -----------------------------------------------------------------------------
 # Routes
@@ -874,7 +870,6 @@ def health():
     return {"status": "ok", "time": dt.datetime.utcnow().isoformat() + "Z"}
 
 def render_dashboard(request: Request, audit: AuditRun, website: Website, previous: Optional[AuditRun]) -> HTMLResponse:
-    # Build context used by your template
     ctx_audit = {
         "id": audit.id,
         "finished_at": audit.finished_at,
@@ -901,36 +896,43 @@ def render_dashboard(request: Request, audit: AuditRun, website: Website, previo
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, db: Session = Depends(get_db)):
     port_label = os.getenv("PORT", "8080")
-    if SHOW_DASHBOARD_AT_ROOT:
-        try:
-            latest = db.query(AuditRun).order_by(AuditRun.id.desc()).first()
-            if latest:
-                website = db.query(Website).get(latest.website_id)
-                previous = (
-                    db.query(AuditRun)
-                    .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
-                    .order_by(AuditRun.id.desc())
-                    .first()
-                )
-                return render_dashboard(request, latest, website, previous)
-        except SQLAlchemyError:
-            # fall back to status page
-            pass
+    # Always try to show the latest audit at '/'
+    try:
+        latest = get_latest_audit(db)
+        if latest:
+            website = db.query(Website).get(latest.website_id)
+            previous = (
+                db.query(AuditRun)
+                .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
+                .order_by(AuditRun.id.desc())
+                .first()
+            )
+            return render_dashboard(request, latest, website, previous)
+    except SQLAlchemyError:
+        pass  # fall through to status page
 
+    # Styled status page (Tailwind tag FIXED)
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>FF Tech | System Online</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         https://cdn.tailwindcss.com</script>
     </head>
-    <body class="bg-slate-900 text-white flex items-center justify-center h-screen">
-        <div class="p-20 border border-white/10 rounded-3xl text-center shadow-2xl">
-            <h1 class="text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
-            <p class="text-slate-400 text-xl">Audit Engine is listening for instructions...</p>
-            <div class="mt-8 flex gap-4 justify-center">
+    <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
+        <div class="p-12 border border-white/10 rounded-3xl text-center shadow-2xl max-w-xl">
+            <h1 class="text-4xl md:text-6xl font-black mb-4">SYSTEM <span class="text-indigo-500">READY</span></h1>
+            <p class="text-slate-400 text-lg">Audit Engine is listening for instructions...</p>
+            <div class="mt-6 flex gap-3 justify-center">
                 <span class="px-4 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold">● LIVE</span>
                 <span class="px-4 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">PORT: {port_label}</span>
+            </div>
+            <div class="mt-6">
+                <p class="text-slate-400 text-sm">Run a first audit to see the dashboard:</p>
+                <code class="text-xs bg-white/10 px-2 py-1 rounded">
+                    curl -X POST {APP_DOMAIN}/audit/run -H "Content-Type: application/json" -d '{{"website_url":"https://example.com"}}'
+                </code>
             </div>
         </div>
     </body>
@@ -939,16 +941,12 @@ def root(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/audit/run")
 def run_audit(data: AuditStartRequest, db: Session = Depends(get_db)):
-    # Ensure website record exists (single-user mode for simplicity)
     w = db.query(Website).filter(Website.url == data.website_url).first()
     if not w:
         w = Website(user_id=None, url=data.website_url)
         db.add(w); db.commit()
-    # Compute audit
     a = compute_audit(w.url)
-    metrics = a["metrics"]
-    weaknesses = a["weaknesses"]
-    # Store
+    metrics = a["metrics"]; weaknesses = a["weaknesses"]
     run = AuditRun(
         website_id=w.id,
         finished_at=func.now(),
@@ -996,7 +994,7 @@ def pdf_report(audit_id: int, db: Session = Depends(get_db)):
         except Exception: pass
 
 # -----------------------------------------------------------------------------
-# Optional Scheduler (disabled unless you wire jobs)
+# Optional Scheduler (running but no jobs unless you add them)
 # -----------------------------------------------------------------------------
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()
