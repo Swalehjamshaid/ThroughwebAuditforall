@@ -1,255 +1,199 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>FF Tech Audit Command Center</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Styling -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Charts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech | AI-Powered Website Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-glow: rgba(0, 242, 255, 0.5);
+        }
+        body {
+            background: radial-gradient(circle at top right, #1a1a2e, #0f0f1a, #050505);
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(0, 242, 255, 0.3);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+        }
+        .grade-badge {
+            background: linear-gradient(135deg, #00f2ff, #0062ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            filter: drop-shadow(0 0 10px rgba(0, 242, 255, 0.5));
+        }
+        .metric-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot-green { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+        .dot-yellow { background: #ffbb00; box-shadow: 0 0 8px #ffbb00; }
+        .dot-red { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; animation: pulse 2s infinite; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-slate-200">
+<body class="p-6">
 
-<div class="max-w-7xl mx-auto p-6 space-y-12">
+    <nav class="max-w-7xl mx-auto flex justify-between items-center mb-10">
+        <div class="text-2xl font-bold tracking-tighter">FF <span class="text-cyan-400">TECH</span></div>
+        <div class="flex gap-6 items-center">
+            <span class="text-sm opacity-60">Audit ID: #FF-88291</span>
+            <button class="bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-2 px-6 rounded-full transition">Download PDF Certificate</button>
+        </div>
+    </nav>
 
-<!-- ================================================= -->
-<!-- HEADER -->
-<!-- ================================================= -->
-<header class="text-center space-y-2">
-<h1 class="text-3xl font-bold">FF Tech Website Audit Command Center</h1>
-<p class="text-slate-400">Strict Scoring • Python Powered • Enterprise Grade</p>
-</header>
+    <main class="max-w-7xl mx-auto grid grid-cols-12 gap-6">
+        
+        <div class="col-span-12 lg:col-span-4 glass-card p-8 flex flex-col items-center justify-center text-center">
+            <h3 class="text-gray-400 uppercase tracking-widest text-xs mb-4">Overall Site Health</h3>
+            <div class="relative flex items-center justify-center">
+                <svg class="w-48 h-48">
+                    <circle cx="96" cy="96" r="88" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="none" />
+                    <circle cx="96" cy="96" r="88" stroke="#00f2ff" stroke-width="12" fill="none" stroke-dasharray="553" stroke-dashoffset="120" stroke-linecap="round" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-6xl grade-badge">B+</span>
+                    <span class="text-sm opacity-50">78% Score</span>
+                </div>
+            </div>
+            <p class="mt-6 text-sm text-gray-400">Strict Scoring Mode: <span class="text-yellow-500 font-bold text-xs uppercase">Active</span></p>
+        </div>
 
-<!-- ================================================= -->
-<!-- NORTH STAR + ISSUE MAP -->
-<!-- ================================================= -->
-<section class="grid md:grid-cols-3 gap-6">
+        <div class="col-span-12 lg:col-span-8 glass-card p-8 border-l-4 border-cyan-500">
+            <div class="flex items-center gap-3 mb-4">
+                <i class="fa-solid fa-robot text-cyan-400"></i>
+                <h2 class="text-xl font-bold">Executive Summary</h2>
+            </div>
+            <p class="text-gray-300 leading-relaxed italic">
+                "Your website currently holds an FF Tech Grade of <strong>78% (B+)</strong>. While your security protocols are in the top 5th percentile globally, your mobile performance is currently creating a conversion bottleneck. Specifically, the Largest Contentful Paint (LCP) of 4.2s is causing a predicted 25% increase in mobile bounce rates. Furthermore, 12% of your internal pages are currently 'Orphaned,' meaning they receive no link equity and are invisible to major search engines. To reach an 'A' grade, priority must be placed on server-side image compression and resolving the 404 broken links identified in the crawl. Resolving these 'Pulse Red' issues will significantly enhance both user retention and organic authority."
+            </p>
+            <div class="mt-6 flex gap-4">
+                <div class="glass-card bg-red-500/10 border-red-500/20 px-4 py-2 rounded-lg text-xs">
+                    <span class="text-red-400 font-bold uppercase">Weak Area:</span> Performance Bottlenecks
+                </div>
+                <div class="glass-card bg-cyan-500/10 border-cyan-500/20 px-4 py-2 rounded-lg text-xs">
+                    <span class="text-cyan-400 font-bold uppercase">Strong Area:</span> SSL Security
+                </div>
+            </div>
+        </div>
 
-<div class="bg-slate-900 p-6 rounded-xl text-center">
-<h2 class="font-semibold mb-3">Overall Health</h2>
-<canvas id="healthGauge"></canvas>
-<div class="mt-4 text-4xl font-bold" id="healthScore"></div>
-<div class="text-sm text-slate-400" id="healthGrade"></div>
-</div>
+        <div class="col-span-12 mt-4">
+            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                <i class="fa-solid fa-microchip text-cyan-400"></i> Full Audit Metrics (60+)
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="font-bold text-sm">Crawlability</span>
+                        <span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded">5 Issues</span>
+                    </div>
+                    <ul class="space-y-3 text-xs opacity-80">
+                        <li class="flex justify-between"><span>HTTP Status Codes</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Redirect Loops</span> <span class="dot-red metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Orphan Pages</span> <span class="dot-red metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Broken Internal Links</span> <span class="dot-yellow metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Sitemap Status</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Robots.txt Analysis</span> <span class="dot-green metric-dot"></span></li>
+                    </ul>
+                </div>
 
-<div class="bg-slate-900 p-6 rounded-xl md:col-span-2">
-<h2 class="font-semibold mb-3">Problem Map</h2>
-<canvas id="issuesDonut"></canvas>
-</div>
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="font-bold text-sm">Performance</span>
+                        <span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">Slow Response</span>
+                    </div>
+                    <ul class="space-y-3 text-xs opacity-80">
+                        <li class="flex justify-between"><span>Largest Contentful Paint</span> <span class="dot-red metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Cumulative Layout Shift</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Time to First Byte (TTFB)</span> <span class="dot-yellow metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Unminified CSS/JS</span> <span class="dot-yellow metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Image WebP Usage</span> <span class="dot-green metric-dot"></span></li>
+                    </ul>
+                </div>
 
-</section>
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="font-bold text-sm">Security</span>
+                        <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded">Secured</span>
+                    </div>
+                    <ul class="space-y-3 text-xs opacity-80">
+                        <li class="flex justify-between"><span>SSL Validity</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>HTTPS Enforcement</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>HSTS Headers</span> <span class="dot-red metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Mixed Content Issues</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>X-Frame-Options</span> <span class="dot-green metric-dot"></span></li>
+                    </ul>
+                </div>
 
-<!-- ================================================= -->
-<!-- CORE WEB VITALS -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">Core Web Vitals (Speedometer)</h2>
-<canvas id="cwvChart"></canvas>
-</section>
+                <div class="glass-card p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="font-bold text-sm">On-Page</span>
+                        <span class="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-1 rounded">Optimized</span>
+                    </div>
+                    <ul class="space-y-3 text-xs opacity-80">
+                        <li class="flex justify-between"><span>Missing Title Tags</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Duplicate Meta Descr.</span> <span class="dot-yellow metric-dot"></span></li>
+                        <li class="flex justify-between"><span>H1 Tag Structure</span> <span class="dot-green metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Image Alt Attributes</span> <span class="dot-red metric-dot"></span></li>
+                        <li class="flex justify-between"><span>Schema Markup</span> <span class="dot-yellow metric-dot"></span></li>
+                    </ul>
+                </div>
 
-<!-- ================================================= -->
-<!-- CRAWL STRUCTURE -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">Crawl Depth & Structure</h2>
-<canvas id="crawlTree"></canvas>
-</section>
+            </div>
+        </div>
 
-<!-- ================================================= -->
-<!-- COMPETITOR + MONEY RISK -->
-<!-- ================================================= -->
-<section class="grid md:grid-cols-2 gap-6">
+        <div class="col-span-12 lg:col-span-12 glass-card p-8 mt-4">
+            <h3 class="text-lg font-bold mb-6">Competitive Authority Benchmark</h3>
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-xs mb-1"><span>You (FF Tech Audit)</span> <span>78%</span></div>
+                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                        <div class="bg-cyan-500 h-full w-[78%] shadow-[0_0_10px_#00f2ff]"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1 opacity-50"><span>Competitor A</span> <span>85%</span></div>
+                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                        <div class="bg-gray-500 h-full w-[85%] opacity-50"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-xs mb-1 opacity-50"><span>Competitor B</span> <span>62%</span></div>
+                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                        <div class="bg-gray-500 h-full w-[62%] opacity-50"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-<div class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">Competitor Comparison</h2>
-<canvas id="competitorChart"></canvas>
-</div>
+    </main>
 
-<div class="bg-slate-900 p-6 rounded-xl text-center">
-<h2 class="font-semibold mb-3">Estimated Money at Risk</h2>
-<div id="moneyRisk" class="text-5xl font-bold text-red-400"></div>
-<p class="text-sm text-slate-400 mt-2">Estimated monthly loss due to performance & errors</p>
-</div>
-
-</section>
-
-<!-- ================================================= -->
-<!-- EXECUTIVE SUMMARY -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">AI Executive Summary</h2>
-<p id="executiveSummary" class="leading-relaxed text-slate-300"></p>
-</section>
-
-<!-- ================================================= -->
-<!-- FIX PRIORITY HEATMAP -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">Critical Fix Priority (Impact vs Effort)</h2>
-<table class="w-full text-sm">
-<thead class="border-b border-slate-700">
-<tr>
-<th class="text-left">Metric</th>
-<th>Impact</th>
-<th>Effort</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody id="heatmapTable"></tbody>
-</table>
-</section>
-
-<!-- ================================================= -->
-<!-- FIX-IT CHECKLIST -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">Fix-It Checklist</h2>
-<ul id="fixList" class="space-y-2"></ul>
-<button class="mt-4 px-4 py-2 bg-emerald-600 rounded">Re-Validate</button>
-</section>
-
-<!-- ================================================= -->
-<!-- MASTER METRICS TABLE -->
-<!-- ================================================= -->
-<section class="bg-slate-900 p-6 rounded-xl">
-<h2 class="font-semibold mb-3">All Metrics (60+)</h2>
-<input id="search" placeholder="Search metrics..."
-class="mb-4 w-full p-2 rounded bg-slate-800">
-
-<table class="w-full text-sm">
-<thead class="border-b border-slate-700">
-<tr>
-<th>Category</th>
-<th>Metric</th>
-<th>Status</th>
-<th>Impact</th>
-</tr>
-</thead>
-<tbody id="metricsTable"></tbody>
-</table>
-</section>
-
-</div>
-
-<!-- ================================================= -->
-<!-- PYTHON DATA BINDING -->
-<!-- ================================================= -->
-<script>
-fetch("/api/audit-result")
-.then(res => res.json())
-.then(data => {
-
-/* Health Gauge */
-document.getElementById("healthScore").innerText = data.health + "%";
-document.getElementById("healthGrade").innerText = "Grade: " + data.grade;
-
-new Chart(healthGauge, {
-type: "doughnut",
-data: {
-datasets: [{
-data: [data.health, 100 - data.health],
-backgroundColor: [data.health_color, "#1e293b"],
-borderWidth: 0
-}]
-},
-options: { cutout: "80%" }
-});
-
-/* Issue Map */
-new Chart(issuesDonut, {
-type: "doughnut",
-data: {
-labels: ["Errors","Warnings","Notices"],
-datasets: [{
-data: [data.errors, data.warnings, data.notices],
-backgroundColor: ["#ef4444","#f59e0b","#3b82f6"]
-}]
-}
-});
-
-/* CWV */
-new Chart(cwvChart, {
-type: "bar",
-data: {
-labels: data.cwv.labels,
-datasets: [
-{ label: "Your Site", data: data.cwv.site },
-{ label: "Benchmark", data: data.cwv.benchmark }
-]
-}
-});
-
-/* Crawl Map */
-new Chart(crawlTree, {
-type: "treemap",
-data: {
-datasets: [{
-tree: data.crawl_depth,
-key: "value",
-groups: ["depth"]
-}]
-}
-});
-
-/* Competitors */
-new Chart(competitorChart, {
-type: "bar",
-data: {
-labels: data.competitors.labels,
-datasets: [{
-label: "Health Score",
-data: data.competitors.scores
-}]
-}
-});
-
-/* Money Risk */
-document.getElementById("moneyRisk").innerText =
-"$" + data.money_risk.toLocaleString();
-
-/* Summary */
-document.getElementById("executiveSummary").innerText =
-data.executive_summary;
-
-/* Heatmap */
-data.heatmap.forEach(i => {
-heatmapTable.innerHTML += `
-<tr class="border-b border-slate-800">
-<td>${i.metric}</td>
-<td>${i.impact}</td>
-<td>${i.effort}</td>
-<td>${i.status}</td>
-</tr>`;
-});
-
-/* Fix List */
-data.fix_list.forEach(f => {
-fixList.innerHTML += `
-<li>
-<label>
-<input type="checkbox" class="mr-2"> ${f}
-</label>
-</li>`;
-});
-
-/* Metrics Table */
-data.metrics.forEach(m => {
-metricsTable.innerHTML += `
-<tr class="border-b border-slate-800">
-<td>${m.category}</td>
-<td>${m.metric}</td>
-<td>${m.status}</td>
-<td>${m.impact}</td>
-</tr>`;
-});
-
-});
-</script>
+    <footer class="max-w-7xl mx-auto mt-20 pb-10 border-t border-white/5 pt-10 text-center">
+        <p class="text-sm opacity-40">© 2025 FF Tech International. Powered by Advanced Python Analytics on Railway Cloud.</p>
+    </footer>
 
 </body>
 </html>
