@@ -1,12 +1,12 @@
 
 {
+  "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "nixpacksPlan": true
+    "builder": "RAILPACK"
   },
-  "healthcheck": {
-    "path": "/health",
-    "interval": 10,
-    "timeout": 3,
-    "retries": 12
+  "deploy": {
+    "startCommand": "uvicorn app:app --host 0.0.0.0 --port $PORT",
+    "healthcheckPath": "/",
+    "restartPolicyType": "ALWAYS"
   }
 }
