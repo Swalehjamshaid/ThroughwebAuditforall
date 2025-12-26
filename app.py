@@ -61,6 +61,9 @@ from reportlab.lib.units import cm
 # Email validation
 from email_validator import validate_email, EmailNotValidError
 
+# SQLAlchemy error type for resilience
+from sqlalchemy.exc import SQLAlchemyError
+
 # -----------------------------------------------------------------------------
 # Config (Railway-friendly via env vars)
 # -----------------------------------------------------------------------------
@@ -79,7 +82,7 @@ DEFAULT_TIMEZONE = os.getenv("DEFAULT_TIMEZONE", "Asia/Karachi")
 FFTECH_LOGO_TEXT = os.getenv("FFTECH_LOGO_TEXT", "FF Tech")
 FFTECH_CERT_STAMP_TEXT = os.getenv("FFTECH_CERT_STAMP_TEXT", "Certified Audit Report")
 
-# Admin bootstrap (defaults provided per request; override via Railway Variables after first deploy)
+# Admin bootstrap
 ADMIN_BOOTSTRAP_EMAIL = os.getenv("ADMIN_BOOTSTRAP_EMAIL", "Jamshaid.ali@haier.com.pk")
 ADMIN_BOOTSTRAP_PASSWORD = os.getenv("ADMIN_BOOTSTRAP_PASSWORD", "Jamshaid,1981")
 
@@ -191,7 +194,7 @@ def verify_totp(secret_b32: str, code: str, window: int = 1, digits: int = 6, pe
     return False
 
 def otpauth_uri(secret_b32: str, email: str, issuer: str = "FF Tech", digits: int = 6, period: int = 30) -> str:
-    # This URI can be pasted into Google Authenticator, Microsoft Authenticator, etc.
+    # Compatible with Google/Microsoft Authenticator
     label = f"{issuer}:{email}"
     return f"otpauth://totp/{label}?secret={secret_b32}&issuer={issuer}&algorithm=SHA1&digits={digits}&period={period}"
 
@@ -283,6 +286,8 @@ class ScheduleCreateRequest(BaseModel):
 
 class TOTPEnableRequest(BaseModel):
     code: str
+    # optional: secret from /auth/2fa/setup (if you choose to send it back)
+    secret: Optional[str] = None
 
 class TOTPDisableRequest(BaseModel):
     password: str
@@ -1027,33 +1032,39 @@ def on_startup():
         import logging
         logging.exception("Startup tasks failed: %s", e)
 
-# Landing page OR latest dashboard (controlled by env)
+# Landing page OR latest dashboard (controlled by env, resilient to DB issues)
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request, db: Session = Depends(get_db)):
-    if SHOW_DASHBOARD_AT_ROOT:
-        latest = db.query(AuditRun).order_by(AuditRun.id.desc()).first()
-        if latest:
-            website = db.query(Website).get(latest.website_id)
-            previous = (
-                db.query(AuditRun)
-                .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
-                .order_by(AuditRun.id.desc())
-                .first()
-            )
-            audit_obj = {
-                "id": latest.id,
-                "finished_at": latest.finished_at,
-                "grade": latest.grade,
-                "site_health_score": latest.site_health_score,
-                "metrics_summary": latest.metrics_summary,
-                "weaknesses": latest.weaknesses,
-                "executive_summary": latest.executive_summary,
-                "website": {"url": website.url},
-                "website_url": website.url
-            }
-            return templates.TemplateResponse("index.html", {"request": request, "audit": audit_obj, "previous_audit": previous})
-    # Status page (Tailwind script tag FIXED)
     port_label = os.getenv("PORT", "8080")
+
+    if SHOW_DASHBOARD_AT_ROOT:
+        try:
+            latest = db.query(AuditRun).order_by(AuditRun.id.desc()).first()
+            if latest:
+                website = db.query(Website).get(latest.website_id)
+                previous = (
+                    db.query(AuditRun)
+                    .filter(AuditRun.website_id == website.id, AuditRun.id < latest.id)
+                    .order_by(AuditRun.id.desc())
+                    .first()
+                )
+                audit_obj = {
+                    "id": latest.id,
+                    "finished_at": latest.finished_at,
+                    "grade": latest.grade,
+                    "site_health_score": latest.site_health_score,
+                    "metrics_summary": latest.metrics_summary,
+                    "weaknesses": latest.weaknesses,
+                    "executive_summary": latest.executive_summary,
+                    "website": {"url": website.url},
+                    "website_url": website.url
+                }
+                return templates.TemplateResponse("index.html", {"request": request, "audit": audit_obj, "previous_audit": previous})
+        except SQLAlchemyError:
+            # If DB is not reachable or query fails, fall through to status page
+            pass
+
+    # Styled status page (Tailwind tag FIXED)
     return f"""
     <!DOCTYPE html>
     <html>
@@ -1168,15 +1179,7 @@ def totp_setup(user: User = Depends(current_user), db: Session = Depends(get_db)
 
 @app.post("/auth/2fa/enable")
 def totp_enable(data: TOTPEnableRequest, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    # Expect client to pass the secret received from setup via header or param? For simplicity, reuse secret in body:
-    # To keep stateless, we accept code that must match one of a few recent codes for a temporary secret passed via header.
-    # But to simplify UX, we regenerate and verify here, then store secret if code matches.
-    # Better approach: client calls /setup, displays QR with secret, and then posts back with that secret + code.
-    secret = getattr(data, "secret", None)  # allow dynamic attribute if client sends {"secret":"...","code":"..."}
-    if not secret:
-        # If user had a pending secret set elsewhere, not available. For simplicity, accept enable only when a secret is present.
-        # Generate fresh secret, require code based on it.
-        secret = _b32_secret()
+    secret = data.secret or _b32_secret()
     if not verify_totp(secret, data.code):
         raise HTTPException(status_code=400, detail="Invalid 2FA code")
     user.totp_secret = secret
