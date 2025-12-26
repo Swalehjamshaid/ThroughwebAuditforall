@@ -40,7 +40,7 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
 <div class="max-w-7xl mx-auto px-6 py-6 flex justify-between items-center">
   <div>
     <h1 class="text-3xl font-black">FF TECH <span class="text-indigo-400">AI AUDIT</span></h1>
-    <p class="text-sm text-slate-400">{{ audit.website.url }}</p>
+    <p class="text-sm text-slate-400" id="currentWebsite">{{ audit.website.url }}</p>
   </div>
   <div class="flex items-center gap-4">
     <button onclick="toggleMode()" class="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-sm font-bold">Toggle Dark/Light</button>
@@ -48,6 +48,16 @@ body { font-family: Inter, system-ui; transition: background 0.3s, color 0.3s; }
   </div>
 </div>
 </header>
+
+<!-- URL INPUT SECTION -->
+<div class="max-w-3xl mx-auto px-6 py-6">
+  <div class="glass rounded-3xl p-6 flex flex-col md:flex-row items-center gap-4">
+    <input type="url" id="websiteUrl" placeholder="Enter website URL..." 
+           class="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-slate-200 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+    <button onclick="startAudit()" 
+            class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-xl transition">Start Audit</button>
+  </div>
+</div>
 
 <!-- LIVE AUDIT BANNER -->
 <div class="max-w-7xl mx-auto px-6 py-2">
@@ -239,7 +249,20 @@ function animateAudit() {
   currentStep++;
   setTimeout(animateAudit, 800);
 }
-animateAudit();
+
+// START AUDIT FUNCTION
+function startAudit() {
+    const url = document.getElementById("websiteUrl").value.trim();
+    if(!url) {
+        alert("Please enter a valid website URL.");
+        return;
+    }
+    document.getElementById("currentWebsite").innerText = url;
+    const banner = document.getElementById("liveBanner");
+    banner.innerHTML = `<span>Audit in Progress for ${url}</span> <span class="animate-pulse">●</span>`;
+    console.log("Audit started for:", url);
+    animateAudit();
+}
 
 // Charts (placeholder, populate with real data)
 new Chart(document.getElementById("issuesChart"), {
