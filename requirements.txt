@@ -1,7 +1,6 @@
-
 # Web framework & server
 fastapi==0.115.6
-uvicorn==0.32.0
+uvicorn[standard]==0.32.0
 
 # Database & PostgreSQL driver
 sqlalchemy==2.0.36
@@ -10,14 +9,16 @@ psycopg2-binary==2.9.9
 # HTTP & parsing
 requests==2.32.3
 beautifulsoup4==4.12.3
+lxml==5.3.0
 
 # Authentication & validation
 PyJWT==2.9.0
 email-validator==2.2.0
 python-multipart==0.0.9
 
-# Scheduling
+# Scheduling & Timezones (Critical for Railway)
 apscheduler==3.10.4
+pytz==2024.1
 
 # Data models
 pydantic==2.9.2
@@ -26,7 +27,7 @@ pydantic==2.9.2
 reportlab==4.2.5
 jinja2==3.1.4
 
-# ---- Optional (uncomment if needed) ----
-# passlib[bcrypt]==1.7.4     # stronger password hashing
-# tldextract==5.1.2          # domain parsing helpers
-# typing_extensions==4.12.2  # sometimes helpful with pinned stacks
+# Security & Utilities
+passlib[bcrypt]==1.7.4
+tldextract==5.1.2
+openai
