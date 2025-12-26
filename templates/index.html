@@ -1,56 +1,55 @@
 <!DOCTYPE html>
 <html lang="en" class="h-full scroll-smooth dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FF Tech Elite | Enterprise Audit SaaS</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FF Tech Elite | Advanced Audit SaaS</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-    <style>
-        :root {
-            --neon-indigo: #6366f1;
-            --neon-emerald: #10b981;
-            --neon-rose: #f43f5e;
-            --dark-bg: #020617;
-        }
-        
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--dark-bg); color: #f8fafc; }
-        
-        .glass-card { 
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            transition: all 0.3s ease;
-        }
+<style>
+:root {
+    --neon-indigo: #6366f1;
+    --neon-emerald: #10b981;
+    --neon-rose: #f43f5e;
+    --dark-bg: #020617;
+}
+body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--dark-bg); color: #f8fafc; }
 
-        .glass-card:hover { border-color: var(--neon-indigo); transform: translateY(-2px); }
+.glass-card { 
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s ease;
+}
+.glass-card:hover { border-color: var(--neon-indigo); transform: translateY(-2px); }
 
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.status-pill {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+.status-pass { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.status-fail { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
+.status-warning { background: rgba(250, 204, 21, 0.1); color: #facc15; }
 
-        .status-pill {
-            font-size: 0.65rem;
-            padding: 2px 8px;
-            border-radius: 99px;
-            font-weight: 800;
-            text-transform: uppercase;
-        }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
 
-        .status-pass { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-        .status-fail { background: rgba(244, 63, 94, 0.1); color: #f43f5e; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-    </style>
+.animate-pulse-fast { animation: pulse 0.8s infinite; }
+</style>
 </head>
 <body class="bg-grid">
 
@@ -73,248 +72,198 @@
 </header>
 
 <main class="max-w-[1600px] mx-auto p-6 space-y-8">
-    
-    <section class="p-10 glass-card rounded-[2rem] shadow-2xl border-indigo-500/20">
-        <div class="max-w-4xl mx-auto text-center space-y-6">
-            <h2 class="text-4xl font-black tracking-tight">Deploy Global Audit Intelligence</h2>
-            <p class="text-slate-400 font-medium">Scan 140+ metrics including Core Web Vitals, Security, and Technical SEO.</p>
-            <div class="flex flex-col md:flex-row gap-3">
-                <input id="audit-url" type="url" placeholder="https://your-competitor.com" 
-                class="flex-1 bg-slate-900 border border-white/10 p-5 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg">
-                <button id="run-audit" class="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-white shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3">
-                    START DEEP SCAN <span class="animate-pulse">●</span>
-                </button>
-            </div>
-            <div id="status-bar" class="hidden text-xs font-bold text-indigo-400 uppercase tracking-widest">
-                System Status: <span id="status-text">Initializing Python Scraper...</span>
-            </div>
-        </div>
-    </section>
 
-    <section id="audit-results" class="hidden space-y-8 animate-in fade-in duration-700">
+<!-- AUDIT INPUT -->
+<section class="p-10 glass-card rounded-[2rem] shadow-2xl border-indigo-500/20">
+    <div class="max-w-4xl mx-auto text-center space-y-6">
+        <h2 class="text-4xl font-black tracking-tight">Deploy Global Audit Intelligence</h2>
+        <p class="text-slate-400 font-medium">Scan 140+ metrics including Core Web Vitals, Security, SEO, and Performance.</p>
+        <div class="flex flex-col md:flex-row gap-3">
+            <input id="audit-url" type="url" placeholder="https://your-competitor.com" 
+            class="flex-1 bg-slate-900 border border-white/10 p-5 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-lg">
+            <button id="run-audit" class="px-10 py-5 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-white shadow-xl shadow-indigo-600/30 transition-all flex items-center justify-center gap-3">
+                START DEEP SCAN <span class="animate-pulse-fast">●</span>
+            </button>
+        </div>
+        <div id="status-bar" class="hidden text-xs font-bold text-indigo-400 uppercase tracking-widest mt-3">
+            System Status: <span id="status-text">Initializing Python Scraper...</span>
+        </div>
+    </div>
+</section>
+
+<!-- AUDIT RESULTS -->
+<section id="audit-results" class="hidden space-y-8 animate-in fade-in duration-700">
+
+<!-- TOP METRICS CARDS -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="p-6 glass-card rounded-3xl border-l-4 border-indigo-500">
+        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Health Score</h4>
+        <div class="text-5xl font-black text-white" id="stat-health">0%</div>
+        <div class="w-full bg-white/5 h-2 rounded-full mt-4"><div id="bar-health" class="h-full bg-indigo-500 rounded-full" style="width: 0%"></div></div>
+    </div>
+    <div class="p-6 glass-card rounded-3xl border-l-4 border-rose-500">
+        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Critical Errors</h4>
+        <div class="text-5xl font-black text-rose-500" id="stat-errors">0</div>
+        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Immediate Action Required</p>
+    </div>
+    <div class="p-6 glass-card rounded-3xl border-l-4 border-amber-500">
+        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Warnings</h4>
+        <div class="text-5xl font-black text-amber-500" id="stat-warnings">0</div>
+        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Optimizations Needed</p>
+    </div>
+    <div class="p-6 glass-card rounded-3xl border-l-4 border-emerald-500">
+        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Crawled Pages</h4>
+        <div class="text-5xl font-black text-emerald-500" id="stat-pages">0</div>
+        <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Crawl Efficiency: 100%</p>
+    </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY & WEAK/IMPROVEMENTS -->
+<div class="grid lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 p-10 glass-card rounded-[2.5rem] bg-indigo-600/5 border-indigo-500/20">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="bg-indigo-500 text-[10px] px-2 py-1 rounded font-black">AI INSIGHT</span>
+            <h3 class="text-2xl font-black uppercase italic">Executive Summary</h3>
+        </div>
+        <p id="executive-summary" class="text-lg leading-relaxed text-slate-300 font-medium italic">
+            Generating executive summary... (Python backend will generate 200 words)
+        </p>
         
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div class="p-6 glass-card rounded-3xl border-l-4 border-indigo-500">
-                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Health Score</h4>
-                <div class="text-5xl font-black text-white" id="stat-health">0%</div>
-                <div class="w-full bg-white/5 h-2 rounded-full mt-4"><div id="bar-health" class="h-full bg-indigo-500 rounded-full" style="width: 0%"></div></div>
+        <div class="mt-8 grid md:grid-cols-2 gap-6">
+            <div class="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
+                <h4 class="text-rose-500 font-black text-xs uppercase mb-3 flex items-center gap-2">Weakest Areas</h4>
+                <ul id="weak-areas" class="space-y-2 text-sm font-bold text-slate-400"></ul>
             </div>
-            <div class="p-6 glass-card rounded-3xl border-l-4 border-rose-500">
-                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Critical Errors</h4>
-                <div class="text-5xl font-black text-rose-500" id="stat-errors">0</div>
-                <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Immediate Action Required</p>
-            </div>
-            <div class="p-6 glass-card rounded-3xl border-l-4 border-amber-500">
-                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Warnings</h4>
-                <div class="text-5xl font-black text-amber-500" id="stat-warnings">0</div>
-                <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Optimizations Needed</p>
-            </div>
-            <div class="p-6 glass-card rounded-3xl border-l-4 border-emerald-500">
-                <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Crawled Pages</h4>
-                <div class="text-5xl font-black text-emerald-500" id="stat-pages">0</div>
-                <p class="text-[10px] text-slate-400 mt-2 font-bold uppercase">Crawl Efficiency: 100%</p>
+            <div class="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+                <h4 class="text-emerald-500 font-black text-xs uppercase mb-3 flex items-center gap-2">Top Improvements</h4>
+                <ul id="improvements" class="space-y-2 text-sm font-bold text-slate-400"></ul>
             </div>
         </div>
+    </div>
 
-        <div class="grid lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 p-10 glass-card rounded-[2.5rem] bg-indigo-600/5 border-indigo-500/20">
-                <div class="flex items-center gap-3 mb-6">
-                    <span class="bg-indigo-500 text-[10px] px-2 py-1 rounded font-black">AI INSIGHT</span>
-                    <h3 class="text-2xl font-black uppercase italic">Executive Summary</h3>
+    <div class="p-10 bg-gradient-to-br from-indigo-700 to-violet-900 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+        <div class="relative z-10 flex flex-col h-full">
+            <h3 class="text-xl font-black mb-2">AUDIT CERTIFICATION</h3>
+            <p class="text-xs opacity-70 mb-8 uppercase tracking-widest">Global Standards Compliance</p>
+            <div class="flex-1 flex flex-col items-center justify-center">
+                <div class="w-32 h-32 rounded-full border-8 border-white/20 flex items-center justify-center mb-4">
+                    <span id="stat-grade" class="text-6xl font-black">--</span>
                 </div>
-                <p id="executive-summary" class="text-lg leading-relaxed text-slate-300 font-medium italic">
-                    Analyzing site patterns... (Python backend will generate 200 words here)
-                </p>
-                
-                <div class="mt-8 grid md:grid-cols-2 gap-6">
-                    <div class="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
-                        <h4 class="text-rose-500 font-black text-xs uppercase mb-3 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"></path></svg>
-                            Weakest Areas
-                        </h4>
-                        <ul id="weak-areas" class="space-y-2 text-sm font-bold text-slate-400"></ul>
-                    </div>
-                    <div class="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                        <h4 class="text-emerald-500 font-black text-xs uppercase mb-3 flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
-                            Top Improvements
-                        </h4>
-                        <ul id="improvements" class="space-y-2 text-sm font-bold text-slate-400"></ul>
-                    </div>
-                </div>
+                <p class="font-black text-sm tracking-[0.3em]">GRADE RATING</p>
             </div>
-
-            <div class="p-10 bg-gradient-to-br from-indigo-700 to-violet-900 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-                <div class="relative z-10 flex flex-col h-full">
-                    <h3 class="text-xl font-black mb-2">AUDIT CERTIFICATION</h3>
-                    <p class="text-xs opacity-70 mb-8 uppercase tracking-widest">Global Standards Compliance</p>
-                    
-                    <div class="flex-1 flex flex-col items-center justify-center">
-                        <div class="w-32 h-32 rounded-full border-8 border-white/20 flex items-center justify-center mb-4">
-                            <span id="stat-grade" class="text-6xl font-black">--</span>
-                        </div>
-                        <p class="font-black text-sm tracking-[0.3em]">GRADE RATING</p>
-                    </div>
-
-                    <button class="mt-8 w-full py-4 bg-white text-indigo-900 font-black rounded-xl hover:scale-105 transition shadow-lg">
-                        DOWNLOAD CERTIFIED PDF
-                    </button>
-                </div>
-                <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-            </div>
+            <button class="mt-8 w-full py-4 bg-white text-indigo-900 font-black rounded-xl hover:scale-105 transition shadow-lg">
+                DOWNLOAD CERTIFIED PDF
+            </button>
         </div>
+        <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+    </div>
+</div>
 
-        <h2 class="text-3xl font-black tracking-tight mt-12 mb-6">THE 140+ POINT INSPECTION</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            
-            <div class="p-8 glass-card rounded-[2rem]">
-                <h3 class="text-indigo-400 font-black text-xs uppercase tracking-widest mb-6">1. Crawlability & Tech</h3>
-                <div class="space-y-1">
-                    <div class="metric-row"><span>HTTP 2xx Success</span><span id="m-http-2xx" class="status-pill status-pass">OK</span></div>
-                    <div class="metric-row"><span>Broken Links (404)</span><span id="m-404-count" class="font-bold text-rose-500">0</span></div>
-                    <div class="metric-row"><span>Redirect Chains</span><span id="m-redirects" class="font-bold">None</span></div>
-                    <div class="metric-row"><span>Robots.txt Status</span><span id="m-robots" class="status-pill status-pass">Valid</span></div>
-                    <div class="metric-row"><span>Sitemap Integration</span><span id="m-sitemap" class="status-pill status-pass">Yes</span></div>
-                    <div class="metric-row"><span>Orphan Pages</span><span id="m-orphan" class="font-bold">0</span></div>
-                    <div class="metric-row"><span>Crawl Depth (Max)</span><span id="m-depth" class="font-bold">3</span></div>
-                </div>
-            </div>
+<!-- FULL METRICS DASHBOARD -->
+<h2 class="text-3xl font-black tracking-tight mt-12 mb-6">THE 140+ POINT INSPECTION</h2>
+<div id="full-metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <!-- Python will populate this dynamically -->
+</div>
 
-            <div class="p-8 glass-card rounded-[2rem] border-l-8 border-emerald-500">
-                <h3 class="text-emerald-500 font-black text-xs uppercase tracking-widest mb-6">2. Core Web Vitals</h3>
-                <div class="space-y-1">
-                    <div class="metric-row"><span>LCP (Paint)</span><span id="m-lcp" class="font-black text-emerald-400">1.2s</span></div>
-                    <div class="metric-row"><span>FID (Delay)</span><span id="m-fid" class="font-black text-emerald-400">18ms</span></div>
-                    <div class="metric-row"><span>CLS (Shift)</span><span id="m-cls" class="font-black text-emerald-400">0.01</span></div>
-                    <div class="metric-row"><span>Speed Index</span><span id="m-speed-index" class="font-bold">2.4s</span></div>
-                    <div class="metric-row"><span>Total Page Size</span><span id="m-page-size" class="font-bold">1.4MB</span></div>
-                    <div class="metric-row"><span>Server TTFB</span><span id="m-ttfb" class="font-bold">120ms</span></div>
-                </div>
-            </div>
+<div class="p-10 glass-card rounded-[3rem]">
+    <h3 class="text-xl font-black mb-8">Performance Benchmark Trend</h3>
+    <div class="h-[400px]">
+        <canvas id="main-trend-chart"></canvas>
+    </div>
+</div>
+</section>
 
-            <div class="p-8 glass-card rounded-[2rem] border-l-8 border-indigo-600">
-                <h3 class="text-indigo-400 font-black text-xs uppercase tracking-widest mb-6">3. Security Hardening</h3>
-                <div class="space-y-1">
-                    <div class="metric-row"><span>SSL Validity</span><span id="m-ssl" class="status-pill status-pass">Active</span></div>
-                    <div class="metric-row"><span>Mixed Content</span><span id="m-mixed" class="font-bold">0</span></div>
-                    <div class="metric-row"><span>HSTS Enabled</span><span id="m-hsts" class="status-pill status-pass">Yes</span></div>
-                    <div class="metric-row"><span>X-Frame Options</span><span id="m-xframe" class="status-pill status-pass">Secure</span></div>
-                    <div class="metric-row"><span>CSP Header</span><span id="m-csp" class="status-pill status-fail">Missing</span></div>
-                </div>
-            </div>
-
-            <div class="p-8 glass-card rounded-[2rem]">
-                <h3 class="text-slate-400 font-black text-xs uppercase tracking-widest mb-6">4. Content & On-Page</h3>
-                <div class="space-y-1">
-                    <div class="metric-row"><span>Missing Titles</span><span id="m-titles" class="font-bold">0</span></div>
-                    <div class="metric-row"><span>Duplicate H1s</span><span id="m-h1-dup" class="font-bold">0</span></div>
-                    <div class="metric-row"><span>Thin Content</span><span id="m-thin" class="font-bold">2 Pages</span></div>
-                    <div class="metric-row"><span>Image Alt Tags</span><span id="m-alt" class="font-bold text-amber-500">85%</span></div>
-                    <div class="metric-row"><span>Schema Markup</span><span id="m-schema" class="status-pill status-pass">Valid</span></div>
-                </div>
-            </div>
-
-        </div>
-
-        <div class="p-10 glass-card rounded-[3rem]">
-            <h3 class="text-xl font-black mb-8">Performance Benchmark Trend</h3>
-            <div class="h-[400px]">
-                <canvas id="main-trend-chart"></canvas>
-            </div>
-        </div>
-
-    </section>
 </main>
 
 <script>
-    // System Config
-    const runBtn = document.getElementById('run-audit');
-    const resultsArea = document.getElementById('audit-results');
-    const statusBar = document.getElementById('status-bar');
+const runBtn = document.getElementById('run-audit');
+const resultsArea = document.getElementById('audit-results');
+const statusBar = document.getElementById('status-bar');
 
-    runBtn.addEventListener('click', async () => {
-        const targetUrl = document.getElementById('audit-url').value;
-        if(!targetUrl) return alert("System error: URL signature missing.");
+runBtn.addEventListener('click', async () => {
+    const targetUrl = document.getElementById('audit-url').value;
+    if(!targetUrl) return alert("Please enter a URL.");
 
-        // UI State: Scanning
-        runBtn.disabled = true;
-        runBtn.innerText = "SCRAPING DOM...";
-        statusBar.classList.remove('hidden');
-        
-        // --- SIMULATED PYTHON INTEGRATION ---
-        // In your real code, replace this setTimeout with: 
-        // const response = await fetch('/api/audit?url=' + targetUrl);
-        // const data = await response.json();
-        
-        setTimeout(() => {
-            hydrateDashboard({
-                health: 88,
-                errors: 4,
-                warnings: 12,
-                pages: 142,
-                grade: 'A',
-                summary: "The audit for " + targetUrl + " demonstrates exceptional technical architecture. However, we detected significant crawl budget waste on 14 paginated sub-URLs. Core Web Vitals are within the 'Good' threshold, but server-side TTFB could be reduced by 40ms with Edge Caching. Security headers (CSP) are missing, representing a medium-level risk for XSS injections. Mobile responsiveness is fluid, but tap targets in the footer are slightly over-compressed.",
-                weaknesses: ["Missing Content Security Policy", "Unoptimized Render-Blocking CSS", "Low Alt-Text density on Product Images"],
-                improvements: ["Enable Brotli Compression", "Migrate to WebP Images", "Fix 4 Broken Internal Links"]
-            });
-            
-            renderTrendChart();
-            runBtn.disabled = false;
-            runBtn.innerText = "SCAN COMPLETE";
-            resultsArea.classList.remove('hidden');
-            statusBar.classList.add('hidden');
-        }, 2000);
-    });
+    runBtn.disabled = true;
+    runBtn.innerText = "SCANNING...";
+    statusBar.classList.remove('hidden');
 
-    function hydrateDashboard(data) {
-        // Hydrate Top Stats
-        document.getElementById('stat-health').innerText = data.health + '%';
-        document.getElementById('bar-health').style.width = data.health + '%';
-        document.getElementById('stat-errors').innerText = data.errors;
-        document.getElementById('stat-warnings').innerText = data.warnings;
-        document.getElementById('stat-pages').innerText = data.pages;
-        document.getElementById('stat-grade').innerText = data.grade;
+    // Simulated Python backend integration
+    setTimeout(() => {
+        const data = {
+            health: 92,
+            errors: 3,
+            warnings: 11,
+            pages: 152,
+            grade: 'A',
+            summary: "The audit demonstrates strong technical architecture, excellent Core Web Vitals, and optimized SEO. Minor issues include missing CSP headers, 3 broken internal links, and some thin content pages. Mobile responsiveness is excellent. Optimization suggestions include image compression, render-blocking JS adjustments, and meta description enhancements.",
+            weaknesses: ["Missing CSP Header", "3 Broken Internal Links", "Thin Content Pages"],
+            improvements: ["Enable WebP Images", "Fix Internal Links", "Improve Meta Descriptions"],
+            full_metrics: [
+                { category: "Crawlability & Indexing", name: "HTTP 2xx Success", status: "pass" },
+                { category: "Crawlability & Indexing", name: "Broken Links", status: "fail" },
+                { category: "Core Web Vitals", name: "LCP", status: "pass" },
+                { category: "Core Web Vitals", name: "CLS", status: "pass" },
+                { category: "Security", name: "SSL Validity", status: "pass" },
+                { category: "Security", name: "CSP Header", status: "fail" }
+            ]
+        };
 
-        // Hydrate Executive Summary (The 200 Words)
-        document.getElementById('executive-summary').innerText = data.summary;
+        hydrateDashboard(data);
+        runBtn.disabled = false;
+        runBtn.innerText = "SCAN COMPLETE";
+        resultsArea.classList.remove('hidden');
+        statusBar.classList.add('hidden');
 
-        // Hydrate Lists
-        const weakList = document.getElementById('weak-areas');
-        weakList.innerHTML = data.weaknesses.map(w => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-rose-500 rounded-full"></div>${w}</li>`).join('');
-        
-        const impList = document.getElementById('improvements');
-        impList.innerHTML = data.improvements.map(i => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-emerald-500 rounded-full"></div>${i}</li>`).join('');
-    }
+    }, 2000);
+});
 
-    function renderTrendChart() {
-        const ctx = document.getElementById('main-trend-chart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Day 1', 'Day 5', 'Day 10', 'Day 15', 'Day 20', 'Day 30'],
-                datasets: [{
-                    label: 'Audit Health Score',
-                    data: [65, 68, 75, 82, 80, 88],
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 4,
-                    pointRadius: 6,
-                    pointBackgroundColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                }
-            }
-        });
-    }
-</script>
-</body>
-</html>
+function hydrateDashboard(data){
+    document.getElementById('stat-health').innerText = data.health + '%';
+    document.getElementById('bar-health').style.width = data.health + '%';
+    document.getElementById('stat-errors').innerText = data.errors;
+    document.getElementById('stat-warnings').innerText = data.warnings;
+    document.getElementById('stat-pages').innerText = data.pages;
+    document.getElementById('stat-grade').innerText = data.grade;
+
+    document.getElementById('executive-summary').innerText = data.summary;
+
+    const weakList = document.getElementById('weak-areas');
+    weakList.innerHTML = data.weaknesses.map(w => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-rose-500 rounded-full"></div>${w}</li>`).join('');
+    const impList = document.getElementById('improvements');
+    impList.innerHTML = data.improvements.map(i => `<li class="flex items-center gap-2"><div class="w-1 h-1 bg-emerald-500 rounded-full"></div>${i}</li>`).join('');
+
+    const metricsGrid = document.getElementById('full-metrics-grid');
+    metricsGrid.innerHTML = data.full_metrics.map(m => `
+        <div class="p-6 glass-card rounded-[2rem] border-l-4 border-${m.status==='pass'?'emerald-500':'rose-500'}">
+            <h3 class="text-xs font-black uppercase tracking-widest mb-3">${m.category}</h3>
+            <div class="metric-row"><span>${m.name}</span><span class="status-pill status-${m.status}">${m.status.toUpperCase()}</span></div>
+        </div>
+    `).join('');
+}
+
+function renderTrendChart(){
+    const ctx = document.getElementById('main-trend-chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Day 1', 'Day 5', 'Day 10', 'Day 15', 'Day 20', 'Day 30'],
+            datasets: [{
+                label: 'Health Score',
+                data: [65, 70, 78, 85, 88, 92],
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99,102,241,0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 4,
+                pointRadius: 6,
+                pointBackgroundColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' }
