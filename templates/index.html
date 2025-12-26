@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="h-full scroll-smooth dark">
 <head>
@@ -6,9 +7,9 @@
 <title>FF Tech Elite | Ultimate Website Audit</title>
 
 <!-- Tailwind CSS -->
-<script src="https://cdn.tailwindcss.com"></script>
+https://cdn.tailwindcss.com</script>
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+https://cdn.jsdelivr.net/npm/chart.js</script>
 <style>
   body { font-family: 'Inter', sans-serif; }
   .hidden { display: none; }
@@ -60,79 +61,58 @@
 
     <!-- Charts & Metrics -->
     <div id="metrics-container">
-
-      <!-- Overall Score -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Overall Score</h3>
         <div class="chart-container mb-4"><canvas id="chart-overall-score"></canvas></div>
       </div>
-
-      <!-- Technical SEO -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
-        <h3 class="text-xl font-semibold mb-2">Technical SEO <span class="tooltip" title="Crawl errors, sitemap, robots.txt, canonical tags">(?)</span></h3>
+        <h3 class="text-xl font-semibold mb-2">Technical SEO</h3>
         <div class="chart-container"><canvas id="chart-technical-seo"></canvas></div>
       </div>
-
-      <!-- On-Page SEO -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
-        <h3 class="text-xl font-semibold mb-2">On-Page SEO <span class="tooltip" title="Meta tags, headings, content quality, schema">(?)</span></h3>
+        <h3 class="text-xl font-semibold mb-2">On-Page SEO</h3>
         <div class="chart-container"><canvas id="chart-onpage-seo"></canvas></div>
       </div>
-
-      <!-- Performance -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Performance & Core Web Vitals</h3>
         <div class="chart-container"><canvas id="chart-performance"></canvas></div>
       </div>
-
-      <!-- Security -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Security</h3>
         <div class="chart-container"><canvas id="chart-security"></canvas></div>
       </div>
-
-      <!-- Mobile & Responsiveness -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Mobile & Responsiveness</h3>
         <div class="chart-container"><canvas id="chart-mobile"></canvas></div>
       </div>
-
-      <!-- Accessibility -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Accessibility & Usability</h3>
         <div class="chart-container"><canvas id="chart-usability"></canvas></div>
       </div>
-
-      <!-- Backlinks -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Backlinks & Authority</h3>
         <div class="chart-container"><canvas id="chart-backlinks"></canvas></div>
       </div>
-
-      <!-- Content & Keywords -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Content & Keywords</h3>
         <div class="chart-container"><canvas id="chart-content"></canvas></div>
       </div>
-
-      <!-- Competitor Comparison -->
       <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded">
         <h3 class="text-xl font-semibold mb-2">Competitor Comparison</h3>
         <div class="chart-container"><canvas id="chart-competitor"></canvas></div>
       </div>
-
     </div>
 
     <!-- Advanced Features -->
     <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded space-y-4">
       <h3 class="text-xl font-semibold mb-2">Advanced Features</h3>
       <ul class="list-disc pl-6 space-y-1">
-        <li id="py-integration"><a href="#" target="_blank" class="text-blue-600 dark:text-blue-400 underline">Python Audit Integration Link</a></li>
-        <li id="screenshot">Screenshot comparison placeholder</li>
-        <li id="recommendations">SEO recommendations & action plan placeholder</li>
-        <li id="weak-areas">Weak areas placeholder</li>
-        <li id="export-report">Export report placeholder</li>
-        <li id="audit-history">Historical audits placeholder</li>
+        <li id="py-integration">#Python Audit Integration Link</a></li>
+        <li id="recommendations">Recommendations: <span id="recommendations-list"></span></li>
+        <li id="weak-areas">Weak Areas: <span id="weak-areas-list"></span></li>
+        <li><Download Certified PDF Report</a></li>
+        <li id="audit-history">Historical audits trend chart:</li>
+        <div class="chart-container"><canvas id="chart-history"></canvas></div>
       </ul>
     </div>
 
@@ -153,50 +133,105 @@ document.getElementById('toggle-dark').addEventListener('click', ()=>{
 // Audit Counter and Subscription Limit
 let auditCount = 0;
 const maxFreeAudits = 5;
-document.getElementById('run-audit').addEventListener('click', ()=>{
-  const url = document.getElementById('audit-url').value;
+
+// Charts
+let historyChart;
+
+document.getElementById('run-audit').addEventListener('click', async ()=>{
+  const url = document.getElementById('audit-url').value.trim();
   if(!url){ alert("Enter a valid URL"); return; }
 
   auditCount++;
-  if(auditCount>maxFreeAudits){
+  if(auditCount > maxFreeAudits){
     document.getElementById('subscription-alert').classList.remove('hidden');
     return;
   }
 
   document.getElementById('audit-results').classList.remove('hidden');
-  document.getElementById('audit-status').innerText = `Audit #${auditCount} executed! Python will populate data.`;
+  document.getElementById('audit-status').innerText = `Running audit for ${url}...`;
 
-  // Update Python Integration Link
-  document.getElementById('py-integration').querySelector('a').href = `http://localhost:8000/run-audit?url=${encodeURIComponent(url)}`;
-});
+  try {
+    const res = await fetch(`/api/audit?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    const audit = data.audit;
 
-// Dummy Charts (to be replaced by Python JSON)
-function generateCharts(){
-  const chartIds = ['chart-overall-score','chart-technical-seo','chart-onpage-seo','chart-performance','chart-security','chart-mobile','chart-usability','chart-backlinks','chart-content','chart-competitor'];
-  chartIds.forEach(id=>{
-    const ctx = document.getElementById(id).getContext('2d');
-    new Chart(ctx,{
-      type:'bar',
-      data:{
-        labels:['Metric1','Metric2','Metric3','Metric4','Metric5'],
-        datasets:[{label:'Score',data:[Math.random()*100,Math.random()*100,Math.random()*100,Math.random()*100,Math.random()*100],backgroundColor:'rgba(37,99,235,0.7)'}]
-      },
-      options:{responsive:true,maintainAspectRatio:false}
+    // Executive summary
+    document.getElementById('executive-summary').innerText = audit.executive_summary;
+
+    // Update Python Integration Link
+    document.getElementById('py-integration').querySelector('a').href = `/run-audit?url=${encodeURIComponent(url)}`;
+
+    // Recommendations
+    const recoList = Object.values(audit.recommendations).join(", ");
+    document.getElementById('recommendations-list').innerText = recoList;
+
+    // Weak areas
+    document.getElementById('weak-areas-list').innerText = audit.weaknesses.join(", ");
+
+    // PDF link
+    document.getElementById('download-pdf').href = `/api/audit/pdf?url=${encodeURIComponent(url)}`;
+
+    // Charts
+    const chartData = [
+      { id:'chart-overall-score', label:'Overall', value:audit.site_health_score },
+      { id:'chart-technical-seo', label:'Technical SEO', value:audit.metrics_summary.seo_score },
+      { id:'chart-onpage-seo', label:'On-Page SEO', value:audit.metrics_summary.accessibility_score },
+      { id:'chart-performance', label:'Performance', value:audit.metrics_summary.performance_score },
+      { id:'chart-security', label:'Security', value:audit.metrics_summary.security_score },
+      { id:'chart-mobile', label:'Mobile', value:audit.metrics_summary.mobile_friendly ? 100 : 0 },
+      { id:'chart-usability', label:'Accessibility', value:audit.metrics_summary.accessibility_score },
+      { id:'chart-backlinks', label:'Backlinks', value:0 },
+      { id:'chart-content', label:'Content', value:audit.metrics_summary.pages_crawled },
+      { id:'chart-competitor', label:'Competitor', value:audit.site_health_score }
+    ];
+
+    chartData.forEach(c=>{
+      const ctx = document.getElementById(c.id).getContext('2d');
+      new Chart(ctx,{
+        type:'bar',
+        data:{ labels:[c.label], datasets:[{ label:c.label, data:[c.value], backgroundColor:'rgba(37,99,235,0.7)' }] },
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ min:0, max:100 } } }
+      });
     });
-  });
-}
-generateCharts();
+
+    // History chart
+    const histRes = await fetch(`/api/history?url=${encodeURIComponent(url)}&limit=12`);
+    const histData = await histRes.json();
+    const labels = histData.points.map(p=>new Date(p.t).toLocaleDateString());
+    const scores = histData.points.map(p=>p.score);
+    const ctxHist = document.getElementById('chart-history').getContext('2d');
+    if(historyChart){
+      historyChart.data.labels = labels;
+      historyChart.data.datasets[0].data = scores;
+      historyChart.update();
+    } else {
+      historyChart = new Chart(ctxHist,{
+        type:'line',
+        data:{ labels, datasets:[{ data:scores, borderColor:'#2563EB', backgroundColor:'rgba(37,99,235,0.2)', tension:.4, fill:true }] },
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ min:0, max:100 } } }
+      });
+    }
+
+    document.getElementById('audit-status').innerText = `Audit completed for ${audit.website.url}. Score ${audit.site_health_score}% (Grade ${audit.grade}).`;
+
+  } catch(e){
+    console.error(e);
+    document.getElementById('audit-status').innerText = 'Audit failed. Please try again.';
+  }
+});
 
 // Subscription Button Placeholder
 document.getElementById('subscribe-btn').addEventListener('click',()=>{
   alert("Integrate Stripe/PayPal backend here.");
 });
 
-// Send Login Link Placeholder
-document.getElementById('send-link').addEventListener('click',()=>{
-  const email = document.getElementById('email-login').value;
+// Send Login Link
+document.getElementById('send-link').addEventListener('click', async ()=>{
+  const email = document.getElementById('email-login').value.trim();
   if(!email){ alert("Enter valid email"); return; }
-  alert(`Python will handle sending login link to ${email}`);
+  const res = await fetch('/auth/send-link',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
+  const data = await res.json();
+  document.getElementById('login-status').innerText = data.message || 'Check your email for login link.';
 });
 </script>
 </body>
