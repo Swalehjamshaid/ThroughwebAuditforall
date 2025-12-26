@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | AI-Powered Website Audit</title>
+    <title>FF Tech | AI-Powered Website Audit Report</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --glass: rgba(255, 255, 255, 0.03);
+            --glass: rgba(255, 255, 255, 0.05);
             --glass-border: rgba(255, 255, 255, 0.1);
-            --accent-glow: rgba(0, 242, 255, 0.5);
+            --accent: #00f2ff;
+            --accent-dark: #0062ff;
+            --green: #00ff88;
+            --yellow: #ffbb00;
+            --red: #ff4d4d;
         }
         body {
             background: radial-gradient(circle at top right, #1a1a2e, #0f0f1a, #050505);
@@ -20,180 +25,276 @@
         }
         .glass-card {
             background: var(--glass);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
             border-radius: 24px;
-            transition: all 0.3s ease;
+            transition: all 0.4s ease;
         }
         .glass-card:hover {
-            border-color: rgba(0, 242, 255, 0.3);
-            box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
+            border-color: rgba(0, 242, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.15);
         }
         .grade-badge {
-            background: linear-gradient(135deg, #00f2ff, #0062ff);
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            font-weight: 800;
-            filter: drop-shadow(0 0 10px rgba(0, 242, 255, 0.5));
+            font-weight: 900;
+            font-size: 4.5rem;
+            filter: drop-shadow(0 0 15px rgba(0, 242, 255, 0.6));
         }
         .metric-dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             display: inline-block;
+            box-shadow: 0 0 10px currentColor;
         }
-        .dot-green { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
-        .dot-yellow { background: #ffbb00; box-shadow: 0 0 8px #ffbb00; }
-        .dot-red { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; animation: pulse 2s infinite; }
-        
+        .dot-green { background: var(--green); }
+        .dot-yellow { background: var(--yellow); }
+        .dot-red { background: var(--red); animation: pulse 2s infinite; }
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .category-header {
+            background: linear-gradient(90deg, rgba(0,242,255,0.1), transparent);
+            border-left: 4px solid var(--accent);
         }
     </style>
 </head>
-<body class="p-6">
+<body class="p-6 lg:p-12">
 
-    <nav class="max-w-7xl mx-auto flex justify-between items-center mb-10">
-        <div class="text-2xl font-bold tracking-tighter">FF <span class="text-cyan-400">TECH</span></div>
-        <div class="flex gap-6 items-center">
-            <span class="text-sm opacity-60">Audit ID: #FF-88291</span>
-            <button class="bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-2 px-6 rounded-full transition">Download PDF Certificate</button>
-        </div>
-    </nav>
-
-    <main class="max-w-7xl mx-auto grid grid-cols-12 gap-6">
-        
-        <div class="col-span-12 lg:col-span-4 glass-card p-8 flex flex-col items-center justify-center text-center">
-            <h3 class="text-gray-400 uppercase tracking-widest text-xs mb-4">Overall Site Health</h3>
-            <div class="relative flex items-center justify-center">
-                <svg class="w-48 h-48">
-                    <circle cx="96" cy="96" r="88" stroke="rgba(255,255,255,0.05)" stroke-width="12" fill="none" />
-                    <circle cx="96" cy="96" r="88" stroke="#00f2ff" stroke-width="12" fill="none" stroke-dasharray="553" stroke-dashoffset="120" stroke-linecap="round" />
-                </svg>
-                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-6xl grade-badge">B+</span>
-                    <span class="text-sm opacity-50">78% Score</span>
-                </div>
+    <!-- Login / Registration Gate (shown only if not authenticated) -->
+    <div id="auth-gate" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden">
+        <div class="glass-card p-10 max-w-md w-full mx-4">
+            <h2 class="text-3xl font-bold text-center mb-8">Unlock Full Audit Report</h2>
+            <div id="login-form" class="space-y-6">
+                <input type="email" id="login-email" placeholder="Enter your email" class="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-cyan-400">
+                <input type="password" id="login-password" placeholder="Password" class="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-cyan-400">
+                <button onclick="simulateLogin()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-4 rounded-xl transition">
+                    Access Report
+                </button>
+                <p class="text-center text-sm opacity-70">Don't have access? <a href="#" onclick="showRegister()" class="text-cyan-400 underline">Register</a></p>
             </div>
-            <p class="mt-6 text-sm text-gray-400">Strict Scoring Mode: <span class="text-yellow-500 font-bold text-xs uppercase">Active</span></p>
-        </div>
-
-        <div class="col-span-12 lg:col-span-8 glass-card p-8 border-l-4 border-cyan-500">
-            <div class="flex items-center gap-3 mb-4">
-                <i class="fa-solid fa-robot text-cyan-400"></i>
-                <h2 class="text-xl font-bold">Executive Summary</h2>
+            <div id="register-form" class="space-y-6 hidden">
+                <input type="text" placeholder="Full Name" class="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-xl">
+                <input type="email" id="reg-email" placeholder="Business Email" class="w-full px-6 py-4 bg-white/5 border border-white/10 rounded-xl">
+                <button onclick="simulateRegister()" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold py-4 rounded-xl transition">
+                    Send Paid Access Link (via Email)
+                </button>
+                <p class="text-center text-sm opacity-70"><a href="#" onclick="showLogin()" class="text-cyan-400 underline">Back to Login</a></p>
             </div>
-            <p class="text-gray-300 leading-relaxed italic">
-                "Your website currently holds an FF Tech Grade of <strong>78% (B+)</strong>. While your security protocols are in the top 5th percentile globally, your mobile performance is currently creating a conversion bottleneck. Specifically, the Largest Contentful Paint (LCP) of 4.2s is causing a predicted 25% increase in mobile bounce rates. Furthermore, 12% of your internal pages are currently 'Orphaned,' meaning they receive no link equity and are invisible to major search engines. To reach an 'A' grade, priority must be placed on server-side image compression and resolving the 404 broken links identified in the crawl. Resolving these 'Pulse Red' issues will significantly enhance both user retention and organic authority."
-            </p>
-            <div class="mt-6 flex gap-4">
-                <div class="glass-card bg-red-500/10 border-red-500/20 px-4 py-2 rounded-lg text-xs">
-                    <span class="text-red-400 font-bold uppercase">Weak Area:</span> Performance Bottlenecks
-                </div>
-                <div class="glass-card bg-cyan-500/10 border-cyan-500/20 px-4 py-2 rounded-lg text-xs">
-                    <span class="text-cyan-400 font-bold uppercase">Strong Area:</span> SSL Security
-                </div>
-            </div>
+            <div id="auth-message" class="text-center mt-4 hidden"></div>
         </div>
+    </div>
 
-        <div class="col-span-12 mt-4">
-            <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
-                <i class="fa-solid fa-microchip text-cyan-400"></i> Full Audit Metrics (60+)
-            </h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="font-bold text-sm">Crawlability</span>
-                        <span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded">5 Issues</span>
-                    </div>
-                    <ul class="space-y-3 text-xs opacity-80">
-                        <li class="flex justify-between"><span>HTTP Status Codes</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Redirect Loops</span> <span class="dot-red metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Orphan Pages</span> <span class="dot-red metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Broken Internal Links</span> <span class="dot-yellow metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Sitemap Status</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Robots.txt Analysis</span> <span class="dot-green metric-dot"></span></li>
-                    </ul>
-                </div>
-
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="font-bold text-sm">Performance</span>
-                        <span class="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">Slow Response</span>
-                    </div>
-                    <ul class="space-y-3 text-xs opacity-80">
-                        <li class="flex justify-between"><span>Largest Contentful Paint</span> <span class="dot-red metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Cumulative Layout Shift</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Time to First Byte (TTFB)</span> <span class="dot-yellow metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Unminified CSS/JS</span> <span class="dot-yellow metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Image WebP Usage</span> <span class="dot-green metric-dot"></span></li>
-                    </ul>
-                </div>
-
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="font-bold text-sm">Security</span>
-                        <span class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded">Secured</span>
-                    </div>
-                    <ul class="space-y-3 text-xs opacity-80">
-                        <li class="flex justify-between"><span>SSL Validity</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>HTTPS Enforcement</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>HSTS Headers</span> <span class="dot-red metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Mixed Content Issues</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>X-Frame-Options</span> <span class="dot-green metric-dot"></span></li>
-                    </ul>
-                </div>
-
-                <div class="glass-card p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="font-bold text-sm">On-Page</span>
-                        <span class="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-1 rounded">Optimized</span>
-                    </div>
-                    <ul class="space-y-3 text-xs opacity-80">
-                        <li class="flex justify-between"><span>Missing Title Tags</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Duplicate Meta Descr.</span> <span class="dot-yellow metric-dot"></span></li>
-                        <li class="flex justify-between"><span>H1 Tag Structure</span> <span class="dot-green metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Image Alt Attributes</span> <span class="dot-red metric-dot"></span></li>
-                        <li class="flex justify-between"><span>Schema Markup</span> <span class="dot-yellow metric-dot"></span></li>
-                    </ul>
-                </div>
-
+    <div id="report-content" class="max-w-7xl mx-auto">
+        <nav class="flex justify-between items-center mb-12">
+            <div class="text-3xl font-black tracking-tighter">FF <span class="text-cyan-400">TECH</span></div>
+            <div class="flex items-center gap-8">
+                <span class="text-sm opacity-60">Audit ID: <span id="audit-id">#FF-88291</span></span>
+                <button class="bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-3 px-8 rounded-full transition shadow-lg shadow-cyan-500/30">
+                    Download PDF Certificate
+                </button>
             </div>
-        </div>
+        </nav>
 
-        <div class="col-span-12 lg:col-span-12 glass-card p-8 mt-4">
-            <h3 class="text-lg font-bold mb-6">Competitive Authority Benchmark</h3>
-            <div class="space-y-4">
-                <div>
-                    <div class="flex justify-between text-xs mb-1"><span>You (FF Tech Audit)</span> <span>78%</span></div>
-                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                        <div class="bg-cyan-500 h-full w-[78%] shadow-[0_0_10px_#00f2ff]"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs mb-1 opacity-50"><span>Competitor A</span> <span>85%</span></div>
-                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                        <div class="bg-gray-500 h-full w-[85%] opacity-50"></div>
-                    </div>
-                </div>
-                <div>
-                    <div class="flex justify-between text-xs mb-1 opacity-50"><span>Competitor B</span> <span>62%</span></div>
-                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                        <div class="bg-gray-500 h-full w-[62%] opacity-50"></div>
+        <!-- Overall Site Health -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <div class="lg:col-span-1 glass-card p-10 text-center flex flex-col justify-center">
+                <h3 class="text-gray-400 uppercase tracking-widest text-sm mb-6">Overall Site Health</h3>
+                <div class="relative w-64 h-64 mx-auto">
+                    <svg class="w-full h-full -rotate-90">
+                        <circle cx="128" cy="128" r="110" stroke="rgba(255,255,255,0.1)" stroke-width="16" fill="none"/>
+                        <circle cx="128" cy="128" r="110" stroke="url(#gradient)" stroke-width="16" fill="none" 
+                                stroke-dasharray="691" id="health-circle" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gradient">
+                                <stop offset="0%" stop-color="#00f2ff"/>
+                                <stop offset="100%" stop-color="#0062ff"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <div class="grade-badge" id="overall-grade">A-</div>
+                        <div class="text-2xl font-bold" id="overall-score">92%</div>
+                        <div class="text-sm opacity-60 mt-2" id="scoring-mode">Strict Mode Active</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-    </main>
+            <div class="lg:col-span-2 glass-card p-10">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-4">
+                    <i class="fa-solid fa-robot text-cyan-400 text-3xl"></i> Executive Summary
+                </h2>
+                <p class="text-gray-300 leading-relaxed text-lg italic" id="executive-summary">
+                    "Your website demonstrates strong technical foundation with excellent security and crawlability. However, performance on mobile devices and image optimization present opportunities for improvement..."
+                </p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-red-400" id="total-errors">12</div>
+                        <div class="text-sm opacity-70">Critical Errors</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-yellow-400" id="total-warnings">28</div>
+                        <div class="text-sm opacity-70">Warnings</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-cyan-400" id="total-notices">45</div>
+                        <div class="text-sm opacity-70">Notices</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-green-400" id="crawled-pages">1,842</div>
+                        <div class="text-sm opacity-70">Pages Crawled</div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-    <footer class="max-w-7xl mx-auto mt-20 pb-10 border-t border-white/5 pt-10 text-center">
-        <p class="text-sm opacity-40">© 2025 FF Tech International. Powered by Advanced Python Analytics on Railway Cloud.</p>
+        <!-- All Categories -->
+        <section class="space-y-12">
+            <!-- Template for each category - you can duplicate and customize -->
+            <div class="category-header glass-card p-8">
+                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-spider text-cyan-400"></i>
+                    <span id="category-1-title">Crawlability & Indexation</span>
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-1-metrics">
+                    <!-- Metrics will be injected here via JS -->
+                </div>
+            </div>
+
+            <!-- Repeat similar blocks for other categories with unique IDs -->
+            <!-- Category 2: On-Page SEO -->
+            <div class="category-header glass-card p-8">
+                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-file-code text-cyan-400"></i> On-Page SEO Metrics
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-2-metrics"></div>
+            </div>
+
+            <!-- Category 3: Technical & Performance -->
+            <div class="category-header glass-card p-8">
+                <h2 class="text-2xl font-bold mb-8 flex items-center gap-4">
+                    <i class="fa-solid fa-gauge-high text-cyan-400"></i> Technical & Performance Metrics
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="category-3-metrics"></div>
+            </div>
+
+            <!-- Add more categories as needed up to 10 -->
+        </section>
+
+        <!-- Competitive Benchmark -->
+        <section class="mt-16 glass-card p-10">
+            <h3 class="text-2xl font-bold mb-8">Competitive Authority Benchmark</h3>
+            <canvas id="benchmarkChart" height="100"></canvas>
+        </section>
+    </div>
+
+    <footer class="max-w-7xl mx-auto mt-20 pt-10 border-t border-white/10 text-center opacity-50 text-sm">
+        © 2025 FF Tech International. AI-Powered SEO Auditing Platform.
     </footer>
 
+    <script>
+        // Simulate authentication (in real app, this would check session/server)
+        function simulateLogin() {
+            document.getElementById('auth-gate').classList.add('hidden');
+            document.getElementById('report-content').classList.remove('hidden');
+        }
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+        function showLogin() {
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        }
+        function simulateRegister() {
+            document.getElementById('auth-message').classList.remove('hidden');
+            document.getElementById('auth-message').innerHTML = '<p class="text-green-400">Paid access link sent to your email!</p>';
+        }
+
+        // Example data structure - in production, this comes from Python backend (e.g., JSON response)
+        const auditData = {
+            overall: {
+                score: 92,
+                grade: "A-",
+                errors: 12,
+                warnings: 28,
+                notices: 45,
+                crawled: 1842,
+                summary: "Strong technical foundation with excellent security. Mobile performance and image optimization are key opportunities."
+            },
+            categories: [
+                {
+                    title: "Crawlability & Indexation",
+                    metrics: [
+                        {name: "HTTP 4xx Errors", value: "8", status: "red"},
+                        {name: "HTTP 5xx Errors", value: "0", status: "green"},
+                        {name: "Orphan Pages", value: "142 (7.7%)", status: "yellow"},
+                        {name: "Broken Internal Links", value: "34", status: "red"},
+                        {name: "Redirect Loops", value: "0", status: "green"},
+                        {name: "Sitemap Status", value: "Valid", status: "green"}
+                    ]
+                },
+                // Add more categories with metrics...
+            ]
+        };
+
+        // Populate overall health circle
+        const circumference = 691;
+        const offset = circumference - (auditData.overall.score / 100) * circumference;
+        document.getElementById('health-circle').style.strokeDashoffset = offset;
+        document.getElementById('overall-score').textContent = auditData.overall.score + '%';
+        document.getElementById('overall-grade').textContent = auditData.overall.grade;
+        document.getElementById('total-errors').textContent = auditData.overall.errors;
+        document.getElementById('total-warnings').textContent = auditData.overall.warnings;
+        document.getElementById('total-notices').textContent = auditData.overall.notices;
+        document.getElementById('crawled-pages').textContent = auditData.overall.crawled;
+        document.getElementById('executive-summary').innerHTML = `"${auditData.overall.summary}"`;
+
+        // Render metrics dynamically
+        auditData.categories.forEach((cat, index) => {
+            const container = document.getElementById(`category-${index+1}-metrics`);
+            if (!container) return;
+            cat.metrics.forEach(metric => {
+                const div = document.createElement('div');
+                div.className = 'glass-card p-5';
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm opacity-90">${metric.name}</span>
+                        <span class="metric-dot dot-${metric.status}"></span>
+                    </div>
+                    <div class="mt-3 text-lg font-bold text-right">${metric.value}</div>
+                `;
+                container.appendChild(div);
+            });
+        });
+
+        // Benchmark chart
+        new Chart(document.getElementById('benchmarkChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Your Site', 'Competitor A', 'Competitor B', 'Industry Avg'],
+                datasets: [{
+                    label: 'Site Health Score',
+                    data: [92, 87, 71, 79],
+                    backgroundColor: ['#00f2ff', '#888', '#888', '#444'],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
+            }
+        });
+
+        // Show gate initially (remove .hidden from auth-gate div to enable)
+        // document.getElementById('auth-gate').classList.remove('hidden');
+        // document.getElementById('report-content').classList.add('hidden');
+    </script>
 </body>
 </html>
