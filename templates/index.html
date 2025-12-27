@@ -45,7 +45,7 @@
         
         <section id="section-audit" class="section-view text-center mb-16">
             <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tighter">AI Website <span class="text-indigo-600">Audit.</span></h1>
-            <p class="text-slate-400 mb-10 text-lg font-medium max-w-2xl mx-auto italic">Verified technical health across 250+ technical SEO & performance signals.</p>
+            <p class="text-slate-400 mb-10 text-lg font-medium max-w-2xl mx-auto italic">Analyze 250+ signals for SEO, Performance, and Security in 15 seconds.</p>
             
             <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
                 <input id="url-input" type="url" placeholder="https://example.com" required class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
@@ -55,11 +55,10 @@
 
         <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem]">
             <div class="status-pulse mb-4 mx-auto"></div>
-            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">CRAWLING PAGES & GENERATING INSIGHTS...</p>
+            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">SCANNING HEADERS & CRAWLING PAGES...</p>
         </div>
 
         <div id="results-view" class="hidden space-y-8">
-            
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white p-10 rounded-[3rem] shadow-sm border flex flex-col items-center justify-center relative">
                     <canvas id="mainChart" width="220" height="220"></canvas>
@@ -70,13 +69,13 @@
                 
                 <div class="md:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-center">
                     <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Executive Intelligence</h3>
-                        <button onclick="downloadPDF()" class="text-indigo-600 font-bold text-xs uppercase"><i class="fas fa-file-pdf mr-1"></i> Export 5-Page PDF</button>
+                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Analysis Summary</h3>
+                        <button onclick="downloadPDF()" class="text-indigo-600 font-bold text-xs uppercase"><i class="fas fa-file-pdf mr-1"></i> Export Certified PDF</button>
                     </div>
                     <p id="summary-text" class="text-slate-600 leading-relaxed text-lg font-medium italic mb-8"></p>
                     <div class="flex gap-3">
                          <div class="bg-indigo-50 px-5 py-3 rounded-2xl">
-                            <span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Overall Score</span>
+                            <span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Health Score</span>
                             <span id="score-text" class="font-bold text-indigo-600 text-xl">0%</span>
                          </div>
                     </div>
@@ -86,11 +85,11 @@
         </div>
 
         <section id="section-admin" class="section-view hidden">
-            <h2 class="text-4xl font-black tracking-tight mb-10 text-rose-500 uppercase italic">Admin Oversight</h2>
+            <h2 class="text-4xl font-black tracking-tight mb-10 text-rose-500 uppercase italic">Admin Console</h2>
             <div class="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
                 <div class="flex border-b bg-slate-50/50">
-                    <button id="tab-users" onclick="adminTab('users')" class="px-8 py-4 text-[10px] font-black uppercase admin-tab-active border-r">Users List</button>
-                    <button id="tab-audits" onclick="adminTab('audits')" class="px-8 py-4 text-[10px] font-black uppercase">Audit History</button>
+                    <button id="tab-users" onclick="adminTab('users')" class="px-8 py-4 text-[10px] font-black uppercase admin-tab-active border-r">Users</button>
+                    <button id="tab-audits" onclick="adminTab('audits')" class="px-8 py-4 text-[10px] font-black uppercase">Audit Logs</button>
                 </div>
                 <div id="admin-table-container" class="p-6 overflow-x-auto min-h-[300px]"></div>
             </div>
@@ -115,11 +114,11 @@
         let chart = null;
         let isLogin = true;
 
-        // API Handler with JWT support
+        // Core API Interactor
         async function api(path, method = 'GET', body = null) {
-            const h = { 'Content-Type': 'application/json' };
-            if (token) h['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : null });
             if (res.status === 401) { localStorage.removeItem('token'); location.reload(); }
             return res.json();
         }
@@ -132,11 +131,12 @@
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        // Core Audit Logic
+        // Audit Form Submission
         document.getElementById('audit-form').onsubmit = async (e) => {
             e.preventDefault();
             const url = document.getElementById('url-input').value;
             
+            // Uses your custom main.js fadeToggle and CSS status-pulse
             if (typeof fadeToggle === "function") fadeToggle('loading-zone', true);
             else document.getElementById('loading-zone').classList.remove('hidden');
             
@@ -148,7 +148,7 @@
             else document.getElementById('loading-zone').classList.add('hidden');
 
             document.getElementById('results-view').classList.remove('hidden');
-            document.getElementById('results-view').classList.add('glass-entry'); // From your CSS
+            document.getElementById('results-view').classList.add('glass-entry');
 
             document.getElementById('grade-display').innerText = data.grade;
             document.getElementById('summary-text').innerText = data.summary;
@@ -170,7 +170,7 @@
                 </div>`).join('');
         };
 
-        // Admin Oversight
+        // Admin Table Interaction
         async function adminTab(type) {
             const container = document.getElementById('admin-table-container');
             document.getElementById('tab-users').classList.toggle('admin-tab-active', type === 'users');
@@ -180,14 +180,14 @@
             if (type === 'users') {
                 container.innerHTML = `<table class="w-full text-left text-xs border-collapse font-bold">
                     <tr class="border-b uppercase text-[9px] font-black text-slate-400">
-                        <th class="p-4">User</th><th class="p-4">Sub</th><th class="p-4">Remaining</th>
+                        <th class="p-4">Email</th><th class="p-4">Sub</th><th class="p-4">Credits</th>
                     </tr>
                     ${data.map(u => `<tr class="border-b hover:bg-slate-50 transition"><td class="p-4">${u.email}</td><td class="p-4">${u.subscribed ? '👑 PRO' : 'FREE'}</td><td class="p-4">${u.free_audits_remaining}</td></tr>`).join('')}
                 </table>`;
             } else {
                 container.innerHTML = `<table class="w-full text-left text-xs border-collapse font-bold">
                     <tr class="border-b uppercase text-[9px] font-black text-slate-400">
-                        <th class="p-4">Website</th><th class="p-4">Grade</th><th class="p-4">Score</th>
+                        <th class="p-4">Target Website</th><th class="p-4">Grade</th><th class="p-4">Score</th>
                     </tr>
                     ${data.map(a => `<tr class="border-b hover:bg-slate-50 transition"><td class="p-4 text-indigo-600 truncate max-w-[150px]">${a.url}</td><td class="p-4 font-black">${a.grade}</td><td class="p-4">${a.overall}%</td></tr>`).join('')}
                 </table>`;
@@ -196,7 +196,7 @@
 
         function loadAdmin() { showSection('section-admin'); adminTab('users'); }
 
-        // Onboarding & Billing
+        // Auth & Billing Interaction
         async function handleAuth(e) {
             e.preventDefault();
             const email = document.getElementById('auth-email').value;
