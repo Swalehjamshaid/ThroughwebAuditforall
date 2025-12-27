@@ -1,124 +1,380 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FF Tech AI Website Audit</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ app_name }} — Dashboard</title>
+  https://cdn.tailwindcss.com</script>
+  https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
+  https://fonts.gstatic.com
+  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .glass { background: rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.35);
+             backdrop-filter: saturate(140%) blur(10px); border-radius: 18px; box-shadow: 0 10px 35px rgba(0,0,0,.15); }
+    .metric-card{border-left-width:8px}
+    .metric-green{border-color:#10b981}.metric-yellow{border-color:#f59e0b}.metric-red{border-color:#ef4444}
+    .btn-primary{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); color:#fff}
+    .btn-primary:hover{filter:brightness(1.05)}
+    .grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+  </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<body class="bg-slate-50 text-slate-800">
 
-<main class="p-6 max-w-5xl mx-auto">
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3 9-8 10-5-1-8-5-8-10V6l8-4z" stroke="white" stroke-width="1.3"/></svg>
+        <div>
+          <h1 class="text-xl md:text-2xl font-black">{{ app_name }}</h1>
+          <p class="text-xs md:text-sm opacity-80">Open audits, scheduling & certified reports</p>
+        </div>
+      </div>
+      <nav class="flex items-center gap-4">
+        <button id="btn-login" class="underline">Login</button>
+        <button id="btn-register" class="underline">Register</button>
+        <span id="user-badge" class="hidden">
+          <span class="text-sm">Signed in: <b id="user-email"></b></span>
+          <button id="btn-logout" class="ml-3 underline">Logout</button>
+        </span>
+      </nav>
+    </div>
+  </header>
 
-<h1 class="text-3xl font-bold mb-6">FF Tech — Website Audit Platform</h1>
+  <!-- Main -->
+  <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
 
-<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
-  <h2 class="text-xl font-semibold mb-2">Open Access Audit</h2>
-  <form id="audit-form" class="flex gap-2">
-    <input id="website-url" type="url" placeholder="https://example.com" class="flex-1 p-2 rounded border border-gray-300" required>
-    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Run Audit</button>
-  </form>
-</section>
+    <!-- Health/Ping -->
+    <div class="glass p-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-sm">Health: <b id="health-status">checking…</b></span>
+        <span class="text-sm">Ping: <b id="ping-status">checking…</b></span>
+      </div>
+      <div class="text-xs opacity-70">Server time: <span id="server-time">—</span></div>
+    </div>
 
-<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
-  <h2 class="text-xl font-semibold mb-2">User Registration</h2>
-  <form id="register-form" class="flex flex-col gap-2">
-    <input id="reg-email" type="email" placeholder="Email" class="p-2 rounded border border-gray-300" required>
-    <input id="reg-password" type="password" placeholder="Password (min 8 chars)" class="p-2 rounded border border-gray-300" required>
-    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Register</button>
-  </form>
-  <div id="register-msg" class="mt-2"></div>
-</section>
+    <!-- Audit form -->
+    <section class="glass p-6">
+      <h2 class="text-xl font-black">Run an Audit</h2>
+      <p class="text-sm opacity-80">Enter any website URL for an immediate, visual report</p>
+      <form id="audit-form" class="mt-4 flex flex-col md:flex-row gap-3">
+        <input id="website-url" type="url" placeholder="https://example.com" required
+               class="flex-1 rounded px-4 py-3 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Run Audit</button>
+        <button id="export-pdf" class="px-5 py-3 rounded border font-bold" type="button">Export PDF</button>
+      </form>
+      <p class="mt-2 text-xs opacity-70">Free audits remaining: <span id="free-remaining">—</span></p>
+    </section>
 
-<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
-  <h2 class="text-xl font-semibold mb-2">User Login</h2>
-  <form id="login-form" class="flex flex-col gap-2">
-    <input id="login-email" type="email" placeholder="Email" class="p-2 rounded border border-gray-300" required>
-    <input id="login-password" type="password" placeholder="Password" class="p-2 rounded border border-gray-300" required>
-    <button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Login</button>
-  </form>
-  <div id="login-msg" class="mt-2"></div>
-</section>
+    <!-- Progress & Summary -->
+    <section id="results" class="hidden space-y-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Overall</h3>
+          <canvas id="overall-gauge"></canvas>
+        </div>
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Categories</h3>
+          <canvas id="category-chart"></canvas>
+        </div>
+      </div>
+      <div class="glass p-6">
+        <h3 class="text-lg font-black">Executive Summary</h3>
+        <p id="exec-summary" class="mt-2 leading-relaxed"></p>
+      </div>
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="glass p-6">
+          <h4 class="font-black text-green-700">Strengths</h4>
+          <ul id="strengths" class="mt-3 list-disc list-inside text-sm"></ul>
+        </div>
+        <div class="glass p-6">
+          <h4 class="font-black text-rose-700">Weak Areas</h4>
+          <ul id="weaknesses" class="mt-3 list-disc list-inside text-sm"></ul>
+        </div>
+        <div class="glass p-6">
+          <h4 class="font-black text-amber-700">Priority Fixes</h4>
+          <ul id="priority" class="mt-3 list-disc list-inside text-sm"></ul>
+        </div>
+      </div>
+      <div class="glass p-6">
+        <h4 class="text-lg font-black mb-3">Metrics (sample)</h4>
+        <div id="metrics-grid" class="grid-auto"></div>
+      </div>
+    </section>
 
-<section id="summary" class="hidden mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
-  <h2 class="text-xl font-semibold mb-2">Audit Summary</h2>
-  <pre id="out" class="whitespace-pre-wrap"></pre>
-  <button id="export-pdf" class="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Export PDF</button>
-</section>
+    <!-- Account & Scheduling -->
+    <section class="glass p-6">
+      <h2 class="text-xl font-black">Account & Scheduling</h2>
+      <div class="grid md:grid-cols-2 gap-6 mt-4">
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Add Website</h3>
+          <form id="add-site-form" class="space-y-3">
+            <input id="add-site-url" type="url" placeholder="https://example.com"
+                   class="w-full rounded px-4 py-3 border border-slate-300" required>
+            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Add</button>
+          </form>
+        </div>
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Schedule Daily Audit</h3>
+          <form id="schedule-form" class="space-y-3">
+            <input id="schedule-url" type="url" placeholder="https://example.com"
+                   class="w-full rounded px-4 py-3 border border-slate-300" required>
+            <div class="grid grid-cols-3 gap-3">
+              <input id="schedule-time" type="time" class="rounded px-4 py-3 border border-slate-300" value="09:00">
+              <input id="schedule-date" type="date" class="rounded px-4 py-3 border border-slate-300">
+              <input id="schedule-tz" type="text" class="rounded px-4 py-3 border border-slate-300" value="Asia/Karachi">
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              <label class="flex items-center gap-2"><input id="schedule-daily" type="checkbox" checked> Daily Report</label>
+              <label class="flex items-center gap-2"><input id="schedule-acc" type="checkbox" checked> Accumulated Report</label>
+            </div>
+            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Save Schedule</button>
+          </form>
+        </div>
+      </div>
 
-<section id="charts" class="hidden mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
-  <h2 class="text-xl font-semibold mb-2">Charts</h2>
-  <canvas id="overallGauge" class="mb-4"></canvas>
-  <canvas id="issuesChart" class="mb-4"></canvas>
-  <canvas id="categoryChart" class="mb-4"></canvas>
-</section>
+      <div class="grid md:grid-cols-2 gap-6 mt-6">
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Your Schedules</h3>
+          <div id="schedules-list" class="space-y-2 text-sm opacity-90"></div>
+        </div>
+        <div class="glass p-4">
+          <h3 class="font-bold mb-2">Settings & Billing</h3>
+          <form id="settings-form" class="space-y-3">
+            <input id="settings-tz" type="text" placeholder="Asia/Karachi"
+                   class="w-full rounded px-4 py-3 border border-slate-300">
+            <label class="flex items-center gap-2 text-sm"><input id="settings-daily" type="checkbox"> Default: Daily emails</label>
+            <label class="flex items-center gap-2 text-sm"><input id="settings-acc" type="checkbox"> Default: Accumulated emails</label>
+            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Save Settings</button>
+          </form>
+          <div class="mt-3">
+            <button id="subscribe-btn" class="btn-primary px-5 py-3 rounded font-bold">$5/month — Subscribe</button>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<script>
-let authToken = null;
+  </main>
 
-// --- Audit Form ---
-document.getElementById('audit-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const url = document.getElementById('website-url').value;
-  const headers = authToken ? { "Authorization": "Bearer " + authToken } : {};
-  const res = await fetch('/audit?url=' + encodeURIComponent(url), { headers });
-  const data = await res.json();
+  <!-- Footer -->
+  <footer class="py-10">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-6 text-center">
+        <p class="font-black">FF Tech © <span id="year"></span></p>
+        <p class="text-xs opacity-70">Professional Scheduled Audit & Reporting · International Standard</p>
+      </div>
+    </div>
+  </footer>
 
-  document.getElementById('summary').classList.remove('hidden');
-  document.getElementById('charts').classList.remove('hidden');
-  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+  <script>
+    const $ = s => document.querySelector(s);
+    const state = { token: null, role: null, subscribed: false, freeRemaining: null, charts: {} };
 
-  // Charts
-  const overallCtx = document.getElementById('overallGauge').getContext('2d');
-  new Chart(overallCtx, { type: 'doughnut', data: data.overall_gauge, options: { responsive:true }});
+    function toast(msg){ console.log('[Toast]', msg); }
 
-  const issuesCtx = document.getElementById('issuesChart').getContext('2d');
-  new Chart(issuesCtx, { type: 'bar', data: data.issues_chart, options: { responsive:true }});
+    // Very small helper for API calls
+    async function api(path, opts = {}){
+      const headers = opts.headers || {};
+      if(state.token) headers['Authorization'] = 'Bearer ' + state.token;
+      if(!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
+      const res = await fetch(path, { ...opts, headers });
+      if(!res.ok){
+        const txt = await res.text().catch(()=> '');
+        throw new Error(`HTTP ${res.status} ${txt}`);
+      }
+      const ct = res.headers.get('Content-Type') || '';
+      if(ct.includes('application/pdf')) return res.blob();
+      if(ct.includes('application/json')) return res.json();
+      return res.text();
+    }
 
-  const catCtx = document.getElementById('categoryChart').getContext('2d');
-  new Chart(catCtx, { type: 'bar', data: data.category_chart, options: { responsive:true }});
-});
+    function chart(ctx, type, data){
+      return new Chart(ctx, {
+        type, data, options: { plugins: { legend: { display: false } }, responsive: true }
+      });
+    }
 
-// --- Export PDF ---
-document.getElementById('export-pdf').addEventListener('click', async () => {
-  const url = document.getElementById('website-url').value;
-  const headers = authToken ? { "Authorization": "Bearer " + authToken } : {};
-  const res = await fetch('/export-pdf?url=' + encodeURIComponent(url), { headers });
-  const blob = await res.blob();
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'fftech_audit.pdf';
-  a.click();
-});
+    function severityClass(sev){
+      return sev === 'green' ? 'metric-green' : (sev === 'yellow' ? 'metric-yellow' : 'metric-red');
+    }
 
-// --- Registration ---
-document.getElementById('register-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const payload = {
-    email: document.getElementById('reg-email').value,
-    password: document.getElementById('reg-password').value,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-  };
-  const res = await fetch('/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  const data = await res.json();
-  document.getElementById('register-msg').textContent = data.message || JSON.stringify(data);
-});
+    function saveSession(token, role, remaining, subscribed, email){
+      localStorage.setItem('fftech_token', token);
+      localStorage.setItem('fftech_role', role || 'user');
+      localStorage.setItem('fftech_remaining', remaining ?? '');
+      localStorage.setItem('fftech_subscribed', subscribed ? 'true' : 'false');
+      localStorage.setItem('fftech_email', email || '');
+      state.token = token; state.role = role; state.freeRemaining = remaining; state.subscribed = subscribed;
+      $('#user-email').textContent = email || '';
+      $('#user-badge').classList.remove('hidden');
+      $('#btn-login').classList.add('hidden');
+      $('#btn-register').classList.add('hidden');
+    }
 
-// --- Login ---
-document.getElementById('login-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const payload = {
-    email: document.getElementById('login-email').value,
-    password: document.getElementById('login-password').value
-  };
-  const res = await fetch('/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  const data = await res.json();
-  if(data.token){ authToken = data.token; document.getElementById('login-msg').textContent = "Login successful"; }
-  else document.getElementById('login-msg').textContent = data.message || "Login failed";
-});
-</script>
+    function clearSession(){
+      ['fftech_token','fftech_role','fftech_remaining','fftech_subscribed','fftech_email'].forEach(k=> localStorage.removeItem(k));
+      state.token = null; state.role = null; state.subscribed = false; state.freeRemaining = null;
+      $('#user-badge').classList.add('hidden');
+      $('#btn-login').classList.remove('hidden');
+      $('#btn-register').classList.remove('hidden');
+    }
 
-</main>
+    function loadSession(){
+      const t = localStorage.getItem('fftech_token');
+      const role = localStorage.getItem('fftech_role');
+      const sub = localStorage.getItem('fftech_subscribed') === 'true';
+      const rem = localStorage.getItem('fftech_remaining');
+      const email = localStorage.getItem('fftech_email') || '';
+      if(t){
+        state.token = t; state.role = role; state.subscribed = sub; state.freeRemaining = rem ? parseInt(rem) : null;
+        $('#user-email').textContent = email;
+        $('#user-badge').classList.remove('hidden');
+        $('#btn-login').classList.add('hidden');
+        $('#btn-register').classList.add('hidden');
+      }
+    }
+
+    async function updateHealth(){
+      try{
+        const health = await api('/health');
+        $('#health-status').textContent = 'OK';
+        $('#server-time').textContent = health.time || '—';
+      }catch{ $('#health-status').textContent = 'error'; }
+      try{
+        const ping = await api('/ping');
+        $('#ping-status').textContent = ping === 'pong' ? 'OK' : '—';
+      }catch{ $('#ping-status').textContent = 'error'; }
+    }
+
+    async function runAudit(url){
+      const payload = await api(`/audit?url=${encodeURIComponent(url)}`);
+      $('#results').classList.remove('hidden');
+
+      $('#free-remaining').textContent = payload.remaining ?? '—';
+      $('#exec-summary').textContent = payload.summary;
+      $('#strengths').innerHTML = (payload.strengths || []).map(s => `<li>${s}</li>`).join('');
+      $('#weaknesses').innerHTML = (payload.weaknesses || []).map(s => `<li>${s}</li>`).join('');
+      $('#priority').innerHTML  = (payload.priority  || []).map(s => `<li>${s}</li>`).join('');
+
+      if(payload.overall_gauge){ chart($('#overall-gauge'), 'doughnut', payload.overall_gauge); }
+      if(payload.category_chart){ chart($('#category-chart'), 'bar', payload.category_chart); }
+
+      const grid = $('#metrics-grid'); grid.innerHTML = '';
+      (payload.metrics || []).slice(0, 24).forEach(m => {
+        const pad = String(m.num).padStart(3,'0');
+        const card = document.createElement('div');
+        card.className = `glass p-4 metric-card ${severityClass(m.severity)}`;
+        card.innerHTML = `<h5 class="text-sm font-bold mb-2">${pad}. Metric ${pad}</h5><div class="h-48"><canvas id="chart-${pad}"></canvas></div>`;
+        grid.appendChild(card);
+        chart(document.getElementById(`chart-${pad}`), (m.chart_type || 'bar'), m.chart_data);
+      });
+    }
+
+    // Events
+    $('#audit-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const url = $('#website-url').value.trim();
+      if(!url) return toast('Enter a website URL.');
+      try { await runAudit(url); } catch(err){ toast(err.message); }
+    });
+
+    $('#export-pdf').addEventListener('click', async ()=>{
+      const url = $('#website-url').value || 'https://example.com';
+      try{
+        const pdf = await api(`/export-pdf?url=${encodeURIComponent(url)}`);
+        const blobUrl = URL.createObjectURL(pdf);
+        const a = document.createElement('a');
+        a.href = blobUrl; a.download = `fftech_audit_${Date.now()}.pdf`; a.click();
+        URL.revokeObjectURL(blobUrl);
+      }catch(err){ toast(err.message); }
+    });
+
+    $('#btn-register').addEventListener('click', async ()=>{
+      const email = prompt('Email:'); const password = prompt('Password (min 8 chars):'); const timezone = prompt('Timezone:', 'Asia/Karachi');
+      if(!email || !password) return;
+      try{
+        const res = await api('/register', { method:'POST', body: JSON.stringify({ email, password, timezone }) });
+        toast(res.message || 'Registration successful.');
+      }catch(err){ toast(err.message); }
+    });
+
+    $('#btn-login').addEventListener('click', async ()=>{
+      const email = prompt('Email:'); const password = prompt('Password:');
+      if(!email || !password) return;
+      try{
+        const res = await api('/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        saveSession(res.token, res.role, res.free_audits_remaining, res.subscribed, email);
+      }catch(err){ toast(err.message); }
+    });
+
+    $('#btn-logout').addEventListener('click', (e)=>{ e.preventDefault(); clearSession(); });
+
+    // Add website
+    $('#add-site-form').addEventListener('submit', async (e)=>{
+      e.preventDefault(); if(!state.token) return toast('Login required.');
+      const url = $('#add-site-url').value.trim(); if(!url) return toast('Enter a URL.');
+      try{ const res = await api('/websites', { method:'POST', body: JSON.stringify({ url }) }); toast(res.message || 'Added.'); }
+      catch(err){ toast(err.message); }
+    });
+
+    // Schedule
+    $('#schedule-form').addEventListener('submit', async (e)=>{
+      e.preventDefault(); if(!state.token) return toast('Login required.');
+      const payload = {
+        website_url: $('#schedule-url').value.trim(),
+        time_of_day:  $('#schedule-time').value || '09:00',
+        preferred_date: $('#schedule-date').value || null,
+        timezone: $('#schedule-tz').value || 'UTC',
+        daily_report: $('#schedule-daily').checked,
+        accumulated_report: $('#schedule-acc').checked,
+        enabled: true
+      };
+      if(!payload.website_url) return toast('Enter a site URL.');
+      try{ const res = await api('/schedule', { method:'POST', body: JSON.stringify(payload) });
+        toast(res.message || 'Schedule saved.'); await refreshSchedules();
+      }catch(err){ toast(err.message); }
+    });
+
+    async function refreshSchedules(){
+      if(!state.token) return;
+      try{
+        const sched = await api('/schedules');
+        const list = $('#schedules-list');
+        list.innerHTML = (sched || []).map(s => `
+          <div class="glass px-3 py-2 flex justify-between">
+            <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} · accumulated:${s.accumulated_report}</span>
+            <span class="opacity-60">last: ${s.last_run_at ?? '—'}</span>
+          </div>
+        `).join('');
+      }catch{}
+    }
+
+    // Settings
+    $('#settings-form').addEventListener('submit', async (e)=>{
+      e.preventDefault(); if(!state.token) return toast('Login required.');
+      const payload = { timezone: $('#settings-tz').value || 'UTC', notify_daily_default: $('#settings-daily').checked, notify_acc_default: $('#settings-acc').checked };
+      try{ const res = await api('/settings', { method:'POST', body: JSON.stringify(payload) }); toast(res.message || 'Settings updated.'); }
+      catch(err){ toast(err.message); }
+    });
+
+    // Billing
+    $('#subscribe-btn').addEventListener('click', async ()=>{
+      if(!state.token) return toast('Login required.');
+      try{
+        const res = await api('/billing/checkout', { method:'POST' });
+        if(res.url) window.location.href = res.url; else toast(res.message || 'Subscription activated (demo).');
+      }catch(err){ toast(err.message); }
+    });
+
+    // Init
+    (async function init(){
+      $('#year').textContent = new Date().getFullYear();
+      loadSession();
+      await updateHealth();
+      await refreshSchedules();
+    })();
+  </script>
 </body>
 </html>
