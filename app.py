@@ -21,10 +21,11 @@ import requests
 from bs4 import BeautifulSoup
 
 from fastapi import FastAPI, Request, HTTPException, Query, Header
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.requests import Request as FastAPIRequest
 from pydantic import BaseModel, EmailStr, Field
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, text as sa_text
@@ -150,7 +151,7 @@ def safe_session():
     db = None
     try:
         db = SessionLocal()
-        db.execute(sa_text("SELECT 1"))
+        db.execute(sa_text("SELECT 1"))  # ping
         yield db
     except OperationalError as e:
         print("[DB UNAVAILABLE]", e)
@@ -212,6 +213,27 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 async def health_check():
     return {"status": "healthy", "time": datetime.utcnow().isoformat()}
 
+# --- Favicon: avoid noisy 404s ---
+@app.get("/favicon.ico")
+def favicon():
+    # 1x1 transparent PNG
+    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR4nGNgYGBgAAAABQABJzQnWQAAAABJRU5ErkJggg==")
+    return Response(content=png, media_type="image/png")
+
+# --- Ping: quick probe ---
+@app.get("/ping", response_class=PlainTextResponse)
+def ping():
+    return PlainTextResponse("pong")
+
+# --- Global exception handler: avoid Railway “failed to respond” page ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: FastAPIRequest, exc: Exception):
+    try:
+        print("[UNCAUGHT ERROR]", type(exc).__name__, str(exc))
+    except Exception:
+        pass
+    return JSONResponse(status_code=500, content={"error": "Internal Server Error", "message": str(exc)[:500]})
+
 # ---------------- FLEXIBLE HTML LINKING ----------------
 def ensure_dir(path: str, auto_create: bool) -> bool:
     if os.path.isdir(path):
@@ -264,7 +286,8 @@ def get_jinja_page(name: str, request: Request):
 # ---------------- NETWORK HELPERS ----------------
 def safe_request(url: str, method: str = "GET", **kwargs):
     try:
-        kwargs.setdefault("timeout", (10, 20))
+        # Short timeouts to avoid hanging worker (prevents “failed to respond”)
+        kwargs.setdefault("timeout", (8, 12))  # connect=8s, read=12s
         kwargs.setdefault("allow_redirects", True)
         kwargs.setdefault("headers", {"User-Agent": USER_AGENT})
         return requests.request(method.upper(), url, **kwargs)
@@ -290,7 +313,7 @@ def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
 def is_blocking_script(tag) -> bool:
     return tag.name == "script" and not (tag.get("async") or tag.get("defer") or tag.get("type")=="module")
 
-def crawl_internal(seed_url: str, max_pages: int = 100):
+def crawl_internal(seed_url: str, max_pages: int = 60):  # fewer pages for speed
     visited, queue, results, host = set(), [(seed_url, 0)], [], urlparse(seed_url).netloc
     while queue and len(results) < max_pages:
         url, depth = queue.pop(0)
@@ -370,7 +393,7 @@ def run_actual_audit(target_url: str) -> dict:
     robots_ok = bool(robots_head and robots_head.status_code < 400)
     sitemap_ok = bool(sitemap_head and sitemap_head.status_code < 400)
 
-    crawled = crawl_internal(resp.url, max_pages=100)
+    crawled = crawl_internal(resp.url, max_pages=60)
     statuses = {"2xx":0,"3xx":0,"4xx":0,"5xx":0,None:0}
     redirect_chains = 0
     broken_internal = 0
@@ -866,6 +889,7 @@ def admin_audits(authorization: str | None = Header(None)):
 # ---------------- Scheduler (hardened) ----------------
 async def scheduler_loop():
     await asyncio.sleep(3)
+    error_count = 0
     while True:
         try:
             with safe_session() as db:
@@ -877,9 +901,13 @@ async def scheduler_loop():
                 try:
                     schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
                 except Exception as e:
-                    print("[SCHEDULER QUERY ERROR]", e)
+                    error_count += 1
+                    if error_count <= 5:
+                        print("[SCHEDULER QUERY ERROR]", e)
                     await asyncio.sleep(SCHEDULER_INTERVAL)
                     continue
+
+                error_count = 0  # reset after successful query
 
                 for s in schedules:
                     try:
@@ -1006,7 +1034,8 @@ async def init_db():
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(init_db())
-    asyncio.create_task(scheduler_loop())
+    if SCHEDULER_INTERVAL > 0:
+        asyncio.create_task(scheduler_loop())
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
