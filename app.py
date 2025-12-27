@@ -10,7 +10,7 @@
 # - SMTP email delivery with 5-page Certified PDF (FF Tech)
 # - Admin endpoints
 # - Settings (timezone + notification prefs)
-# - Stripe Checkout & Webhook integration (with safe fallbacks)
+# - Stripe Checkout & Webhook integration (safe fallbacks)
 # - Railway healthcheck fix: /health + bind to PORT
 
 import os, io, hmac, json, time, base64, secrets, asyncio
@@ -402,9 +402,9 @@ def run_actual_audit(target_url: str) -> dict:
     if size_mb > 2.0: perf_score -= 35
     elif size_mb > 1.0: perf_score -= 20
     if ttfb_ms > 1500: perf_score -= 35
-    elif ttfb_ms > 800: perf_score -= 18
+    elif 800 < ttfb_ms <= 1500: perf_score -= 18
     if blocking_script_count > 3: perf_score -= 18
-    elif blocking_script_count > 0: perf_score -= 10
+    elif 0 < blocking_script_count <= 3: perf_score -= 10
     if stylesheet_count > 4: perf_score -= 6
 
     a11y_score = 100
@@ -663,221 +663,364 @@ app = FastAPI(title=APP_NAME)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # -----------------------------------------------
-# Embedded HTML (single-page)
+# Embedded world‑class HTML (single-page; CDN-only)
 # -----------------------------------------------
 INDEX_HTML = r"""<!DOCTYPE html>
-<html lang='en'>
+<html lang='en' data-theme='light'>
 <head>
 <meta charset='UTF-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <title>FF Tech — Professional Audit</title>
 https://cdn.tailwindcss.com</script>
-https://cdn.jsdelivr.net/npm/chart.js</script>
+<script>tailwind.config={theme:{extend:{fontFamily:{inter:['Inter','system-ui','sans-serif']},colors:{brand:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},emerald:{500:'#10b981'},amber:{500:'#f59e0b'},rose:{500:'#ef4444'}}}}}</script>
+https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
+https://fonts.gstatic.com
+https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
 https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
 <style>
-body{font-family:Inter,sans-serif;background:linear-gradient(to bottom,#f9fafb,#e0e7ff)}.card{background:#fff;border-radius:1.5rem;box-shadow:0 25px 50px rgba(0,0,0,.15);padding:2.5rem}.metric-card{border-left-width:8px}.green{border-color:#10b981}.yellow{border-color:#f59e0b}.red{border-color:#ef4444}canvas{max-height:250px;width:100%!important}.btn{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff}
+body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 700px at 10% 10%,#eef2ff,transparent),radial-gradient(1200px 700px at 90% 90%,#f1f5f9,transparent)}
+.glass{background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.35);backdrop-filter:saturate(140%) blur(10px);box-shadow:0 25px 50px rgba(0,0,0,.22);border-radius:24px}
+.metric-card{border-left-width:8px}
+.metric-green{border-color:#10b981}.metric-yellow{border-color:#f59e0b}.metric-red{border-color:#ef4444}
+.blur-premium{filter:blur(10px);pointer-events:none}
+.btn-gradient{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff}
+.btn-gradient:hover{filter:brightness(1.05)}
+.gradient-hero{background:radial-gradient(600px 300px at 50% 10%,#4f46e5 0,transparent 60%),linear-gradient(135deg,#4f46e5,#7c3aed)}
+.grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
 </style>
 </head>
-<body class='text-gray-800'>
-<header class='bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-8 shadow-2xl fixed w-full top-0 z-50'>
-  <div class='max-w-7xl mx-auto px-8 flex justify-between items-center'>
-    <h1 class='text-3xl font-extrabold'><i class="fas fa-chart-line mr-3"></i>FF Tech Audit Platform</h1>
-    <div class='space-x-6'>
-      <button id='open-login' class='underline'>Login</button>
-      <button id='open-register' class='underline'>Register</button>
-      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> <button id='logout' class='underline ml-2'>Logout</button></span>
+<body class='text-slate-800'>
+<header class='gradient-hero text-white shadow-2xl fixed inset-x-0 top-0 z-50'>
+  <div class='max-w-7xl mx-auto px-6 py-5 flex items-center justify-between'>
+    <div class='flex items-center gap-4'>
+      <i class='fas fa-shield-halved text-3xl'></i>
+      <div>
+        <h1 class='text-2xl font-black'>FF Tech — Audit Platform</h1>
+        <p class='text-sm opacity-80'>World-class Scheduled Web Audit & Certified Reporting</p>
+      </div>
     </div>
+    <nav class='flex items-center gap-6'>
+      #Login</a>
+      #Register</a>
+      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> · #Logout</a></span>
+    </nav>
   </div>
 </header>
 
-<section id='hero' class='pt-48 pb-12 px-8'>
-  <div class='max-w-6xl mx-auto text-center'>
-    <h2 class='text-6xl font-black mb-8'>Professional Scheduled Website Audit</h2>
-    <p class='text-2xl mb-8'>250+ Metrics • Automated Scheduling • Certified Reports</p>
-    <form id='audit-form' class='flex max-w-4xl mx-auto rounded-full overflow-hidden shadow-2xl'>
-      <input type='url' id='website-url' placeholder='Enter Website URL' required class='flex-1 px-12 py-6 text-2xl text-gray-900'>
-      <button type='submit' class='bg-white text-primary px-20 py-6 font-bold text-2xl hover:bg-gray-100'>Run Free Audit</button>
-    </form>
-    <p class='text-xl mt-4'>Free Audits Remaining: <span id='remaining' class='font-bold'>—</span></p>
-    <div class='mt-4'><button id='subscribe-btn' class='btn px-6 py-3 rounded-xl font-bold hidden'>$5/month — Subscribe</button></div>
-  </div>
-</section>
-
-<section id='summary' class='py-16 px-8 hidden'>
-  <div class='max-w-7xl mx-auto'>
-    <div class='text-center mb-12'><span id='grade-badge' class='text-7xl font-black px-16 py-8 rounded-full bg-green-100 text-green-700 inline-block'>A+</span></div>
-    <canvas id='overall-gauge' class='mx-auto mb-16' width='500' height='500'></canvas>
-    <div class='card'><h3 class='text-4xl font-bold text-center mb-8'>Executive Summary</h3><p id='exec-summary' class='text-2xl leading-relaxed text-center max-w-5xl mx-auto'></p></div>
-    <div class='grid md:grid-cols-3 gap-8 mt-8'>
-      <div class='card'><h4 class='text-2xl font-bold mb-4 text-green-700'>Strengths</h4><ul id='strengths' class='space-y-2 text-lg'></ul></div>
-      <div class='card'><h4 class='text-2xl font-bold mb-4 text-red-700'>Weak Areas</h4><ul id='weaknesses' class='space-y-2 text-lg'></ul></div>
-      <div class='card'><h4 class='text-2xl font-bold mb-4 text-amber-700'>Priority Fixes</h4><ul id='priority' class='space-y-2 text-lg'></ul></div>
-    </div>
-    <canvas id='category-chart' class='card p-8 mt-12'></canvas>
-    <div class='text-center mt-8'><button id='export-pdf' class='btn px-10 py-4 rounded-xl text-xl font-bold'>Export Certified PDF</button></div>
-  </div>
-</section>
-
-<section id='dashboard' class='py-16 px-8 hidden'>
-  <div class='max-w-7xl mx-auto'>
-    <h3 class='text-5xl font-bold text-center mb-12'>Complete Metrics (1–250)</h3>
-    <div class='grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12' id='metrics-grid'>
-      <div id='metric-001' class='metric-card card green'><h5 class='text-2xl font-bold mb-8'>001. Site Health Score</h5><canvas id='chart-001'></canvas></div>
-      <div id='metric-002' class='metric-card card red'><h5 class='text-2xl font-bold mb-8'>002. Total Errors</h5><canvas id='chart-002'></canvas></div>
-      <div id='metric-250' class='metric-card card green'><h5 class='text-2xl font-bold mb-8'>250. Overall Stability Index</h5><canvas id='chart-250'></canvas></div>
-    </div>
-  </div>
-</section>
-
-<section id='user-panel' class='py-16 px-8 hidden'>
-  <div class='max-w-7xl mx-auto'>
-    <h3 class='text-4xl font-bold mb-6'>Website Management, Scheduling & Settings</h3>
-    <div class='grid md:grid-cols-3 gap-8'>
-      <div class='card'>
-        <h4 class='text-2xl font-bold mb-4'>Add Website</h4>
-        <form id='add-site-form' class='space-y-4'>
-          <input id='add-site-url' type='url' placeholder='https://example.com' class='w-full px-4 py-3 rounded-xl border'>
-          <button class='btn px-6 py-3 rounded-xl font-bold'>Add</button>
-        </form>
-      </div>
-      <div class='card md:col-span-2'>
-        <h4 class='text-2xl font-bold mb-4'>Schedule Audit</h4>
-        <form id='schedule-form' class='space-y-4'>
-          <input id='schedule-url' type='url' placeholder='https://example.com' class='w-full px-4 py-3 rounded-xl border'>
-          <div class='grid grid-cols-2 gap-4'>
-            <input id='schedule-time' type='time' class='px-4 py-3 rounded-xl border' value='09:00'>
-            <input id='schedule-tz' type='text' placeholder='Asia/Karachi' class='px-4 py-3 rounded-xl border' value='Asia/Karachi'>
+<section id='hero' class='pt-36 pb-12'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='glass p-8 md:p-12'>
+      <div class='flex flex-col md:flex-row items-center gap-10'>
+        <div class='flex-1 text-center md:text-left'>
+          <h2 class='text-4xl md:text-6xl font-black tracking-tight'>Professional Website Audits, <span class='text-brand-200'>Scheduled</span></h2>
+          <p class='mt-3 opacity-80'>250+ metrics · Certified PDF · SEO, Performance, Security, Mobile & Accessibility</p>
+          <form id='audit-form' class='mt-6 flex items-center gap-3'>
+            <input id='website-url' type='url' placeholder='https://example.com'
+                   class='flex-1 rounded-xl px-4 py-3 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900' required>
+            <button class='btn-gradient px-6 py-3 rounded-xl font-bold' type='submit'>Run Free Audit</button>
+          </form>
+          <p class='mt-3 text-sm opacity-80'>Free Audits Remaining: <span id='remaining' class='font-extrabold'>—</span></p>
+        </div>
+        <div class='w-full md:w-96 h-64 bg-white/10 rounded-2xl border border-white/20 relative overflow-hidden'>
+          <svg class='absolute inset-0' viewBox='0 0 300 300'>
+            <circle cx='150' cy='150' r='120' stroke='#e5e7eb' stroke-width='10' fill='none'></circle>
+            <circle id='hero-progress' cx='150' cy='150' r='120' stroke='url(#grad)' stroke-width='10' fill='none' stroke-dasharray='753' stroke-dashoffset='753'></circle>
+            <defs><linearGradient id='grad' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#4f46e5'/><stop offset='100%' stop-color='#7c3aed'/></linearGradient></defs>
+          </svg>
+          <div class='absolute inset-0 flex items-center justify-center'>
+            <div class='text-center'>
+              <span class='text-xl font-bold'>Audit Progress</span>
+              <div id='hero-progress-pct' class='text-3xl font-black'>0%</div>
+            </div>
           </div>
-          <label class='block'><input id='schedule-daily' type='checkbox' checked class='mr-2'> Daily Report</label>
-          <label class='block'><input id='schedule-acc' type='checkbox' checked class='mr-2'> Accumulated Report</label>
-          <button class='btn px-6 py-3 rounded-xl font-bold'>Save Schedule</button>
-        </form>
+        </div>
       </div>
-    </div>
-
-    <div class='grid md:grid-cols-2 gap-8 mt-8'>
-      <div class='card'>
-        <h4 class='text-2xl font-bold mb-4'>Your Schedules</h4>
-        <div id='schedules-list' class='space-y-2 text-lg'></div>
-      </div>
-      <div class='card'>
-        <h4 class='text-2xl font-bold mb-4'>Settings</h4>
-        <form id='settings-form' class='space-y-4'>
-          <input id='settings-tz' type='text' placeholder='Asia/Karachi' class='w-full px-4 py-3 rounded-xl border'>
-          <label class='block'><input id='settings-daily' type='checkbox' class='mr-2'> Default: Daily emails</label>
-          <label class='block'><input id='settings-acc' type='checkbox' class='mr-2'> Default: Accumulated emails</label>
-          <button class='btn px-6 py-3 rounded-xl font-bold'>Save Settings</button>
-        </form>
-        <div class='mt-4'><button id='subscribe-btn-panel' class='btn px-6 py-3 rounded-xl font-bold'>$5/month — Subscribe</button></div>
+      <div class='mt-4 flex items-center gap-6 text-slate-700'>
+        <span class='flex items-center gap-2'><i class='fas fa-lock'></i> Secure</span>
+        <span class='flex items-center gap-2'><i class='fas fa-bolt'></i> Instant</span>
+        <span class='flex items-center gap-2'><i class='fas fa-certificate'></i> Certified</span>
       </div>
     </div>
   </div>
 </section>
+
+<section id='progress-section' class='hidden pb-8'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='glass p-8'>
+      <h3 class='text-2xl font-black mb-6'>Audit in Progress</h3>
+      <div class='space-y-4'>
+        <div class='flex items-center gap-3'>
+          <span class='w-28 font-bold'>Crawling</span><progress id='p-crawl' class='w-full h-3' value='0' max='100'></progress><span id='crawl-pct' class='w-16 text-right font-black'>0%</span>
+        </div>
+        <div class='flex items-center gap-3'>
+          <span class='w-28 font-bold'>Analyzing</span><progress id='p-analyze' class='w-full h-3' value='0' max='100'></progress><span id='analyze-pct' class='w-16 text-right font-black'>0%</span>
+        </div>
+        <div class='flex items-center gap-3'>
+          <span class='w-28 font-bold'>Scoring</span><progress id='p-score' class='w-full h-3' value='0' max='100'></progress><span id='score-pct' class='w-16 text-right font-black'>0%</span>
+        </div>
+        <div class='flex items-center gap-3'>
+          <span class='w-28 font-bold'>Reporting</span><progress id='p-report' class='w-full h-3' value='0' max='100'></progress><span id='report-pct' class='w-16 text-right font-black'>0%</span>
+        </div>
+      </div>
+      <div class='mt-6 grid md:grid-cols-2 gap-6'>
+        <div class='glass p-4'><canvas id='health-gauge'></canvas></div>
+        <div class='glass p-4'><canvas id='issues-chart'></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id='summary-section' class='hidden pb-8'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='glass p-8'>
+      <div class='text-center mb-6'><span id='grade-badge' class='text-3xl font-black bg-green-100 text-green-700 px-5 py-3 rounded-full'>A+</span></div>
+      <div class='grid md:grid-cols-2 gap-6'>
+        <div class='glass p-4'><canvas id='overall-gauge'></canvas></div>
+        <div class='glass p-4'><canvas id='category-chart'></canvas></div>
+      </div>
+      <article class='mt-8 glass p-6'>
+        <h4 class='text-xl font-extrabold mb-3'>Executive Summary</h4>
+        <p id='exec-summary' class='leading-relaxed'></p>
+      </article>
+      <div class='mt-6 grid md:grid-cols-3 gap-6'>
+        <div class='glass p-6'><h5 class='font-black text-green-700'>Strengths</h5><ul id='strengths' class='mt-2 list-disc list-inside'></ul></div>
+        <div class='glass p-6'><h5 class='font-black text-rose-700'>Weak Areas</h5><ul id='weaknesses' class='mt-2 list-disc list-inside'></ul></div>
+        <div class='glass p-6'><h5 class='font-black text-amber-700'>Priority Fixes</h5><ul id='priority' class='mt-2 list-disc list-inside'></ul></div>
+      </div>
+      <div class='text-center mt-8'>
+        <button id='export-pdf' class='btn-gradient px-6 py-3 rounded-xl font-bold'>Export Certified PDF</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id='dashboard-section' class='hidden pb-12'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='glass p-8'>
+      <h3 class='text-2xl font-black mb-4'>Complete Metrics (1–250)</h3>
+      <p class='text-sm opacity-80'>Public users see limited metrics; register to unlock full visuals.</p>
+      <div class='relative'>
+        <div id='premium-blur' class='absolute inset-0 blur-premium hidden'></div>
+        <div id='metrics-grid' class='grid-auto mt-6'></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id='user-panel' class='hidden pb-12'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='grid md:grid-cols-3 gap-6'>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Add Website</h4>
+        <form id='add-site-form' class='space-y-3'>
+          <input id='add-site-url' type='url' placeholder='https://example.com'
+                 class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' required />
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Add</button>
+        </form>
+      </div>
+      <div class='glass p-6 md:col-span-2'>
+        <h4 class='text-xl font-black mb-3'>Schedule Audit</h4>
+        <form id='schedule-form' class='space-y-3'>
+          <input id='schedule-url' type='url' placeholder='https://example.com'
+                 class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' required />
+          <div class='grid grid-cols-2 gap-4'>
+            <input id='schedule-time' type='time' class='rounded-xl px-4 py-3 border border-slate-300' value='09:00' />
+            <input id='schedule-tz' type='text' class='rounded-xl px-4 py-3 border border-slate-300' placeholder='Asia/Karachi' value='Asia/Karachi' />
+          </div>
+          <div class='grid grid-cols-2 gap-4'>
+            <label class='flex items-center gap-2'><input id='schedule-daily' type='checkbox' checked /> Daily Report</label>
+            <label class='flex items-center gap-2'><input id='schedule-acc' type='checkbox' checked /> Accumulated Report</label>
+          </div>
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Save Schedule</button>
+        </form>
+      </div>
+    </div>
+
+    <div class='grid md:grid-cols-2 gap-6 mt-6'>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Your Schedules</h4>
+        <div id='schedules-list' class='space-y-2 text-sm'></div>
+      </div>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Settings</h4>
+        <form id='settings-form' class='space-y-3'>
+          <input id='settings-tz' type='text' placeholder='Asia/Karachi'
+                 class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' />
+          <label class='flex items-center gap-2'><input id='settings-daily' type='checkbox' /> Default: Daily emails</label>
+          <label class='flex items-center gap-2'><input id='settings-acc' type='checkbox' /> Default: Accumulated emails</label>
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Save Settings</button>
+        </form>
+        <div class='mt-4'>
+          <button id='subscribe-btn-panel' class='btn-gradient px-6 py-3 rounded-xl font-bold'>$5/month — Subscribe</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class='py-10'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='glass p-8 text-center'>
+      <p class='font-black text-lg'>FF Tech © <span id='year'></span></p>
+      <p class='text-sm opacity-80'>Professional Scheduled Audit & Reporting System · International Standard</p>
+    </div>
+  </div>
+</footer>
 
 <script>
-let token = null;
+const $=s=>document.querySelector(s);
+const state={token:null,role:null,subscribed:false,freeRemaining:null,charts:{}};
 
-function injectMetricCard(num, severity){
-  const pad = String(num).padStart(3,'0');
-  const grid = document.getElementById('metrics-grid');
-  const div = document.createElement('div');
-  div.id = `metric-${pad}`;
-  div.className = `metric-card card ${severity}`;
-  div.innerHTML = `<h5 class='text-2xl font-bold mb-8'>${pad}. Metric ${pad}</h5><canvas id='chart-${pad}'></canvas>`;
-  grid.appendChild(div);
+function toast(msg){console.log('[Toast]',msg)}
+function severityClass(sev){return sev==='green'?'metric-green':(sev==='yellow'?'metric-yellow':'metric-red')}
+function chart(ctx,type,data){return new Chart(ctx,{type,data,options:{plugins:{legend:{display:false}},responsive:true}})}
+function setProgress(el,pct){if(el){el.value=pct}}
+
+async function api(path,opts={}){
+  const headers=opts.headers||{};
+  if(state.token) headers['Authorization']='Bearer '+state.token;
+  if(!headers['Content-Type'] && opts.body) headers['Content-Type']='application/json';
+  const res=await fetch(path,{...opts,headers});
+  if(!res.ok){throw new Error('HTTP '+res.status+' '+(await res.text()))}
+  const ct=res.headers.get('Content-Type')||'';
+  if(ct.includes('application/pdf')) return res.blob();
+  if(ct.includes('application/json')) return res.json();
+  return res.text();
 }
-async function runAudit(url){
-  const res = await fetch(`/audit?url=${encodeURIComponent(url)}`, { headers: token? {'Authorization':'Bearer '+token} : {} });
-  return await res.json();
+
+function saveSession(token,role,remaining,subscribed){
+  localStorage.setItem('fftech_token',token); localStorage.setItem('fftech_role',role||'user');
+  localStorage.setItem('fftech_remaining', remaining ?? ''); localStorage.setItem('fftech_subscribed', subscribed?'true':'false');
+  state.token=token; state.role=role; state.freeRemaining=remaining; state.subscribed=subscribed;
+  $('#user-status').classList.remove('hidden'); $('#open-login').classList.add('hidden'); $('#open-register').classList.add('hidden');
+  toast('Logged in!');
 }
-document.getElementById('audit-form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const url = document.getElementById('website-url').value;
-  const data = await runAudit(url);
-  ['summary','dashboard'].forEach(id=>document.getElementById(id).classList.remove('hidden'));
-  document.getElementById('grade-badge').textContent = data.grade;
-  document.getElementById('exec-summary').textContent = data.summary;
-  const s = document.getElementById('strengths'), w = document.getElementById('weaknesses'), p = document.getElementById('priority');
-  s.innerHTML=''; w.innerHTML=''; p.innerHTML='';
-  data.strengths.forEach(x=>s.innerHTML += `<li>${x}</li>`); data.weaknesses.forEach(x=>w.innerHTML += `<li>${x}</li>`); data.priority.forEach(x=>p.innerHTML += `<li>${x}</li>`);
-  if (data.overall_gauge) new Chart(document.getElementById('overall-gauge'), { type:'doughnut', data: data.overall_gauge });
-  new Chart(document.getElementById('category-chart'), { type:'bar', data: data.category_chart });
-  data.metrics.forEach(m=>{
-    const pad = String(m.num).padStart(3,'0');
-    let card = document.getElementById(`metric-${pad}`), canv = document.getElementById(`chart-${pad}`);
-    if (!card || !canv){ injectMetricCard(m.num, m.severity); canv = document.getElementById(`chart-${pad}`); card = document.getElementById(`metric-${pad}`); }
-    if (card && canv){ card.className = `metric-card card ${m.severity}`; new Chart(canv, { type: m.chart_type || 'bar', data: m.chart_data });}
-  });
-  if (typeof data.remaining !== 'undefined' && data.remaining !== null){
-    document.getElementById('remaining').textContent = data.remaining;
-    const subscribeBtns = [document.getElementById('subscribe-btn'), document.getElementById('subscribe-btn-panel')];
-    subscribeBtns.forEach(btn=>btn.classList.remove('hidden'));
+function clearSession(){
+  localStorage.removeItem('fftech_token'); localStorage.removeItem('fftech_role'); localStorage.removeItem('fftech_remaining'); localStorage.removeItem('fftech_subscribed');
+  state.token=null; state.role=null; state.subscribed=false; state.freeRemaining=null;
+  $('#user-status').classList.add('hidden'); $('#open-login').classList.remove('hidden'); $('#open-register').classList.remove('hidden');
+  toast('Logged out.');
+}
+function loadSession(){
+  const t=localStorage.getItem('fftech_token'); const role=localStorage.getItem('fftech_role'); const sub=localStorage.getItem('fftech_subscribed')==='true';
+  const rem=localStorage.getItem('fftech_remaining'); if(t){state.token=t; state.role=role; state.subscribed=sub; state.freeRemaining=rem?parseInt(rem):null;
+    $('#user-status').classList.remove('hidden'); $('#open-login').classList.add('hidden'); $('#open-register').classList.add('hidden');
+    $('#user-panel').classList.remove('hidden');
   }
+}
+
+async function runAudit(url){
+  $('#progress-section').classList.remove('hidden');
+  let p=0; const tick=()=>{p=Math.min(100,p+Math.random()*10+8);
+    setProgress($('#p-crawl'),Math.min(35,p)); $('#crawl-pct').textContent=Math.min(35,Math.floor(p))+'%';
+    setProgress($('#p-analyze'),Math.min(70,p)); $('#analyze-pct').textContent=Math.min(70,Math.floor(p))+'%';
+    setProgress($('#p-score'),Math.min(85,p)); $('#score-pct').textContent=Math.min(85,Math.floor(p))+'%';
+    setProgress($('#p-report'),Math.min(100,p)); $('#report-pct').textContent=Math.min(100,Math.floor(p))+'%';
+    const ring=document.getElementById('hero-progress'); if(ring){ring.setAttribute('stroke-dashoffset', String(753*(1-Math.min(1,p/100))))}
+    document.getElementById('hero-progress-pct').textContent=Math.floor(p)+'%';
+    if(p<100) setTimeout(tick,120);
+  }; tick();
+
+  const payload=await api(`/audit?url=${encodeURIComponent(url)}`);
+  $('#summary-section').classList.remove('hidden'); $('#dashboard-section').classList.remove('hidden');
+
+  $('#grade-badge').textContent=payload.grade;
+  $('#exec-summary').textContent=payload.summary;
+  $('#strengths').innerHTML=payload.strengths.map(s=>`<li>${s}</li>`).join('');
+  $('#weaknesses').innerHTML=payload.weaknesses.map(s=>`<li>${s}</li>`).join('');
+  $('#priority').innerHTML=payload.priority.map(s=>`<li>${s}</li>`).join('');
+  if(payload.overall_gauge) chart($('#overall-gauge'),'doughnut',payload.overall_gauge);
+  if(payload.category_chart) chart($('#category-chart'),'bar',payload.category_chart);
+  if(payload.health_gauge) chart($('#health-gauge'),'doughnut',payload.health_gauge);
+  if(payload.issues_chart) chart($('#issues-chart'),'bar',payload.issues_chart);
+
+  const blur=$('#premium-blur'); blur.classList.toggle('hidden', !!payload.premium);
+
+  const grid=$('#metrics-grid'); grid.innerHTML='';
+  payload.metrics.forEach(m=>{
+    const pad=String(m.num).padStart(3,'0');
+    const card=document.createElement('div'); card.className=`glass p-4 metric-card ${severityClass(m.severity)}`;
+    card.innerHTML=`<h5 class='text-sm font-bold mb-2'>${pad}. Metric ${pad}</h5><div class='h-48'><canvas id='chart-${pad}'></canvas></div>`;
+    grid.appendChild(card); chart(document.getElementById(`chart-${pad}`),(m.chart_type||'bar'),m.chart_data);
+  });
+
+  if(typeof payload.remaining!=='undefined' && payload.remaining!==null){
+    document.getElementById('remaining').textContent=payload.remaining;
+    state.freeRemaining=payload.remaining; localStorage.setItem('fftech_remaining', payload.remaining);
+  }
+}
+
+document.getElementById('audit-form').addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  const url=document.getElementById('website-url').value.trim();
+  if(!url) return toast('Please enter a website URL.');
+  try{await runAudit(url)}catch(err){toast(err.message)}
 });
-document.getElementById('export-pdf').addEventListener('click', ()=>{
-  const url = document.getElementById('website-url').value || 'https://example.com';
-  window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
+
+document.getElementById('export-pdf').addEventListener('click',async()=>{
+  const url=document.getElementById('website-url').value || 'https://example.com';
+  const pdf=await api(`/export-pdf?url=${encodeURIComponent(url)}`);
+  const blobUrl=URL.createObjectURL(pdf); const a=document.createElement('a');
+  a.href=blobUrl; a.download=`fftech_audit_${Date.now()}.pdf`; a.click(); URL.revokeObjectURL(blobUrl);
 });
 
 // Registration/Login
-document.getElementById('open-register').onclick = async ()=>{
-  const email = prompt('Email:'); const password = prompt('Password (min 8 chars):'); const timezone = prompt('Timezone (e.g., Asia/Karachi):','Asia/Karachi');
-  if (!email || !password) return;
-  const res = await fetch('/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password, timezone }) });
-  const data = await res.json(); alert(data.message || JSON.stringify(data));
-};
-document.getElementById('open-login').onclick = async ()=>{
-  const email = prompt('Email:'); const password = prompt('Password:'); if (!email || !password) return;
-  const res = await fetch('/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
-  const data = await res.json();
-  if (data.token){
-    token = data.token; document.getElementById('user-status').classList.remove('hidden'); document.getElementById('user-email').textContent = email;
-    document.getElementById('user-panel').classList.remove('hidden'); document.getElementById('remaining').textContent = data.free_audits_remaining ?? '—';
-    alert('Logged in!');
-  } else alert(JSON.stringify(data));
-};
-document.getElementById('logout').onclick = ()=>{ token=null; document.getElementById('user-status').classList.add('hidden'); document.getElementById('user-panel').classList.add('hidden'); };
+document.getElementById('open-register').addEventListener('click',async(e)=>{
+  e.preventDefault(); const email=prompt('Email:'); const password=prompt('Password (min 8 chars):'); const timezone=prompt('Timezone (e.g., Asia/Karachi):','Asia/Karachi');
+  if(!email||!password) return;
+  try{const res=await api('/register',{method:'POST',body:JSON.stringify({email,password,timezone})}); toast(res.message||'Registration submitted. Check email.')}
+  catch(err){toast(err.message)}
+});
+document.getElementById('open-login').addEventListener('click',async(e)=>{
+  e.preventDefault(); const email=prompt('Email:'); const password=prompt('Password:'); if(!email||!password) return;
+  try{const res=await api('/login',{method:'POST',body:JSON.stringify({email,password})});
+    $('#user-email').textContent=email; saveSession(res.token,res.role,res.free_audits_remaining,res.subscribed); $('#user-panel').classList.remove('hidden');
+  }catch(err){toast(err.message)}
+});
+document.getElementById('logout').addEventListener('click',(e)=>{e.preventDefault(); clearSession()});
 
-// Add website
-document.getElementById('add-site-form').addEventListener('submit', async (e)=>{
-  e.preventDefault(); if (!token) return alert('Login required');
-  const url = document.getElementById('add-site-url').value;
-  const res = await fetch('/websites', { method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
-  const data = await res.json(); alert(data.message || JSON.stringify(data));
+// Add Website
+document.getElementById('add-site-form').addEventListener('submit',async(e)=>{
+  e.preventDefault(); if(!state.token) return toast('Login required.');
+  const url=document.getElementById('add-site-url').value.trim(); if(!url) return toast('Enter a site URL.');
+  try{const res=await api('/websites',{method:'POST',body:JSON.stringify({url})}); toast(res.message||'Site added.')}catch(err){toast(err.message)}
 });
 
-// Create schedule
-document.getElementById('schedule-form').addEventListener('submit', async (e)=>{
-  e.preventDefault(); if (!token) return alert('Login required');
-  const website_url = document.getElementById('schedule-url').value;
-  const time_of_day = document.getElementById('schedule-time').value || '09:00';
-  const timezone = document.getElementById('schedule-tz').value || 'UTC';
-  const daily_report = document.getElementById('schedule-daily').checked;
-  const accumulated_report = document.getElementById('schedule-acc').checked;
-  const res = await fetch('/schedule', { method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-    body: JSON.stringify({ website_url, time_of_day, timezone, daily_report, accumulated_report, enabled:true }) });
-  const data = await res.json(); alert(data.message || JSON.stringify(data));
-  const schedRes = await fetch('/schedules', { headers:{'Authorization':'Bearer '+token} });
-  const sched = await schedRes.json(); const list = document.getElementById('schedules-list'); list.innerHTML = '';
-  sched.forEach(s=>list.innerHTML += `<div>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} acc:${s.accumulated_report}</div>`);
+// Schedule
+document.getElementById('schedule-form').addEventListener('submit',async(e)=>{
+  e.preventDefault(); if(!state.token) return toast('Login required.');
+  const payload={website_url:$('#schedule-url').value.trim(),time_of_day:$('#schedule-time').value||'09:00',
+    timezone:$('#schedule-tz').value||'UTC',daily_report:$('#schedule-daily').checked,accumulated_report:$('#schedule-acc').checked,enabled:true};
+  if(!payload.website_url) return toast('Enter a site URL.');
+  try{const res=await api('/schedule',{method:'POST',body:JSON.stringify(payload)}); toast(res.message||'Schedule saved.'); await refreshSchedules();}catch(err){toast(err.message)}
 });
+async function refreshSchedules(){
+  if(!state.token) return;
+  try{const sched=await api('/schedules'); const list=$('#schedules-list'); list.innerHTML=(sched||[]).map(s=>`
+    <div class='glass px-3 py-2 flex justify-between'>
+      <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} · accumulated:${s.accumulated_report}</span>
+      <span class='opacity-60'>last: ${s.last_run_at ?? '—'}</span>
+    </div>`).join('');
+  }catch(err){}
+}
 
 // Settings
-document.getElementById('settings-form').addEventListener('submit', async (e)=>{
-  e.preventDefault(); if (!token) return alert('Login required');
-  const timezone = document.getElementById('settings-tz').value || 'UTC';
-  const notify_daily_default = document.getElementById('settings-daily').checked;
-  const notify_acc_default = document.getElementById('settings-acc').checked;
-  const res = await fetch('/settings', { method:'POST', headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-    body: JSON.stringify({ timezone, notify_daily_default, notify_acc_default }) });
-  const data = await res.json(); alert(data.message || JSON.stringify(data));
+document.getElementById('settings-form').addEventListener('submit',async(e)=>{
+  e.preventDefault(); if(!state.token) return toast('Login required.');
+  const payload={timezone:$('#settings-tz').value||'UTC',notify_daily_default:$('#settings-daily').checked,notify_acc_default:$('#settings-acc').checked};
+  try{const res=await api('/settings',{method:'POST',body:JSON.stringify(payload)}); toast(res.message||'Settings updated.')}catch(err){toast(err.message)}
 });
-async function openCheckout(){ if (!token) return alert('Login required');
-  const res = await fetch('/billing/checkout', { method:'POST', headers:{'Authorization':'Bearer '+token} });
-  const data = await res.json(); if (data.url) window.location.href = data.url; else alert(data.message || JSON.stringify(data));
+
+// Billing
+async function openCheckout(){ if(!state.token) return toast('Login required.');
+  try{const res=await api('/billing/checkout',{method:'POST'}); if(res.url) window.location.href=res.url; else toast(res.message||'Subscription activated (demo).');}
+  catch(err){toast(err.message)}
 }
-document.getElementById('subscribe-btn').onclick = openCheckout;
-document.getElementById('subscribe-btn-panel').onclick = openCheckout;
+document.getElementById('subscribe-btn-panel').addEventListener('click',openCheckout);
+
+(function init(){ document.getElementById('year').textContent=new Date().getFullYear(); loadSession(); refreshSchedules();
+  const ring=document.getElementById('hero-progress'); if(ring){ring.setAttribute('stroke-dasharray','753'); ring.setAttribute('stroke-dashoffset','753');}
+})();
 </script>
 </body>
 </html>
@@ -901,7 +1044,6 @@ def audit(url: str = Query(..., description="Website URL to audit"),
           db=Depends(get_db)):
     payload = run_actual_audit(url)
 
-    # Determine user (if JWT provided)
     is_registered = False
     user = None
     if authorization and authorization.startswith("Bearer "):
@@ -912,13 +1054,11 @@ def audit(url: str = Query(..., description="Website URL to audit"),
         except Exception:
             is_registered = False
 
-    # Enforce Open vs Registered behavior
     if not is_registered:
-        payload["metrics"] = payload["metrics"][:50]  # limited visibility
+        payload["metrics"] = payload["metrics"][:50]
         payload["premium"] = False
         payload["remaining"] = None
     else:
-        # Registered user: free audits limit then subscription
         if not user.subscribed and user.free_audits_remaining <= 0:
             payload["metrics"] = payload["metrics"][:50]
             payload["premium"] = False
@@ -930,7 +1070,6 @@ def audit(url: str = Query(..., description="Website URL to audit"),
                 user.free_audits_remaining -= 1
                 db.commit()
 
-    # Persist audit record
     site = db.query(Website).filter(Website.url == normalize_url(url)).first()
     if not site:
         site = Website(url=normalize_url(url), user_id=(user.id if user else None), active=True)
@@ -1189,11 +1328,6 @@ async def scheduler_loop():
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(scheduler_loop())
-    
-if __name__ == "__main__":
-    import uvicorn, os
-    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
-
 
 # -----------------------------------------------
 # MAIN (bind to PORT for Railway)
