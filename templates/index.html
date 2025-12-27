@@ -2,171 +2,266 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>FF Tech – AI Website Audit Platform</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF Tech | Enterprise Website Audit Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Tailwind CSS CDN -->
+<!-- CDN ONLY -->
 <script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Chart.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 </head>
+
 <body class="bg-gray-100 text-gray-900">
 
-<!-- ================= HEADER ================= -->
-<header class="bg-black text-white p-4 flex justify-between items-center">
-  <h1 class="text-xl font-bold">FF Tech – AI Website Audit</h1>
-  <div id="userStatus" class="text-sm">Public User</div>
+<!-- ======================================================
+HEADER
+====================================================== -->
+<header class="bg-black text-white px-6 py-4 flex justify-between items-center">
+  <div class="text-xl font-bold">FF Tech WebAudit</div>
+  <div id="userType" class="text-sm">Public User</div>
 </header>
 
-<!-- ================= HERO ================= -->
-<section class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-10 text-center">
-  <h2 class="text-3xl font-bold mb-4">World-Class Website Audit</h2>
-  <p class="mb-6">Technical • SEO • Performance • Security • ROI</p>
+<!-- ======================================================
+PART ONE — ACCESS MODES
+====================================================== -->
+<section class="bg-white m-4 p-6 rounded shadow">
+  <h2 class="text-xl font-bold mb-4">Access Type</h2>
 
-  <div class="flex justify-center gap-2">
-    <input id="websiteInput" type="url" placeholder="https://example.com"
-           class="p-2 rounded text-black w-72">
-    <button onclick="runAudit()" class="bg-black px-4 py-2 rounded">
+  <div class="grid md:grid-cols-3 gap-4">
+
+    <!-- OPEN -->
+    <div class="border p-4 rounded">
+      <h3 class="font-semibold">Open for All</h3>
+      <p class="text-sm text-gray-600">
+        Limited metrics · No reports · No scheduling
+      </p>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="border p-4 rounded">
+      <h3 class="font-semibold">Registered User</h3>
+      <input id="emailInput" type="email"
+        placeholder="Enter email"
+        class="border p-2 w-full mt-2">
+      <button onclick="sendLoginLink()"
+        class="bg-indigo-600 text-white w-full mt-2 py-2 rounded">
+        Send Login Link
+      </button>
+      <p class="text-xs text-gray-500 mt-2">
+        10 free audits → $5/month subscription
+      </p>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="border p-4 rounded">
+      <h3 class="font-semibold">Admin</h3>
+      <p class="text-sm text-gray-600">
+        Users · Audits · Reports · System
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ======================================================
+HERO SECTION
+====================================================== -->
+<section class="bg-gradient-to-r from-indigo-600 to-purple-700 text-white p-10 text-center">
+  <h1 class="text-3xl font-bold">AI-Powered Website Audit</h1>
+  <p class="mt-2">SEO · Performance · Security · Growth · ROI</p>
+
+  <div class="flex justify-center mt-6 gap-2">
+    <input id="websiteURL"
+      class="p-2 rounded text-black w-80"
+      placeholder="https://example.com">
+    <button onclick="runAudit()"
+      class="bg-black px-4 py-2 rounded">
       Run Free Audit
     </button>
   </div>
 </section>
 
-<!-- ================= PROGRESS ================= -->
+<!-- ======================================================
+PROGRESS
+====================================================== -->
 <section class="p-6">
   <div class="w-full bg-gray-300 rounded">
-    <div id="progressBar" class="bg-green-500 text-xs text-white text-center p-1 rounded"
-         style="width:0%">Waiting</div>
+    <div id="progressBar"
+      class="bg-green-600 text-white text-xs text-center p-1 rounded"
+      style="width:0%">Idle</div>
   </div>
 </section>
 
-<!-- ================= EXECUTIVE SUMMARY ================= -->
-<section class="p-6 bg-white m-4 rounded shadow">
-  <h3 class="text-xl font-bold mb-2">Executive Summary</h3>
-  <div id="summaryText" class="text-gray-700">
-    Run an audit to generate summary.
-  </div>
+<!-- ======================================================
+EXECUTIVE SUMMARY
+====================================================== -->
+<section class="bg-white m-4 p-6 rounded shadow">
+  <h2 class="text-xl font-bold">Executive Summary</h2>
 
-  <div class="flex gap-4 mt-4">
-    <div id="gradeBadge" class="text-4xl font-bold"></div>
-    <canvas id="healthGauge" width="150" height="150"></canvas>
+  <p id="execSummary" class="mt-3 text-gray-700">
+    Awaiting audit results…
+  </p>
+
+  <div class="flex items-center gap-6 mt-6">
+    <div id="gradeBadge" class="text-5xl font-bold"></div>
+    <canvas id="healthGauge" width="180"></canvas>
   </div>
 </section>
 
-<!-- ================= DASHBOARD ================= -->
+<!-- ======================================================
+METRICS DASHBOARD (ALL CATEGORIES)
+====================================================== -->
 <section class="p-6">
-  <h3 class="text-2xl font-bold mb-4">Audit Metrics Dashboard</h3>
+  <h2 class="text-2xl font-bold mb-4">Audit Metrics Dashboard</h2>
+
   <div id="metricsContainer"
-       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
   </div>
 </section>
 
-<!-- ================= COMPETITOR ================= -->
-<section class="p-6 bg-white m-4 rounded shadow">
-  <h3 class="text-xl font-bold mb-2">Competitor Comparison</h3>
-  <canvas id="competitorChart"></canvas>
+<!-- ======================================================
+EMAIL SCHEDULING
+====================================================== -->
+<section class="bg-white m-4 p-6 rounded shadow">
+  <h3 class="font-bold text-lg">Email Report Scheduling</h3>
+
+  <div class="grid md:grid-cols-3 gap-4 mt-4">
+    <select id="reportType" class="border p-2">
+      <option value="daily">Daily Report</option>
+      <option value="accumulated">Accumulated Report</option>
+    </select>
+
+    <input id="reportTime" type="time" class="border p-2">
+
+    <button onclick="saveSchedule()"
+      class="bg-indigo-600 text-white py-2 rounded">
+      Save Schedule
+    </button>
+  </div>
 </section>
 
-<!-- ================= FOOTER ================= -->
-<footer class="bg-black text-white p-4 text-center">
-  © 2025 FF Tech – Certified Website Audit Platform
+<!-- ======================================================
+SUBSCRIPTION
+====================================================== -->
+<section class="bg-white m-4 p-6 rounded shadow">
+  <h3 class="font-bold text-lg">Subscription</h3>
+  <p class="text-sm mt-1">
+    Continue auditing after 10 free runs with <b>$5/month</b>.
+  </p>
+  <button class="bg-green-600 text-white px-4 py-2 mt-4 rounded">
+    Upgrade Now
+  </button>
+</section>
+
+<!-- ======================================================
+ADMIN PANEL
+====================================================== -->
+<section class="bg-white m-4 p-6 rounded shadow">
+  <h3 class="font-bold text-lg">Admin Dashboard</h3>
+  <ul class="list-disc ml-5 text-sm mt-2">
+    <li>User login activity</li>
+    <li>Audit history</li>
+    <li>Email schedules</li>
+    <li>Subscriptions</li>
+    <li>System health</li>
+  </ul>
+</section>
+
+<!-- ======================================================
+FOOTER
+====================================================== -->
+<footer class="bg-black text-white text-center p-4">
+  © 2025 FF Tech · Certified Website Audit Reports
 </footer>
 
-<!-- ================= JAVASCRIPT ================= -->
+<!-- ======================================================
+JAVASCRIPT — PYTHON CONTROLS EVERYTHING
+====================================================== -->
 <script>
 async function runAudit() {
-  const url = document.getElementById("websiteInput").value;
+  const url = websiteURL.value;
   if (!url) return alert("Enter website URL");
 
-  document.getElementById("progressBar").style.width = "30%";
-  document.getElementById("progressBar").innerText = "Running audit...";
+  progressBar.style.width = "40%";
+  progressBar.innerText = "Auditing…";
 
-  const response = await fetch("/api/audit", {
+  const res = await fetch("/api/audit", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: {"Content-Type":"application/json"},
     body: JSON.stringify({url})
   });
 
-  const data = await response.json();
+  const data = await res.json();
   renderAudit(data);
 }
 
 function renderAudit(data) {
-  document.getElementById("progressBar").style.width = "100%";
-  document.getElementById("progressBar").innerText = "Audit Completed";
+  progressBar.style.width = "100%";
+  progressBar.innerText = "Completed";
 
-  document.getElementById("userStatus").innerText =
-    data.user_type === "public" ? "Public User" : "Registered User";
-
-  document.getElementById("summaryText").innerText = data.summary;
-  document.getElementById("gradeBadge").innerText = data.grade;
+  execSummary.innerText = data.summary;
+  gradeBadge.innerText = data.grade;
+  userType.innerText = data.user_type;
 
   renderGauge(data.score);
   renderMetrics(data.metrics);
-  renderCompetitors(data.competitors);
 }
 
 function renderGauge(score) {
-  new Chart(document.getElementById("healthGauge"), {
+  new Chart(healthGauge, {
     type: "doughnut",
     data: {
-      labels: ["Health"],
       datasets: [{
-        data: [score, 100 - score],
+        data: [score, 100-score],
         backgroundColor: ["#16a34a", "#e5e7eb"]
       }]
     },
-    options: {cutout: "70%"}
+    options: { cutout: "70%" }
   });
 }
 
 function renderMetrics(metrics) {
-  const container = document.getElementById("metricsContainer");
-  container.innerHTML = "";
+  metricsContainer.innerHTML = "";
 
-  Object.values(metrics).forEach(metric => {
-    const color =
-      metric.status === "green" ? "bg-green-100 border-green-500" :
-      metric.status === "yellow" ? "bg-yellow-100 border-yellow-500" :
-      "bg-red-100 border-red-500";
-
+  Object.values(metrics).forEach(m => {
     const card = document.createElement("div");
-    card.className = `border-l-4 ${color} p-4 bg-white rounded shadow`;
-    card.id = `metric-${metric.number}`;
+    card.className = "bg-white p-4 rounded shadow border-l-4";
+    card.style.borderColor =
+      m.status === "green" ? "#16a34a" :
+      m.status === "yellow" ? "#eab308" : "#dc2626";
 
     card.innerHTML = `
-      <h4 class="font-bold">${metric.number}. ${metric.name}</h4>
-      <p class="text-2xl font-bold">${metric.value} ${metric.unit || ""}</p>
-      <canvas id="chart-${metric.number}" height="80"></canvas>
+      <h4 class="font-bold">${m.number}. ${m.name}</h4>
+      <div class="text-2xl font-bold">${m.value} ${m.unit || ""}</div>
+      <canvas id="metric_${m.number}" height="80"></canvas>
     `;
 
-    container.appendChild(card);
+    metricsContainer.appendChild(card);
 
-    new Chart(document.getElementById(`chart-${metric.number}`), {
+    new Chart(document.getElementById(`metric_${m.number}`), {
       type: "line",
       data: {
-        labels: metric.trend.map((_, i) => i + 1),
+        labels: m.trend.map((_, i) => i + 1),
         datasets: [{
-          data: metric.trend,
-          borderColor: "#6366f1",
-          fill: false
+          data: m.trend,
+          borderColor: "#6366f1"
         }]
       },
-      options: {plugins:{legend:{display:false}}}
+      options: {
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
     });
   });
 }
 
-function renderCompetitors(comp) {
-  new Chart(document.getElementById("competitorChart"), {
-    type: "bar",
-    data: {
-      labels: comp.labels,
-      datasets: comp.datasets
-    }
-  });
+function sendLoginLink() {
+  fetch("/api/register", { method: "POST" });
+  alert("Login link sent");
+}
+
+function saveSchedule() {
+  fetch("/api/schedule", { method: "POST" });
+  alert("Schedule saved");
 }
 </script>
 
