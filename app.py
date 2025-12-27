@@ -11,6 +11,7 @@
 # - Admin endpoints
 # - Settings (timezone + notification prefs)
 # - Stripe Checkout & Webhook integration (with safe fallbacks)
+# - Railway healthcheck fix: /health + bind to PORT
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from datetime import datetime, timezone
@@ -19,8 +20,8 @@ from urllib.parse import urlparse, urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from fastapi import FastAPI, Request, Depends, HTTPException, status, Query, Header
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi import FastAPI, Request, Depends, HTTPException, Query, Header
+from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
@@ -247,7 +248,7 @@ def normalize_url(raw: str) -> str:
     return raw
 
 # -----------------------------------------------
-# Actual audit engine (shortened here for brevity)
+# Actual audit engine
 # -----------------------------------------------
 def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
     if scheme != "https": return False
@@ -440,15 +441,11 @@ def run_actual_audit(target_url: str) -> dict:
         return "F"
     grade = grade_from_score(overall)
 
-    # CWV proxy (approx; demonstration-only)
-    cls = 0.08 if mixed or blocking_script_count > 2 else 0.03
-
     # Issues breakdown
     errors = (1 if scheme != "https" else 0) + (1 if mixed else 0) + broken_internal
     warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0) + (1 if blocking_script_count > 0 else 0)
     notices = (1 if not csp else 0) + (1 if not sitemap_ok else 0) + (1 if not robots_ok else 0)
 
-    # Category totals per spec (cat1..cat5)
     cat2_base = min(100, statuses["2xx"])
     penalty = (statuses["4xx"] * 2) + (statuses["5xx"] * 3) + (redirect_chains * 1.5) + (broken_internal * 2) + (broken_external * 1.5)
     cat2_total = max(30, min(100, int(cat2_base - penalty)))
@@ -477,11 +474,10 @@ def run_actual_audit(target_url: str) -> dict:
         f"alt attributes, and JSON‑LD structured data ({'present' if ld_json_count else 'absent'}). Security posture needs attention: HSTS is "
         f"{'present' if hsts else 'missing'}, CSP is {'present' if csp else 'missing'}, X‑Frame‑Options is {'present' if xfo else 'missing'}, "
         f"and mixed content is {'detected' if mixed else 'not detected'}. Mobile readiness is {'confirmed' if viewport_meta else 'not confirmed'}. "
-        f"The internal crawl discovered {len(crawled)} pages with depth up to {max_depth}, status distribution "
+        f"The internal crawl discovered {len(crawled)} pages with status distribution "
         f"{statuses['2xx']} (2xx), {statuses['3xx']} (3xx), {statuses['4xx']} (4xx), {statuses['5xx']} (5xx), and {redirect_chains} redirect chains. "
         f"Prioritize compression (Brotli/GZIP), deferring non‑critical JS, caching/CDN to reduce TTFB, fixing broken links (internal {broken_internal}, external {broken_external}), "
-        f"and enabling security headers to improve Core Web Vitals and reduce business risk. These improvements will enhance search visibility, user trust, "
-        f"and conversion efficiency while establishing a defensible, internationally compliant posture."
+        f"and enabling security headers to improve Core Web Vitals and reduce business risk."
     )
 
     # Gauges/charts
@@ -496,28 +492,27 @@ def run_actual_audit(target_url: str) -> dict:
     issues_chart = {"labels": ["Errors","Warnings","Notices"], "datasets": [{"data": [errors, warnings, notices], "backgroundColor": ["#ef4444","#f59e0b","#3b82f6"]}]}
     category_chart = chart_bar(list(cat_scores.keys()), list(cat_scores.values()))
 
-    # Strengths/weaknesses/priorities
     strengths = []
-    if sec_score >= 80 and scheme == "https": strengths.append("HTTPS enforced with baseline security headers.")
-    if seo_score >= 75: strengths.append("Solid SEO foundations across titles/headings.")
-    if a11y_score >= 75: strengths.append("Semantic structure aids assistive technologies.")
-    if viewport_meta: strengths.append("Viewport meta present; mobile readiness baseline.")
-    if perf_score >= 70: strengths.append("Acceptable page weight; optimization opportunities remain.")
-    if not strengths: strengths = ["Platform reachable and crawlable.", "Baseline metadata present."]
+    if sec_score >= 80 and scheme == "https": strengths.append("HTTPS with baseline security headers.")
+    if seo_score >= 75: strengths.append("SEO foundations across titles/headings.")
+    if a11y_score >= 75: strengths.append("Semantic structure aids assistive tech.")
+    if viewport_meta: strengths.append("Viewport meta present; mobile baseline.")
+    if perf_score >= 70: strengths.append("Acceptable page weight; optimization possible.")
+    if not strengths: strengths = ["Platform reachable and crawlable."]
 
     weaknesses = []
     if perf_score < 80: weaknesses.append("Render‑blocking JS/CSS impacting interactivity.")
-    if seo_score < 80: weaknesses.append("Meta description/canonical coverage inconsistent.")
+    if seo_score < 80: weaknesses.append("Meta/canonical coverage inconsistent.")
     if a11y_score < 80: weaknesses.append("Alt text and ARIA landmarks incomplete.")
-    if sec_score < 90: weaknesses.append("HSTS/CSP/XFO/XCTO/Referrer‑Policy require hardening.")
+    if sec_score < 90: weaknesses.append("HSTS/CSP/XFO/XCTO/Referrer‑Policy missing.")
     if not viewport_meta: weaknesses.append("Mobile viewport not confirmed.")
-    if not weaknesses: weaknesses = ["Further analysis required to uncover advanced issues."]
+    if not weaknesses: weaknesses = ["Further analysis required for advanced issues."]
 
     priority = [
-        "Enable Brotli/GZIP and set Cache‑Control headers.",
+        "Enable Brotli/GZIP and set Cache‑Control.",
         "Defer/async non‑critical scripts; inline critical CSS.",
         "Optimize images (WebP/AVIF) with responsive srcset.",
-        "Expand JSON‑LD schema; validate canonical consistency.",
+        "Expand JSON‑LD; validate canonical consistency.",
         "Add HSTS, CSP, X‑Frame‑Options, X‑Content‑Type‑Options, Referrer‑Policy."
     ]
 
@@ -532,7 +527,6 @@ def run_actual_audit(target_url: str) -> dict:
     add_metric(1, overall, "doughnut")
     add_metric(2, 100 if errors == 0 else 40)
     add_metric(3, 80 if warnings <= 2 else 50)
-    # Distribute remaining based on category scores
     for n in range(4, 251):
         base = overall if n<=55 else (cat2_total if n<=75 else (seo_score if n<=110 else (perf_score if n<=131 else (sec_score if n<=185 else 70))))
         add_metric(n, max(10, min(100, base - ((n%7)*2))), "bar" if n%5 else "doughnut")
@@ -895,12 +889,16 @@ document.getElementById('subscribe-btn-panel').onclick = openCheckout;
 @app.get("/", response_class=HTMLResponse)
 def home(): return HTMLResponse(INDEX_HTML)
 
+# --- Healthcheck (Railway) ---
+@app.get("/health", response_class=JSONResponse)
+def health():
+    return {"status":"ok","time": datetime.utcnow().isoformat()}
+
 # --- Public & Registered audit ---
 @app.get("/audit", response_class=JSONResponse)
 def audit(url: str = Query(..., description="Website URL to audit"),
           authorization: str | None = Header(None),
           db=Depends(get_db)):
-    # Run actual audit
     payload = run_actual_audit(url)
 
     # Determine user (if JWT provided)
@@ -928,7 +926,6 @@ def audit(url: str = Query(..., description="Website URL to audit"),
         else:
             payload["premium"] = True
             payload["remaining"] = user.free_audits_remaining
-            # decrement free audits if not subscribed
             if not user.subscribed and user.free_audits_remaining > 0:
                 user.free_audits_remaining -= 1
                 db.commit()
@@ -1072,13 +1069,10 @@ def billing_status(user: User = Depends(get_current_user)):
 
 @app.post("/billing/checkout")
 def billing_checkout(user: User = Depends(get_current_user), db=Depends(get_db)):
-    # If Stripe not configured, flip subscribed for demo
     if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
         user.subscribed = True
         db.commit()
         return {"message": "Stripe not configured — subscription activated for demo.", "url": None}
-
-    # Create Stripe Checkout Session
     try:
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -1093,8 +1087,8 @@ def billing_checkout(user: User = Depends(get_current_user), db=Depends(get_db))
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/billing/webhook")
-def billing_webhook(request: Request, db=Depends(get_db)):
-    payload = request.body()
+async def billing_webhook(request: Request, db=Depends(get_db)):
+    payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
     if not STRIPE_WEBHOOK_SECRET:
         return {"message": "Webhook secret not configured"}
@@ -1105,7 +1099,6 @@ def billing_webhook(request: Request, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Handle subscription events
     type_ = event["type"]
     data = event["data"]["object"]
     try:
@@ -1179,7 +1172,6 @@ async def scheduler_loop():
                            f"Daily: {s.daily_report} | Accumulated: {s.accumulated_report}\n\n" \
                            "Certified PDF attached.\n— FF Tech"
                     send_email(user.email, subj, body, [(f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf", pdf_bytes)])
-                    # Persist Audit
                     row = Audit(
                         website_id=site.id, url=site.url, overall=payload["overall"], grade=payload["grade"],
                         errors=payload["errors"], warnings=payload["warnings"], notices=payload["notices"],
@@ -1197,3 +1189,11 @@ async def scheduler_loop():
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(scheduler_loop())
+
+# -----------------------------------------------
+# MAIN (bind to PORT for Railway)
+# -----------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("app:app", host="0.0.0.0", port=port)
