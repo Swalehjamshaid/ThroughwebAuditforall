@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | Professional AI Website Audit Platform</title>
-    
+    <title>FF Tech | Professional AI Website Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -13,202 +12,194 @@
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
         .gradient-brand { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        .metric-card { @apply bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden; border-left-width: 6px; }
+        .card { background: white; border: 1px solid #e2e8f0; border-radius: 1.5rem; padding: 2rem; transition: 0.3s; }
+        .metric-card { border-left-width: 6px; }
         .green { border-left-color: #10b981; }
         .yellow { border-left-color: #f59e0b; }
         .red { border-left-color: #ef4444; }
-        .chart-container { height: 100px; width: 100%; margin-top: 1rem; }
-        .premium-gate { filter: blur(8px); pointer-events: none; user-select: none; }
-        progress::-webkit-progress-value { background-color: #4f46e5; border-radius: 10px; }
-        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 10px; }
+        .premium-blur { filter: blur(8px); pointer-events: none; user-select: none; }
+        canvas { max-height: 250px; width: 100% !important; }
     </style>
 </head>
 <body class="antialiased">
 
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 py-4 px-8 flex justify-between items-center">
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 py-4 px-8 flex justify-between items-center">
         <div class="flex items-center gap-2">
             <div class="p-2 gradient-brand rounded-lg text-white"><i data-lucide="shield-check"></i></div>
             <h1 class="text-2xl font-extrabold tracking-tighter text-slate-900 uppercase">FF Tech</h1>
         </div>
-        <div class="flex items-center gap-6">
-            <div id="auth-section" class="flex items-center gap-4">
-                <span id="user-display" class="text-sm font-bold text-slate-600 hidden"></span>
-                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-500 hover:text-indigo-600">Login</button>
-                <button onclick="toggleModal('register-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg shadow-slate-200">Get Started</button>
+        <div id="auth-nav" class="flex gap-4 items-center">
+            <div id="guest-links" class="flex gap-4">
+                <button onclick="toggleModal('login')" class="text-sm font-bold text-slate-500 hover:text-indigo-600">Login</button>
+                <button onclick="toggleModal('register')" class="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg">Get Started</button>
+            </div>
+            <div id="user-links" class="hidden flex gap-6 items-center">
+                <span id="nav-email" class="text-sm font-bold text-slate-600"></span>
+                <button onclick="logout()" class="text-xs font-black text-rose-500 uppercase tracking-widest">Logout</button>
             </div>
         </div>
     </nav>
 
     <section id="hero" class="gradient-brand text-white pt-32 pb-24 px-8 relative overflow-hidden">
         <div class="max-w-5xl mx-auto text-center relative z-10">
-            <h2 class="text-5xl md:text-7xl font-black mb-8 tracking-tight">Professional AI <br>Website Audit</h2>
-            <p class="text-xl md:text-2xl mb-12 opacity-90 max-w-3xl mx-auto font-medium">250+ Metrics • Certified PDF Reports • Automated Scheduling</p>
-            
-            <form id="audit-form" class="flex flex-col md:flex-row max-w-3xl mx-auto bg-white p-2 rounded-[2rem] shadow-2xl overflow-hidden mb-12">
-                <input type="url" id="website-url" placeholder="https://your-website.com" required class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl">
-                <button type="submit" class="gradient-brand px-12 py-5 rounded-[1.8rem] font-black text-lg hover:opacity-90 transition shadow-lg">Run Free Audit</button>
+            <h2 class="text-5xl md:text-7xl font-black mb-10 tracking-tight">Professional AI <br>Website Audit</h2>
+            <form id="audit-form" class="flex flex-col md:flex-row max-w-3xl mx-auto bg-white p-2 rounded-[2.5rem] shadow-2xl mb-8">
+                <input type="url" id="website-url" placeholder="https://your-website.com" required 
+                       class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl">
+                <button type="submit" class="gradient-brand px-12 py-5 rounded-[2.2rem] font-black text-lg hover:opacity-90 transition shadow-lg">
+                    Run Free Audit
+                </button>
             </form>
-
-            <div class="flex justify-center gap-12 text-sm font-bold uppercase tracking-widest opacity-80">
-                <span id="audits-left">Audits Remaining: 10</span>
-                <span class="flex items-center gap-2"><i data-lucide="zap"></i> Instant Results</span>
-            </div>
+            <p class="text-xl font-medium opacity-80" id="audits-status">
+                Free Audits Remaining: <span id="remaining-count" class="font-bold underline">10</span>
+            </p>
         </div>
     </section>
 
-    <section id="progress-section" class="py-20 px-8 hidden bg-slate-50">
-        <div class="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-xl p-12 border border-slate-100">
-            <h3 class="text-3xl font-black text-center mb-12 text-slate-900 uppercase">System Analysis in Progress</h3>
-            <div class="space-y-8">
-                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Crawling</span><progress id="p-crawl" class="flex-1 h-3" value="0" max="100"></progress><span id="crawl-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
-                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Analyzing</span><progress id="p-analyze" class="flex-1 h-3" value="0" max="100"></progress><span id="analyze-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
-                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Scoring</span><progress id="p-score" class="flex-1 h-3" value="0" max="100"></progress><span id="score-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
-            </div>
-        </div>
-    </section>
-
-    <section id="summary-section" class="py-24 px-8 hidden">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid lg:grid-cols-3 gap-12 items-center mb-24">
-                <div class="text-center lg:text-left">
-                    <span id="grade-badge" class="text-9xl font-black px-12 py-8 rounded-3xl bg-indigo-50 text-indigo-600 shadow-xl inline-block mb-8">A+</span>
-                    <h2 class="text-4xl font-black text-slate-900 mb-4">Executive Summary</h2>
-                    <p id="exec-summary" class="text-xl text-slate-500 leading-relaxed italic"></p>
-                </div>
-                <div class="lg:col-span-2 bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100">
-                    <canvas id="category-chart" height="300"></canvas>
-                </div>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-8 mb-24">
-                <div class="p-8 bg-emerald-50 rounded-3xl border border-emerald-100">
-                    <h4 class="text-xl font-bold text-emerald-900 mb-6 flex items-center gap-2"><i data-lucide="trending-up"></i> Strengths</h4>
-                    <ul id="strengths-list" class="space-y-4 text-emerald-800 font-semibold"></ul>
-                </div>
-                <div class="p-8 bg-rose-50 rounded-3xl border border-rose-100">
-                    <h4 class="text-xl font-bold text-rose-900 mb-6 flex items-center gap-2"><i data-lucide="alert-circle"></i> Weaknesses</h4>
-                    <ul id="weaknesses-list" class="space-y-4 text-rose-800 font-semibold"></ul>
-                </div>
-                <div class="p-8 bg-amber-50 rounded-3xl border border-amber-100">
-                    <h4 class="text-xl font-bold text-amber-900 mb-6 flex items-center gap-2"><i data-lucide="check-square"></i> Priorities</h4>
-                    <ul id="priority-list" class="space-y-4 text-amber-800 font-semibold"></ul>
-                </div>
-            </div>
-
-            <div class="text-center">
-                <button onclick="exportPDF()" class="bg-slate-900 text-white px-12 py-5 rounded-2xl text-xl font-bold shadow-2xl flex items-center gap-4 mx-auto hover:bg-slate-800 transition">
-                    <i data-lucide="download"></i> Download Certified PDF Report
+    <main id="results" class="hidden max-w-7xl mx-auto py-20 px-8 space-y-16">
+        
+        <section class="grid lg:grid-cols-3 gap-12 items-center">
+            <div class="text-center lg:text-left space-y-6">
+                <div id="grade-display" class="text-9xl font-black px-12 py-8 rounded-3xl bg-indigo-50 text-indigo-600 shadow-xl inline-block">A+</div>
+                <h3 class="text-4xl font-black text-slate-900">Executive Summary</h3>
+                <p id="exec-summary" class="text-xl text-slate-500 leading-relaxed italic"></p>
+                <button onclick="downloadPDF()" class="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 mx-auto lg:mx-0">
+                    <i data-lucide="file-down"></i> Export Certified PDF
                 </button>
             </div>
-        </div>
-    </section>
+            <div class="lg:col-span-2 card">
+                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Category Scores</h4>
+                <canvas id="category-chart"></canvas>
+            </div>
+        </section>
 
-    <section id="dashboard-section" class="py-24 px-8 hidden bg-slate-50 border-t border-slate-200">
-        <div class="max-w-7xl mx-auto">
-            <h3 class="text-4xl font-black text-slate-900 mb-16 text-center">Detailed Audit Intelligence</h3>
+        <section class="grid md:grid-cols-3 gap-8">
+            <div class="p-8 bg-emerald-50 rounded-3xl border border-emerald-100">
+                <h4 class="text-xl font-bold text-emerald-900 mb-6">Strengths</h4>
+                <ul id="strengths-list" class="space-y-4 text-emerald-800 font-semibold"></ul>
+            </div>
+            <div class="p-8 bg-rose-50 rounded-3xl border border-rose-100">
+                <h4 class="text-xl font-bold text-rose-900 mb-6">Weaknesses</h4>
+                <ul id="weaknesses-list" class="space-y-4 text-rose-800 font-semibold"></ul>
+            </div>
+            <div class="p-8 bg-amber-50 rounded-3xl border border-amber-100">
+                <h4 class="text-xl font-bold text-amber-900 mb-6">Priority Fixes</h4>
+                <ul id="priority-list" class="space-y-4 text-amber-800 font-semibold"></ul>
+            </div>
+        </section>
+
+        <section>
+            <div class="flex justify-between items-end mb-12">
+                <h3 class="text-4xl font-black text-slate-900">250+ Metrics Intelligence</h3>
+                <button id="premium-unlock" onclick="startStripe()" class="hidden bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm shadow-lg">Unlock Premium Access</button>
+            </div>
             <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 </div>
-        </div>
-    </section>
+        </section>
+    </main>
 
-    <footer class="bg-slate-950 text-slate-500 py-20 px-8 text-center border-t border-slate-900">
+    <footer class="bg-slate-950 text-slate-500 py-20 px-8 text-center">
         <p class="font-black text-white text-xl tracking-tighter mb-4 uppercase">FF Tech International</p>
-        <p class="text-xs font-bold uppercase tracking-widest opacity-50 mb-8">Professional Website Audit System v4.0</p>
-        <p>© 2025 FF Tech SaaS. All Rights Reserved.</p>
+        <p class="text-xs font-bold uppercase tracking-widest opacity-50 mb-8">Professional Audit System © 2025</p>
     </footer>
 
     <script>
         lucide.createIcons();
-        let currentToken = localStorage.getItem('token');
-        const API_BASE = ""; // Relative if hosted on same server
+        let currentToken = null;
+        let catChartInstance = null;
 
-        // UI Helpers
-        function toggleModal(id) { /* logic for login/reg modals */ }
-        
-        async function exportPDF() {
+        // B.13 Form Handling
+        document.getElementById('audit-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('website-url').value;
+            const headers = currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {};
+            
+            // Show Loading State
+            document.querySelector('#audit-form button').innerText = "Analyzing...";
+
+            try {
+                const res = await fetch(`/audit?url=${encodeURIComponent(url)}`, { headers });
+                const data = await res.json();
+                renderAuditReport(data);
+            } catch (err) {
+                alert("Audit Error. Check console.");
+            } finally {
+                document.querySelector('#audit-form button').innerText = "Run Free Audit";
+            }
+        };
+
+        function renderAuditReport(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('grade-display').innerText = data.grade;
+            document.getElementById('exec-summary').innerText = data.summary;
+            document.getElementById('remaining-count').innerText = data.remaining ?? "10";
+
+            // Render Lists
+            const listMap = { 'strengths-list': data.strengths, 'weaknesses-list': data.weaknesses, 'priority-list': data.priority };
+            Object.entries(listMap).forEach(([id, items]) => {
+                document.getElementById(id).innerHTML = items.map(i => `<li class="flex items-start gap-2"><i data-lucide="check" class="w-4 mt-1"></i>${i}</li>`).join('');
+            });
+
+            // Category Chart
+            if (catChartInstance) catChartInstance.destroy();
+            catChartInstance = new Chart(document.getElementById('category-chart'), {
+                type: 'bar',
+                data: data.category_chart,
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 250+ Metrics Grid
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = '';
+            
+            if(!data.premium) document.getElementById('premium-unlock').classList.remove('hidden');
+
+            data.metrics.forEach((m, index) => {
+                const isLocked = !data.premium && index >= 50;
+                const card = document.createElement('div');
+                card.className = `card metric-card ${m.severity} ${isLocked ? 'premium-blur' : ''}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-[10px] font-black text-slate-400">#${String(m.num).padStart(3, '0')}</span>
+                        <div class="w-2 h-2 rounded-full ${m.severity === 'red' ? 'bg-red-500' : 'bg-emerald-500'}"></div>
+                    </div>
+                    <h5 class="text-sm font-bold text-slate-700 mb-4">Metric Signal #${m.num}</h5>
+                    <canvas id="chart-${m.num}"></canvas>
+                `;
+                grid.appendChild(card);
+                
+                new Chart(document.getElementById(`chart-${m.num}`), {
+                    type: m.chart_type,
+                    data: m.chart_data,
+                    options: { 
+                        plugins: { legend: { display: false } },
+                        scales: { x: { display: false }, y: { display: false } },
+                        maintainAspectRatio: false
+                    }
+                });
+            });
+            lucide.createIcons();
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function downloadPDF() {
             const url = document.getElementById('website-url').value;
             window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
         }
 
-        // Audit Flow Controller
-        document.getElementById('audit-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const url = document.getElementById('website-url').value;
-            
-            // Show Progress
-            document.getElementById('progress-section').classList.remove('hidden');
-            document.getElementById('hero').classList.add('hidden');
-            simulateProgress();
-
-            try {
-                const response = await fetch(`${API_BASE}/audit?url=${encodeURIComponent(url)}`, {
-                    headers: currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {}
-                });
-                const data = await response.json();
-                renderReport(data);
-            } catch (err) {
-                alert("Audit Failed. Please check the URL and try again.");
-            }
-        });
-
-        function simulateProgress() {
-            let p = 0;
-            const interval = setInterval(() => {
-                p += 5;
-                document.getElementById('p-crawl').value = p;
-                document.getElementById('crawl-pct').innerText = p + '%';
-                if (p >= 100) clearInterval(interval);
-            }, 150);
+        async function startStripe() {
+            const res = await fetch('/billing/checkout', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${currentToken}` }
+            });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+            else alert("Please Login to Subscribe.");
         }
 
-        function renderReport(data) {
-            document.getElementById('progress-section').classList.add('hidden');
-            document.getElementById('summary-section').classList.remove('hidden');
-            document.getElementById('dashboard-section').classList.remove('hidden');
-
-            // Grade & Summary
-            document.getElementById('grade-badge').innerText = data.grade;
-            document.getElementById('exec-summary').innerText = data.summary;
-
-            // Lists
-            const renderList = (id, items) => {
-                const el = document.getElementById(id);
-                el.innerHTML = items.map(item => `<li>• ${item}</li>`).join('');
-            };
-            renderList('strengths-list', data.strengths);
-            renderList('weaknesses-list', data.weaknesses);
-            renderList('priority-list', data.priority);
-
-            // Category Chart
-            new Chart(document.getElementById('category-chart'), {
-                type: 'bar',
-                data: data.category_chart,
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-            });
-
-            // 250+ Metrics Injection
-            const grid = document.getElementById('metrics-grid');
-            grid.innerHTML = ''; // Clear previous
-            data.metrics.forEach(m => {
-                const card = document.createElement('div');
-                card.className = `metric-card ${m.severity}`;
-                card.innerHTML = `
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-[10px] font-black text-slate-400">METRIC #${String(m.num).padStart(3, '0')}</span>
-                        <div class="w-2 h-2 rounded-full ${m.severity === 'red' ? 'bg-red-500' : 'bg-emerald-500'}"></div>
-                    </div>
-                    <h5 class="text-sm font-bold text-slate-700 mb-4">System Signal #${m.num}</h5>
-                    <div class="chart-container"><canvas id="chart-m-${m.num}"></canvas></div>
-                `;
-                grid.appendChild(card);
-                
-                // Initialize sparkline for each metric
-                new Chart(document.getElementById(`chart-m-${m.num}`), {
-                    type: m.chart_type,
-                    data: m.chart_data,
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                });
-            });
+        function logout() {
+            currentToken = null;
+            location.reload();
         }
     </script>
 </body>
