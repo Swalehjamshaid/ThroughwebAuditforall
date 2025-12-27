@@ -664,6 +664,13 @@ class SettingsIn(BaseModel):
 # FastAPI app + CORS
 # -----------------------------------------------
 app = FastAPI(title=APP_NAME)
+
+# --- PLACE HEALTH CHECK HERE ---
+@app.get("/health", response_class=JSONResponse)
+async def health_check():
+    """Railway pings this to see if the container is alive."""
+    return {"status": "healthy", "time": datetime.utcnow().isoformat()}
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # -----------------------------------------------
@@ -1035,11 +1042,6 @@ document.getElementById('subscribe-btn-panel').addEventListener('click',openChec
 # -----------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def home(): return HTMLResponse(INDEX_HTML)
-
-# --- Healthcheck (Railway) ---
-@app.get("/health", response_class=JSONResponse)
-def health():
-    return {"status":"ok","time": datetime.utcnow().isoformat()}
 
 # --- Public & Registered audit ---
 @app.get("/audit", response_class=JSONResponse)
