@@ -58,7 +58,7 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@fftech.io")
 
-SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "60"))
+SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "60"))  # set 0 to disable while stabilizing
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
@@ -213,19 +213,19 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 async def health_check():
     return {"status": "healthy", "time": datetime.utcnow().isoformat()}
 
-# --- Favicon: avoid noisy 404s ---
+# Favicon (avoid noisy 404s)
 @app.get("/favicon.ico")
 def favicon():
     # 1x1 transparent PNG
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR4nGNgYGBgAAAABQABJzQnWQAAAABJRU5ErkJggg==")
     return Response(content=png, media_type="image/png")
 
-# --- Ping: quick probe ---
+# Ping (quick probe)
 @app.get("/ping", response_class=PlainTextResponse)
 def ping():
     return PlainTextResponse("pong")
 
-# --- Global exception handler: avoid Railway “failed to respond” page ---
+# Global exception handler: avoid Railway “failed to respond” page
 @app.exception_handler(Exception)
 async def global_exception_handler(request: FastAPIRequest, exc: Exception):
     try:
@@ -445,8 +445,6 @@ def run_actual_audit(target_url: str) -> dict:
         else: a11y_score -= 6
 
     bp_score = 100
-    if scheme != "https": bp_score -= 35
-    if mixed: bp_score -= 15
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     sec_score = 100
@@ -468,9 +466,9 @@ def run_actual_audit(target_url: str) -> dict:
         return "F"
     grade = grade_from_score(overall)
 
-    errors = (1 if scheme != "https" else 0) + (1 if mixed else 0) + broken_internal
-    warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0) + (1 if blocking_script_count > 0 else 0)
-    notices = (1 if not headers.get("Content-Security-Policy") else 0) + (1 if not sitemap_ok else 0) + (1 if not robots_ok else 0)
+    errors = broken_internal + (1 if mixed else 0)
+    warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0)
+    notices = (1 if not headers.get("Content-Security-Policy") else 0) + (1 if not robots_ok else 0) + (1 if not sitemap_ok else 0)
 
     cat2_base = 100
     penalty = (statuses["4xx"] * 2) + (statuses["5xx"] * 3) + (redirect_chains * 1.5) + (broken_internal * 2)
@@ -494,10 +492,11 @@ def run_actual_audit(target_url: str) -> dict:
     category_chart= {"labels": list(cat_scores.keys()), "datasets":[{"label":"Score","data": list(cat_scores.values()), "backgroundColor":["#6366f1","#f59e0b","#10b981","#ef4444","#0ea5e9"]}]}
 
     strengths = []
-    if sec_score >= 80 and scheme == "https": strengths.append("HTTPS with baseline security headers.")
+    if sec_score >= 80: strengths.append("Baseline security headers in place.")
     if seo_score >= 75: strengths.append("SEO foundations across titles/headings.")
     if a11y_score >= 75: strengths.append("Semantic structure aids assistive tech.")
     if perf_score >= 70: strengths.append("Acceptable page weight; optimization possible.")
+    if viewport_meta: strengths.append("Viewport meta present; mobile baseline.")
     if not strengths: strengths = ["Platform reachable and crawlable."]
 
     weaknesses = []
@@ -505,6 +504,7 @@ def run_actual_audit(target_url: str) -> dict:
     if seo_score  < 80: weaknesses.append("Meta/canonical coverage inconsistent.")
     if a11y_score< 80: weaknesses.append("Alt text and ARIA landmarks incomplete.")
     if sec_score  < 90: weaknesses.append("HSTS/CSP/XFO/XCTO/Referrer‑Policy missing.")
+    if not viewport_meta: weaknesses.append("Mobile viewport not confirmed.")
     if not weaknesses: weaknesses = ["Further analysis required for advanced issues."]
 
     priority = [
@@ -563,7 +563,13 @@ document.getElementById('audit-form').addEventListener('submit',async(e)=>{e.pre
 """
 
 @app.get("/", response_class=HTMLResponse)
-def home():
+def home(request: Request):
+    # Prefer the template if pages/ exists, else fallback to inline INDEX_HTML
+    try:
+        if 'templates' in globals() and templates is not None:
+            return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME})
+    except Exception:
+        pass
     return HTMLResponse(INDEX_HTML)
 
 # ---------------- Schemas ----------------
@@ -691,6 +697,10 @@ def verify(token: str):
         if not user: raise HTTPException(status_code=404, detail="User not found")
         user.is_verified = True; db.commit()
         return {"message": "Email verified. You can now log in."}
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
 
 @app.post("/login")
 def login(payload: LoginIn, request: Request):
