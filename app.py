@@ -1,27 +1,14 @@
 
 # app.py
 # FF Tech — AI Website Audit SaaS + Ultra-Flexible Web Integrator
-# ---------------------------------------------------------------------------------
-# One-file backend that is frontend-agnostic, API-driven, and production-ready:
+# ---------------------------------------------------------------------------
 # - Serves ANY frontend (raw HTML, SPA builds, Markdown, Jinja) from ./pages with smart asset injection
 # - Open Access + Registered (passwordless magic link) access model, JWT auth
-# - AI Audit Engine returns FULL 200 metrics grouped by category (placeholders for external-data items)
+# - Audit Engine returns FULL 200 metrics grouped by category (placeholders for external-data items)
 # - Chart.js-ready datasets for graphs (overall gauge, issues pie, category bars)
 # - Certified 5-page PDF report with charts, narrative, and branding
 # - Stripe subscriptions (real/demo), daily scheduler with PDF email delivery
 # - Admin endpoints, DB-safe sessions, health checks, runtime-extensible asset injector
-#
-# Run:
-#   pip install fastapi uvicorn jinja2 requests beautifulsoup4 reportlab sqlalchemy pydantic
-#   # optional for Markdown rendering:
-#   pip install markdown
-#   uvicorn app:app --host 0.0.0.0 --port 8000
-#
-# Project structure:
-# .
-# ├─ app.py
-# ├─ pages/       (index.html, *.md, *.j2)
-# └─ static/      (css/style.css, js/app.js, images/*)
 
 import os, io, hmac, json, time, base64, secrets, asyncio, mimetypes
 from dataclasses import dataclass, asdict
@@ -44,7 +31,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
-# Stripe (lazy import to avoid boot errors when keys absent)
+# Optional Stripe
 try:
     import stripe
 except Exception:
@@ -81,7 +68,7 @@ PAGES_DIR = os.getenv("PAGES_DIR", "pages")
 AUTO_CREATE_STATIC = os.getenv("AUTO_CREATE_STATIC", "true").lower() == "true"
 AUTO_CREATE_PAGES  = os.getenv("AUTO_CREATE_PAGES", "true").lower() == "true"
 
-# Asset injection defaults (runtime-extensible via /assets.update)
+# Runtime-extensible asset injection defaults
 LOCAL_STYLES_DEFAULT        = ["/static/css/style.css"]
 LOCAL_SCRIPTS_HEAD_DEFAULT  = []
 LOCAL_SCRIPTS_BODY_DEFAULT  = ["/static/js/app.js"]
@@ -123,7 +110,7 @@ INDEX_HTML_FALLBACK = r"""<!DOCTYPE html>
       <button type="submit" style="padding:0.8rem 1rem;border-radius:0.6rem;background:#6366f1;color:#fff;font-weight:700;">Run Audit</button>
       <button type="button" id="pdf-btn" style="padding:0.8rem 1rem;border-radius:0.6rem;background:#111827;color:#fff;font-weight:700;">Export PDF</button>
     </form>
-    <div id="results" class="ff-card" style="margin-top:1rem; display:none;">
+    <div id="results" class="ff-card hidden" style="margin-top:1rem;">
       <h2>Results</h2>
       <p id="summary"></p>
       <canvas id="overallChart" width="260" height="260"></canvas>
@@ -137,7 +124,7 @@ INDEX_HTML_FALLBACK = r"""<!DOCTYPE html>
         const url = document.getElementById('url-input').value;
         const res = await fetch('/audit?url=' + encodeURIComponent(url));
         const data = await res.json();
-        document.getElementById('results').style.display = 'block';
+        document.getElementById('results').classList.remove('hidden');
         document.getElementById('summary').innerText = data.summary || '';
         const ctx = document.getElementById('overallChart').getContext('2d');
         if (chart) chart.destroy();
@@ -163,7 +150,8 @@ app.add_middleware(
 )
 
 def ensure_dir(path: str, auto_create: bool) -> bool:
-    if os.path.isdir(path): return True
+    if os.path.isdir(path):
+        return True
     if auto_create:
         try:
             os.makedirs(path, exist_ok=True)
@@ -226,11 +214,15 @@ class InjectorState:
 INJECTOR = InjectorState()
 
 def _has_asset(html_low: str, url: str) -> bool:
-    try: return url.lower() in html_low
-    except Exception: return False
+    try:
+        return url.lower() in html_low
+    except Exception:
+        return False
 
 def _inject_head(html: str, flags: UIFlags) -> str:
-    html_low = html.lower(); tags = []
+    html_low = html.lower()
+    tags = []
+
     # CDN scripts (head)
     if flags.tailwind:
         for url in INJECTOR.cdn_scripts_head:
@@ -240,27 +232,45 @@ def _inject_head(html: str, flags: UIFlags) -> str:
         for url in INJECTOR.cdn_scripts_head:
             if "chart" in url and not _has_asset(html_low, url):
                 tags.append(f'{url}</script>')
-    # Styles
+
+    # Styles (CDN + local)
     for url in INJECTOR.cdn_styles:
-        if not _has_asset(html_low, url): tags.append(f'{url}')
+        if not _has_asset(html_low, url):
+            tags.append(f'<url}')
     for url in INJECTOR.local_styles:
-        if not _has_asset(html_low, url): tags.append(f'{url}')
+        if not _has_asset(html_low, url):
+            tags.append(f'{url}')
+
     # Local head scripts
     for url in INJECTOR.local_scripts_head:
-        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
-    # Inline CSS
+        if not _has_asset(html_low, url):
+            tags.append(f'{url}</script>')
+
+    # Base inline CSS
     if INJECTOR.base_inline_css.strip():
         tags.append(f"<style>{INJECTOR.base_inline_css}</style>")
+
     payload = "\n".join(tags)
     idx = html_low.rfind("</head>")
     return html[:idx] + payload + html[idx:] if idx != -1 else payload + "\n" + html
 
 def _inject_body(html: str, flags: UIFlags) -> str:
-    html_low = html.lower(); tags = []
+    html_low = html.lower()
+    tags = []
+
+    # Local body scripts
     for url in INJECTOR.local_scripts_body:
-        if not _has_asset(html_low, url): tags.append(f'<script src="{url    for url in INJECTOR.cdn_scripts_body:
-        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url):
+            tags.append(f'{url}</script>')
+
+    # CDN body scripts (optional)
+    for url in INJECTOR.cdn_scripts_body:
+        if not _has_asset(html_low, url):
+            tags.append(f'{url}</script>')
+
+    # Flags bootstrap
     tags.append(f"<script>window.__FF_FLAGS__={json.dumps(asdict(flags))};window.__APP_NAME__={json.dumps(APP_NAME)};</script>")
+
     payload = "\n".join(tags)
     idx = html_low.rfind("</body>")
     return html[:idx] + payload + html[idx:] if idx != -1 else html + "\n" + payload
@@ -467,7 +477,8 @@ def safe_session():
     finally:
         try:
             if db: db.close()
-        except Exception: pass
+        except Exception:
+            pass
 
 # ---------------------- SECURITY (magic link + JWT) ----------------------
 def jwt_sign(payload: dict, key: str = SECRET_KEY, exp_minutes: int = 60) -> str:
@@ -550,7 +561,7 @@ def normalize_url(raw: str) -> str:
     if not parsed.scheme: raw = "https://" + raw
     return raw
 
-# ---------------------- AUDIT ENGINE (all 200 metrics) ----------------------
+# ---------------------- AUDIT ENGINE (all 200 metrics skeleton) ----------------------
 def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
     if scheme != "https": return False
     for tag in soup.find_all(["img","script","link","iframe","video","audio","source"]):
@@ -591,7 +602,7 @@ def run_actual_audit(target_url: str) -> dict:
     url = normalize_url(target_url)
     resp = safe_request(url, "GET")
 
-    # If unreachable, return full structure with zero/placeholder values
+    # If unreachable, return full structure with placeholders
     if not resp or (resp.status_code and resp.status_code >= 400):
         charts = {
             "overall_gauge":{"labels":["Score","Remaining"],"datasets":[{"data":[0,100],"backgroundColor":["#ef4444","#e5e7eb"],"borderWidth":0}]} ,
@@ -600,7 +611,7 @@ def run_actual_audit(target_url: str) -> dict:
                             "datasets":[{"label":"Score","data":[0,0,0,0,0,0,0,0,0],"backgroundColor":["#6366f1","#22c55e","#0ea5e9","#f59e0b","#10b981","#ef4444","#8b5cf6","#fb7185","#14b8a6"]}]}
         }
         cat_scores = {"Executive":0,"Health":0,"Crawl/Index":0,"On-Page SEO":0,"Performance":0,"Mobile/Sec/Intl":0,"Competitors":0,"Broken Links":0,"Opportunities":0}
-        metrics = [{"id": i, "name": f"Metric {i}", "value": 0, "category": "Executive"} for i in range(1,201)]
+        metrics = [{"id": i, "name": f"Metric {i}", "value": 0, "category": "Executive Summary"} for i in range(1,201)]
         return {
             "overall":0,"grade":"F",
             "summary":f"{url} unreachable. Fix availability (HTTP 2xx), DNS/TLS, and ensure HTTPS.",
@@ -727,7 +738,6 @@ def run_actual_audit(target_url: str) -> dict:
         "Opportunities": 70, # placeholder heuristic
     }
 
-    # Executive summary
     exec_summary = (
         f"FF Tech audited {resp.url}. Overall health {overall}% (grade {grade}). "
         f"Payload {size_mb:.2f} MB; TTFB {ttfb_ms} ms. Improve SEO (H1/meta/canonical/alt/JSON-LD), "
@@ -742,17 +752,21 @@ def run_actual_audit(target_url: str) -> dict:
     charts = {
         "overall_gauge": gauge(overall),
         "issues_pie": {"labels":["Errors","Warnings","Notices"],
-                       "datasets":[{"data":[errors,warnings,notices],"backgroundColor":["#ef4444","#f59e0b","#3b82f6"]}]},
+                       "datasets":[{"data":[errors,warnings,notices],
+                                    "backgroundColor":["#ef4444","#f59e0b","#3b82f6"]}]},
         "category_bar": {"labels": list(cat_scores.keys()),
                          "datasets":[{"label":"Score","data": list(cat_scores.values()),
                                       "backgroundColor":["#6366f1","#22c55e","#0ea5e9","#f59e0b","#10b981","#ef4444","#8b5cf6","#fb7185","#14b8a6"]}]},
     }
 
-    # ---------------------- Build ALL 200 metrics ----------------------
+    # Build ALL 200 metrics (real checks + placeholders)
     metrics: List[Dict] = []
+    def add_metrics(start_id: int, items: List[tuple], category: str):
+        for idx,(name,val) in enumerate(items, start=start_id):
+            metrics.append({"id": idx, "name": name, "value": val, "category": category})
 
-    # A. EXECUTIVE SUMMARY & GRADING (1–10)
-    exec_items = [
+    # A. Executive Summary & Grading (1–10)
+    add_metrics(1, [
         ("Overall Site Health Score (%)", overall),
         ("Website Grade (A+ to D)", grade),
         ("Executive Summary (200 Words)", 1),
@@ -763,12 +777,10 @@ def run_actual_audit(target_url: str) -> dict:
         ("Category Score Breakdown", 1),
         ("Industry-Standard Presentation", 1),
         ("Print / Certified Export Readiness", 1),
-    ]
-    for i,(name,val) in enumerate(exec_items, start=1):
-        metrics.append({"id": i, "name": name, "value": val, "category": "Executive Summary"})
+    ], "Executive Summary")
 
-    # B. OVERALL SITE HEALTH (11–20)
-    health_items = [
+    # B. Overall Site Health (11–20)
+    add_metrics(11, [
         ("Site Health Score", cat_scores["Health"]),
         ("Total Errors", errors),
         ("Total Warnings", warnings),
@@ -779,12 +791,10 @@ def run_actual_audit(target_url: str) -> dict:
         ("Crawl Budget Efficiency", None),
         ("Orphan Pages Percentage", None),
         ("Audit Completion Status", 1),
-    ]
-    for j,(name,val) in enumerate(health_items, start=11):
-        metrics.append({"id": j, "name": name, "value": val, "category": "Overall Site Health"})
+    ], "Overall Site Health")
 
-    # C. CRAWLABILITY & INDEXATION (21–40)
-    crawl_items = [
+    # C. Crawlability & Indexation (21–40)
+    add_metrics(21, [
         ("HTTP 2xx Pages", statuses["2xx"]),
         ("HTTP 3xx Pages", statuses["3xx"]),
         ("HTTP 4xx Pages", statuses["4xx"]),
@@ -805,12 +815,10 @@ def run_actual_audit(target_url: str) -> dict:
         ("Pagination Issues", None),
         ("Crawl Depth Distribution", None),
         ("Duplicate Parameter URLs", None),
-    ]
-    for k,(name,val) in enumerate(crawl_items, start=21):
-        metrics.append({"id": k, "name": name, "value": val, "category": "Crawlability & Indexation"})
+    ], "Crawlability & Indexation")
 
-    # D. ON-PAGE SEO (41–75)
-    seo_items = [
+    # D. On-Page SEO (41–75)
+    add_metrics(41, [
         ("Missing Title Tags", 0 if title_tag else 1),
         ("Duplicate Title Tags", None),
         ("Title Too Long", 1 if title_tag and len(title_tag)>65 else 0),
@@ -846,12 +854,10 @@ def run_actual_audit(target_url: str) -> dict:
         ("External Links Count", None),
         ("Broken External Links", None),
         ("Anchor Text Issues", None),
-    ]
-    for m,(name,val) in enumerate(seo_items, start=41):
-        metrics.append({"id": m, "name": name, "value": val, "category": "On-Page SEO"})
+    ], "On-Page SEO")
 
-    # E. PERFORMANCE & TECHNICAL (76–96)
-    perf_items = [
+    # E. Performance & Technical (76–96)
+    add_metrics(76, [
         ("Largest Contentful Paint (LCP)", None),
         ("First Contentful Paint (FCP)", None),
         ("Cumulative Layout Shift (CLS)", None),
@@ -860,25 +866,23 @@ def run_actual_audit(target_url: str) -> dict:
         ("Speed Index", None),
         ("Time to Interactive", None),
         ("DOM Content Loaded", None),
-        ("Total Page Size", round(size_mb,2)),
+        ("Total Page Size (MB)", round(size_mb,2)),
         ("Requests Per Page", None),
         ("Unminified CSS", None),
         ("Unminified JavaScript", None),
         ("Render Blocking Resources", blocking_script_count),
         ("Excessive DOM Size", None),
         ("Third-Party Script Load", None),
-        ("Server Response Time", ttfb_ms),
+        ("Server Response Time (ms)", ttfb_ms),
         ("Image Optimization", None),
         ("Lazy Loading Issues", None),
         ("Browser Caching Issues", None),
         ("Missing GZIP / Brotli", None),
         ("Resource Load Errors", None),
-    ]
-    for n,(name,val) in enumerate(perf_items, start=76):
-        metrics.append({"id": n, "name": name, "value": val, "category": "Performance & Technical"})
+    ], "Performance & Technical")
 
-    # F. MOBILE, SECURITY & INTERNATIONAL (97–150)
-    msi_items = [
+    # F. Mobile, Security & International (97–150)
+    add_metrics(97, [
         ("Mobile Friendly Test", None),
         ("Viewport Meta Tag", 1 if viewport_meta else 0),
         ("Small Font Issues", None),
@@ -933,11 +937,9 @@ def run_actual_audit(target_url: str) -> dict:
         ("Keyword Trend", None),
         ("Historical Comparison", None),
         ("Overall Stability Index", None),
-    ]
-    for p,(name,val) in enumerate(msi_items, start=97):
-        metrics.append({"id": p, "name": name, "value": val, "category": "Mobile, Security & International"})
+    ], "Mobile, Security & International")
 
-    # G. COMPETITOR ANALYSIS (151–167) — placeholder values (requires external APIs)
+    # G. Competitor Analysis (151–167) — placeholders
     comp_names = [
         "Competitor Health Score","Competitor Performance Comparison","Competitor Core Web Vitals Comparison",
         "Competitor SEO Issues Comparison","Competitor Broken Links Comparison","Competitor Authority Score",
@@ -946,11 +948,10 @@ def run_actual_audit(target_url: str) -> dict:
         "Competitor Security Score","Competitive Gap Score","Competitive Opportunity Heatmap",
         "Competitive Risk Heatmap","Overall Competitive Rank"
     ]
-    for idx, nm in enumerate(comp_names, start=151):
-        metrics.append({"id": idx, "name": nm, "value": None, "category": "Competitor Analysis"})
+    add_metrics(151, [(nm, None) for nm in comp_names], "Competitor Analysis")
 
-    # H. BROKEN LINKS INTELLIGENCE (168–180)
-    bl_items = [
+    # H. Broken Links Intelligence (168–180)
+    add_metrics(168, [
         ("Total Broken Links", broken_internal),
         ("Internal Broken Links", broken_internal),
         ("External Broken Links", None),
@@ -964,35 +965,17 @@ def run_actual_audit(target_url: str) -> dict:
         ("Broken Media Links", None),
         ("Resolution Progress", None),
         ("Risk Severity Index", None),
-    ]
-    for r,(name,val) in enumerate(bl_items, start=168):
-        metrics.append({"id": r, "name": name, "value": val, "category": "Broken Links Intelligence"})
+    ], "Broken Links Intelligence")
 
-    # I. OPPORTUNITIES, GROWTH & ROI (181–200)
-    opp_items = [
-        ("High Impact Opportunities", None),
-        ("Quick Wins Score", None),
-        ("Long-Term Fixes", None),
-        ("Traffic Growth Forecast", None),
-        ("Ranking Growth Forecast", None),
-        ("Conversion Impact Score", None),
-        ("Content Expansion Opportunities", None),
-        ("Internal Linking Opportunities", None),
-        ("Speed Improvement Potential", None),
-        ("Mobile Improvement Potential", None),
-        ("Security Improvement Potential", None),
-        ("Structured Data Opportunities", None),
-        ("Crawl Optimization Potential", None),
-        ("Backlink Opportunity Score", None),
-        ("Competitive Gap ROI", None),
-        ("Fix Roadmap Timeline", None),
-        ("Time-to-Fix Estimate", None),
-        ("Cost-to-Fix Estimate", None),
-        ("ROI Forecast", None),
-        ("Overall Growth Readiness", None),
+    # I. Opportunities, Growth & ROI (181–200)
+    opp_names = [
+        "High Impact Opportunities","Quick Wins Score","Long-Term Fixes","Traffic Growth Forecast","Ranking Growth Forecast",
+        "Conversion Impact Score","Content Expansion Opportunities","Internal Linking Opportunities","Speed Improvement Potential",
+        "Mobile Improvement Potential","Security Improvement Potential","Structured Data Opportunities","Crawl Optimization Potential",
+        "Backlink Opportunity Score","Competitive Gap ROI","Fix Roadmap Timeline","Time-to-Fix Estimate","Cost-to-Fix Estimate",
+        "ROI Forecast","Overall Growth Readiness"
     ]
-    for s,(name,val) in enumerate(opp_items, start=181):
-        metrics.append({"id": s, "name": name, "value": val, "category": "Opportunities, Growth & ROI"})
+    add_metrics(181, [(nm, None) for nm in opp_names], "Opportunities, Growth & ROI")
 
     return {
         "overall": overall,
@@ -1033,7 +1016,7 @@ def export_pdf(url: str = Query(...)):
         c.setFont("Helvetica", 9); c.setFillColor(colors.slategray)
         c.drawString(20*mm, 12*mm, "© FF Tech — Certified Website Audit • support@fftech.io")
 
-    # Page 1: Cover
+    # Page 1
     header_footer("Certified Audit Report")
     c.setFont("Helvetica-Bold", 24); c.setFillColor(colors.indigo)
     c.drawString(20*mm, H-65*mm, "Executive Website Health")
@@ -1043,7 +1026,7 @@ def export_pdf(url: str = Query(...)):
     c.drawString(20*mm, H-100*mm, f"Overall Score: {payload['overall']}%")
     c.showPage()
 
-    # Page 2: Gauges & Issues
+    # Page 2
     header_footer("Score Gauge & Issues Breakdown")
     d1 = Drawing(180, 180)
     p1 = Pie(); p1.x = 40; p1.y = 20; p1.width = 100; p1.height = 100
@@ -1061,7 +1044,7 @@ def export_pdf(url: str = Query(...)):
     renderPDF.draw(d2, c, 115*mm, H-180*mm)
     c.showPage()
 
-    # Page 3: Category Scores
+    # Page 3
     header_footer("Category Scores")
     labels = list(payload["cat_scores"].keys()); vals = list(payload["cat_scores"].values())
     d3 = Drawing(400, 220)
@@ -1074,7 +1057,7 @@ def export_pdf(url: str = Query(...)):
     renderPDF.draw(d3, c, 20*mm, H-230*mm)
     c.showPage()
 
-    # Page 4: Narrative
+    # Page 4
     header_footer("Strengths, Weaknesses & Priorities")
     c.setFont("Helvetica", 11)
     summary = payload["summary"]; lines = []
@@ -1097,7 +1080,7 @@ def export_pdf(url: str = Query(...)):
     bullets("Priority Fixes", ["Add HSTS/CSP/XFO/XCTO/Referrer-Policy.","Defer/async JS; inline critical CSS.","Compress images; enable caching."], colors.Color(0.39,0.33,0.94))
     c.showPage()
 
-    # Page 5: Signals Overview
+    # Page 5
     header_footer("Top Signals Snapshot")
     top = payload["metrics"][:12]
     labels = [m["name"][:18] for m in top]
@@ -1226,7 +1209,7 @@ def list_schedules(authorization: str | None = Header(None)):
         rows = db.query(Schedule).filter(Schedule.user_id == data.get("uid")).all()
         out = []
         for s in rows:
-            site = db.query(Website).get(s.website_id)
+            site = db.get(Website, s.website_id) if hasattr(db, "get") else db.query(Website).get(s.website_id)
             out.append({"id": s.id, "website_url": site.url if site else None, "enabled": s.enabled,
                         "time_of_day": s.time_of_day, "timezone": s.timezone,
                         "last_run_at": s.last_run_at.isoformat() if s.last_run_at else None})
@@ -1335,7 +1318,7 @@ async def scheduler_loop():
                 now_utc = datetime.utcnow().replace(second=0, microsecond=0)
                 schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
                 for s in schedules:
-                    user = db.query(User).get(s.user_id)
+                    user = db.get(User, s.user_id) if hasattr(db, "get") else db.query(User).get(s.user_id)
                     if not user or not user.subscribed: continue
                     hh, mm = map(int, (s.time_of_day or "09:00").split(":"))
                     try:
@@ -1347,7 +1330,7 @@ async def scheduler_loop():
                     except Exception:
                         scheduled_utc = now_utc.replace(hour=hh, minute=mm, second=0, microsecond=0)
                     if now_utc >= scheduled_utc and (not s.last_run_at or s.last_run_at < scheduled_utc):
-                        site = db.query(Website).get(s.website_id)
+                        site = db.get(Website, s.website_id) if hasattr(db, "get") else db.query(Website).get(s.website_id)
                         if not site: continue
                         payload = run_actual_audit(site.url)
                         # Email 1-page PDF snapshot
