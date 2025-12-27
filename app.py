@@ -890,7 +890,7 @@ def admin_audits(authorization: str | None = Header(None)):
                  "created_at": a.created_at.isoformat()} for a in audits]
 
 # -----------------------------------------------
-# Scheduler (skips when DB down)
+# Scheduler (skips when DB down; hardened)
 # -----------------------------------------------
 async def scheduler_loop():
     await asyncio.sleep(3)
@@ -898,55 +898,103 @@ async def scheduler_loop():
         try:
             with safe_session() as db:
                 if not db:
-                    await asyncio.sleep(SCHEDULER_INTERVAL); continue
+                    await asyncio.sleep(SCHEDULER_INTERVAL)
+                    continue
+
                 now_utc = datetime.utcnow().replace(second=0, microsecond=0)
-                schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
+
+                # Guard the schedules query (prevents undefined-column crash)
+                try:
+                    schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
+                except Exception as e:
+                    print("[SCHEDULER QUERY ERROR]", e)
+                    await asyncio.sleep(SCHEDULER_INTERVAL)
+                    continue
+
                 for s in schedules:
-                    user = db.query(User).get(s.user_id)
-                    if not user or not user.subscribed: continue
-                    hh, mm = map(int, (s.time_of_day or "09:00").split(":"))
-                    tzname = s.timezone or "UTC"
                     try:
-                        from zoneinfo import ZoneInfo
-                        tz = ZoneInfo(tzname)
-                        local_now = now_utc.replace(tzinfo=timezone.utc).astimezone(tz)
-                        if s.preferred_date:
-                            local_first = s.preferred_date.replace(tzinfo=timezone.utc).astimezone(tz)
-                            scheduled_local = local_first.replace(hour=hh, minute=mm, second=0, microsecond=0)
-                        else:
-                            scheduled_local = local_now.replace(hour=hh, minute=mm, second=0, microsecond=0)
-                        scheduled_utc = scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
-                    except Exception:
-                        scheduled_utc = now_utc.replace(hour=hh, minute=mm, second=0, microsecond=0)
-                    should_run = (now_utc >= scheduled_utc and (not s.last_run_at or s.last_run_at < scheduled_utc))
-                    if should_run:
-                        site = db.query(Website).get(s.website_id)
-                        if not site: continue
-                        payload = run_actual_audit(site.url)
-                        # Minimal PDF (lazy import inside loop)
-                        from reportlab.lib.pagesizes import A4
-                        from reportlab.pdfgen import canvas
-                        from reportlab.lib.units import mm
-                        buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
-                        c.setFont("Helvetica-Bold", 14); c.drawString(20*mm, A4[1]-30*mm, f"Audit: {site.url} ({payload['grade']} / {payload['overall']}%)")
-                        c.showPage(); c.save(); pdf_bytes = buf.getvalue(); buf.close()
-                        subj = f"FF Tech Audit — {site.url} ({payload['grade']} / {payload['overall']}%)"
-                        body = "Your scheduled audit is ready.\nCertified PDF attached.\n— FF Tech"
-                        send_email(user.email, subj, body, [(f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf", pdf_bytes)])
-                        row = Audit(
-                            website_id=site.id, url=site.url, overall=payload["overall"], grade=payload["grade"],
-                            errors=payload["errors"], warnings=payload["warnings"], notices=payload["notices"],
-                            summary=payload["summary"], cat_scores_json=json.dumps(payload["cat_scores"]),
-                            cat_totals_json=json.dumps(payload["totals"]), metrics_json=json.dumps(payload["metrics"])
-                        )
-                        db.add(row); s.last_run_at = now_utc; db.commit()
+                        user = db.query(User).get(s.user_id)
+                        if not user or not user.subscribed:
+                            continue
+
+                        hh, mm = map(int, (s.time_of_day or "09:00").split(":"))
+                        tzname = s.timezone or "UTC"
+                        try:
+                            from zoneinfo import ZoneInfo
+                            tz = ZoneInfo(tzname)
+                            local_now = now_utc.replace(tzinfo=timezone.utc).astimezone(tz)
+                            if s.preferred_date:
+                                local_first = s.preferred_date.replace(tzinfo=timezone.utc).astimezone(tz)
+                                scheduled_local = local_first.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                            else:
+                                scheduled_local = local_now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                            scheduled_utc = scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
+                        except Exception:
+                            scheduled_utc = now_utc.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+                        should_run = (now_utc >= scheduled_utc and (not s.last_run_at or s.last_run_at < scheduled_utc))
+                        if should_run:
+                            site = db.query(Website).get(s.website_id)
+                            if not site: continue
+                            payload = run_actual_audit(site.url)
+                            # Minimal PDF (lazy import inside loop)
+                            from reportlab.lib.pagesizes import A4
+                            from reportlab.pdfgen import canvas
+                            from reportlab.lib.units import mm
+                            buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
+                            c.setFont("Helvetica-Bold", 14); c.drawString(20*mm, A4[1]-30*mm, f"Audit: {site.url} ({payload['grade']} / {payload['overall']}%)")
+                            c.showPage(); c.save(); pdf_bytes = buf.getvalue(); buf.close()
+                            subj = f"FF Tech Audit — {site.url} ({payload['grade']} / {payload['overall']}%)"
+                            body = "Your scheduled audit is ready.\nCertified PDF attached.\n— FF Tech"
+                            send_email(user.email, subj, body, [(f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf", pdf_bytes)])
+                            row = Audit(
+                                website_id=site.id, url=site.url, overall=payload["overall"], grade=payload["grade"],
+                                errors=payload["errors"], warnings=payload["warnings"], notices=payload["notices"],
+                                summary=payload["summary"], cat_scores_json=json.dumps(payload["cat_scores"]),
+                                cat_totals_json=json.dumps(payload["totals"]), metrics_json=json.dumps(payload["metrics"])
+                            )
+                            db.add(row); s.last_run_at = now_utc; db.commit()
+                    except Exception as e:
+                        print("[SCHEDULER ITEM ERROR]", e)
         except Exception as e:
             print("[SCHEDULER ERROR]", e)
+
         await asyncio.sleep(SCHEDULER_INTERVAL)
 
 # -----------------------------------------------
-# SAFE DB INIT
+# SAFE DB INIT (+ schema patches)
 # -----------------------------------------------
+def apply_schema_patches(conn):
+    """Add missing columns to schedules table (idempotent)."""
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS time_of_day varchar(8)
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS timezone varchar(64) DEFAULT 'UTC'
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS daily_report boolean DEFAULT true
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS accumulated_report boolean DEFAULT true
+    """))
+    conn.execute(sa_text("""
+        ALTER TABLE schedules
+        ADD COLUMN IF NOT EXISTS last_run_at timestamp NULL
+    """))
+
 async def init_db():
     max_attempts = int(os.getenv("DB_CONNECT_MAX_ATTEMPTS", "10"))
     delay = float(os.getenv("DB_CONNECT_RETRY_DELAY", "2"))
@@ -967,7 +1015,8 @@ async def init_db():
         try:
             with engine.connect() as conn:
                 conn.execute(sa_text("SELECT 1"))
-            Base.metadata.create_all(bind=engine)
+                Base.metadata.create_all(bind=engine)
+                apply_schema_patches(conn)
             print("[DB] Connected and tables ensured")
             return
         except OperationalError as e:
