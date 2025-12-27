@@ -4,14 +4,12 @@
 # - Open Access audits (unlimited, limited metrics)
 # - Registered users: FREE_AUDITS_LIMIT (5–10) -> $5/mo subscription
 # - Email verification, scheduling (preferred time/date, timezone)
-# - Certified PDF export (minimal example)
+# - Certified PDF export (5-page, charts & colored summary)
 # - Stripe checkout/webhook (demo fallback if not configured)
 # - Railway healthcheck: /health + bind to $PORT
 # - SAFE DB INIT + SAFE SESSIONS (graceful when DB is down)
-# - Flexible HTML linking (conditionally mounted):
-#     /page/<name> (raw HTML from ./pages, auto-injected assets/flags)
-#     /template/<name> (Jinja with flags)
-#     /static/* (assets)
+# - Flexible HTML linking:
+#     /page/<name> (raw HTML auto-injected assets/flags), /template/<name> (Jinja), /static/* (assets)
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from contextlib import contextmanager
@@ -217,16 +215,15 @@ async def health_check():
 # Favicon (avoid noisy 404s)
 @app.get("/favicon.ico")
 def favicon():
-    # 1x1 transparent PNG
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADElEQVR4nGNgYGBgAAAABQABJzQnWQAAAABJRU5ErkJggg==")
     return Response(content=png, media_type="image/png")
 
-# Ping (quick probe)
+# Ping
 @app.get("/ping", response_class=PlainTextResponse)
 def ping():
     return PlainTextResponse("pong")
 
-# Global exception handler: avoid Railway “failed to respond” page
+# Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     try:
@@ -289,30 +286,26 @@ def get_ui_flags(user=None) -> UIFlags:
 def inject_head_assets(html: str, flags: UIFlags) -> str:
     """
     Inject Tailwind, Chart.js, Fonts & Icons into raw HTML.
-    If </head> exists (case-insensitive), insert before it; else prepend to the HTML.
+    If </head> exists (case-insensitive), insert before it; else prepend.
     """
     head_inject = []
 
     if flags.tailwind:
         head_inject.append('https://cdn.tailwindcss.com</script>')
-
     if flags.charts:
         head_inject.append('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>')
 
-    head_inject.append('<link href="https://fonts.googleapis.com/css2?family=Plus+:wght@400;700;800&display=swap')
+    head_inject.append('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap')
     head_inject.append('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css')
 
     payload = "\n".join(head_inject) + """
 <style>
-  body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background-color: #f8fafc; }
-  .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(226,232,240,0.8); }
-  .grade-badge { text-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+  body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background-color: #f8fafc; scroll-behavior: smooth; }
+  .glass { background: rgba(255,255,255,0.75); backdrop-filter: blur(12px); border: 1px solid rgba(226,232,240,0.8); }
   .status-pulse { width: 14px; height: 14px; background: #6366f1; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
-  @keyframes pulse {
-    0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
-    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
-    100% { transform: scale(0.9); }
-  }
+  @keyframes pulse { 0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } 100% { transform: scale(0.9); } }
+  .hidden { display: none !important; }
+  .admin-tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; }
 </style>
 """.strip()
 
@@ -343,12 +336,6 @@ def inject_bootstrap_script(html: str, app_name: str, flags: UIFlags) -> str:
 
 @app.get("/page/{name}", response_class=HTMLResponse)
 def get_flexible_page(name: str, request: Request):
-    """
-    Flexible raw HTML loader with auto-injection:
-    - Reads ./pages/<name>.html
-    - Injects Tailwind/Chart.js/fonts in <head>
-    - Injects window.__FF_FLAGS__ + window.__APP_NAME__ in <body>
-    """
     if not HAS_PAGES:
         raise HTTPException(status_code=404, detail="Pages directory not available")
     if any(ch in name for ch in ("..", "/", "\\")):
@@ -530,19 +517,11 @@ def run_actual_audit(target_url: str) -> dict:
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     sec_score = 100
-    # Header presence checks (info only)
-    headers_present = {
-        "Strict-Transport-Security": bool(headers.get("Strict-Transport-Security")),
-        "Content-Security-Policy": bool(headers.get("Content-Security-Policy")),
-        "X-Frame-Options": bool(headers.get("X-Frame-Options")),
-        "X-Content-Type-Options": bool(headers.get("X-Content-Type-Options")),
-        "Referrer-Policy": bool(headers.get("Referrer-Policy")),
-    }
-    if not headers_present["Strict-Transport-Security"]: sec_score -= 18
-    if not headers_present["Content-Security-Policy"]: sec_score -= 18
-    if not headers_present["X-Frame-Options"]: sec_score -= 10
-    if not headers_present["X-Content-Type-Options"]: sec_score -= 8
-    if not headers_present["Referrer-Policy"]: sec_score -= 6
+    if not headers.get("Strict-Transport-Security"): sec_score -= 18
+    if not headers.get("Content-Security-Policy"): sec_score -= 18
+    if not headers.get("X-Frame-Options"): sec_score -= 10
+    if not headers.get("X-Content-Type-Options"): sec_score -= 8
+    if not headers.get("Referrer-Policy"): sec_score -= 6
     if mixed: sec_score -= 25
 
     overall = round(0.26 * seo_score + 0.28 * perf_score + 0.14 * a11y_score + 0.12 * bp_score + 0.20 * sec_score)
@@ -558,7 +537,7 @@ def run_actual_audit(target_url: str) -> dict:
 
     errors = broken_internal + (1 if mixed else 0)
     warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0)
-    notices = (1 if not headers_present["Content-Security-Policy"] else 0) + (1 if not robots_ok else 0) + (1 if not sitemap_ok else 0)
+    notices = (1 if not headers.get("Content-Security-Policy") else 0) + (1 if not robots_ok else 0) + (1 if not sitemap_ok else 0)
 
     cat2_base = 100
     penalty = (statuses["4xx"] * 2) + (statuses["5xx"] * 3) + (redirect_chains * 1.5) + (broken_internal * 2)
@@ -635,132 +614,46 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>FF TECH — Professional AI Audit</title>
+    <title>FF TECH — Professional AI Website Audit</title>
 </head>
 <body class="text-slate-900">
-    <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                <i class="fas fa-robot text-xs"></i>
-            </div>
-            <span class="font-extrabold tracking-tighter text-xl italic uppercase">FF TECH</span>
-        </div>
-        <div id="auth-nav">
-             <button onclick="alert('Login logic triggered')" class="text-sm font-bold text-slate-500 mr-4">Login</button>
-             <button onclick="alert('Registration logic triggered')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg">Sign Up Free</button>
-        </div>
-    </nav>
-
     <main class="pt-32 pb-20 px-6 max-w-5xl mx-auto">
-        <section class="text-center mb-16">
-            <h1 class="text-5xl md:text-6xl font-black mb-4 tracking-tighter">AI Website <span class="text-indigo-600">Audit.</span></h1>
-            <p class="text-slate-400 mb-10 font-medium">Analyze 250+ technical signals for SEO, Performance, and Security.</p>
-            
-            <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
-                <input id="url-input" type="url" placeholder="https://example.com" required 
-                       class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
-                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase tracking-tighter">
-                    Analyze Site
-                </button>
-            </form>
-        </section>
-
-        <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem] border border-indigo-50">
-            <div class="status-pulse mb-4"></div>
-            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">Scanning signals & checking headers...</p>
-        </div>
-
-        <div id="results-view" class="hidden space-y-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center">
-                    <canvas id="mainChart" width="180" height="180"></canvas>
-                    <div id="grade-display" class="text-7xl font-black mt-6 text-indigo-600 grade-badge italic tracking-tighter">--</div>
-                </div>
-                
-                <div class="md:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-center">
-                    <h3 class="text-xs font-black text-slate-300 uppercase tracking-[0.3em] mb-4">Executive Intelligence</h3>
-                    <p id="summary-text" class="text-slate-600 leading-relaxed text-lg font-medium italic"></p>
-                    <div class="mt-8 flex gap-3">
-                         <div class="bg-indigo-50 px-5 py-3 rounded-2xl"><span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Health</span><span id="score-text" class="font-bold text-indigo-600 text-xl">0%</span></div>
-                         <div class="bg-slate-50 px-5 py-3 rounded-2xl"><span class="text-[10px] font-black text-slate-400 block uppercase mb-1 tracking-widest">Type</span><span class="font-bold text-slate-800 text-xl italic">Deep Scan</span></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            </div>
-        </div>
+      <h1 class="text-5xl md:text-6xl font-black mb-6 tracking-tighter">FF TECH Audit</h1>
+      <form id="audit-form" class="max-w-2xl mx-auto flex gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
+        <input id="url-input" type="url" placeholder="https://example.com" required class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
+        <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase tracking-tighter">
+          Analyze Site
+        </button>
+      </form>
+      <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem] border border-indigo-50">
+        <div class="status-pulse mb-4"></div>
+        <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">CRAWLING PAGES & CHECKING HEADERS...</p>
+      </div>
+      <div id="results-view" class="hidden">
+        <canvas id="mainChart" width="200" height="200"></canvas>
+      </div>
     </main>
-
     <script>
-        const form = document.getElementById('audit-form');
-        let currentChart = null;
-        
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            const urlInput = document.getElementById('url-input').value;
-            
-            // Show Loader
-            document.getElementById('loading-zone').classList.remove('hidden');
-            document.getElementById('results-view').classList.add('hidden');
-
-            try {
-                const response = await fetch('/audit?url=' + encodeURIComponent(urlInput));
-                if (!response.ok) throw new Error('Audit failed: ' + response.status);
-                const data = await response.json();
-                
-                // Hide Loader
-                document.getElementById('loading-zone').classList.add('hidden');
-                document.getElementById('results-view').classList.remove('hidden');
-
-                // Update UI
-                document.getElementById('grade-display').innerText = data.grade || '--';
-                document.getElementById('summary-text').innerText = data.summary || '';
-                document.getElementById('score-text').innerText = (data.overall ?? 0) + '%';
-
-                // Render Chart.js
-                if(currentChart) currentChart.destroy();
-                const ctx = document.getElementById('mainChart').getContext('2d');
-                const gaugeData = data.overall_gauge || {
-                    labels: ['Score','Remaining'],
-                    datasets: [{ data: [data.overall ?? 0, 100-(data.overall ?? 0)], backgroundColor: ['#6366f1','#e5e7eb'], borderWidth: 0 }]
-                };
-                currentChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: gaugeData,
-                    options: { 
-                        cutout: '85%', 
-                        plugins: { legend: { display: false } },
-                        animation: { duration: 1200, easing: 'easeOutQuart' }
-                    }
-                });
-
-                // Populate Signal Grid (first 12 metrics)
-                const grid = document.getElementById('metrics-grid');
-                const metrics = Array.isArray(data.metrics) ? data.metrics.slice(0, 12) : [];
-                grid.innerHTML = metrics.map(m => {
-                    let passPct = 0;
-                    try {
-                        const ds = m?.chart_data?.datasets?.[0]?.data || [];
-                        if (Array.isArray(ds) && ds.length >= 1 && typeof ds[0] === 'number') passPct = Math.max(0, Math.min(100, ds[0]));
-                    } catch(e){ passPct = 0; }
-                    const barColor = m?.severity === 'green' ? 'bg-indigo-500' : (m?.severity === 'yellow' ? 'bg-amber-500' : 'bg-rose-500');
-                    return `
-                    <div class="bg-white p-6 rounded-3xl border border-slate-50 shadow-sm text-center">
-                        <div class="text-[9px] font-black text-slate-300 uppercase mb-3 tracking-widest">Signal ${m?.num ?? '--'}</div>
-                        <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full ${barColor}" style="width: ${passPct}%; transition: width .8s ease"></div>
-                        </div>
-                        <div class="mt-2 text-[10px] text-slate-500 font-bold">${passPct}%</div>
-                    </div>`;
-                }).join('');
-
-            } catch (err) {
-                alert("The audit engine is warming up or temporarily unavailable. Please try again in 30 seconds.");
-                console.error(err);
-                document.getElementById('loading-zone').classList.add('hidden');
-            }
-        };
+      const form = document.getElementById('audit-form');
+      let chart = null;
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('url-input').value;
+        document.getElementById('loading-zone').classList.remove('hidden');
+        document.getElementById('results-view').classList.add('hidden');
+        try {
+          const res = await fetch('/audit?url=' + encodeURIComponent(url));
+          const data = await res.json();
+          document.getElementById('loading-zone').classList.add('hidden');
+          document.getElementById('results-view').classList.remove('hidden');
+          const ctx = document.getElementById('mainChart').getContext('2d');
+          if (chart) chart.destroy();
+          chart = new Chart(ctx, { type: 'doughnut', data: data.overall_gauge, options: { cutout: '85%', plugins:{ legend:{ display:false } } }});
+        } catch (e) {
+          alert('Audit temporarily unavailable. Try again shortly.');
+          document.getElementById('loading-zone').classList.add('hidden');
+        }
+      };
     </script>
 </body>
 </html>
@@ -806,23 +699,207 @@ class SettingsIn(BaseModel):
     notify_daily_default: bool
     notify_acc_default: bool
 
-# ---------------- Routes (DB-safe) ----------------
+# ---------------- PDF EXPORT (5 pages with charts & colored summary) ----------------
 @app.get("/export-pdf")
 def export_pdf(url: str = Query(...)):
+    """
+    Generates a 5-page colored PDF report:
+    1) Cover: title, URL, grade, overall score
+    2) Score gauge (pie) + Issues chart (pie)
+    3) Category scores (bar)
+    4) Narrative summary (strengths, weaknesses, priority)
+    5) Top metrics pass% (bar) + totals
+    """
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.graphics.shapes import Drawing, String, Rect
+    from reportlab.graphics.charts.piecharts import Pie
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.graphics.charts.legends import Legend
+    from reportlab.graphics import renderPDF
 
     payload = run_actual_audit(url)
-    buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
-    c.setFont("Helvetica-Bold", 20); c.drawString(20*mm, A4[1]-30*mm, "FF Tech — Certified Website Audit")
-    c.setFont("Helvetica", 11); c.drawString(20*mm, A4[1]-40*mm, f"Website: {url}")
-    c.setFont("Helvetica-Bold", 16); c.drawString(20*mm, A4[1]-55*mm, f"Grade: {payload['grade']} • Health: {payload['overall']}%")
-    c.showPage(); c.save()
+
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+
+    def header_footer(page_title: str):
+        # Header band
+        c.setFillColor(colors.indigo)
+        c.rect(0, H-35*mm, W, 35*mm, fill=True, stroke=False)
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(20*mm, H-20*mm, APP_NAME)
+        c.setFont("Helvetica", 10)
+        c.drawRightString(W-20*mm, H-20*mm, datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"))
+        # Page title
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(20*mm, H-45*mm, page_title)
+        # Footer
+        c.setFont("Helvetica", 9)
+        c.setFillColor(colors.slategray)
+        c.drawString(20*mm, 12*mm, "Certified by FF Tech • Automated Analysis • Email: support@fftech.io")
+
+    # ---- Page 1: Cover ----
+    header_footer("Certified Audit Report")
+    c.setFont("Helvetica-Bold", 24); c.setFillColor(colors.indigo)
+    c.drawString(20*mm, H-65*mm, "Executive Website Health")
+    c.setFillColor(colors.black); c.setFont("Helvetica", 12)
+    c.drawString(20*mm, H-80*mm, f"Website: {normalize_url(url)}")
+    c.drawString(20*mm, H-90*mm, f"Grade: {payload['grade']}")
+    c.drawString(20*mm, H-100*mm, f"Overall Score: {payload['overall']}%")
+
+    # Decorative band
+    c.setFillColor(colors.Color(0.93,0.95,0.99))
+    c.roundRect(20*mm, H-140*mm, W-40*mm, 25*mm, 8, fill=True, stroke=False)
+    c.setFillColor(colors.black); c.setFont("Helvetica", 11)
+    c.drawString(25*mm, H-125*mm, payload["summary"][:180] + ("..." if len(payload["summary"])>180 else ""))
+
+    c.showPage()
+
+    # ---- Page 2: Gauges & Issues (Pie charts) ----
+    header_footer("Score Gauge & Issues Breakdown")
+
+    # Score Pie: [score, remaining]
+    d1 = Drawing(180, 180)
+    p1 = Pie()
+    p1.x = 40; p1.y = 20; p1.width = 100; p1.height = 100
+    p1.data = [payload["overall"], 100 - payload["overall"]]
+    p1.labels = ["Score", "Remaining"]
+    p1.slices.strokeWidth = 0.5
+    p1.slices[0].fillColor = colors.Color(0.13,0.59,0.95)  # blue
+    p1.slices[1].fillColor = colors.Color(0.90,0.92,0.95)  # gray
+    d1.add(p1)
+    d1.add(String(40, 130, "Overall Health", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.indigo))
+    renderPDF.draw(d1, c, 20*mm, H-180*mm)
+
+    # Issues Pie: [errors, warnings, notices]
+    d2 = Drawing(220, 180)
+    p2 = Pie()
+    p2.x = 60; p2.y = 20; p2.width = 100; p2.height = 100
+    p2.data = [payload["errors"], payload["warnings"], payload["notices"]]
+    p2.labels = ["Errors", "Warnings", "Notices"]
+    p2.slices[0].fillColor = colors.Color(0.93,0.36,0.36)  # red
+    p2.slices[1].fillColor = colors.Color(0.96,0.62,0.12)  # amber
+    p2.slices[2].fillColor = colors.Color(0.23,0.51,0.96)  # blue
+    d2.add(p2)
+    d2.add(String(40, 130, "Issues Breakdown", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.indigo))
+    renderPDF.draw(d2, c, 115*mm, H-180*mm)
+
+    # Context lines
+    c.setFont("Helvetica", 11)
+    c.drawString(20*mm, H-200*mm, f"TTFB: {payload['summary'].split('TTFB ')[1].split(' ms')[0]} ms (from summary)")
+    c.drawString(20*mm, H-210*mm, "Optimize caching, async/defer scripts, and reduce payload for performance.")
+
+    c.showPage()
+
+    # ---- Page 3: Category Scores (Bar chart) ----
+    header_footer("Category Scores")
+    cats = list(payload["cat_scores"].keys())
+    vals = list(payload["cat_scores"].values())
+
+    d3 = Drawing(400, 220)
+    bc = VerticalBarChart()
+    bc.x = 50; bc.y = 30
+    bc.height = 140; bc.width = 300
+    bc.data = [vals]
+    bc.categoryAxis.categoryNames = cats
+    bc.barWidth = 18
+    bc.groupSpacing = 12
+    bc.valueAxis.valueMin = 0
+    bc.valueAxis.valueMax = 100
+    bc.valueAxis.valueStep = 20
+    bc.bars[0].fillColor = colors.Color(0.39,0.33,0.94)  # indigo
+    d3.add(bc)
+    d3.add(String(50, 180, "SEO / Performance / Security / Accessibility / Mobile", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.indigo))
+    renderPDF.draw(d3, c, 20*mm, H-230*mm)
+
+    # Highlights
+    c.setFont("Helvetica-Bold", 12); c.setFillColor(colors.indigo)
+    c.drawString(20*mm, H-250*mm, "Highlights")
+    c.setFont("Helvetica", 11); c.setFillColor(colors.black)
+    c.drawString(20*mm, H-260*mm, f"Overall: {payload['overall']}% • Grade: {payload['grade']} • Mobile: {cats[-1]} {vals[-1]}%")
+
+    c.showPage()
+
+    # ---- Page 4: Detailed Summary (colored bullets) ----
+    header_footer("Detailed Summary & Recommendations")
+
+    def bullet_list(title: str, items: list[str], color):
+        c.setFillColor(color); c.setFont("Helvetica-Bold", 12)
+        c.drawString(20*mm, y[0], title); y[0] -= 8*mm
+        c.setFillColor(colors.black); c.setFont("Helvetica", 11)
+        for it in (items[:8] if items else ["—"]):
+            c.drawString(25*mm, y[0], f"• {it}")
+            y[0] -= 7*mm
+        y[0] -= 4*mm
+
+    y = [H-65*mm]
+    bullet_list("Strengths", payload["strengths"], colors.Color(0.10,0.64,0.47))  # teal
+    bullet_list("Weaknesses", payload["weaknesses"], colors.Color(0.93,0.36,0.36))  # red
+    bullet_list("Priority Actions", payload["priority"], colors.Color(0.39,0.33,0.94))  # indigo
+
+    # Executive paragraph
+    c.setFillColor(colors.indigo); c.setFont("Helvetica-Bold", 12)
+    c.drawString(20*mm, y[0], "Executive Summary"); y[0] -= 8*mm
+    c.setFillColor(colors.black); c.setFont("Helvetica", 11)
+    summary_lines = []
+    text = payload["summary"]
+    # Simple wrap
+    while text:
+        summary_lines.append(text[:95])
+        text = text[95:]
+    for ln in summary_lines[:12]:
+        c.drawString(25*mm, y[0], ln); y[0] -= 6*mm
+
+    c.showPage()
+
+    # ---- Page 5: Metrics Overview (bar) & Totals ----
+    header_footer("Metrics Overview")
+    top_metrics = payload["metrics"][:12]
+    labels = [f"S{m['num']}" for m in top_metrics]
+    passes = []
+    for m in top_metrics:
+        try:
+            passes.append(int(m["chart_data"]["datasets"][0]["data"][0]))
+        except Exception:
+            passes.append(0)
+
+    d5 = Drawing(400, 220)
+    bc2 = VerticalBarChart()
+    bc2.x = 50; bc2.y = 30
+    bc2.height = 140; bc2.width = 300
+    bc2.data = [passes]
+    bc2.categoryAxis.categoryNames = labels
+    bc2.barWidth = 16
+    bc2.groupSpacing = 10
+    bc2.valueAxis.valueMin = 0
+    bc2.valueAxis.valueMax = 100
+    bc2.valueAxis.valueStep = 20
+    bc2.bars[0].fillColor = colors.Color(0.13,0.59,0.95)  # blue
+    d5.add(bc2)
+    d5.add(String(50, 180, "Top Signals Pass %", fontName="Helvetica-Bold", fontSize=12, fillColor=colors.indigo))
+    renderPDF.draw(d5, c, 20*mm, H-230*mm)
+
+    # Totals box
+    c.setFillColor(colors.Color(0.96,0.97,0.99))
+    c.roundRect(20*mm, H-260*mm, W-40*mm, 25*mm, 8, fill=True, stroke=False)
+    c.setFillColor(colors.black); c.setFont("Helvetica", 11)
+    totals = payload["totals"]
+    c.drawString(25*mm, H-245*mm, f"Totals • Overall: {totals['overall']}% • Cat2: {totals['cat2']} • SEO: {totals['cat3']} • Perf: {totals['cat4']} • Security/Mobile: {totals['cat5']}")
+
+    c.showPage()
+    c.save()
+
     pdf_bytes = buf.getvalue(); buf.close()
     fname = f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf"
-    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename=\"{fname}\"'})
 
+# ---------------- Routes (DB-safe) ----------------
 @app.get("/audit", response_class=JSONResponse)
 def audit_handler(url: str = Query(...), authorization: str | None = Header(None)):
     payload = run_actual_audit(url)
@@ -928,6 +1005,7 @@ def login(payload: LoginIn, request: Request):
         token = jwt_sign({"uid": user.id, "role": user.role}, exp_minutes=60*24*7)
         return {"token": token, "role": user.role, "free_audits_remaining": user.free_audits_remaining, "subscribed": user.subscribed}
 
+# Websites & Scheduling
 @app.post("/websites")
 def add_website(payload: WebsiteIn, authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -985,7 +1063,6 @@ def list_schedules(authorization: str | None = Header(None)):
         rows = db.query(Schedule).filter(Schedule.user_id == data.get("uid")).all()
         out = []
         for s in rows:
-            # SQLAlchemy 2.x: use Session.get for safe primary key lookup
             site = db.get(Website, s.website_id)
             out.append({"id": s.id, "website_url": site.url if site else None, "enabled": s.enabled,
                         "time_of_day": s.time_of_day, "timezone": s.timezone,
@@ -1117,7 +1194,7 @@ async def scheduler_loop():
                     await asyncio.sleep(SCHEDULER_INTERVAL)
                     continue
 
-                error_count = 0  # reset after successful query
+                error_count = 0  # reset
 
                 for s in schedules:
                     try:
@@ -1146,13 +1223,13 @@ async def scheduler_loop():
                             if not site: continue
                             payload = run_actual_audit(site.url)
 
-                            # Minimal PDF email
+                            # Minimal PDF email page
                             from reportlab.lib.pagesizes import A4
                             from reportlab.pdfgen import canvas
                             from reportlab.lib.units import mm
-                            buf = io.BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
-                            c.setFont("Helvetica-Bold", 14); c.drawString(20*mm, A4[1]-30*mm, f"Audit: {site.url} ({payload['grade']} / {payload['overall']}%)")
-                            c.showPage(); c.save(); pdf_bytes = buf.getvalue(); buf.close()
+                            buf = io.BytesIO(); cpdf = canvas.Canvas(buf, pagesize=A4)
+                            cpdf.setFont("Helvetica-Bold", 14); cpdf.drawString(20*mm, A4[1]-30*mm, f"Audit: {site.url} ({payload['grade']} / {payload['overall']}%)")
+                            cpdf.showPage(); cpdf.save(); pdf_bytes = buf.getvalue(); buf.close()
                             subj = f"FF Tech Audit — {site.url} ({payload['grade']} / {payload['overall']}%)"
                             body = "Your scheduled audit is ready.\nCertified PDF attached.\n— FF Tech"
                             send_email(user.email, subj, body, [(f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf", pdf_bytes)])
@@ -1173,26 +1250,17 @@ async def scheduler_loop():
 
 # ---------------- SAFE DB INIT (+ committed schema patches) ----------------
 def apply_schema_patches_committed():
-    """
-    Ensure tables and attempt to add missing columns on 'schedules'.
-    Uses dialect-aware statements and ignores 'column exists' errors.
-    """
     with engine.begin() as conn:
-        # Ensure base tables exist
         Base.metadata.create_all(bind=engine)
+        dialect = engine.dialect.name
 
-        dialect = engine.dialect.name  # 'sqlite', 'postgresql', etc.
-
-        # Helper: run ALTER and ignore failures (existing columns)
         def try_alter(stmt: str):
             try:
                 conn.execute(sa_text(stmt))
             except Exception as e:
-                # Log once; continue without crashing
                 print("[SCHEMA PATCH WARN]", str(e)[:200])
 
         if dialect == "sqlite":
-            # SQLite doesn't support IF NOT EXISTS in ALTER COLUMN; best-effort adds
             try_alter("ALTER TABLE schedules ADD COLUMN enabled boolean DEFAULT 1")
             try_alter("ALTER TABLE schedules ADD COLUMN preferred_date timestamp NULL")
             try_alter("ALTER TABLE schedules ADD COLUMN time_of_day varchar(8)")
@@ -1201,7 +1269,6 @@ def apply_schema_patches_committed():
             try_alter("ALTER TABLE schedules ADD COLUMN accumulated_report boolean DEFAULT 1")
             try_alter("ALTER TABLE schedules ADD COLUMN last_run_at timestamp NULL")
         else:
-            # Postgres/MySQL variants accept IF NOT EXISTS
             try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true")
             try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL")
             try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS time_of_day varchar(8)")
@@ -1213,7 +1280,6 @@ def apply_schema_patches_committed():
 async def init_db():
     max_attempts = int(os.getenv("DB_CONNECT_MAX_ATTEMPTS", "10"))
     delay = float(os.getenv("DB_CONNECT_RETRY_DELAY", "2"))
-    # sanitized DB URL log
     try:
         sanitized = DATABASE_URL
         if "@" in sanitized and "://" in sanitized:
