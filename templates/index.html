@@ -1,884 +1,299 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Universal Web Audit — Single File (Python + CDN)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH — Professional AI Website Audit</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <!-- Bootstrap 5 (CDN) -->
-  https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css
-
-  <!-- Font Awesome (Icons) -->
-  <link
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
-    rel="stylesheet"
-    integrity="sha512-KfkfwYDsLkIlwQp6LFnl8zNdLGxu9bV6stS+tqZ0Zx1V9EBRvZK5B2GW1L1gkVZ7n6g6NVGFxY8+55mYw5q5 -->
-  https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js</script>
-
-  <!-- Pyodide (Python in browser) -->
-  <script
-    src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"
-    crossorigin="anonymous"
- #22c55e;
-      --yellow: #f59e0b;
-      --red: #ef4444;
-      --muted: #6b7280;
-      --bg: #0b1220;
-      --card: #121a2e;
-      --border: #1f2a44;
-      --text: #e5e7eb;
-    }
-    body {
-      background: linear-gradient(180deg, #0b1220 0%, #0e1730 100%);
-      color: var(--text);
-    }
-    .navbar, .footer {
-      background: rgba(18,26,46,0.9);
-      backdrop-filter: blur(6px);
-      border-bottom: 1px solid var(--border);
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-    }
-    .badge-grade {
-      font-size: 1.25rem;
-      padding: 0.6rem 0.9rem;
-      border-radius: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .grade-A { background: rgba(34,197,94,.15); color: #34d399; }
-    .grade-B { background: rgba(59,130,246,.15); color: #60a5fa; }
-    .grade-C { background: rgba(245,158,11,.15); color: #fbbf24; }
-    .grade-D { background: rgba(239,68,68,.15); color: #f87171; }
-
-    .metric-card {
-      position: relative;
-      overflow: hidden;
-    }
-    .metric-header {
-      display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem;
-    }
-    .severity-dot { width:10px; height:10px; border-radius:50%; }
-    .sev-green { background: var(--green); }
-    .sev-yellow { background: var(--yellow); }
-    .sev-red { background: var(--red); }
-
-    .blurred {
-      filter: blur(3px);
-      pointer-events: none;
-      opacity: .7;
-    }
-    .blur-overlay {
-      position: absolute;
-      inset: 0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background: rgba(12,18,32,.65);
-      color: #fff;
-      font-weight:600;
-    }
-    .progress-steps .step {
-      flex:1; text-align:center; padding:.5rem; border-right:1px dashed var(--border);
-    }
-    .progress-steps .step:last-child { border-right:none; }
-
-    .chart-canvas {
-      width:100%;
-      height:70px;
-    }
-    .sparkline {
-      width:100%;
-      height:60px;
-    }
-    .section-title {
-      border-left:4px solid #3b82f6;
-      padding-left:.75rem;
-      margin:1.5rem 0 1rem 0;
-    }
-
-    @media print {
-      .no-print { display:none !important; }
-      body { background: #fff; color: #000; }
-      .card { border-color: #ccc; }
-    }
-  </style>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; scroll-behavior: smooth; }
+        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .status-pulse { 
+            width: 14px; height: 14px; background: #6366f1; border-radius: 50%; 
+            display: inline-block; animation: pulse 1.5s infinite; 
+        }
+        @keyframes pulse { 
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } 
+            100% { transform: scale(0.9); } 
+        }
+        .gradient-text { background: linear-gradient(90deg, #4f46e5, #9333ea); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
 </head>
-<body>
-  <!-- (11) Header / Navigation Bar -->
-  <nav class="navbar navbar-expand-lg px-3">
-    <div class="container-fluid">
-      #
-        <i class="fa-solid fa-shield-halved me-2"></i> Universal Web Audit
-      </a>
-      <div class="d-flex align-items-center gap-3">
-        <!-- (33) Free audit counter -->
-        <span id="freeAuditCounter" class="badge bg-secondary">Free audits: 0</span>
-        <!-- (34) Trust indicators -->
-        <span class="text-success"><i class="fa-solid fa-lock"></i> Secure</span>
-        <span class="text-info"><i class="fa-solid fa-bolt"></i> Instant</span>
-        <!-- (32) Signup CTA -->
-        #signupSign up</a>
-      </div>
+<body class="text-slate-900">
+
+    <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.reload()">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
+                <i class="fas fa-robot text-xs"></i>
+            </div>
+            <span class="font-extrabold tracking-tighter text-xl italic uppercase">FF TECH</span>
+        </div>
+        <div id="nav-actions" class="flex items-center gap-4">
+            <span id="user-status" class="hidden text-xs font-bold text-slate-400 uppercase tracking-widest mr-2"></span>
+            <button id="auth-btn" onclick="toggleAuthModal()" class="text-sm font-bold text-slate-600 hover:text-indigo-600 transition">Login</button>
+            <button id="upgrade-btn" onclick="subscribe()" class="hidden bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg hover:bg-indigo-700">Upgrade to Pro</button>
+        </div>
+    </nav>
+
+    <main class="pt-32 pb-20 px-6 max-w-6xl mx-auto">
+        
+        <section id="hero" class="text-center mb-16">
+            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tighter">AI Website <span class="gradient-text">Audit.</span></h1>
+            <p class="text-slate-500 mb-10 text-lg font-medium max-w-2xl mx-auto">Instant technical analysis for SEO, Performance, and Security. Get a certified PDF report in seconds.</p>
+            
+            <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
+                <input id="url-input" type="url" placeholder="https://yourwebsite.com" required 
+                       class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
+                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 uppercase tracking-tighter">
+                    Analyze Site
+                </button>
+            </form>
+        </section>
+
+        <div id="loading-zone" class="hidden text-center py-24 glass rounded-[3rem] border border-indigo-50">
+            <div class="status-pulse mb-6"></div>
+            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-sm">Scanning 250+ technical signals...</p>
+        </div>
+
+        <div id="results-view" class="hidden space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative">
+                    <canvas id="mainChart" width="220" height="220"></canvas>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center pt-4">
+                        <div id="grade-display" class="text-6xl font-black text-indigo-600 italic tracking-tighter">--</div>
+                        <div class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Global Grade</div>
+                    </div>
+                </div>
+                
+                <div class="md:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-center">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-[0.3em]">AI Intelligence Report</h3>
+                        <button onclick="downloadPDF()" class="text-indigo-600 hover:text-indigo-800 font-bold text-xs uppercase tracking-widest flex items-center gap-2">
+                            <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                    </div>
+                    <p id="summary-text" class="text-slate-600 leading-relaxed text-lg font-medium italic mb-8"></p>
+                    <div class="flex flex-wrap gap-3">
+                         <div class="bg-indigo-50 px-6 py-4 rounded-2xl min-w-[120px]">
+                            <span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Overall Health</span>
+                            <span id="score-text" class="font-bold text-indigo-600 text-2xl">0%</span>
+                         </div>
+                         <div id="premium-badge" class="hidden bg-emerald-50 px-6 py-4 rounded-2xl border border-emerald-100">
+                            <span class="text-[10px] font-black text-emerald-400 block uppercase mb-1 tracking-widest">Premium Status</span>
+                            <span class="font-bold text-emerald-600 text-lg italic"><i class="fas fa-check-circle mr-1"></i> Full Signal Access</span>
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                </div>
+
+            <div id="paywall-cta" class="hidden p-12 text-center bg-slate-900 rounded-[3rem] text-white">
+                <i class="fas fa-lock text-indigo-400 text-4xl mb-4"></i>
+                <h3 class="text-2xl font-bold mb-2">Unlock 200+ Additional Signals</h3>
+                <p class="text-slate-400 mb-6 max-w-md mx-auto">You're viewing a basic scan. Register or subscribe to get deep technical insights and automated scheduling.</p>
+                <div class="flex justify-center gap-4">
+                    <button onclick="toggleAuthModal()" class="bg-indigo-600 px-8 py-3 rounded-xl font-bold">Sign Up Free</button>
+                    <button onclick="subscribe()" class="bg-white text-slate-900 px-8 py-3 rounded-xl font-bold">Get Pro ($5/mo)</button>
+                </div>
+            </div>
+        </div>
+
+        <section id="pricing" class="mt-32 text-center">
+            <div class="max-w-sm mx-auto bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl">
+                <span class="text-indigo-600 font-bold text-xs uppercase tracking-[0.2em] bg-indigo-50 px-3 py-1 rounded-full">Pro Plan</span>
+                <div class="my-6">
+                    <span class="text-5xl font-black tracking-tight">$5</span>
+                    <span class="text-slate-400 font-bold">/month</span>
+                </div>
+                <ul class="text-left space-y-4 mb-8 text-slate-600 font-medium text-sm">
+                    <li><i class="fas fa-check text-indigo-500 mr-2"></i> Unlimited Deep Audits</li>
+                    <li><i class="fas fa-check text-indigo-500 mr-2"></i> Daily Automated Monitoring</li>
+                    <li><i class="fas fa-check text-indigo-500 mr-2"></i> Certified PDF Reports</li>
+                    <li><i class="fas fa-check text-indigo-500 mr-2"></i> Priority Support</li>
+                </ul>
+                <button onclick="subscribe()" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition">Start Professional Audit</button>
+            </div>
+        </section>
+    </main>
+
+    <div id="auth-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-6">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleAuthModal()"></div>
+        <div class="relative bg-white w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl">
+            <h2 id="auth-title" class="text-3xl font-black tracking-tight mb-2">Welcome Back</h2>
+            <p id="auth-desc" class="text-slate-400 text-sm mb-8">Enter your details to access your dashboard.</p>
+            
+            <form id="auth-form" onsubmit="handleAuth(event)" class="space-y-4">
+                <input type="email" id="auth-email" placeholder="Email Address" required class="w-full p-4 bg-slate-50 rounded-xl outline-none border border-transparent focus:border-indigo-500 font-bold">
+                <input type="password" id="auth-pass" placeholder="Password" required class="w-full p-4 bg-slate-50 rounded-xl outline-none border border-transparent focus:border-indigo-500 font-bold">
+                <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 mt-4">Continue</button>
+            </form>
+            
+            <div class="mt-6 text-center">
+                <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-xs font-bold text-indigo-600 uppercase tracking-widest">Need an account? Sign Up</button>
+            </div>
+        </div>
     </div>
-  </nav>
 
-  <!-- (12) Hero – Public Audit Entry -->
-  <header class="container py-4">
-    <div class="row g-3 align-items-end">
-      <div class="col-12 col-lg-8">
-        <h1 class="mb-2">Run a Free Public Audit</h1>
-        <p class="text-muted mb-3">
-          Enter a website URL to analyze core health, SEO, performance, mobile, security and more.
-          No login required. Premium metrics are blurred.
-        </p>
-        <!-- (13) Website URL Input -->
-        <div class="input-group">
-          <span class="input-group-text">https://</span>
-          <input id="siteUrl" type="text" class="form-control" placeholder="example.com or full URL" />
-          <!-- (14) Run Free Audit Button -->
-          <button id="runAuditBtn" class="btn btn-primary">
-            <i class="fa-solid fa-play me-1"></i> Run Free Audit
-          </button>
-        </div>
-        <!-- (35) Secure / instant messaging (placeholder) -->
-        <div class="mt-2 small text-muted">
-          <i class="fa-solid fa-message-lock me-1"></i> Secure instant messaging placeholder — hook up WebSocket endpoint to enable chat.
-        </div>
-      </div>
-      <div class="col-12 col-lg-4">
-        <!-- (15) Audit Progress Visualization -->
-        <div class="card p-3">
-          <div class="progress mb-2" role="progressbar" aria-label="Audit Progress">
-            <div id="auditProgressBar" class="progress-bar" style="width: 0%">0%</div>
-          </div>
-          <div class="progress-steps d-flex small text-muted">
-            <!-- (25–27) Step indicators -->
-            <div class="step" id="step-crawl"><i class="fa-solid fa-spider"></i> Crawl</div>
-            <div class="step" id="step-analyze"><i class="fa-solid fa-magnifying-glass-chart"></i> Analyze</div>
-            <div class="step" id="step-score"><i class="fa-solid fa-gauge"></i> Score</div>
-            <div class="step" id="step-report"><i class="fa-solid fa-file-lines"></i> Report</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </header>
+    <script>
+        let currentUser = null;
+        let token = localStorage.getItem('token');
+        let currentChart = null;
+        let isLoginMode = true;
 
-  <main class="container pb-5">
-    <!-- (16) Executive Summary -->
-    <section id="executiveSummary">
-      <h2 class="section-title">Executive Summary</h2>
-      <div class="row g-3">
-        <div class="col-12 col-lg-8">
-          <div class="card p-3">
-            <!-- (36) Overall Site Health Score (%) + (37) Grade -->
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <div>
-                <div class="h5 mb-1">Overall Site Health</div>
-                <div class="display-6" id="siteHealthPercent">–%</div>
-              </div>
-              <div>
-                <span id="gradeBadge" class="badge-grade grade-D">Grade: D</span>
-              </div>
-            </div>
+        // Initialize App
+        if (token) fetchUserStatus();
 
-            <!-- (28) Site Health Gauge (public view) -->
-            <div id="healthGauge" style="width:100%;height:220px;"></div>
+        async function fetchUserStatus() {
+            try {
+                const res = await fetch('/billing/status', { headers: { 'Authorization': `Bearer ${token}` }});
+                if (res.ok) {
+                    currentUser = await res.json();
+                    updateUIForUser();
+                } else {
+                    logout();
+                }
+            } catch (e) { console.error("Auth fetch error", e); }
+        }
 
-            <!-- (38) Executive Summary Container (200 words) -->
-            <div class="mt-3">
-              <h6>Summary</h6>
-              <p id="executiveText" class="text-muted">
-                This is the public executive summary generated based on visible metrics. Premium metrics are blurred.
-                Integrate your backend to replace this text with an AI-generated summary (~200 words) including key insights,
-                business impact, and recommended actions.
-              </p>
-            </div>
+        function updateUIForUser() {
+            document.getElementById('auth-btn').innerText = 'Logout';
+            document.getElementById('auth-btn').onclick = logout;
+            document.getElementById('user-status').innerText = currentUser.subscribed ? 'PRO MEMBER' : `${currentUser.free_audits_remaining} Free Audits Left`;
+            document.getElementById('user-status').classList.remove('hidden');
+            if (!currentUser.subscribed) document.getElementById('upgrade-btn').classList.remove('hidden');
+        }
 
-            <!-- (39–41) Highlights & Priority Fixes -->
-            <div class="row g-2 mt-2">
-              <div class="col-12 col-md-4">
-                <div class="card p-2">
-                  <h6><i class="fa-solid fa-thumbs-up me-1 text-success"></i> Strengths</h6>
-                  <ul id="strengthsList" class="small text-muted mb-0"></ul>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <div class="card p-2">
-                  <h6><i class="fa-solid fa-triangle-exclamation me-1 text-warning"></i> Weak Areas</h6>
-                  <ul id="weakAreasList" class="small text-muted mb-0"></ul>
-                </div>
-              </div>
-              <div class="col-12 col-md-4">
-                <div class="card p-2">
-                  <h6><i class="fa-solid fa-list-check me-1 text-danger"></i> Priority Fixes</h6>
-                  <ul id="priorityFixesList" class="small text-muted mb-0"></ul>
-                </div>
-              </div>
-            </div>
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
 
-            <!-- (42–45) Visual severity | category breakdown | print/export -->
-            <div class="row g-2 mt-3">
-              <div class="col-12 col-md-6">
-                <div class="card p-2">
-                  <h6>Errors / Warnings / Notices</h6>
-                  <canvas id="errWarnNoticeChart" class="chart-canvas"></canvas>
-                </div>
-              </div>
-              <div class="col-12 col-md-6">
-                <div class="card p-2">
-                  <h6>Category Score Breakdown</h6>
-                  <canvas id="categoryBreakdownChart" class="chart-canvas"></canvas>
-                </div>
-              </div>
-            </div>
+        // --- Audit Logic ---
+        const auditForm = document.getElementById('audit-form');
+        auditForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('url-input').value;
+            
+            document.getElementById('loading-zone').classList.remove('hidden');
+            document.getElementById('results-view').classList.add('hidden');
+            document.getElementById('hero').classList.add('opacity-50');
 
-            <div class="mt-3 d-flex gap-2 no-print">
-              <button class="btn btn-outline-light" onclick="window.print()">
-                <i class="fa-solid fa-print me-1"></i> Print / Save PDF
-              </button>
-              <button class="btn btn-outline-info" id="exportJsonBtn">
-                <i class="fa-solid fa-file-export me-1"></i> Export JSON
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- (17) Website Grade Badge replicated -->
-        <div class="col-12 col-lg-4">
-          <div class="card p-3">
-            <h6>Website Grade</h6>
-            <div class="display-4" id="gradeLarge">D</div>
-            <p class="text-muted small mb-2">
-              Grade is computed from visible metrics. Premium metrics enhance accuracy.
-            </p>
-            <div id="gradeJustification" class="small text-muted"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- (18) Metrics Dashboard -->
-    <section id="metricsDashboard" class="mt-4">
-      <h2 class="section-title">Metrics Dashboard</h2>
-      <div class="row g-3" id="metricsGrid">
-        <!-- Cards injected dynamically for metrics (46–235) with unique IDs and charts -->
-      </div>
-    </section>
-
-    <!-- (19) Competitor Analysis -->
-    <section id="competitorAnalysis" class="mt-4">
-      <h2 class="section-title">Competitor Analysis</h2>
-      <div class="card p-3">
-        <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-4">
-            <label class="form-label small">Competitor #1 URL</label>
-            <input id="compUrl1" class="form-control" placeholder="competitor1.com" />
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label small">Competitor #2 URL</label>
-            <input id="compUrl2" class="form-control" placeholder="competitor2.com" />
-          </div>
-          <div class="col-12 col-md-4">
-            <button id="runCompBtn" class="btn btn-outline-primary w-100">
-              <i class="fa-solid fa-chart-line me-1"></i> Compare
-            </button>
-          </div>
-        </div>
-        <div class="row g-2 mt-2">
-          <div class="col-12 col-md-6">
-            <div id="compGauge" style="width:100%;height:220px;"></div>
-          </div>
-          <div class="col-12 col-md-6">
-            <canvas id="compBars" class="chart-canvas"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- (20) Broken Links Intelligence -->
-    <section id="brokenLinksIntelligence" class="mt-4">
-      <h2 class="section-title">Broken Links Intelligence</h2>
-      <div class="row g-3">
-        <div class="col-12 col-lg-4"><div class="card p-2"><h6>Total Broken Links</h6><canvas id="brokenTotal" class="chart-canvas"></canvas></div></div>
-        <div class="col-12 col-lg-4"><div class="card p-2"><h6>Status Code Distribution</h6><canvas id="statusDist" class="chart-canvas"></canvas></div></div>
-        <div class="col-12 col-lg-4"><div class="card p-2"><h6>Fix Priority Score</h6><canvas id="fixPriority" class="chart-canvas"></canvas></div></div>
-      </div>
-    </section>
-
-    <!-- (21) Opportunities & ROI -->
-    <section id="opportunitiesROI" class="mt-4">
-      <h2 class="section-title">Opportunities & ROI</h2>
-      <div class="row g-3">
-        <div class="col-12 col-lg-6">
-          <div class="card p-2">
-            <h6>Growth Forecast</h6>
-            <canvas id="growthForecast" class="chart-canvas"></canvas>
-          </div>
-        </div>
-        <div class="col-12 col-lg-6">
-          <div class="card p-2">
-            <h6>ROI Forecast</h6>
-            <canvas id="roiForecast" class="chart-canvas"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- (22) Footer -->
-  <footer class="footer py-3 mt-4">
-    <div class="container d-flex justify-content-between small">
-      <div>© 2025 Universal Web Audit — Single File (Python via Pyodide)</div>
-      <div>Made for Ops: Khan Roy Jamshaid</div>
-    </div>
-  </footer>
-
-  <!-- =========================== -->
-  <!-- Scripts: Init & Integration -->
-  <!-- =========================== -->
-  <script>
-    /** ========== Utility & State ========== */
-    const state = {
-      auditsRun: Number(localStorage.getItem('freeAudits') || 0),
-      metrics: {}, // populated per metric id -> value
-      charts: {},  // chart instances
-      premiumBlurStart: 100, // metrics above this number are blurred in public
-    };
-
-    const metricSpecs = [
-      // Core lists (46–235). Each gets unique id 'metric-<num>'
-      // Grouped for readability. Values are placeholders until computed by Python or backend.
-      // Overall Site Health (46–55)
-      [46,'Site Health Score'],[47,'Total Errors'],[48,'Total Warnings'],[49,'Total Notices'],[50,'Total Crawled Pages'],
-      [51,'Total Indexed Pages'],[52,'Issues Trend'],[53,'Crawl Budget Efficiency'],[54,'Orphan Pages Percentage'],[55,'Audit Completion Status'],
-      // Crawlability & Indexation (56–75)
-      [56,'HTTP 2xx Pages'],[57,'HTTP 3xx Pages'],[58,'HTTP 4xx Pages'],[59,'HTTP 5xx Pages'],[60,'Redirect Chains'],
-      [61,'Redirect Loops'],[62,'Broken Internal Links'],[63,'Broken External Links'],[64,'robots.txt Blocked URLs'],[65,'Meta Robots Blocked URLs'],
-      [66,'Non-Canonical Pages'],[67,'Missing Canonical Tags'],[68,'Incorrect Canonical Tags'],[69,'Sitemap Missing Pages'],[70,'Sitemap Not Crawled Pages'],
-      [71,'Hreflang Errors'],[72,'Hreflang Conflicts'],[73,'Pagination Issues'],[74,'Crawl Depth Distribution'],[75,'Duplicate Parameter URLs'],
-      // On-Page SEO (76–110)
-      [76,'Missing Title Tags'],[77,'Duplicate Title Tags'],[78,'Title Too Long'],[79,'Title Too Short'],[80,'Missing Meta Descriptions'],
-      [81,'Duplicate Meta Descriptions'],[82,'Meta Too Long'],[83,'Meta Too Short'],[84,'Missing H1'],[85,'Multiple H1'],
-      [86,'Duplicate Headings'],[87,'Thin Content Pages'],[88,'Duplicate Content Pages'],[89,'Low Text-to-HTML Ratio'],[90,'Missing Image Alt Tags'],
-      [91,'Duplicate Alt Tags'],[92,'Large Uncompressed Images'],[93,'Pages Without Indexed Content'],[94,'Missing Structured Data'],[95,'Structured Data Errors'],
-      [96,'Rich Snippet Warnings'],[97,'Missing Open Graph Tags'],[98,'Long URLs'],[99,'Uppercase URLs'],[100,'Non-SEO-Friendly URLs'],
-      [101,'Too Many Internal Links'],[102,'Pages Without Incoming Links'],[103,'Orphan Pages'],[104,'Broken Anchor Links'],[105,'Redirected Internal Links'],
-      [106,'NoFollow Internal Links'],[107,'Link Depth Issues'],[108,'External Links Count'],[109,'Broken External Links'],[110,'Anchor Text Issues'],
-      // Performance & Technical (111–131)
-      [111,'Largest Contentful Paint'],[112,'First Contentful Paint'],[113,'Cumulative Layout Shift'],[114,'Total Blocking Time'],[115,'First Input Delay'],
-      [116,'Speed Index'],[117,'Time to Interactive'],[118,'DOM Content Loaded'],[119,'Total Page Size'],[120,'Requests Per Page'],
-      [121,'Unminified CSS'],[122,'Unminified JavaScript'],[123,'Render Blocking Resources'],[124,'Excessive DOM Size'],[125,'Third-Party Script Load'],
-      [126,'Server Response Time'],[127,'Image Optimization'],[128,'Lazy Loading Issues'],[129,'Browser Caching Issues'],[130,'Missing GZIP / Brotli'],
-      [131,'Resource Load Errors'],
-      // Mobile, Security & International (132–185)
-      [132,'Mobile Friendly Test'],[133,'Viewport Meta Tag'],[134,'Small Font Issues'],[135,'Tap Target Issues'],[136,'Mobile Core Web Vitals'],
-      [137,'Mobile Layout Issues'],[138,'Intrusive Interstitials'],[139,'Mobile Navigation Issues'],[140,'HTTPS Implementation'],[141,'SSL Certificate Validity'],
-      [142,'Expired SSL'],[143,'Mixed Content'],[144,'Insecure Resources'],[145,'Missing Security Headers'],[146,'Open Directory Listing'],
-      [147,'Login Pages Without HTTPS'],[148,'Missing Hreflang'],[149,'Incorrect Language Codes'],[150,'Hreflang Conflicts'],[151,'Region Targeting Issues'],
-      [152,'Multi-Domain SEO Issues'],[153,'Domain Authority'],[154,'Referring Domains'],[155,'Total Backlinks'],[156,'Toxic Backlinks'],
-      [157,'NoFollow Backlinks'],[158,'Anchor Distribution'],[159,'Referring IPs'],[160,'Lost / New Backlinks'],[161,'JS Rendering Issues'],
-      [162,'CSS Blocking'],[163,'Crawl Budget Waste'],[164,'AMP Issues'],[165,'PWA Issues'],[166,'Canonical Conflicts'],
-      [167,'Subdomain Duplication'],[168,'Pagination Conflicts'],[169,'Dynamic URL Issues'],[170,'Lazy Load Conflicts'],[171,'Sitemap Presence'],
-      [172,'Noindex Issues'],[173,'Structured Data Consistency'],[174,'Redirect Correctness'],[175,'Broken Rich Media'],[176,'Social Metadata Presence'],
-      [177,'Error Trend'],[178,'Health Trend'],[179,'Crawl Trend'],[180,'Index Trend'],[181,'CWV Trend'],
-      [182,'Backlink Trend'],[183,'Keyword Trend'],[184,'Historical Comparison'],[185,'Overall Stability Index'],
-      // Competitor Analysis (186–202)
-      [186,'Competitor Health Score'],[187,'Competitor Performance Comparison'],[188,'Competitor CWV Comparison'],[189,'Competitor SEO Issues Comparison'],[190,'Competitor Broken Links Comparison'],
-      [191,'Competitor Authority Score'],[192,'Competitor Backlink Growth'],[193,'Competitor Keyword Visibility'],[194,'Competitor Rank Distribution'],[195,'Competitor Content Volume'],
-      [196,'Competitor Speed Comparison'],[197,'Competitor Mobile Score'],[198,'Competitor Security Score'],[199,'Competitive Gap Score'],[200,'Competitive Opportunity Heatmap'],
-      [201,'Competitive Risk Heatmap'],[202,'Overall Competitive Rank'],
-      // Broken Links Intelligence (203–215)
-      [203,'Total Broken Links'],[204,'Internal Broken Links'],[205,'External Broken Links'],[206,'Broken Links Trend'],[207,'Broken Pages by Impact'],
-      [208,'Status Code Distribution'],[209,'Page Type Distribution'],[210,'Fix Priority Score'],[211,'SEO Loss Impact'],[212,'Affected Pages Count'],
-      [213,'Broken Media Links'],[214,'Resolution Progress'],[215,'Risk Severity Index'],
-      // Opportunities, Growth & ROI (216–235)
-      [216,'High Impact Opportunities'],[217,'Quick Wins Score'],[218,'Long-Term Fixes'],[219,'Traffic Growth Forecast'],[220,'Ranking Growth Forecast'],
-      [221,'Conversion Impact Score'],[222,'Content Expansion Opportunities'],[223,'Internal Linking Opportunities'],[224,'Speed Improvement Potential'],[225,'Mobile Improvement Potential'],
-      [226,'Security Improvement Potential'],[227,'Structured Data Opportunities'],[228,'Crawl Optimization Potential'],[229,'Backlink Opportunity Score'],[230,'Competitive Gap ROI'],
-      [231,'Fix Roadmap Timeline'],[232,'Time-to-Fix Estimate'],[233,'Cost-to-Fix Estimate'],[234,'ROI Forecast'],[235,'Overall Growth Readiness'],
-    ];
-
-    function setAuditCounter() {
-      document.getElementById('freeAuditCounter').textContent = `Free audits: ${state.auditsRun}`;
-    }
-
-    function severityColor(value, type='default') {
-      // Simple thresholds; customize per metric (backend can override)
-      if (type === 'score') { // higher is better
-        if (value >= 85) return 'sev-green';
-        if (value >= 60) return 'sev-yellow';
-        return 'sev-red';
-      }
-      if (type === 'errorCount') { // lower is better
-        if (value <= 5) return 'sev-green';
-        if (value <= 20) return 'sev-yellow';
-        return 'sev-red';
-      }
-      // default: neutral
-      return 'sev-yellow';
-    }
-
-    /** ========== Build Metric Cards (Rule 3–8) ========== */
-    function buildMetricsGrid() {
-      const grid = document.getElementById('metricsGrid');
-      grid.innerHTML = '';
-      for (const [num, title] of metricSpecs) {
-        const id = `metric-${num}`;
-        const isPremium = num > state.premiumBlurStart;
-        const card = document.createElement('div');
-        card.className = 'col-12 col-md-6 col-lg-4';
-        card.innerHTML = `
-          <div class="card p-3 metric-card" id="${id}">
-            ${isPremium ? `<div class="blur-overlay">Premium — Sign up to unlock</div>` : ''}
-            <div class="${isPremium ? 'blurred' : ''}">
-              <div class="metric-header">
-                <div class="severity-dot ${severityColor(0)}"></div>
-                <div class="fw-bold">#${num}: ${title}</div>
-                <span class="ms-auto badge bg-dark" id="${id}-value">–</span>
-              </div>
-              <canvas id="${id}-chart" class="sparkline"></canvas>
-            </div>
-          </div>
-        `;
-        grid.appendChild(card);
-
-        // init a tiny sparkline with placeholder data
-        const ctx = document.getElementById(`${id}-chart`).getContext('2d');
-        const spark = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: Array.from({length: 8}, (_, i) => i+1),
-            datasets: [{
-              data: Array.from({length: 8}, () => Math.floor(Math.random()*100)),
-              borderColor: '#60a5fa',
-              backgroundColor: 'rgba(96,165,250,0.15)',
-              tension: 0.4,
-              pointRadius: 0
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: {legend: {display: false}},
-            scales: {
-              x: {display: false}, y: {display: false}
+            try {
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                const response = await fetch('/audit?url=' + encodeURIComponent(url), { headers });
+                const data = await response.json();
+                
+                renderResults(data);
+            } catch (err) {
+                alert("Audit failed. Check connection.");
+            } finally {
+                document.getElementById('loading-zone').classList.add('hidden');
+                document.getElementById('hero').classList.remove('opacity-50');
             }
-          }
-        });
-        state.charts[id] = spark;
-        state.metrics[id] = null;
-      }
-    }
+        };
 
-    /** ========== Category Charts & Gauge ========== */
-    let errWarnChart, categoryChart, compBarChart, brokenTotalChart, statusDistChart, fixPriorityChart, growthChart, roiChart, healthGauge, compGauge;
+        function renderResults(data) {
+            document.getElementById('results-view').classList.remove('hidden');
+            document.getElementById('grade-display').innerText = data.grade || 'F';
+            document.getElementById('summary-text').innerText = data.summary;
+            document.getElementById('score-text').innerText = data.overall + '%';
+            
+            if (data.premium) {
+                document.getElementById('premium-badge').classList.remove('hidden');
+                document.getElementById('paywall-cta').classList.add('hidden');
+            } else {
+                document.getElementById('paywall-cta').classList.remove('hidden');
+            }
 
-    function initSummaryCharts() {
-      // Errors / Warnings / Notices
-      errWarnChart = new Chart(document.getElementById('errWarnNoticeChart'), {
-        type: 'bar',
-        data: {
-          labels: ['Errors', 'Warnings', 'Notices'],
-          datasets: [{ data: [0,0,0], backgroundColor: ['#ef4444','#f59e0b','#60a5fa'] }]
-        },
-        options: {responsive:true, plugins:{legend:{display:false}}}
-      });
+            // Charts
+            if(currentChart) currentChart.destroy();
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            currentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: data.overall_gauge,
+                options: { cutout: '88%', plugins: { legend: { display: false } } }
+            });
 
-      // Category Breakdown
-      categoryChart = new Chart(document.getElementById('categoryBreakdownChart'), {
-        type: 'radar',
-        data: {
-          labels: ['Crawl','On-Page','Perf','Mobile/Sec','Backlinks/Intl'],
-          datasets: [{
-            label: 'Score',
-            data: [20,20,20,20,20],
-            borderColor: '#34d399',
-            backgroundColor: 'rgba(52,211,153,0.2)'
-          }]
-        },
-        options: {responsive:true}
-      });
-
-      // Health Gauge (ECharts)
-      healthGauge = echarts.init(document.getElementById('healthGauge'));
-      healthGauge.setOption({
-        series: [{
-          type: 'gauge',
-          min: 0, max: 100,
-          axisLine: { lineStyle: { width: 8 } },
-          detail: { formatter: '{value}%' },
-          data: [{ value: 0, name: 'Health' }]
-        }]
-      });
-
-      // Competitor Gauge + Bars
-      compGauge = echarts.init(document.getElementById('compGauge'));
-      compGauge.setOption({
-        series: [{ type: 'gauge', min:0, max:100, data:[{value:0,name:'Competitor Health'}] }]
-      });
-
-      compBarChart = new Chart(document.getElementById('compBars'), {
-        type: 'bar',
-        data: {
-          labels: ['Perf','CWV','SEO','Links','Authority','Mobile','Security'],
-          datasets: [
-            { label: 'Comp #1', data: [0,0,0,0,0,0,0], backgroundColor: 'rgba(96,165,250,0.6)'},
-            { label: 'Comp #2', data: [0,0,0,0,0,0,0], backgroundColor: 'rgba(52,211,153,0.6)'}
-          ]
-        },
-        options: {responsive:true}
-      });
-
-      // Broken Links Intelligence
-      brokenTotalChart = new Chart(document.getElementById('brokenTotal'), {
-        type: 'doughnut',
-        data: { labels: ['Broken','OK'], datasets: [{ data:[0,0], backgroundColor:['#ef4444','#22c55e'] }] },
-        options: {responsive:true}
-      });
-
-      statusDistChart = new Chart(document.getElementById('statusDist'), {
-        type: 'bar',
-        data: { labels: ['4xx','5xx','Timeout','DNS'], datasets: [{ data:[0,0,0,0], backgroundColor:'#f59e0b'}] },
-        options: {responsive:true, plugins:{legend:{display:false}}}
-      });
-
-      fixPriorityChart = new Chart(document.getElementById('fixPriority'), {
-        type: 'line',
-        data: { labels: ['Low','Med','High','Critical'], datasets: [{ data:[0,0,0,0], borderColor:'#ef4444' }] },
-        options: {responsive:true, plugins:{legend:{display:false}}}
-      });
-
-      // Opportunities & ROI
-      growthChart = new Chart(document.getElementById('growthForecast'), {
-        type: 'line',
-        data: { labels: Array.from({length:12}, (_,i)=>`M${i+1}`), datasets: [{ data: Array(12).fill(0), borderColor:'#60a5fa' }] },
-        options: {responsive:true, plugins:{legend:{display:false}}}
-      });
-
-      roiChart = new Chart(document.getElementById('roiForecast'), {
-        type: 'line',
-        data: { labels: Array.from({length:12}, (_,i)=>`M${i+1}`), datasets: [{ data: Array(12).fill(0), borderColor:'#34d399' }] },
-        options: {responsive:true, plugins:{legend:{display:false}}}
-      });
-    }
-
-    /** ========== Grade computation ========== */
-    function computeGrade(health) {
-      if (health >= 90) return 'A+';
-      if (health >= 80) return 'A';
-      if (health >= 70) return 'B';
-      if (health >= 60) return 'C';
-      return 'D';
-    }
-    function setGradeUI(grade) {
-      const badge = document.getElementById('gradeBadge');
-      const large = document.getElementById('gradeLarge');
-      badge.className = 'badge-grade';
-      if (grade.startsWith('A')) badge.classList.add('grade-A');
-      else if (grade.startsWith('B')) badge.classList.add('grade-B');
-      else if (grade.startsWith('C')) badge.classList.add('grade-C');
-      else badge.classList.add('grade-D');
-      badge.textContent = `Grade: ${grade}`;
-      large.textContent = grade;
-      document.getElementById('gradeJustification').textContent =
-        'Grade is based on visible public metrics (errors, warnings, CWV, security). Connect backend to factor premium signals.';
-    }
-
-    /** ========== Pyodide / Python Init ========== */
-    let pyodideReady = false;
-    let pyodide = null;
-
-    async function initPyodide() {
-      pyodide = await loadPyodide();
-      // Minimal Python analysis functions (operate on fetched HTML)
-      const pyCode = `
-import js
-from bs4 import BeautifulSoup
-
-def analyze_html(html_text: str) -> dict:
-    try:
-        soup = BeautifulSoup(html_text, 'html.parser')
-    except Exception as e:
-        return {"error": str(e)}
-
-    # On-Page basics
-    title = soup.find('title')
-    meta_desc = soup.find('meta', attrs={'name':'description'})
-    h1s = soup.find_all('h1')
-    imgs = soup.find_all('img')
-
-    missing_title = 1 if (title is None or len(title.get_text(strip=True)) == 0) else 0
-    missing_meta_desc = 1 if (meta_desc is None or not meta_desc.get('content')) else 0
-    missing_h1 = 1 if len(h1s) == 0 else 0
-    multiple_h1 = 1 if len(h1s) > 1 else 0
-    missing_alt = sum(1 for i in imgs if not i.get('alt'))
-
-    # Simple text-to-HTML ratio proxy
-    total_text_len = len(soup.get_text())
-    total_html_len = len(html_text)
-    text_html_ratio = (total_text_len / total_html_len) if total_html_len > 0 else 0
-
-    # Structured data presence
-    ld_json = soup.find('script', attrs={'type':'application/ld+json'})
-    structured_data_missing = 1 if ld_json is None else 0
-
-    # Open Graph presence
-    og_title = soup.find('meta', property='og:title')
-    og_missing = 1 if og_title is None else 0
-
-    # Viewport meta (mobile)
-    viewport_meta = soup.find('meta', attrs={'name':'viewport'})
-    viewport_missing = 1 if viewport_meta is None else 0
-
-    # Health heuristic (placeholder)
-    # Penalize missing key elements
-    penalties = (missing_title*10 + missing_meta_desc*8 + missing_h1*8 + multiple_h1*4 +
-                 structured_data_missing*6 + og_missing*3 + viewport_missing*6)
-    base = 85.0
-    health = max(0.0, min(100.0, base - penalties - (missing_alt*0.5) - (10.0 if text_html_ratio < 0.05 else 0.0)))
-
-    # Errors / warnings / notices (placeholder mapping)
-    errors = missing_title + missing_h1 + structured_data_missing + viewport_missing
-    warnings = missing_meta_desc + multiple_h1 + og_missing
-    notices = 1 if text_html_ratio < 0.1 else 0
-
-    return {
-        "health": round(health, 1),
-        "errors": int(errors),
-        "warnings": int(warnings),
-        "notices": int(notices),
-        "missing_title": int(missing_title),
-        "missing_meta_desc": int(missing_meta_desc),
-        "missing_h1": int(missing_h1),
-        "multiple_h1": int(multiple_h1),
-        "missing_alt_count": int(missing_alt),
-        "text_html_ratio": round(text_html_ratio, 4),
-        "structured_data_missing": int(structured_data_missing),
-        "og_missing": int(og_missing),
-        "viewport_missing": int(viewport_missing)
-    }
-`;
-      // Load bs4 via micropip? Not available offline. Use Pyodide's built-in "beautifulsoup4" if present.
-      // Fallback: try-except import (Pyodide packages often include bs4).
-      try {
-        await pyodide.loadPackage('beautifulsoup4');
-      } catch (e) {
-        console.warn('bs4 load failed, analysis limited:', e);
-      }
-      await pyodide.runPythonAsync(pyCode);
-      pyodideReady = true;
-    }
-
-    /** ========== Audit flow ========== */
-    function setStep(step) {
-      const steps = ['crawl','analyze','score','report'];
-      steps.forEach(s => {
-        const el = document.getElementById(`step-${s}`);
-        el.style.fontWeight = (s === step) ? '700' : '400';
-        el.style.color = (s === step) ? '#fff' : '#9ca3af';
-      });
-    }
-    function setProgress(pct) {
-      const bar = document.getElementById('auditProgressBar');
-      bar.style.width = `${pct}%`;
-      bar.textContent = `${pct}%`;
-    }
-
-    async function runAudit() {
-      const urlInput = document.getElementById('siteUrl').value.trim();
-      if (!urlInput) return alert('Please enter a URL');
-
-      state.auditsRun += 1;
-      localStorage.setItem('freeAudits', String(state.auditsRun));
-      setAuditCounter();
-
-      setStep('crawl'); setProgress(10);
-
-      // Attempt direct fetch — may fail due to CORS
-      let html = '';
-      try {
-        const resp = await fetch(urlInput.startsWith('http') ? urlInput : `https://${urlInput}`, { mode: 'cors' });
-        html = await resp.text();
-      } catch (e) {
-        // Backend-ready placeholder: use proxy endpoint to bypass CORS
-        // const resp = await fetch(`/proxy?url=${encodeURIComponent(urlInput)}`);
-        // html = await resp.text();
-        console.warn('Direct fetch blocked by CORS. Using placeholder HTML sample.');
-        html = `
-          <html><head>
-            <title>Sample Page</title>
-            <meta name="description" content="Sample description">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta property="og:title" content="Sample OG">
-            <script type="application/ld+json">{}</script>
-          </head><body>
-            <h1>Welcome</h1>
-            a.jpg
-            b.jpg
-            <p>This is sample content for analysis.</p>
-          </body></html>`;
-      }
-
-      setStep('analyze'); setProgress(45);
-      if (!pyodideReady) await initPyodide();
-
-      // Run Python analysis
-      let result = {};
-      try {
-        result = await pyodide.runPythonAsync(`analyze_html(${JSON.stringify(html)})`);
-      } catch (e) {
-        console.error('Python analysis failed:', e);
-      }
-
-      // Update summary charts & health
-      const health = result.health ?? 55;
-      document.getElementById('siteHealthPercent').textContent = `${health}%`;
-      healthGauge.setOption({ series: [{ data: [{ value: health, name: 'Health' }] }] });
-
-      errWarnChart.data.datasets[0].data = [
-        result.errors ?? 5,
-        result.warnings ?? 8,
-        result.notices ?? 2
-      ];
-      errWarnChart.update();
-
-      categoryChart.data.datasets[0].data = [
-        Math.max(10, 100 - (result.errors ?? 5) * 5), // Crawl (placeholder)
-        Math.max(10, 100 - (result.missing_title + result.missing_meta_desc + result.missing_h1 + result.multiple_h1) * 8),
-        Math.max(10, 70), // Perf placeholder
-        Math.max(10, 100 - (result.viewport_missing ?? 0) * 10),
-        Math.max(10, 80) // Backlinks/Intl placeholder
-      ];
-      categoryChart.update();
-
-      // Grade
-      setStep('score'); setProgress(70);
-      const grade = computeGrade(health);
-      setGradeUI(grade);
-
-      // Populate highlight lists
-      populateHighlights(result);
-
-      // Map some results to metrics
-      const assignments = [
-        [46, result.health ?? 55, 'score'],
-        [47, result.errors ?? 5, 'errorCount'],
-        [48, result.warnings ?? 8, 'errorCount'],
-        [49, result.notices ?? 2, 'errorCount'],
-        [76, result.missing_title ?? 0, 'errorCount'],
-        [80, result.missing_meta_desc ?? 0, 'errorCount'],
-        [84, result.missing_h1 ?? 0, 'errorCount'],
-        [85, result.multiple_h1 ?? 0, 'errorCount'],
-        [90, result.missing_alt_count ?? 0, 'errorCount'],
-        [94, result.structured_data_missing ?? 1, 'errorCount'],
-        [97, result.og_missing ?? 1, 'errorCount'],
-        [133, result.viewport_missing ?? 1, 'errorCount'],
-      ];
-      for (const [num, val, typ] of assignments) {
-        const id = `metric-${num}`;
-        const elVal = document.getElementById(`${id}-value`);
-        const dot = document.querySelector(`#${id} .severity-dot`);
-        if (elVal) elVal.textContent = String(val);
-        if (dot) {
-          dot.className = `severity-dot ${severityColor(val, typ)}`;
+            // Signal Grid
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = data.metrics.slice(0, 12).map(m => {
+                const passPct = m.chart_data.datasets[0].data[0];
+                const color = m.severity === 'green' ? 'bg-emerald-500' : (m.severity === 'yellow' ? 'bg-amber-500' : 'bg-rose-500');
+                return `
+                    <div class="bg-white p-6 rounded-3xl border border-slate-50 shadow-sm text-center">
+                        <div class="text-[9px] font-black text-slate-300 uppercase mb-3 tracking-widest">Signal ${m.num}</div>
+                        <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full ${color}" style="width: ${passPct}%"></div>
+                        </div>
+                        <div class="mt-2 text-[10px] text-slate-500 font-bold">${passPct}%</div>
+                    </div>`;
+            }).join('');
+            
+            window.scrollTo(0, document.getElementById('results-view').offsetTop - 100);
         }
-        // Add a data point to sparkline
-        const ch = state.charts[id];
-        if (ch) {
-          ch.data.datasets[0].data.push(val);
-          ch.data.labels.push(ch.data.labels.length + 1);
-          ch.update();
+
+        // --- Subscription / Stripe ---
+        async function subscribe() {
+            if (!token) return toggleAuthModal();
+            try {
+                const res = await fetch('/billing/checkout', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }});
+                const data = await res.json();
+                if (data.url) window.location.href = data.url;
+                else alert(data.message); // Demo fallback from your python code
+            } catch (e) { alert("Billing error."); }
         }
-      }
 
-      // Broken links intelligence (placeholder)
-      const broken = (result.errors ?? 5) + (result.warnings ?? 8);
-      brokenTotalChart.data.datasets[0].data = [broken, Math.max(0, 100 - broken)];
-      brokenTotalChart.update();
-      statusDistChart.data.datasets[0].data = [Math.floor(broken*0.7), Math.floor(broken*0.2), Math.floor(broken*0.05), Math.floor(broken*0.05)];
-      statusDistChart.update();
-      fixPriorityChart.data.datasets[0].data = [10, 20, 30, Math.min(60, broken*5)];
-      fixPriorityChart.update();
+        function downloadPDF() {
+            const url = document.getElementById('url-input').value;
+            window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
+        }
 
-      // Opportunities & ROI (placeholder growth curves)
-      const baseGrowth = Math.max(2, 10 - (result.errors ?? 5));
-      growthChart.data.datasets[0].data = Array.from({length:12}, (_,i)=> Math.max(0, baseGrowth + i*1.5 - (result.warnings ?? 8)*0.2));
-      growthChart.update();
-      roiChart.data.datasets[0].data = Array.from({length:12}, (_,i)=> Math.max(0, (growthChart.data.datasets[0].data[i] * 3)));
-      roiChart.update();
+        // --- Auth UI Helpers ---
+        function toggleAuthModal() {
+            document.getElementById('auth-modal').classList.toggle('hidden');
+        }
 
-      setStep('report'); setProgress(100);
-    }
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('auth-title').innerText = isLoginMode ? "Welcome Back" : "Create Account";
+            document.getElementById('auth-desc').innerText = isLoginMode ? "Enter details to access dashboard." : "Join FF Tech for automated audits.";
+            document.getElementById('auth-toggle-btn').innerText = isLoginMode ? "Need an account? Sign Up" : "Have an account? Login";
+        }
 
-    function populateHighlights(result) {
-      const strengths = [
-        ...(result.missing_title === 0 ? ['Title tag present'] : []),
-        ...(result.missing_meta_desc === 0 ? ['Meta description present'] : []),
-        ...(result.structured_data_missing === 0 ? ['Structured data detected'] : []),
-        ...(result.viewport_missing === 0 ? ['Mobile viewport configured'] : []),
-      ];
-      const weak = [
-        ...(result.missing_h1 ? ['Missing H1'] : []),
-        ...(result.multiple_h1 ? ['Multiple H1 tags'] : []),
-        ...(result.missing_alt_count > 0 ? ['Images missing alt text'] : []),
-        ...(result.og_missing ? ['Open Graph missing'] : []),
-      ];
-      const fixes = [
-        ...(result.missing_h1 ? ['Add a single H1 per page'] : []),
-        ...(result.missing_title ? ['Add a descriptive, unique title (50–60 chars)'] : []),
-        ...(result.missing_meta_desc ? ['Add meta description (140–160 chars)'] : []),
-        ...(result.missing_alt_count > 0 ? ['Add alt text to all images'] : []),
-        ...(result.structured_data_missing ? ['Implement schema.org structured data (JSON-LD)'] : []),
-      ];
-      const strengthsEl = document.getElementById('strengthsList');
-      const weakEl = document.getElementById('weakAreasList');
-      const fixesEl = document.getElementById('priorityFixesList');
-      strengthsEl.innerHTML = strengths.map(s=>`<li>${s}</li>`).join('') || '<li>No major strengths detected in public sample.</li>';
-      weakEl.innerHTML = weak.map(s=>`<li>${s}</li>`).join('') || '<li>No weak areas detected in public sample.</li>';
-      fixesEl.innerHTML = fixes.map(s=>`<li>${s}</li>`).join('') || '<li>No immediate fixes detected in public sample.</li>';
-    }
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-pass').value;
+            const endpoint = isLoginMode ? '/login' : '/register';
 
-    /** ========== Competitor Compare (placeholders) ========== */
-    function runCompetitorComparison() {
-      const s1 = Math.floor(40 + Math.random()*40);
-      const s2 = Math.floor(40 + Math.random()*40);
-      compGauge.setOption({ series: [{ data: [{ value: Math.floor((s1+s2)/2), name:'Competitor Health'}]}] });
-      compBarChart.data.datasets[0].data = [s1-10, s1-12, s1-8, s1-20, s1-5, s1-15, s1-12];
-      compBarChart.data.datasets[1].data = [s2-9, s2-14, s2-7, s2-18, s2-6, s2-10, s2-14];
-      compBarChart.update();
-    }
-
-    /** ========== Export JSON ========== */
-    function exportJSON() {
-      const data = {
-        health: document.getElementById('siteHealthPercent').textContent,
-        grade: document.getElementById('gradeLarge').textContent,
-        metrics: Object.fromEntries(Object.entries(state.metrics).map(([k,v]) => [k, v]))
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'audit.json'; a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    /** ========== Event Bindings ========== */
-    document.getElementById('runAuditBtn').addEventListener('click', runAudit);
-    document.getElementById('runCompBtn').addEventListener('click', runCompetitorComparison);
-    document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
-
-    // Init on load
-    setAuditCounter();
-    buildMetricsGrid();
-    initSummaryCharts();
-    setStep('crawl'); setProgress(0);
-  </script>
-
-  <!-- Bootstrap JS (Bundle) -->
-  https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js</script>
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    if (isLoginMode) {
+                        localStorage.setItem('token', data.token);
+                        location.reload();
+                    } else {
+                        alert("Registration successful! Please check your email for verification.");
+                        toggleAuthMode();
+                    }
+                } else {
+                    alert(data.detail || "Authentication failed.");
+                }
+            } catch (err) { alert("Server error."); }
+        }
+    </script>
 </body>
 </html>
