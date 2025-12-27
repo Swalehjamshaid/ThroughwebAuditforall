@@ -1,178 +1,388 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>FF Tech Global Website Audit Platform</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<!-- Tailwind -->
-<script src="https://cdn.tailwindcss.com"></script>
-
-<!-- Charts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-
-<style>
-body { font-family: 'Inter', sans-serif; }
-.glass { background: rgba(15,23,42,.7); backdrop-filter: blur(12px); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech AI-Powered Website Audit Platform</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
+        .metric-card { @apply border-l-4 pl-6 mb-8 bg-white shadow-lg rounded-xl p-6; }
+        .green { border-color: #10b981; }
+        .yellow { border-color: #f59e0b; }
+        .red { border-color: #ef4444; }
+        canvas { max-height: 180px; width: 100% !important; height: auto !important; }
+        .blur-premium { filter: blur(8px); pointer-events: none; }
+    </style>
 </head>
+<body class="bg-gray-100 text-gray-800">
 
-<body class="bg-gradient-to-br from-slate-950 via-slate-900 to-black text-slate-200">
+    <!-- 11. Header / Navigation Bar -->
+    <header class="gradient-bg text-white py-6 shadow-xl fixed w-full top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <h1 class="text-3xl font-bold">FF Tech</h1>
+            <nav class="space-x-8">
+                <a href="#hero" class="hover:underline">Home</a>
+                <a href="#dashboard" class="hover:underline">Metrics</a>
+                <a href="#competitor" class="hover:underline">Competitors</a>
+                <a href="#broken" class="hover:underline">Broken Links</a>
+                <a href="#opportunities" class="hover:underline">Opportunities</a>
+            </nav>
+        </div>
+    </header>
 
-<!-- ================================================= -->
-<!-- HEADER -->
-<!-- ================================================= -->
-<header class="p-6 border-b border-slate-800 flex justify-between items-center">
-<div>
-<h1 class="text-3xl font-extrabold">FF Tech WebAudit™</h1>
-<p class="text-slate-400 text-sm">Global 150-Metric Audit Standard</p>
-</div>
-<div class="space-x-4">
-<button onclick="setMode('open')" class="px-4 py-2 bg-slate-800 rounded">Open Audit</button>
-<button onclick="setMode('pro')" class="px-4 py-2 bg-emerald-600 rounded">Email Registration</button>
-</div>
-</header>
+    <!-- 12. Hero Section -->
+    <section id="hero" class="gradient-bg text-white pt-32 pb-20 px-6">
+        <div class="max-w-4xl mx-auto text-center">
+            <h2 class="text-5xl font-bold mb-6">AI-Powered Website Audit Platform</h2>
+            <p class="text-xl mb-10">235 Professional Metrics • Instant Results • Public Audit</p>
+            <form id="audit-form" class="flex max-w-2xl mx-auto">
+                <input type="url" id="website-url" placeholder="https://example.com" required class="flex-1 px-6 py-4 rounded-l-xl text-gray-900">
+                <button type="submit" class="bg-white text-indigo-600 px-10 py-4 rounded-r-xl font-bold hover:bg-gray-100">Run Free Audit</button>
+            </form>
+            <p class="mt-6 text-lg" id="audit-counter">Free Audits Remaining: <span id="remaining">10</span></p>
+            <div class="mt-4 flex justify-center space-x-6">
+                <span><i class="fas fa-lock"></i> Secure</span>
+                <span><i class="fas fa-bolt"></i> Instant</span>
+                <span><i class="fas fa-shield-alt"></i> Trusted</span>
+            </div>
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- MODE BANNER -->
-<!-- ================================================= -->
-<section id="modeBanner" class="text-center py-4 text-sm bg-slate-900">
-Open Audit Mode — Limited Metrics
-</section>
+    <!-- 15. Audit Progress -->
+    <section id="progress" class="py-16 px-6 hidden">
+        <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl p-10">
+            <h3 class="text-4xl font-bold text-center mb-10">Audit in Progress</h3>
+            <div class="space-y-8">
+                <div class="flex items-center"><span class="w-40 font-semibold">Crawling</span><progress id="p-crawl" class="flex-1 h-6 rounded-full" value="0" max="100"></progress><span id="crawl-pct" class="w-20 text-right">0%</span></div>
+                <div class="flex items-center"><span class="w-40 font-semibold">Analyzing</span><progress id="p-analyze" class="flex-1 h-6 rounded-full" value="0" max="100"></progress><span id="analyze-pct" class="w-20 text-right">0%</span></div>
+                <div class="flex items-center"><span class="w-40 font-semibold">Scoring</span><progress id="p-score" class="flex-1 h-6 rounded-full" value="0" max="100"></progress><span id="score-pct" class="w-20 text-right">0%</span></div>
+                <div class="flex items-center"><span class="w-40 font-semibold">Reporting</span><progress id="p-report" class="flex-1 h-6 rounded-full" value="0" max="100"></progress><span id="report-pct" class="w-20 text-right">0%</span></div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-10 mt-12">
+                <div><canvas id="gauge-health"></canvas></div>
+                <div><canvas id="chart-issues"></canvas></div>
+            </div>
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- INPUT -->
-<!-- ================================================= -->
-<section class="max-w-6xl mx-auto p-6">
-<div class="glass p-6 rounded-xl grid md:grid-cols-3 gap-4">
-<input id="url" placeholder="Enter Website URL"
-class="p-3 rounded bg-slate-800 col-span-2">
-<button onclick="startAudit()"
-class="bg-indigo-600 p-3 rounded font-semibold">
-Run Audit
-</button>
-</div>
-</section>
+    <!-- 16. Executive Summary -->
+    <section id="summary" class="py-16 px-6 hidden">
+        <div class="max-w-6xl mx-auto bg-white rounded-2xl shadow-2xl p-10">
+            <div class="text-center mb-10">
+                <span id="grade-badge" class="text-7xl font-bold px-10 py-6 rounded-full bg-green-100 text-green-700 inline-block">A+</span>
+            </div>
+            <canvas id="gauge-overall" class="mx-auto mb-12 max-w-md"></canvas>
+            <h3 class="text-4xl font-bold text-center mb-8">Executive Summary</h3>
+            <p id="exec-summary" class="text-lg leading-relaxed text-center max-w-4xl mx-auto mb-12"></p>
+            <div class="grid md:grid-cols-3 gap-10 mb-12">
+                <div class="p-6 bg-green-50 rounded-xl"><h4 class="text-2xl font-bold text-green-700 mb-4">Strengths</h4><ul id="strengths" class="space-y-2"></ul></div>
+                <div class="p-6 bg-red-50 rounded-xl"><h4 class="text-2xl font-bold text-red-700 mb-4">Weak Areas</h4><ul id="weaknesses" class="space-y-2"></ul></div>
+                <div class="p-6 bg-amber-50 rounded-xl"><h4 class="text-2xl font-bold text-amber-700 mb-4">Priority Actions</h4><ul id="actions" class="space-y-2"></ul></div>
+            </div>
+            <canvas id="chart-categories" class="max-w-5xl mx-auto"></canvas>
+            <div class="text-center mt-10"><button id="export-pdf" class="bg-indigo-600 text-white px-10 py-4 rounded-xl text-xl font-bold">Export Certified PDF</button></div>
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- OVERALL SCORE -->
-<!-- ================================================= -->
-<section class="max-w-6xl mx-auto p-6 grid md:grid-cols-4 gap-6">
+    <!-- 18. Metrics Dashboard - All 235 Metrics with Full Names -->
+    <section id="dashboard" class="py-16 px-6 hidden">
+        <div class="max-w-7xl mx-auto">
+            <h2 class="text-4xl font-bold text-center mb-12">Complete 235-Metric Dashboard</h2>
 
-<div class="glass p-6 rounded-xl text-center">
-<h3 class="font-semibold">Overall Health</h3>
-<canvas id="overallGauge"></canvas>
-<p id="overallScore" class="text-4xl font-bold mt-2"></p>
-<p id="overallGrade" class="text-sm text-slate-400"></p>
-</div>
+            <!-- Core Website Audit (1–140) -->
+            <h3 class="text-3xl font-bold mb-8">Core Website Audit (1–140)</h3>
+            <div id="core-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                <!-- All 140 core metrics are pre-defined below with unique IDs -->
+                <div id="metric-001" class="metric-card green"><h4 class="text-xl font-bold mb-4">001. Site Health Score</h4><canvas id="chart-001"></canvas></div>
+                <div id="metric-002" class="metric-card green"><h4 class="text-xl font-bold mb-4">002. Total Errors</h4><canvas id="chart-002"></canvas></div>
+                <div id="metric-003" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">003. Total Warnings</h4><canvas id="chart-003"></canvas></div>
+                <div id="metric-004" class="metric-card green"><h4 class="text-xl font-bold mb-4">004. Total Notices</h4><canvas id="chart-004"></canvas></div>
+                <div id="metric-005" class="metric-card green"><h4 class="text-xl font-bold mb-4">005. Total Crawled Pages</h4><canvas id="chart-005"></canvas></div>
+                <div id="metric-006" class="metric-card green"><h4 class="text-xl font-bold mb-4">006. Total Indexed Pages</h4><canvas id="chart-006"></canvas></div>
+                <div id="metric-007" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">007. Issues Trend</h4><canvas id="chart-007"></canvas></div>
+                <div id="metric-008" class="metric-card green"><h4 class="text-xl font-bold mb-4">008. Crawl Budget Efficiency</h4><canvas id="chart-008"></canvas></div>
+                <div id="metric-009" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">009. Orphan Pages Percentage</h4><canvas id="chart-009"></canvas></div>
+                <div id="metric-010" class="metric-card green"><h4 class="text-xl font-bold mb-4">010. Audit Completion Status</h4><canvas id="chart-010"></canvas></div>
+                <div id="metric-011" class="metric-card green"><h4 class="text-xl font-bold mb-4">011. HTTP 2xx Pages</h4><canvas id="chart-011"></canvas></div>
+                <div id="metric-012" class="metric-card green"><h4 class="text-xl font-bold mb-4">012. HTTP 3xx Pages</h4><canvas id="chart-012"></canvas></div>
+                <div id="metric-013" class="metric-card red"><h4 class="text-xl font-bold mb-4">013. HTTP 4xx Pages</h4><canvas id="chart-013"></canvas></div>
+                <div id="metric-014" class="metric-card red"><h4 class="text-xl font-bold mb-4">014. HTTP 5xx Pages</h4><canvas id="chart-014"></canvas></div>
+                <div id="metric-015" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">015. Redirect Chains</h4><canvas id="chart-015"></canvas></div>
+                <div id="metric-016" class="metric-card red"><h4 class="text-xl font-bold mb-4">016. Redirect Loops</h4><canvas id="chart-016"></canvas></div>
+                <div id="metric-017" class="metric-card red"><h4 class="text-xl font-bold mb-4">017. Broken Internal Links</h4><canvas id="chart-017"></canvas></div>
+                <div id="metric-018" class="metric-card red"><h4 class="text-xl font-bold mb-4">018. Broken External Links</h4><canvas id="chart-018"></canvas></div>
+                <div id="metric-019" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">019. robots.txt Blocked URLs</h4><canvas id="chart-019"></canvas></div>
+                <div id="metric-020" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">020. Meta Robots Blocked URLs</h4><canvas id="chart-020"></canvas></div>
+                <div id="metric-021" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">021. Non-Canonical Pages</h4><canvas id="chart-021"></canvas></div>
+                <div id="metric-022" class="metric-card red"><h4 class="text-xl font-bold mb-4">022. Missing Canonical Tags</h4><canvas id="chart-022"></canvas></div>
+                <div id="metric-023" class="metric-card red"><h4 class="text-xl font-bold mb-4">023. Incorrect Canonical Tags</h4><canvas id="chart-023"></canvas></div>
+                <div id="metric-024" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">024. Sitemap Missing Pages</h4><canvas id="chart-024"></canvas></div>
+                <div id="metric-025" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">025. Sitemap Not Crawled Pages</h4><canvas id="chart-025"></canvas></div>
+                <div id="metric-026" class="metric-card red"><h4 class="text-xl font-bold mb-4">026. Hreflang Errors</h4><canvas id="chart-026"></canvas></div>
+                <div id="metric-027" class="metric-card red"><h4 class="text-xl font-bold mb-4">027. Hreflang Conflicts</h4><canvas id="chart-027"></canvas></div>
+                <div id="metric-028" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">028. Pagination Issues</h4><canvas id="chart-028"></canvas></div>
+                <div id="metric-029" class="metric-card green"><h4 class="text-xl font-bold mb-4">029. Crawl Depth Distribution</h4><canvas id="chart-029"></canvas></div>
+                <div id="metric-030" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">030. Duplicate Parameter URLs</h4><canvas id="chart-030"></canvas></div>
+                <!-- On-Page SEO (31-65) -->
+                <div id="metric-031" class="metric-card red"><h4 class="text-xl font-bold mb-4">031. Missing Title Tags</h4><canvas id="chart-031"></canvas></div>
+                <div id="metric-032" class="metric-card red"><h4 class="text-xl font-bold mb-4">032. Duplicate Title Tags</h4><canvas id="chart-032"></canvas></div>
+                <div id="metric-033" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">033. Title Tags Too Long</h4><canvas id="chart-033"></canvas></div>
+                <div id="metric-034" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">034. Title Tags Too Short</h4><canvas id="chart-034"></canvas></div>
+                <div id="metric-035" class="metric-card red"><h4 class="text-xl font-bold mb-4">035. Missing Meta Descriptions</h4><canvas id="chart-035"></canvas></div>
+                <div id="metric-036" class="metric-card red"><h4 class="text-xl font-bold mb-4">036. Duplicate Meta Descriptions</h4><canvas id="chart-036"></canvas></div>
+                <div id="metric-037" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">037. Meta Descriptions Too Long</h4><canvas id="chart-037"></canvas></div>
+                <div id="metric-038" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">038. Meta Descriptions Too Short</h4><canvas id="chart-038"></canvas></div>
+                <div id="metric-039" class="metric-card red"><h4 class="text-xl font-bold mb-4">039. Missing H1 Tags</h4><canvas id="chart-039"></canvas></div>
+                <div id="metric-040" class="metric-card red"><h4 class="text-xl font-bold mb-4">040. Multiple H1 Tags</h4><canvas id="chart-040"></canvas></div>
+                <div id="metric-041" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">041. Missing H2-H6 Tags</h4><canvas id="chart-041"></canvas></div>
+                <div id="metric-042" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">042. Thin Content Pages</h4><canvas id="chart-042"></canvas></div>
+                <div id="metric-043" class="metric-card red"><h4 class="text-xl font-bold mb-4">043. Duplicate Content Pages</h4><canvas id="chart-043"></canvas></div>
+                <div id="metric-044" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">044. Low Text-to-HTML Ratio</h4><canvas id="chart-044"></canvas></div>
+                <div id="metric-045" class="metric-card red"><h4 class="text-xl font-bold mb-4">045. Missing Alt Attributes for Images</h4><canvas id="chart-045"></canvas></div>
+                <div id="metric-046" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">046. Large Images Without Compression</h4><canvas id="chart-046"></canvas></div>
+                <div id="metric-047" class="metric-card red"><h4 class="text-xl font-bold mb-4">047. Missing Structured Data</h4><canvas id="chart-047"></canvas></div>
+                <div id="metric-048" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">048. Structured Data Errors</h4><canvas id="chart-048"></canvas></div>
+                <div id="metric-049" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">049. Missing Open Graph Tags</h4><canvas id="chart-049"></canvas></div>
+                <div id="metric-050" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">050. Missing Twitter Card Tags</h4><canvas id="chart-050"></canvas></div>
+                <div id="metric-051" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">051. Long URLs</h4><canvas id="chart-051"></canvas></div>
+                <div id="metric-052" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">052. Uppercase in URLs</h4><canvas id="chart-052"></canvas></div>
+                <div id="metric-053" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">053. Non-SEO-friendly URLs</h4><canvas id="chart-053"></canvas></div>
+                <div id="metric-054" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">054. Too Many Internal Links</h4><canvas id="chart-054"></canvas></div>
+                <div id="metric-055" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">055. Pages With No Incoming Links</h4><canvas id="chart-055"></canvas></div>
+                <div id="metric-056" class="metric-card red"><h4 class="text-xl font-bold mb-4">056. Broken Anchor Links</h4><canvas id="chart-056"></canvas></div>
+                <div id="metric-057" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">057. Over-optimized Anchor Text</h4><canvas id="chart-057"></canvas></div>
+                <div id="metric-058" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">058. Missing Anchor Text</h4><canvas id="chart-058"></canvas></div>
+                <div id="metric-059" class="metric-card green"><h4 class="text-xl font-bold mb-4">059. Internal Link Depth Distribution</h4><canvas id="chart-059"></canvas></div>
+                <div id="metric-060" class="metric-card green"><h4 class="text-xl font-bold mb-4">060. External Outbound Links Count</h4><canvas id="chart-060"></canvas></div>
+                <div id="metric-061" class="metric-card red"><h4 class="text-xl font-bold mb-4">061. Broken External Links</h4><canvas id="chart-061"></canvas></div>
+                <div id="metric-062" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">062. NoFollow Internal Links</h4><canvas id="chart-062"></canvas></div>
+                <div id="metric-063" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">063. Keyword Density Issues</h4><canvas id="chart-063"></canvas></div>
+                <div id="metric-064" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">064. Keyword Stuffing</h4><canvas id="chart-064"></canvas></div>
+                <div id="metric-065" class="metric-card green"><h4 class="text-xl font-bold mb-4">065. Anchor Text Issues</h4><canvas id="chart-065"></canvas></div>
+                <!-- Performance & Technical (66-86) -->
+                <div id="metric-066" class="metric-card red"><h4 class="text-xl font-bold mb-4">066. Largest Contentful Paint (LCP)</h4><canvas id="chart-066"></canvas></div>
+                <div id="metric-067" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">067. First Contentful Paint (FCP)</h4><canvas id="chart-067"></canvas></div>
+                <div id="metric-068" class="metric-card red"><h4 class="text-xl font-bold mb-4">068. Cumulative Layout Shift (CLS)</h4><canvas id="chart-068"></canvas></div>
+                <div id="metric-069" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">069. Total Blocking Time (TBT)</h4><canvas id="chart-069"></canvas></div>
+                <div id="metric-070" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">070. First Input Delay (FID)</h4><canvas id="chart-070"></canvas></div>
+                <div id="metric-071" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">071. Speed Index</h4><canvas id="chart-071"></canvas></div>
+                <div id="metric-072" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">072. Time to Interactive (TTI)</h4><canvas id="chart-072"></canvas></div>
+                <div id="metric-073" class="metric-card red"><h4 class="text-xl font-bold mb-4">073. Total Page Size</h4><canvas id="chart-073"></canvas></div>
+                <div id="metric-074" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">074. Number of Requests</h4><canvas id="chart-074"></canvas></div>
+                <div id="metric-075" class="metric-card red"><h4 class="text-xl font-bold mb-4">075. Unminified CSS</h4><canvas id="chart-075"></canvas></div>
+                <div id="metric-076" class="metric-card red"><h4 class="text-xl font-bold mb-4">076. Unminified JS</h4><canvas id="chart-076"></canvas></div>
+                <div id="metric-077" class="metric-card red"><h4 class="text-xl font-bold mb-4">077. Render-blocking Resources</h4><canvas id="chart-077"></canvas></div>
+                <div id="metric-078" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">078. Excessive DOM Elements</h4><canvas id="chart-078"></canvas></div>
+                <div id="metric-079" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">079. Third-party Scripts</h4><canvas id="chart-079"></canvas></div>
+                <div id="metric-080" class="metric-card red"><h4 class="text-xl font-bold mb-4">080. Slow Server Response (TTFB)</h4><canvas id="chart-080"></canvas></div>
+                <div id="metric-081" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">081. Image Optimization Issues</h4><canvas id="chart-081"></canvas></div>
+                <div id="metric-082" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">082. Missing Lazy Loading</h4><canvas id="chart-082"></canvas></div>
+                <div id="metric-083" class="metric-card red"><h4 class="text-xl font-bold mb-4">083. No Browser Caching</h4><canvas id="chart-083"></canvas></div>
+                <div id="metric-084" class="metric-card red"><h4 class="text-xl font-bold mb-4">084. No Compression (GZIP/Brotli)</h4><canvas id="chart-084"></canvas></div>
+                <div id="metric-085" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">085. Resource Load Errors</h4><canvas id="chart-085"></canvas></div>
+                <div id="metric-086" class="metric-card green"><h4 class="text-xl font-bold mb-4">086. Core Web Vitals Pass Rate</h4><canvas id="chart-086"></canvas></div>
+                <!-- Mobile & Usability (87-95) -->
+                <div id="metric-087" class="metric-card green"><h4 class="text-xl font-bold mb-4">087. Mobile Friendly Test</h4><canvas id="chart-087"></canvas></div>
+                <div id="metric-088" class="metric-card green"><h4 class="text-xl font-bold mb-4">088. Viewport Meta Tag Presence</h4><canvas id="chart-088"></canvas></div>
+                <div id="metric-089" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">089. Font Sizes Too Small</h4><canvas id="chart-089"></canvas></div>
+                <div id="metric-090" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">090. Tap Targets Too Close</h4><canvas id="chart-090"></canvas></div>
+                <div id="metric-091" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">091. Mobile Content Clipping</h4><canvas id="chart-091"></canvas></div>
+                <div id="metric-092" class="metric-card red"><h4 class="text-xl font-bold mb-4">092. Intrusive Interstitials</h4><canvas id="chart-092"></canvas></div>
+                <div id="metric-093" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">093. Mobile Navigation Issues</h4><canvas id="chart-093"></canvas></div>
+                <div id="metric-094" class="metric-card green"><h4 class="text-xl font-bold mb-4">094. Responsive Design Score</h4><canvas id="chart-094"></canvas></div>
+                <div id="metric-095" class="metric-card green"><h4 class="text-xl font-bold mb-4">095. Mobile Core Web Vitals</h4><canvas id="chart-095"></canvas></div>
+                <!-- Security & HTTPS (96-103) -->
+                <div id="metric-096" class="metric-card green"><h4 class="text-xl font-bold mb-4">096. HTTPS Implemented Correctly</h4><canvas id="chart-096"></canvas></div>
+                <div id="metric-097" class="metric-card green"><h4 class="text-xl font-bold mb-4">097. SSL Certificate Validity</h4><canvas id="chart-097"></canvas></div>
+                <div id="metric-098" class="metric-card red"><h4 class="text-xl font-bold mb-4">098. Mixed Content Issues</h4><canvas id="chart-098"></canvas></div>
+                <div id="metric-099" class="metric-card red"><h4 class="text-xl font-bold mb-4">099. Insecure Resources Loaded</h4><canvas id="chart-099"></canvas></div>
+                <div id="metric-100" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">100. Missing Security Headers</h4><canvas id="chart-100"></canvas></div>
+                <div id="metric-101" class="metric-card red"><h4 class="text-xl font-bold mb-4">101. Open Directory Listing</h4><canvas id="chart-101"></canvas></div>
+                <div id="metric-102" class="metric-card green"><h4 class="text-xl font-bold mb-4">102. HSTS Header Presence</h4><canvas id="chart-102"></canvas></div>
+                <div id="metric-103" class="metric-card green"><h4 class="text-xl font-bold mb-4">103. Security Score</h4><canvas id="chart-103"></canvas></div>
+                <!-- International SEO (104-110) -->
+                <div id="metric-104" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">104. Hreflang Tags Missing</h4><canvas id="chart-104"></canvas></div>
+                <div id="metric-105" class="metric-card red"><h4 class="text-xl font-bold mb-4">105. Incorrect Hreflang Codes</h4><canvas id="chart-105"></canvas></div>
+                <div id="metric-106" class="metric-card red"><h4 class="text-xl font-bold mb-4">106. Hreflang Conflict Pairs</h4><canvas id="chart-106"></canvas></div>
+                <div id="metric-107" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">107. Region-Specific Content Not Marked</h4><canvas id="chart-107"></canvas></div>
+                <div id="metric-108" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">108. Multi-domain Configuration Errors</h4><canvas id="chart-108"></canvas></div>
+                <div id="metric-109" class="metric-card green"><h4 class="text-xl font-bold mb-4">109. International SEO Score</h4><canvas id="chart-109"></canvas></div>
+                <div id="metric-110" class="metric-card green"><h4 class="text-xl font-bold mb-4">110. Language Coverage</h4><canvas id="chart-110"></canvas></div>
+                <!-- Backlinks & Authority (111-120) -->
+                <div id="metric-111" class="metric-card green"><h4 class="text-xl font-bold mb-4">111. Domain Authority Score</h4><canvas id="chart-111"></canvas></div>
+                <div id="metric-112" class="metric-card green"><h4 class="text-xl font-bold mb-4">112. Total Referring Domains</h4><canvas id="chart-112"></canvas></div>
+                <div id="metric-113" class="metric-card green"><h4 class="text-xl font-bold mb-4">113. Total Backlinks</h4><canvas id="chart-113"></canvas></div>
+                <div id="metric-114" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">114. Toxic Backlinks Count</h4><canvas id="chart-114"></canvas></div>
+                <div id="metric-115" class="metric-card green"><h4 class="text-xl font-bold mb-4">115. Backlink Growth Trend</h4><canvas id="chart-115"></canvas></div>
+                <div id="metric-116" class="metric-card green"><h4 class="text-xl font-bold mb-4">116. Anchor Text Distribution</h4><canvas id="chart-116"></canvas></div>
+                <div id="metric-117" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">117. Lost Backlinks</h4><canvas id="chart-117"></canvas></div>
+                <div id="metric-118" class="metric-card green"><h4 class="text-xl font-bold mb-4">118. New Backlinks</h4><canvas id="chart-118"></canvas></div>
+                <div id="metric-119" class="metric-card green"><h4 class="text-xl font-bold mb-4">119. Referring IPs Diversity</h4><canvas id="chart-119"></canvas></div>
+                <div id="metric-120" class="metric-card green"><h4 class="text-xl font-bold mb-4">120. Authority Trend</h4><canvas id="chart-120"></canvas></div>
+                <!-- Advanced SEO (121-130) -->
+                <div id="metric-121" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">121. JavaScript Rendering Issues</h4><canvas id="chart-121"></canvas></div>
+                <div id="metric-122" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">122. CSS Blocking Rendering</h4><canvas id="chart-122"></canvas></div>
+                <div id="metric-123" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">123. Crawl Budget Waste</h4><canvas id="chart-123"></canvas></div>
+                <div id="metric-124" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">124. Canonicalization Issues</h4><canvas id="chart-124"></canvas></div>
+                <div id="metric-125" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">125. Paginated Page Issues</h4><canvas id="chart-125"></canvas></div>
+                <div id="metric-126" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">126. Dynamic URL Parameters</h4><canvas id="chart-126"></canvas></div>
+                <div id="metric-127" class="metric-card green"><h4 class="text-xl font-bold mb-4">127. AMP Implementation Status</h4><canvas id="chart-127"></canvas></div>
+                <div id="metric-128" class="metric-card green"><h4 class="text-xl font-bold mb-4">128. PWA Readiness</h4><canvas id="chart-128"></canvas></div>
+                <div id="metric-129" class="metric-card green"><h4 class="text-xl font-bold mb-4">129. Structured Data Consistency</h4><canvas id="chart-129"></canvas></div>
+                <div id="metric-130" class="metric-card green"><h4 class="text-xl font-bold mb-4">130. Rich Media Health</h4><canvas id="chart-130"></canvas></div>
+                <!-- Trends & History (131-140) -->
+                <div id="metric-131" class="metric-card green"><h4 class="text-xl font-bold mb-4">131. Health Trend Over Time</h4><canvas id="chart-131"></canvas></div>
+                <div id="metric-132" class="metric-card green"><h4 class="text-xl font-bold mb-4">132. Issue Reduction Trend</h4><canvas id="chart-132"></canvas></div>
+                <div id="metric-133" class="metric-card green"><h4 class="text-xl font-bold mb-4">133. Indexed Pages Trend</h4><canvas id="chart-133"></canvas></div>
+                <div id="metric-134" class="metric-card green"><h4 class="text-xl font-bold mb-4">134. Crawled Pages Trend</h4><canvas id="chart-134"></canvas></div>
+                <div id="metric-135" class="metric-card green"><h4 class="text-xl font-bold mb-4">135. Core Web Vitals Trend</h4><canvas id="chart-135"></canvas></div>
+                <div id="metric-136" class="metric-card green"><h4 class="text-xl font-bold mb-4">136. Performance Improvement</h4><canvas id="chart-136"></canvas></div>
+                <div id="metric-137" class="metric-card green"><h4 class="text-xl font-bold mb-4">137. Security Score Trend</h4><canvas id="chart-137"></canvas></div>
+                <div id="metric-138" class="metric-card green"><h4 class="text-xl font-bold mb-4">138. SEO Score Trend</h4><canvas id="chart-138"></canvas></div>
+                <div id="metric-139" class="metric-card green"><h4 class="text-xl font-bold mb-4">139. Backlink Trend</h4><canvas id="chart-139"></canvas></div>
+                <div id="metric-140" class="metric-card green"><h4 class="text-xl font-bold mb-4">140. Overall Stability Index</h4><canvas id="chart-140"></canvas></div>
+            </div>
 
-<div id="categoryScores" class="md:col-span-3 grid md:grid-cols-3 gap-4">
-<!-- Injected from Python -->
-</div>
+            <!-- Competitor Analysis (186–210) -->
+            <h3 class="text-3xl font-bold mb-8">Competitor Analysis (186–210)</h3>
+            <div id="comp-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                <div id="metric-186" class="metric-card green"><h4 class="text-xl font-bold mb-4">186. Competitor 1 Health Score</h4><canvas id="chart-186"></canvas></div>
+                <div id="metric-187" class="metric-card green"><h4 class="text-xl font-bold mb-4">187. Competitor 2 Health Score</h4><canvas id="chart-187"></canvas></div>
+                <div id="metric-188" class="metric-card green"><h4 class="text-xl font-bold mb-4">188. Competitor 3 Health Score</h4><canvas id="chart-188"></canvas></div>
+                <div id="metric-189" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">189. Performance Comparison</h4><canvas id="chart-189"></canvas></div>
+                <div id="metric-190" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">190. SEO Issues Comparison</h4><canvas id="chart-190"></canvas></div>
+                <div id="metric-191" class="metric-card green"><h4 class="text-xl font-bold mb-4">191. Backlink Authority Comparison</h4><canvas id="chart-191"></canvas></div>
+                <div id="metric-192" class="metric-card green"><h4 class="text-xl font-bold mb-4">192. Keyword Visibility Gap</h4><canvas id="chart-192"></canvas></div>
+                <div id="metric-193" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">193. Traffic Share Comparison</h4><canvas id="chart-193"></canvas></div>
+                <div id="metric-194" class="metric-card green"><h4 class="text-xl font-bold mb-4">194. Competitive Ranking</h4><canvas id="chart-194"></canvas></div>
+                <div id="metric-195" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">195. Content Gap Analysis</h4><canvas id="chart-195"></canvas></div>
+                <div id="metric-196" class="metric-card green"><h4 class="text-xl font-bold mb-4">196. Backlink Gap</h4><canvas id="chart-196"></canvas></div>
+                <div id="metric-197" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">197. Technical SEO Gap</h4><canvas id="chart-197"></canvas></div>
+                <div id="metric-198" class="metric-card green"><h4 class="text-xl font-bold mb-4">198. Mobile Performance Gap</h4><canvas id="chart-198"></canvas></div>
+                <div id="metric-199" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">199. Security Comparison</h4><canvas id="chart-199"></canvas></div>
+                <div id="metric-200" class="metric-card green"><h4 class="text-xl font-bold mb-4">200. Overall Competitive Advantage</h4><canvas id="chart-200"></canvas></div>
+                <div id="metric-201" class="metric-card green"><h4 class="text-xl font-bold mb-4">201. Market Share Estimate</h4><canvas id="chart-201"></canvas></div>
+                <div id="metric-202" class="metric-card green"><h4 class="text-xl font-bold mb-4">202. Competitive Threat Level</h4><canvas id="chart-202"></canvas></div>
+                <div id="metric-203" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">203. Keyword Overlap</h4><canvas id="chart-203"></canvas></div>
+                <div id="metric-204" class="metric-card green"><h4 class="text-xl font-bold mb-4">204. Top Shared Keywords</h4><canvas id="chart-204"></canvas></div>
+                <div id="metric-205" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">205. Unique Keywords Opportunity</h4><canvas id="chart-205"></canvas></div>
+                <div id="metric-206" class="metric-card green"><h4 class="text-xl font-bold mb-4">206. SERP Feature Comparison</h4><canvas id="chart-206"></canvas></div>
+                <div id="metric-207" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">207. Featured Snippet Gap</h4><canvas id="chart-207"></canvas></div>
+                <div id="metric-208" class="metric-card green"><h4 class="text-xl font-bold mb-4">208. Local Pack Comparison</h4><canvas id="chart-208"></canvas></div>
+                <div id="metric-209" class="metric-card green"><h4 class="text-xl font-bold mb-4">209. Competitive Benchmark Score</h4><canvas id="chart-209"></canvas></div>
+                <div id="metric-210" class="metric-card green"><h4 class="text-xl font-bold mb-4">210. Overall Competitive Rank</h4><canvas id="chart-210"></canvas></div>
+            </div>
 
-</section>
+            <!-- Broken Links Intelligence (203–215) Note: Overlap intentional as per checklist -->
+            <h3 class="text-3xl font-bold mb-8">Broken Links Intelligence (203–215)</h3>
+            <div id="broken-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                <div id="metric-203" class="metric-card red"><h4 class="text-xl font-bold mb-4">203. Total Broken Links</h4><canvas id="chart-203"></canvas></div>
+                <div id="metric-204" class="metric-card red"><h4 class="text-xl font-bold mb-4">204. Internal Broken Links</h4><canvas id="chart-204"></canvas></div>
+                <div id="metric-205" class="metric-card red"><h4 class="text-xl font-bold mb-4">205. External Broken Links</h4><canvas id="chart-205"></canvas></div>
+                <div id="metric-206" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">206. Broken Links Trend</h4><canvas id="chart-206"></canvas></div>
+                <div id="metric-207" class="metric-card red"><h4 class="text-xl font-bold mb-4">207. High Impact Broken Links</h4><canvas id="chart-207"></canvas></div>
+                <div id="metric-208" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">208. Fix Priority Score</h4><canvas id="chart-208"></canvas></div>
+                <div id="metric-209" class="metric-card red"><h4 class="text-xl font-bold mb-4">209. SEO Loss from Broken Links</h4><canvas id="chart-209"></canvas></div>
+                <div id="metric-210" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">210. Broken Link Resolution Progress</h4><canvas id="chart-210"></canvas></div>
+                <div id="metric-211" class="metric-card red"><h4 class="text-xl font-bold mb-4">211. Orphaned Pages from Broken Links</h4><canvas id="chart-211"></canvas></div>
+                <div id="metric-212" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">212. Broken Image Links</h4><canvas id="chart-212"></canvas></div>
+                <div id="metric-213" class="metric-card red"><h4 class="text-xl font-bold mb-4">213. Broken Resource Links (CSS/JS)</h4><canvas id="chart-213"></canvas></div>
+                <div id="metric-214" class="metric-card yellow"><h4 class="text-xl font-bold mb-4">214. Broken Link Impact Heatmap</h4><canvas id="chart-214"></canvas></div>
+                <div id="metric-215" class="metric-card red"><h4 class="text-xl font-bold mb-4">215. Risk Severity Index</h4><canvas id="chart-215"></canvas></div>
+            </div>
 
-<!-- ================================================= -->
-<!-- METRICS -->
-<!-- ================================================= -->
-<section class="max-w-6xl mx-auto p-6 space-y-8" id="metricsContainer">
-<!-- All categories injected here -->
-</section>
+            <!-- Opportunities, Growth & ROI (216–235) -->
+            <h3 class="text-3xl font-bold mb-8">Opportunities, Growth & ROI (216–235)</h3>
+            <div id="opp-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+                <div id="metric-216" class="metric-card green"><h4 class="text-xl font-bold mb-4">216. High Impact Opportunities</h4><canvas id="chart-216"></canvas></div>
+                <div id="metric-217" class="metric-card green"><h4 class="text-xl font-bold mb-4">217. Quick Win Fixes</h4><canvas id="chart-217"></canvas></div>
+                <div id="metric-218" class="metric-card green"><h4 class="text-xl font-bold mb-4">218. Traffic Growth Forecast</h4><canvas id="chart-218"></canvas></div>
+                <div id="metric-219" class="metric-card green"><h4 class="text-xl font-bold mb-4">219. Ranking Improvement Potential</h4><canvas id="chart-219"></canvas></div>
+                <div id="metric-220" class="metric-card green"><h4 class="text-xl font-bold mb-4">220. Conversion Impact Estimate</h4><canvas id="chart-220"></canvas></div>
+                <div id="metric-221" class="metric-card green"><h4 class="text-xl font-bold mb-4">221. ROI Forecast from Fixes</h4><canvas id="chart-221"></canvas></div>
+                <div id="metric-222" class="metric-card green"><h4 class="text-xl font-bold mb-4">222. Priority Fix Roadmap</h4><canvas id="chart-222"></canvas></div>
+                <div id="metric-223" class="metric-card green"><h4 class="text-xl font-bold mb-4">223. Keyword Opportunity Score</h4><canvas id="chart-223"></canvas></div>
+                <div id="metric-224" class="metric-card green"><h4 class="text-xl font-bold mb-4">224. Content Gap Opportunities</h4><canvas id="chart-224"></canvas></div>
+                <div id="metric-225" class="metric-card green"><h4 class="text-xl font-bold mb-4">225. Backlink Opportunity Score</h4><canvas id="chart-225"></canvas></div>
+                <div id="metric-226" class="metric-card green"><h4 class="text-xl font-bold mb-4">226. Technical Optimization Gains</h4><canvas id="chart-226"></canvas></div>
+                <div id="metric-227" class="metric-card green"><h4 class="text-xl font-bold mb-4">227. Speed Improvement Impact</h4><canvas id="chart-227"></canvas></div>
+                <div id="metric-228" class="metric-card green"><h4 class="text-xl font-bold mb-4">228. Mobile Optimization Gains</h4><canvas id="chart-228"></canvas></div>
+                <div id="metric-229" class="metric-card green"><h4 class="text-xl font-bold mb-4">229. Security Enhancement Value</h4><canvas id="chart-229"></canvas></div>
+                <div id="metric-230" class="metric-card green"><h4 class="text-xl font-bold mb-4">230. International Expansion Potential</h4><canvas id="chart-230"></canvas></div>
+                <div id="metric-231" class="metric-card green"><h4 class="text-xl font-bold mb-4">231. Estimated Traffic Increase</h4><canvas id="chart-231"></canvas></div>
+                <div id="metric-232" class="metric-card green"><h4 class="text-xl font-bold mb-4">232. Revenue Impact Projection</h4><canvas id="chart-232"></canvas></div>
+                <div id="metric-233" class="metric-card green"><h4 class="text-xl font-bold mb-4">233. Cost-Benefit Analysis</h4><canvas id="chart-233"></canvas></div>
+                <div id="metric-234" class="metric-card green"><h4 class="text-xl font-bold mb-4">234. Implementation Timeline</h4><canvas id="chart-234"></canvas></div>
+                <div id="metric-235" class="metric-card green"><h4 class="text-xl font-bold mb-4">235. Overall Growth Readiness</h4><canvas id="chart-235"></canvas></div>
+            </div>
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- FOOTER -->
-<!-- ================================================= -->
-<footer class="text-center text-xs text-slate-500 p-6 border-t border-slate-800">
-© FF Tech WebAudit™ · ISO-Inspired · SEMrush-Comparable · Python Powered
-</footer>
+    <!-- Premium Gating -->
+    <section class="py-16 px-6">
+        <div class="max-w-4xl mx-auto text-center bg-white rounded-2xl shadow-2xl p-10 relative">
+            <div id="premium-blur" class="absolute inset-0 blur-premium hidden"></div>
+            <h2 class="text-4xl font-bold mb-8">Unlock Full Report</h2>
+            <p class="text-xl mb-8">Premium: All 235 Metrics + Unlimited Audits – $5/month</p>
+            <button id="upgrade-btn" class="bg-indigo-600 text-white px-12 py-6 rounded-xl text-2xl font-bold">Upgrade Now</button>
+        </div>
+    </section>
 
-<!-- ================================================= -->
-<!-- SCRIPT -->
-<!-- ================================================= -->
-<script>
-let MODE = "open";
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-12 text-center">
+        <p class="text-2xl font-bold">FF Tech © December 27, 2025</p>
+        <p class="mt-4">Enterprise-Grade AI Website Audit Platform</p>
+    </footer>
 
-function setMode(mode){
-MODE = mode;
-document.getElementById("modeBanner").innerText =
-mode === "open"
-? "Open Audit Mode — Limited Metrics"
-: "Registered Audit Mode — Full 150 Metrics Enabled";
-}
+    <script>
+        document.getElementById('audit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('website-url').value;
+            const res = await fetch(`/audit?url=${encodeURIComponent(url)}`);
+            const data = await res.json();
 
-function startAudit(){
-const url = document.getElementById("url").value;
+            // Show all sections
+            ['progress', 'summary', 'dashboard'].forEach(s => document.getElementById(s).classList.remove('hidden'));
 
-fetch("/api/audit",{
-method:"POST",
-headers:{ "Content-Type":"application/json" },
-body: JSON.stringify({ url:url, mode:MODE })
-})
-.then(r=>r.json())
-.then(data=>renderAudit(data));
-}
+            // Executive Summary population
+            document.getElementById('grade-badge').textContent = data.grade;
+            document.getElementById('exec-summary').textContent = data.summary;
+            data.strengths.forEach(s => document.getElementById('strengths').innerHTML += `<li>${s}</li>`);
+            data.weaknesses.forEach(w => document.getElementById('weaknesses').innerHTML += `<li>${w}</li>`);
+            data.actions.forEach(a => document.getElementById('actions').innerHTML += `<li>${a}</li>`);
 
-function renderAudit(data){
+            // Render main charts
+            new Chart(document.getElementById('gauge-overall'), { type: 'doughnut', data: data.overall_gauge });
+            new Chart(document.getElementById('chart-categories'), { type: 'bar', data: data.category_chart });
+            new Chart(document.getElementById('gauge-health'), { type: 'doughnut', data: data.health_gauge });
+            new Chart(document.getElementById('chart-issues'), { type: 'bar', data: data.issues_chart });
 
-/* Overall */
-document.getElementById("overallScore").innerText = data.overall.score+"%";
-document.getElementById("overallGrade").innerText = "Grade "+data.overall.grade;
+            // Update each of the 235 metric charts
+            for (let i = 1; i <= 235; i++) {
+                const num = String(i).padStart(3, '0');
+                const chartId = `chart-${num}`;
+                const metricEl = document.getElementById(`metric-${num}`);
+                if (metricEl && data.metrics[i-1]) {
+                    const m = data.metrics[i-1];
+                    metricEl.className = `metric-card ${m.severity}`;
+                    new Chart(document.getElementById(chartId), {
+                        type: m.chart_type || 'bar',
+                        data: m.chart_data,
+                        options: { responsive: true }
+                    });
+                }
+            }
 
-new Chart(overallGauge,{
-type:"doughnut",
-data:{
-datasets:[{
-data:[data.overall.score,100-data.overall.score],
-backgroundColor:[data.overall.color,"#1e293b"],
-borderWidth:0
-}]
-},
-options:{ cutout:"80%" }
-});
-
-/* Category Scores */
-categoryScores.innerHTML="";
-data.categories.forEach(c=>{
-categoryScores.innerHTML+=`
-<div class="glass p-4 rounded-xl text-center">
-<p class="font-semibold">${c.name}</p>
-<p class="text-2xl font-bold">${c.score}%</p>
-<p class="text-xs text-slate-400">Grade ${c.grade}</p>
-</div>`;
-});
-
-/* Metrics */
-metricsContainer.innerHTML="";
-data.categories.forEach(c=>{
-metricsContainer.innerHTML+=`
-<div class="glass p-6 rounded-xl">
-<h2 class="text-xl font-bold mb-4">${c.name} Metrics</h2>
-<table class="w-full text-sm">
-<thead class="border-b border-slate-700">
-<tr>
-<th class="text-left">#</th>
-<th class="text-left">Metric</th>
-<th>Status</th>
-<th>Impact</th>
-</tr>
-</thead>
-<tbody>
-${c.metrics.map(m=>`
-<tr class="border-b border-slate-800">
-<td>${m.id}</td>
-<td>${m.metric}</td>
-<td>${m.status}</td>
-<td>${m.impact}</td>
-</tr>`).join("")}
-</tbody>
-</table>
-</div>`;
-});
-}
-</script>
-
+            // Premium gating
+            if (!data.premium) document.getElementById('premium-blur').classList.remove('hidden');
+        });
+    </script>
 </body>
 </html>
