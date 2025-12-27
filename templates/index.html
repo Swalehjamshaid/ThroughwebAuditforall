@@ -3,283 +3,295 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech — Professional Web Audit Dashboard</title>
-    
+    <title>FF Tech — Enterprise Web Audit Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { jakarta: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' } }
+                    colors: {
+                        brand: { 50: '#f0f7ff', 500: '#0070f3', 600: '#0060df', 700: '#0050bc' }
+                    }
                 }
             }
         }
     </script>
 
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; scroll-behavior: smooth; }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.4); }
-        .premium-blur { filter: blur(12px); pointer-events: none; opacity: 0.6; }
-        .gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        progress::-webkit-progress-value { background-color: #6366f1; border-radius: 20px; }
-        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 20px; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfdfe; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .premium-blur { filter: blur(10px); pointer-events: none; opacity: 0.6; }
+        .gradient-bg { background: linear-gradient(135deg, #0070f3 0%, #7928ca 100%); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        progress::-webkit-progress-value { background: #0070f3; border-radius: 10px; }
+        progress::-webkit-progress-bar { background: #e2e8f0; border-radius: 10px; }
     </style>
 </head>
-<body class="text-slate-900">
+<body class="text-slate-900 overflow-x-hidden">
 
-    <nav class="fixed w-full z-50 glass border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <nav class="fixed w-full z-50 glass border-b border-slate-200 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center text-white shadow-lg">
-                    <i class="fas fa-bolt"></i>
+                    <i class="fas fa-bolt text-lg"></i>
                 </div>
-                <h1 class="text-xl font-extrabold tracking-tighter">FF TECH <span class="font-normal text-slate-400">PRO</span></h1>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tighter">FF TECH</h1>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">AI Audit Engine</p>
+                </div>
             </div>
             
-            <div id="nav-auth" class="flex items-center gap-6">
-                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600 hover:text-brand-600">Login</button>
-                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-xl">Join Free</button>
+            <div id="auth-nav" class="flex items-center gap-6">
+                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600 hover:text-brand-500">Sign In</button>
+                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-xl hover:bg-slate-800 transition-all">Get Started</button>
             </div>
             
-            <div id="nav-user" class="hidden flex items-center gap-6">
-                <span class="text-sm font-semibold">Welcome, <span id="user-display-email" class="text-brand-600">User</span></span>
-                <button onclick="logout()" class="text-sm font-bold text-rose-600">Sign Out</button>
+            <div id="user-nav" class="hidden flex items-center gap-6">
+                <div class="text-right">
+                    <p class="text-xs font-bold text-slate-400 uppercase">Authenticated</p>
+                    <p id="user-display-email" class="text-sm font-bold text-brand-600"></p>
+                </div>
+                <button onclick="logout()" class="text-rose-600 font-bold text-sm"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </div>
     </nav>
 
-    <main class="pt-32 pb-20 px-6">
-        <div class="max-w-7xl mx-auto">
+    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+        
+        <section class="text-center mb-20">
+            <h2 class="text-5xl md:text-7xl font-black tracking-tight mb-6">Professional Web <span class="text-brand-500">Audits.</span></h2>
+            <p class="text-slate-500 text-lg max-w-2xl mx-auto mb-10">Instant 250+ signal analysis for SEO, Performance, and Security. Certified PDF reporting for international standards.</p>
             
-            <div class="text-center mb-16">
-                <h2 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">Technical <span class="text-transparent bg-clip-text gradient-bg">Audits.</span></h2>
-                <p class="text-slate-500 max-w-xl mx-auto text-lg">Crawl internal links, analyze security headers, and generate 5-page certified reports instantly.</p>
-                
-                <form id="audit-form" class="mt-10 max-w-3xl mx-auto p-3 glass rounded-3xl shadow-2xl flex flex-col md:flex-row gap-3">
-                    <input id="input-url" type="url" placeholder="https://yourwebsite.com" required
-                           class="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-lg">
-                    <button type="submit" class="gradient-bg text-white px-12 py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-200 hover:scale-105 transition-all">
-                        ANALYZE
-                    </button>
-                </form>
-                <div class="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    Free Audits Remaining: <span id="val-remaining" class="text-slate-900">10</span>
+            <form id="audit-form" class="max-w-3xl mx-auto p-2 glass rounded-3xl shadow-2xl flex flex-col md:flex-row gap-2 border-2 border-white">
+                <input id="website-url" type="url" placeholder="https://yourwebsite.com" required
+                       class="flex-1 px-6 py-4 rounded-2xl bg-transparent outline-none font-bold text-lg">
+                <button type="submit" class="gradient-bg text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-brand-500/20 hover:scale-[1.02] transition-all">
+                    RUN AUDIT
+                </button>
+            </form>
+            <div class="mt-4 flex justify-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                <span><i class="fas fa-check-circle text-brand-500"></i> Open Access</span>
+                <span><i class="fas fa-lock text-brand-500"></i> Enterprise Grade</span>
+                <span>Free Remaining: <span id="val-remaining" class="text-slate-900">10</span></span>
+            </div>
+        </section>
+
+        <div id="audit-loading" class="hidden max-w-4xl mx-auto glass rounded-[2.5rem] p-10 shadow-2xl mb-20 border-2 border-white">
+            <div class="flex justify-between items-end mb-6">
+                <div>
+                    <h3 class="text-2xl font-black mb-1">Crawl in Progress...</h3>
+                    <p id="progress-status" class="text-slate-400 font-medium italic">Analyzing SSL, TTFB, and 250+ technical metrics</p>
+                </div>
+                <span id="load-pct" class="text-4xl font-black text-brand-600">0%</span>
+            </div>
+            <progress id="bar-progress" class="w-full h-4" value="0" max="100"></progress>
+        </div>
+
+        <div id="audit-results" class="hidden space-y-8">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="glass rounded-[3rem] p-10 flex flex-col items-center justify-center text-center">
+                    <div class="relative w-48 h-48 mb-6">
+                        <canvas id="chart-overall"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="val-grade" class="text-6xl font-black text-slate-900">A+</span>
+                            <span id="val-score" class="text-slate-400 font-bold">95%</span>
+                        </div>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Health Score</p>
+                </div>
+
+                <div class="lg:col-span-2 glass rounded-[3rem] p-10 relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-6">
+                        <h3 class="text-3xl font-black tracking-tight">Executive Summary</h3>
+                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg">
+                            <i class="fas fa-file-pdf"></i> Download PDF
+                        </button>
+                    </div>
+                    <p id="val-summary" class="text-slate-500 text-lg leading-relaxed mb-10"></p>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bg-rose-50 p-6 rounded-3xl border border-rose-100 text-center">
+                            <div id="val-errors" class="text-3xl font-black text-rose-600">0</div>
+                            <div class="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Errors</div>
+                        </div>
+                        <div class="bg-amber-50 p-6 rounded-3xl border border-amber-100 text-center">
+                            <div id="val-warnings" class="text-3xl font-black text-amber-600">0</div>
+                            <div class="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Warnings</div>
+                        </div>
+                        <div class="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-center">
+                            <div id="val-notices" class="text-3xl font-black text-blue-600">0</div>
+                            <div class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Notices</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div id="audit-loading" class="hidden max-w-4xl mx-auto glass rounded-[2.5rem] p-10 border-2 border-white shadow-2xl mb-20">
-                <div class="flex justify-between items-end mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="glass rounded-[3rem] p-10">
+                    <h4 class="font-black text-xl mb-6">Categorical Breakdown</h4>
+                    <canvas id="chart-categories" height="200"></canvas>
+                </div>
+                <div class="bg-slate-900 rounded-[3rem] p-10 text-white">
+                    <h4 class="font-black text-xl mb-6 flex items-center gap-3">
+                        <i class="fas fa-lightbulb text-brand-500"></i> Priority Actions
+                    </h4>
+                    <ul id="val-priority" class="space-y-4 text-slate-400 font-medium"></ul>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-8">
+                    <h3 class="text-3xl font-black tracking-tighter">Technical Checkpoints <span class="text-slate-400 font-normal text-lg ml-2">(250 Metrics)</span></h3>
+                    <div id="badge-premium" class="hidden bg-brand-50 text-brand-600 px-4 py-2 rounded-xl text-xs font-black ring-1 ring-brand-200">
+                        <i class="fas fa-crown mr-2"></i> PREMIUM CONTENT UNLOCKED
+                    </div>
+                </div>
+                
+                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    </div>
+
+                <div id="paywall-lock" class="hidden mt-12 glass rounded-[4rem] p-20 text-center border-2 border-brand-200 shadow-2xl relative">
+                    <div class="absolute -top-10 left-1/2 -translate-x-1/2 w-20 h-20 bg-brand-500 rounded-full flex items-center justify-center text-white text-3xl shadow-xl">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h4 class="text-4xl font-black mb-4">Complete Your Analysis</h4>
+                    <p class="text-slate-500 text-lg mb-10 max-w-xl mx-auto">Public audits are restricted to top-level signals. Subscribe for $5/mo to unlock all 250 technical metrics and schedule daily PDF inbox delivery.</p>
+                    <div class="flex justify-center gap-4">
+                        <button onclick="checkout()" class="gradient-bg text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-2xl shadow-brand-500/20 hover:scale-105 transition-all">Go Premium - $5/mo</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="scheduler-panel" class="hidden pt-20 border-t border-slate-200">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16">
                     <div>
-                        <h3 class="text-2xl font-black mb-1">Crawl in Progress...</h3>
-                        <p class="text-slate-400 font-medium italic">Simulating deep analyze of 250+ signal metrics</p>
+                        <h3 class="text-4xl font-black mb-6">Automated Monitoring</h3>
+                        <p class="text-slate-500 text-lg mb-8">Schedule automated crawls for your added websites. Receive the 5-page certified PDF report via email at your preferred time.</p>
+                        <form id="schedule-form" class="space-y-4">
+                            <input id="sch-url" type="url" placeholder="Monitoring URL" required class="w-full p-5 rounded-2xl border bg-slate-50/50 outline-none focus:border-brand-500 transition-all font-bold">
+                            <div class="grid grid-cols-2 gap-4">
+                                <input id="sch-time" type="time" class="p-5 rounded-2xl border bg-slate-50/50 outline-none font-bold">
+                                <input id="sch-tz" type="text" placeholder="Timezone (e.g. Asia/Karachi)" class="p-5 rounded-2xl border bg-slate-50/50 outline-none font-bold">
+                            </div>
+                            <div class="flex gap-8 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                                <label class="flex items-center gap-3 font-bold text-slate-600"><input id="sch-daily" type="checkbox" checked class="w-5 h-5 accent-brand-500"> Daily PDF</label>
+                                <label class="flex items-center gap-3 font-bold text-slate-600"><input id="sch-acc" type="checkbox" checked class="w-5 h-5 accent-brand-500"> Accumulated</label>
+                            </div>
+                            <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-xl hover:bg-slate-800 transition-all shadow-xl">Activate Monitor</button>
+                        </form>
                     </div>
-                    <span id="load-pct" class="text-4xl font-black text-brand-600">0%</span>
-                </div>
-                <progress id="bar-progress" class="w-full h-4 mb-4" value="0" max="100"></progress>
-            </div>
-
-            <div id="audit-results" class="hidden space-y-8 animate-in fade-in duration-700">
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div class="glass rounded-[3rem] p-10 flex flex-col items-center justify-center text-center shadow-sm">
-                        <div class="relative w-48 h-48 mb-6">
-                            <canvas id="chart-overall"></canvas>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span id="val-grade" class="text-6xl font-black">A+</span>
-                                <span id="val-score" class="text-slate-400 font-bold">0%</span>
-                            </div>
-                        </div>
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Overall Health Index</p>
-                    </div>
-
-                    <div class="lg:col-span-2 glass rounded-[3rem] p-10 shadow-sm relative overflow-hidden">
-                        <div class="flex justify-between items-start mb-8">
-                            <h3 class="text-3xl font-black tracking-tight">Executive Summary</h3>
-                            <button onclick="downloadPDF()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2">
-                                <i class="fas fa-file-pdf"></i> Certified PDF
-                            </button>
-                        </div>
-                        <p id="val-summary" class="text-slate-500 text-lg leading-relaxed mb-10"></p>
-                        <div class="grid grid-cols-3 gap-6">
-                            <div class="bg-rose-50 p-6 rounded-3xl border border-rose-100 text-center">
-                                <div id="val-errors" class="text-3xl font-black text-rose-500">0</div>
-                                <div class="text-[10px] font-bold text-rose-400 uppercase">Errors</div>
-                            </div>
-                            <div class="bg-amber-50 p-6 rounded-3xl border border-amber-100 text-center">
-                                <div id="val-warnings" class="text-3xl font-black text-amber-500">0</div>
-                                <div class="text-[10px] font-bold text-amber-400 uppercase">Warnings</div>
-                            </div>
-                            <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center">
-                                <div id="val-notices" class="text-3xl font-black text-indigo-500">0</div>
-                                <div class="text-[10px] font-bold text-indigo-400 uppercase">Notices</div>
-                            </div>
+                    <div class="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl">
+                        <h4 class="font-black text-slate-400 uppercase text-xs mb-8 tracking-widest">Active Schedules</h4>
+                        <div id="sch-list" class="space-y-4">
+                            <div class="text-center py-20 opacity-30 italic font-bold text-slate-400">No active schedules configured.</div>
                         </div>
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div class="glass rounded-[3rem] p-10">
-                        <h4 class="font-black text-xl mb-6">Categorical Performance</h4>
-                        <canvas id="chart-categories" height="200"></canvas>
-                    </div>
-                    <div class="bg-slate-900 rounded-[3rem] p-10 text-white">
-                        <h4 class="font-black text-xl mb-6"><i class="fas fa-bolt text-brand-500 mr-2"></i> Priority Fixes</h4>
-                        <ul id="val-priority" class="space-y-4 text-slate-400 font-medium"></ul>
-                    </div>
-                </div>
-
-                <div class="pt-10">
-                    <div class="flex items-center justify-between mb-10">
-                        <h3 class="text-4xl font-black tracking-tighter">Technical Details</h3>
-                        <div id="badge-premium" class="hidden bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-xs font-black">
-                            <i class="fas fa-crown mr-2"></i> PREMIUM MEMBER ACCESS
-                        </div>
-                    </div>
-
-                    <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        </div>
-
-                    <div id="paywall-lock" class="hidden mt-10 glass rounded-[4rem] p-20 text-center border-2 border-brand-200 shadow-2xl">
-                        <i class="fas fa-lock text-4xl text-brand-500 mb-6"></i>
-                        <h4 class="text-4xl font-black mb-4">Unlock Full 250+ Signal Report</h4>
-                        <p class="text-slate-500 text-lg mb-10 max-w-xl mx-auto">This public audit is restricted. Subscribe to unlock the deep technical breakdown, Core Web Vitals, and historical link analysis.</p>
-                        <div class="flex justify-center gap-4">
-                            <button onclick="checkout()" class="gradient-bg text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-xl shadow-indigo-200">Go Premium - $5/mo</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="scheduler-area" class="hidden pt-20 border-t border-slate-200">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-20">
-                        <div>
-                            <h3 class="text-4xl font-black mb-4">Audit Monitoring</h3>
-                            <p class="text-slate-500 text-lg mb-10">Schedule automated crawls. We'll deliver the certified PDF directly to your email on your schedule.</p>
-                            <form id="schedule-form" class="space-y-4">
-                                <input id="sch-url" type="url" placeholder="Site to monitor" required class="w-full p-5 rounded-2xl border border-slate-200 outline-none focus:border-brand-500">
-                                <div class="flex gap-4">
-                                    <input id="sch-time" type="time" class="flex-1 p-5 rounded-2xl border border-slate-200">
-                                    <select id="sch-tz" class="flex-1 p-5 rounded-2xl border border-slate-200">
-                                        <option value="UTC">UTC</option>
-                                        <option value="Asia/Karachi">Asia/Karachi</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg">Save Schedule</button>
-                            </form>
-                        </div>
-                        <div class="bg-brand-50/50 rounded-[3rem] p-10 border border-brand-100">
-                            <h4 class="font-black text-brand-500 uppercase text-xs mb-6 tracking-widest">Active Monitors</h4>
-                            <div id="list-schedules" class="space-y-4">
-                                <p class="text-slate-400 italic font-medium">No active monitors.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     </main>
 
     <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
-        <div class="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl">
-            <h3 class="text-3xl font-black mb-6">Welcome Back</h3>
+        <div class="bg-white p-12 rounded-[3rem] w-full max-w-md shadow-2xl relative animate-in zoom-in duration-300">
+            <h3 class="text-4xl font-black mb-8 tracking-tight">Sign In</h3>
             <form id="login-form" class="space-y-4">
-                <input id="l-email" type="email" placeholder="Email" class="w-full p-4 rounded-xl border">
-                <input id="l-pass" type="password" placeholder="Password" class="w-full p-4 rounded-xl border">
-                <button type="submit" class="w-full gradient-bg text-white py-4 rounded-xl font-black">Login</button>
+                <input id="l-email" type="email" placeholder="Email Address" required class="w-full p-4 border rounded-2xl bg-slate-50 font-bold outline-none focus:border-brand-500">
+                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 border rounded-2xl bg-slate-50 font-bold outline-none focus:border-brand-500">
+                <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-indigo-100">Sign In</button>
             </form>
-            <button onclick="toggleModal('login-modal')" class="w-full mt-4 text-slate-400 font-bold">Close</button>
+            <button onclick="toggleModal('login-modal')" class="mt-4 w-full text-slate-400 font-bold text-sm uppercase tracking-widest">Close</button>
+        </div>
+    </div>
+
+    <div id="reg-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="bg-white p-12 rounded-[3rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-300">
+            <h3 class="text-4xl font-black mb-8 tracking-tight">Register</h3>
+            <form id="reg-form" class="space-y-4">
+                <input id="r-email" type="email" placeholder="Email Address" required class="w-full p-4 border rounded-2xl bg-slate-50 font-bold">
+                <input id="r-pass" type="password" placeholder="Password (Min 8 Chars)" minlength="8" required class="w-full p-4 border rounded-2xl bg-slate-50 font-bold">
+                <button type="submit" class="w-full gradient-bg text-white py-4 rounded-2xl font-black text-lg">Join Free</button>
+            </form>
+            <button onclick="toggleModal('reg-modal')" class="mt-4 w-full text-slate-400 font-bold text-sm uppercase tracking-widest">Close</button>
         </div>
     </div>
 
     <script>
         const state = { token: localStorage.getItem('token'), charts: {} };
         const $ = s => document.querySelector(s);
-        const toggleModal = (id) => $('#'+id).classList.toggle('hidden');
 
-        async function callAPI(path, method = 'GET', body = null) {
+        function toggleModal(id) { $('#'+id).classList.toggle('hidden'); }
+
+        async function api(path, method = 'GET', body = null) {
             const h = { 'Content-Type': 'application/json' };
             if (state.token) h['Authorization'] = 'Bearer ' + state.token;
-            return fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
+            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
+            if (res.status === 401) { localStorage.removeItem('token'); location.reload(); }
+            const ct = res.headers.get('Content-Type') || '';
+            if (ct.includes('application/json')) return res.json();
+            return res;
         }
 
         $('#audit-form').onsubmit = async (e) => {
             e.preventDefault();
-            const url = $('#input-url').value;
-            
-            // UI Transition
+            const url = $('#website-url').value;
             $('#audit-loading').classList.remove('hidden');
             $('#audit-results').classList.add('hidden');
+            
             let p = 0;
             const timer = setInterval(() => {
                 p = Math.min(p + 5, 99);
                 $('#bar-progress').value = p;
                 $('#load-pct').innerText = p + '%';
-            }, 400);
+            }, 300);
 
             try {
-                const res = await callAPI(`/audit?url=${encodeURIComponent(url)}`);
-                const data = await res.json();
+                const data = await api(`/audit?url=${encodeURIComponent(url)}`);
                 clearInterval(timer);
-                renderReport(data);
-            } catch (err) { 
-                clearInterval(timer);
-                alert('Audit Connection Failed. Check Backend.');
-            }
+                $('#bar-progress').value = 100; $('#load-pct').innerText = '100%';
+                setTimeout(() => renderReport(data), 500);
+            } catch (err) { clearInterval(timer); alert('Audit Failed'); }
         };
 
         function renderReport(data) {
             $('#audit-loading').classList.add('hidden');
             $('#audit-results').classList.remove('hidden');
 
-            // Set Data
             $('#val-grade').innerText = data.grade;
             $('#val-score').innerText = data.overall + '%';
             $('#val-summary').innerText = data.summary;
             $('#val-errors').innerText = data.errors;
             $('#val-warnings').innerText = data.warnings;
             $('#val-notices').innerText = data.notices;
-            $('#val-remaining').innerText = data.remaining ?? 'Unlimited';
             $('#val-priority').innerHTML = data.priority.map(p => `<li>• ${p}</li>`).join('');
+            $('#val-remaining').innerText = data.remaining ?? '--';
 
-            // Overall Chart
             if(state.charts.overall) state.charts.overall.destroy();
             state.charts.overall = new Chart($('#chart-overall'), {
-                type: 'doughnut',
-                data: data.overall_gauge,
-                options: { cutout: '80%', plugins: { legend: { display: false } } }
+                type: 'doughnut', data: data.overall_gauge, options: { cutout: '80%', plugins: { legend: { display: false } } }
             });
 
-            // Category Chart
             if(state.charts.cats) state.charts.cats.destroy();
             state.charts.cats = new Chart($('#chart-categories'), {
-                type: 'bar',
-                data: data.category_chart,
-                options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+                type: 'bar', data: data.category_chart, options: { indexAxis: 'y', plugins: { legend: { display: false } } }
             });
 
-            // Metrics Grid
-            const grid = $('#metrics-grid');
-            grid.innerHTML = '';
+            const grid = $('#metrics-grid'); grid.innerHTML = '';
             data.metrics.forEach(m => {
                 const card = document.createElement('div');
-                card.className = 'glass p-6 rounded-3xl shadow-sm';
-                card.innerHTML = `<h5 class="text-[10px] font-black text-slate-400 mb-4 tracking-widest uppercase">Signal ${m.num}</h5>
-                                  <canvas id="m-chart-${m.num}" height="140"></canvas>`;
+                const border = m.severity === 'green' ? 'border-emerald-200' : m.severity === 'yellow' ? 'border-amber-200' : 'border-rose-200';
+                card.className = `glass p-6 rounded-3xl border ${border}`;
+                card.innerHTML = `<h5 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Signal ${m.num}</h5><canvas id="m-${m.num}" height="140"></canvas>`;
                 grid.appendChild(card);
-                new Chart($(`#m-chart-${m.num}`), {
-                    type: m.chart_type,
-                    data: m.chart_data,
-                    options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                });
+                new Chart($(`#m-${m.num}`), { type: m.chart_type, data: m.chart_data, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
             });
 
-            // Paywall Check
-            if(!data.premium) {
+            if (!data.premium) {
                 grid.classList.add('premium-blur');
                 $('#paywall-lock').classList.remove('hidden');
                 $('#badge-premium').classList.add('hidden');
@@ -291,41 +303,55 @@ INDEX_HTML = r"""<!DOCTYPE html>
         }
 
         async function downloadPDF() {
-            const url = $('#input-url').value;
+            const url = $('#website-url').value;
             window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
         }
 
         async function checkout() {
-            const res = await callAPI('/billing/checkout', 'POST');
-            const data = await res.json();
-            if (data.url) window.location.href = data.url;
-            else alert(data.message);
+            const res = await api('/billing/checkout', 'POST');
+            if (res.url) window.location.href = res.url; else alert(res.message);
         }
 
         $('#login-form').onsubmit = async (e) => {
             e.preventDefault();
-            const res = await callAPI('/login', 'POST', { email: $('#l-email').value, password: $('#l-pass').value });
-            if (res.ok) {
-                const d = await res.json();
-                localStorage.setItem('token', d.token);
-                location.reload();
-            }
+            const res = await api('/login', 'POST', { email: $('#l-email').value, password: $('#l-pass').value });
+            if (res.token) { localStorage.setItem('token', res.token); location.reload(); }
+        };
+
+        $('#reg-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await api('/register', 'POST', { email: $('#r-email').value, password: $('#r-pass').value, timezone: $('#sch-tz')?.value || 'UTC' });
+            alert(res.message); toggleModal('reg-modal');
         };
 
         function logout() { localStorage.removeItem('token'); location.reload(); }
 
-        (async function init() {
+        async function init() {
             if (state.token) {
-                $('#nav-auth').classList.add('hidden');
-                $('#nav-user').classList.remove('hidden');
-                $('#scheduler-area').classList.remove('hidden');
-                const res = await callAPI('/settings');
-                if (res.ok) {
-                    const u = await res.json();
-                    $('#user-display-email').innerText = u.email || 'User';
+                $('#auth-nav').classList.add('hidden');
+                $('#user-nav').classList.remove('hidden');
+                const user = await api('/settings');
+                if (user.timezone) {
+                    $('#user-display-email').innerText = user.subscribed ? '👑 Premium' : 'Free Member';
+                    if (user.subscribed) $('#scheduler-panel').classList.remove('hidden');
+                    loadSchedules();
                 }
             }
-        })();
+        }
+
+        async function loadSchedules() {
+            const list = await api('/schedules');
+            if (list.length > 0) {
+                $('#sch-list').innerHTML = list.map(s => `
+                    <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                        <p class="font-bold text-slate-800">${s.website_url}</p>
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">${s.time_of_day} • ${s.timezone}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>"""
