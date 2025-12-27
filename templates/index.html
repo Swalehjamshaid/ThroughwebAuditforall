@@ -1,206 +1,642 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | Professional AI Website Audit</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <title>FF Tech — Professional Website Audit & Scheduling</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="FF Tech — Professional Web Audit Dashboard with 250+ metrics, scheduled reports, certified PDF, and admin controls." />
 
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
-        .gradient-brand { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        .card { background: white; border: 1px solid #e2e8f0; border-radius: 1.5rem; padding: 2rem; transition: 0.3s; }
-        .metric-card { border-left-width: 6px; }
-        .green { border-left-color: #10b981; }
-        .yellow { border-left-color: #f59e0b; }
-        .red { border-left-color: #ef4444; }
-        .premium-blur { filter: blur(8px); pointer-events: none; user-select: none; }
-        canvas { max-height: 250px; width: 100% !important; }
-    </style>
+  <!-- Fonts -->
+  https://fonts.gstatic.com
+  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap
+
+  <!-- Tailwind CSS (CDN) -->
+  https://cdn.tailwindcss.com</script>
+  <script>
+    // Tailwind config for custom colors
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { inter: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+              400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#312e81'
+            },
+            emerald: { 500: '#10b981' }, amber: { 500: '#f59e0b' }, rose: { 500: '#ef4444' }
+          },
+          boxShadow: {
+            glass: '0 20px 60px rgba(0,0,0,.18)',
+            soft: '0 10px 30px rgba(0,0,0,.12)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js -->
+  https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
+
+  <!-- Animation libraries -->
+  https://unpkg.com/aos@2.3.4/dist/aos.css
+  https://unpkg.com/aos@2.3.4/dist/aos.js</script>
+  https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js</script>
+
+  <!-- Icons -->
+  https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
+
+  <!-- Global Styles -->
+  <style>
+    :root { --glass-bg: rgba(255, 255, 255, .65); --glass-border: rgba(255,255,255,.35); }
+    [data-theme="dark"] { color-scheme: dark; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: radial-gradient(1200px 700px at 10% 10%, #eef2ff, transparent),
+                radial-gradient(1200px 700px at 90% 90%, #f1f5f9, transparent); }
+    .dark body { background: radial-gradient(1200px 700px at 10% 10%, #0f172a, #111827),
+                 radial-gradient(1200px 700px at 90% 90%, #111827, #0b1020); }
+    .glass {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: saturate(140%) blur(10px);
+      box-shadow: 0 25px 50px rgba(0,0,0,.22);
+      border-radius: 24px;
+    }
+    .metric-card { border-left-width: 8px; }
+    .metric-green { border-color: #10b981; }
+    .metric-yellow { border-color: #f59e0b; }
+    .metric-red { border-color: #ef4444; }
+    .blur-premium { filter: blur(10px); pointer-events: none; }
+    .btn-gradient { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #fff; }
+    .btn-gradient:hover { filter: brightness(1.05); }
+    .gradient-hero { background: radial-gradient(600px 300px at 50% 10%, #4f46e5 0, transparent 60%),
+                             linear-gradient(135deg, #4f46e5, #7c3aed); }
+    .progress-ring { stroke: url(#grad); stroke-width: 10; fill: none; }
+    .progress-track { stroke: #e5e7eb; stroke-width: 10; fill: none; }
+    .badge-grade { border-radius: 999px; font-weight: 800; padding: 10px 20px; }
+    .shadow-deep { box-shadow: 0 40px 100px rgba(0,0,0,.35); }
+    .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+    .hidden-important { display: none !important; }
+  </style>
 </head>
-<body class="antialiased">
 
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 py-4 px-8 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <div class="p-2 gradient-brand rounded-lg text-white"><i data-lucide="shield-check"></i></div>
-            <h1 class="text-2xl font-extrabold tracking-tighter text-slate-900 uppercase">FF Tech</h1>
+<body class="text-slate-800 dark:text-slate-200">
+  <!-- Header / Nav -->
+  <header class="fixed inset-x-0 top-0 z-50">
+    <div class="gradient-hero text-white shadow-2xl">
+      <div class="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <i class="fas fa-shield-halved text-3xl"></i>
+          <div>
+            <h1 class="text-2xl font-black tracking-tight">FF Tech — Audit Platform</h1>
+            <p class="text-sm opacity-80">Professional Scheduled Web Audit & Certified Reporting</p>
+          </div>
         </div>
-        <div id="auth-nav" class="flex gap-4 items-center">
-            <div id="guest-links" class="flex gap-4">
-                <button onclick="toggleModal('login')" class="text-sm font-bold text-slate-500 hover:text-indigo-600">Login</button>
-                <button onclick="toggleModal('register')" class="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg">Get Started</button>
+        <nav class="flex items-center gap-6">
+          <button id="toggle-theme" class="text-white/90 hover:text-white focus:outline-none" title="Toggle theme">
+            <i class="fas fa-moon text-xl"></i>
+          </button>
+          #admin-panelAdmin</a>
+          #Login</a>
+          #Register</a>
+          <span id="user-status" class="hidden">Welcome, <span id="user-email"></span> · <aogout</a></span>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section id="hero" class="pt-36 pb-16">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 md:p-12 shadow-deep" data-aos="fade-up">
+        <div class="flex flex-col md:flex-row items-center gap-10">
+          <div class="flex-1 text-center md:text-left">
+            <h2 class="text-4xl md:text-6xl font-black tracking-tight">World‑class Website Audits, <span class="text-brand-200">Scheduled</span></h2>
+            <p class="mt-4 text-lg opacity-80">250+ metrics · Certified PDF · SEO, Performance, Security, Mobile & Accessibility</p>
+            <div class="mt-6">
+              <form id="audit-form" class="flex items-center gap-3">
+                <input id="website-url" type="url" placeholder="Enter Website URL (e.g., https://example.com)"
+                  class="flex-1 rounded-xl px-4 py-3 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900" required />
+                <button class="btn-gradient px-6 py-3 rounded-xl font-bold shadow-soft" type="submit">Run Free Audit</button>
+              </form>
+              <p class="mt-3 text-sm opacity-80">Free Audits Remaining: <span id="remaining" class="font-extrabold">—</span></p>
             </div>
-            <div id="user-links" class="hidden flex gap-6 items-center">
-                <span id="nav-email" class="text-sm font-bold text-slate-600"></span>
-                <button onclick="logout()" class="text-xs font-black text-rose-500 uppercase tracking-widest">Logout</button>
+          </div>
+          <div class="w-full md:w-96 h-64 bg-white/10 rounded-2xl relative overflow-hidden border border-white/20">
+            <svg class="absolute inset-0" viewBox="0 0 300 300">
+              <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs>
+              <circle cx="150" cy="150" r="120" class="progress-track"></circle>
+              <circle cx="150" cy="150" r="120" class="progress-ring" stroke-dasharray="753" stroke-dashoffset="753" id="hero-progress"></circle>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center">
+                <span class="text-xl font-bold">Audit Progress</span>
+                <div id="hero-progress-pct" class="text-3xl font-black">0%</div>
+              </div>
             </div>
+          </div>
         </div>
-    </nav>
-
-    <section id="hero" class="gradient-brand text-white pt-32 pb-24 px-8 relative overflow-hidden">
-        <div class="max-w-5xl mx-auto text-center relative z-10">
-            <h2 class="text-5xl md:text-7xl font-black mb-10 tracking-tight">Professional AI <br>Website Audit</h2>
-            <form id="audit-form" class="flex flex-col md:flex-row max-w-3xl mx-auto bg-white p-2 rounded-[2.5rem] shadow-2xl mb-8">
-                <input type="url" id="website-url" placeholder="https://your-website.com" required 
-                       class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl">
-                <button type="submit" class="gradient-brand px-12 py-5 rounded-[2.2rem] font-black text-lg hover:opacity-90 transition shadow-lg">
-                    Run Free Audit
-                </button>
-            </form>
-            <p class="text-xl font-medium opacity-80" id="audits-status">
-                Free Audits Remaining: <span id="remaining-count" class="font-bold underline">10</span>
-            </p>
+        <div class="mt-4 flex items-center justify-center md:justify-start gap-6 text-slate-700 dark:text-slate-300">
+          <span class="flex items-center gap-2"><i class="fas fa-lock"></i> Secure</span>
+          <span class="flex items-center gap-2"><i class="fas fa-bolt"></i> Instant</span>
+          <span class="flex items-center gap-2"><i class="fas fa-certificate"></i> Certified</span>
         </div>
-    </section>
+      </div>
+    </div>
+  </section>
 
-    <main id="results" class="hidden max-w-7xl mx-auto py-20 px-8 space-y-16">
-        
-        <section class="grid lg:grid-cols-3 gap-12 items-center">
-            <div class="text-center lg:text-left space-y-6">
-                <div id="grade-display" class="text-9xl font-black px-12 py-8 rounded-3xl bg-indigo-50 text-indigo-600 shadow-xl inline-block">A+</div>
-                <h3 class="text-4xl font-black text-slate-900">Executive Summary</h3>
-                <p id="exec-summary" class="text-xl text-slate-500 leading-relaxed italic"></p>
-                <button onclick="downloadPDF()" class="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 mx-auto lg:mx-0">
-                    <i data-lucide="file-down"></i> Export Certified PDF
-                </button>
+  <!-- Progress -->
+  <section id="progress-section" class="hidden pb-8">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 shadow-deep" data-aos="fade-up">
+        <h3 class="text-2xl font-black mb-6">Audit in Progress</h3>
+        <div class="space-y-4">
+          <div class="flex items-center gap-3">
+            <span class="w-28 font-bold">Crawling</span>
+            <progress id="p-crawl" class="w-full h-3" value="0" max="100"></progress>
+            <span id="crawl-pct" class="w-16 text-right font-black">0%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-28 font-bold">Analyzing</span>
+            <progress id="p-analyze" class="w-full h-3" value="0" max="100"></progress>
+            <span id="analyze-pct" class="w-16 text-right font-black">0%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-28 font-bold">Scoring</span>
+            <progress id="p-score" class="w-full h-3" value="0" max="100"></progress>
+            <span id="score-pct" class="w-16 text-right font-black">0%</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-28 font-bold">Reporting</span>
+            <progress id="p-report" class="w-full h-3" value="0" max="100"></progress>
+            <span id="report-pct" class="w-16 text-right font-black">0%</span>
+          </div>
+        </div>
+        <div class="mt-6 grid md:grid-cols-2 gap-6">
+          <div class="glass p-4"><canvas id="health-gauge"></canvas></div>
+          <div class="glass p-4"><canvas id="issues-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Summary -->
+  <section id="summary-section" class="hidden pb-8">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 shadow-deep" data-aos="fade-up">
+        <div class="text-center mb-6">
+          <span id="grade-badge" class="badge-grade text-3xl bg-green-100 text-green-700">A+</span>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="glass p-4"><canvas id="overall-gauge"></canvas></div>
+          <div class="glass p-4"><canvas id="category-chart"></canvas></div>
+        </div>
+        <article class="mt-8 glass p-6">
+          <h4 class="text-xl font-extrabold mb-3">Executive Summary</h4>
+          <p id="exec-summary" class="leading-relaxed"></p>
+        </article>
+        <div class="mt-6 grid md:grid-cols-3 gap-6">
+          <div class="glass p-6"><h5 class="font-black text-green-700">Strengths</h5><ul id="strengths" class="mt-2 list-disc list-inside"></ul></div>
+          <div class="glass p-6"><h5 class="font-black text-rose-700">Weak Areas</h5><ul id="weaknesses" class="mt-2 list-disc list-inside"></ul></div>
+          <div class="glass p-6"><h5 class="font-black text-amber-700">Priority Fixes</h5><ul id="priority" class="mt-2 list-disc list-inside"></ul></div>
+        </div>
+        <div class="text-center mt-8">
+          <button id="export-pdf" class="btn-gradient px-6 py-3 rounded-xl font-bold shadow-soft hover:scale-[1.02] transition">Export Certified PDF</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Metrics Dashboard -->
+  <section id="dashboard-section" class="hidden pb-12">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 shadow-deep" data-aos="fade-up">
+        <h3 class="text-2xl font-black mb-4">Complete Metrics (1–250)</h3>
+        <p class="text-sm opacity-80">Public users see limited metrics; register to unlock full visuals.</p>
+        <div class="relative">
+          <div id="premium-blur" class="absolute inset-0 blur-premium hidden"></div>
+          <div id="metrics-grid" class="grid-auto mt-6">
+            <!-- Dynamic metric cards inserted here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- User Panel -->
+  <section id="user-panel" class="hidden pb-12">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="grid md:grid-cols-3 gap-6">
+        <div class="glass p-6">
+          <h4 class="text-xl font-black mb-3">Add Website</h4>
+          <form id="add-site-form" class="space-y-3">
+            <input id="add-site-url" type="url" placeholder="https://example.com"
+                   class="w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900" required />
+            <button class="btn-gradient px-5 py-3 rounded-xl font-bold">Add</button>
+          </form>
+        </div>
+        <div class="glass p-6 md:col-span-2">
+          <h4 class="text-xl font-black mb-3">Schedule Audit</h4>
+          <form id="schedule-form" class="space-y-3">
+            <input id="schedule-url" type="url" placeholder="https://example.com"
+                   class="w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900" required />
+            <div class="grid grid-cols-2 gap-4">
+              <input id="schedule-time" type="time" class="rounded-xl px-4 py-3 border border-slate-300" value="09:00" />
+              <input id="schedule-tz" type="text" class="rounded-xl px-4 py-3 border border-slate-300"
+                     placeholder="Asia/Karachi" value="Asia/Karachi" />
             </div>
-            <div class="lg:col-span-2 card">
-                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Category Scores</h4>
-                <canvas id="category-chart"></canvas>
+            <div class="grid grid-cols-2 gap-4">
+              <label class="flex items-center gap-2"><input id="schedule-daily" type="checkbox" checked /> Daily Report</label>
+              <label class="flex items-center gap-2"><input id="schedule-acc" type="checkbox" checked /> Accumulated Report</label>
             </div>
-        </section>
+            <button class="btn-gradient px-5 py-3 rounded-xl font-bold">Save Schedule</button>
+          </form>
+        </div>
+      </div>
 
-        <section class="grid md:grid-cols-3 gap-8">
-            <div class="p-8 bg-emerald-50 rounded-3xl border border-emerald-100">
-                <h4 class="text-xl font-bold text-emerald-900 mb-6">Strengths</h4>
-                <ul id="strengths-list" class="space-y-4 text-emerald-800 font-semibold"></ul>
-            </div>
-            <div class="p-8 bg-rose-50 rounded-3xl border border-rose-100">
-                <h4 class="text-xl font-bold text-rose-900 mb-6">Weaknesses</h4>
-                <ul id="weaknesses-list" class="space-y-4 text-rose-800 font-semibold"></ul>
-            </div>
-            <div class="p-8 bg-amber-50 rounded-3xl border border-amber-100">
-                <h4 class="text-xl font-bold text-amber-900 mb-6">Priority Fixes</h4>
-                <ul id="priority-list" class="space-y-4 text-amber-800 font-semibold"></ul>
-            </div>
-        </section>
+      <div class="grid md:grid-cols-2 gap-6 mt-6">
+        <div class="glass p-6">
+          <h4 class="text-xl font-black mb-3">Your Schedules</h4>
+          <div id="schedules-list" class="space-y-2 text-sm"></div>
+        </div>
+        <div class="glass p-6">
+          <h4 class="text-xl font-black mb-3">Settings</h4>
+          <form id="settings-form" class="space-y-3">
+            <input id="settings-tz" type="text" placeholder="Asia/Karachi"
+                   class="w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900" />
+            <label class="flex items-center gap-2"><input id="settings-daily" type="checkbox" /> Default: Daily emails</label>
+            <label class="flex items-center gap-2"><input id="settings-acc" type="checkbox" /> Default: Accumulated emails</label>
+            <button class="btn-gradient px-5 py-3 rounded-xl font-bold">Save Settings</button>
+          </form>
+          <div class="mt-4">
+            <button id="subscribe-btn-panel" class="btn-gradient px-6 py-3 rounded-xl font-bold">$5/month — Subscribe</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        <section>
-            <div class="flex justify-between items-end mb-12">
-                <h3 class="text-4xl font-black text-slate-900">250+ Metrics Intelligence</h3>
-                <button id="premium-unlock" onclick="startStripe()" class="hidden bg-indigo-600 text-white px-6 py-2 rounded-full font-bold text-sm shadow-lg">Unlock Premium Access</button>
-            </div>
-            <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                </div>
-        </section>
-    </main>
+  <!-- Admin Panel -->
+  <section id="admin-panel" class="hidden pb-12">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 shadow-deep" data-aos="fade-up">
+        <h3 class="text-2xl font-black mb-6">Admin — Users & Audits</h3>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div class="glass p-6">
+            <h4 class="font-black">Recent Users</h4>
+            <div id="admin-users" class="mt-3 text-sm space-y-2"></div>
+          </div>
+          <div class="glass p-6">
+            <h4 class="font-black">Recent Audits</h4>
+            <div id="admin-audits" class="mt-3 text-sm space-y-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-    <footer class="bg-slate-950 text-slate-500 py-20 px-8 text-center">
-        <p class="font-black text-white text-xl tracking-tighter mb-4 uppercase">FF Tech International</p>
-        <p class="text-xs font-bold uppercase tracking-widest opacity-50 mb-8">Professional Audit System © 2025</p>
-    </footer>
+  <!-- Footer -->
+  <footer class="py-10">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="glass p-8 text-center">
+        <p class="font-black text-lg">FF Tech © <span id="year"></span></p>
+        <p class="text-sm opacity-80">Professional Scheduled Audit & Reporting System · International Standard</p>
+      </div>
+    </div>
+  </footer>
 
-    <script>
-        lucide.createIcons();
-        let currentToken = null;
-        let catChartInstance = null;
+  <!-- Toasts / Modal minimal -->
+  <div id="toast" class="fixed bottom-6 right-6 hidden">
+    <div class="glass px-4 py-3 text-sm shadow-soft" id="toast-msg">Message</div>
+  </div>
 
-        // B.13 Form Handling
-        document.getElementById('audit-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const url = document.getElementById('website-url').value;
-            const headers = currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {};
-            
-            // Show Loading State
-            document.querySelector('#audit-form button').innerText = "Analyzing...";
+  <!-- Scripts -->
+  <script>
+    AOS.init({ once: true, duration: 600, easing: 'ease-out-cubic' });
 
-            try {
-                const res = await fetch(`/audit?url=${encodeURIComponent(url)}`, { headers });
-                const data = await res.json();
-                renderAuditReport(data);
-            } catch (err) {
-                alert("Audit Error. Check console.");
-            } finally {
-                document.querySelector('#audit-form button').innerText = "Run Free Audit";
-            }
-        };
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+    const state = {
+      token: null,
+      role: null,
+      subscribed: false,
+      freeRemaining: null,
+      premium: false,
+      charts: {}
+    };
 
-        function renderAuditReport(data) {
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('grade-display').innerText = data.grade;
-            document.getElementById('exec-summary').innerText = data.summary;
-            document.getElementById('remaining-count').innerText = data.remaining ?? "10";
+    // Theme toggle
+    $('#toggle-theme').addEventListener('click', () => {
+      const html = document.documentElement;
+      const isDark = html.dataset.theme === 'dark';
+      html.dataset.theme = isDark ? 'light' : 'dark';
+    });
 
-            // Render Lists
-            const listMap = { 'strengths-list': data.strengths, 'weaknesses-list': data.weaknesses, 'priority-list': data.priority };
-            Object.entries(listMap).forEach(([id, items]) => {
-                document.getElementById(id).innerHTML = items.map(i => `<li class="flex items-start gap-2"><i data-lucide="check" class="w-4 mt-1"></i>${i}</li>`).join('');
-            });
+    // Utils
+    function toast(msg, timeout=2600) {
+      $('#toast-msg').textContent = msg;
+      $('#toast').classList.remove('hidden');
+      setTimeout(()=>$('#toast').classList.add('hidden'), timeout);
+    }
+    function severityClass(sev) {
+      return sev === 'green' ? 'metric-green' : (sev === 'yellow' ? 'metric-yellow' : 'metric-red');
+    }
+    function chart(ctx, type, data) {
+      return new Chart(ctx, { type, data, options: { plugins: { legend: { display: false } }, responsive: true }});
+    }
+    function setProgress(el, pct) {
+      el.value = pct; // for <progress>
+    }
+    function confettiBurst() {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    }
 
-            // Category Chart
-            if (catChartInstance) catChartInstance.destroy();
-            catChartInstance = new Chart(document.getElementById('category-chart'), {
-                type: 'bar',
-                data: data.category_chart,
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+    // JWT storage
+    function loadSession() {
+      const t = localStorage.getItem('fftech_token');
+      const role = localStorage.getItem('fftech_role');
+      const sub = localStorage.getItem('fftech_subscribed') === 'true';
+      const rem = localStorage.getItem('fftech_remaining');
+      if (t) {
+        state.token = t; state.role = role; state.subscribed = sub; state.freeRemaining = rem ? parseInt(rem) : null;
+        $('#user-status').classList.remove('hidden');
+        $('#open-login').classList.add('hidden');
+        $('#open-register').classList.add('hidden');
+        $('#admin-link').classList.toggle('hidden', role !== 'admin');
+        $('#user-panel').classList.remove('hidden');
+      }
+    }
+    function saveSession(token, role, remaining, subscribed) {
+      localStorage.setItem('fftech_token', token);
+      localStorage.setItem('fftech_role', role || 'user');
+      localStorage.setItem('fftech_remaining', remaining ?? '');
+      localStorage.setItem('fftech_subscribed', subscribed ? 'true' : 'false');
+      state.token = token; state.role = role; state.freeRemaining = remaining; state.subscribed = subscribed;
+      $('#user-status').classList.remove('hidden');
+      $('#open-login').classList.add('hidden');
+      $('#open-register').classList.add('hidden');
+      $('#admin-link').classList.toggle('hidden', role !== 'admin');
+      $('#user-panel').classList.remove('hidden');
+      toast('Logged in!');
+    }
+    function clearSession() {
+      localStorage.removeItem('fftech_token');
+      localStorage.removeItem('fftech_role');
+      localStorage.removeItem('fftech_remaining');
+      localStorage.removeItem('fftech_subscribed');
+      state.token = null; state.role = null; state.subscribed = false; state.freeRemaining = null;
+      $('#user-status').classList.add('hidden');
+      $('#open-login').classList.remove('hidden');
+      $('#open-register').classList.remove('hidden');
+      $('#admin-link').classList.add('hidden');
+      $('#user-panel').classList.add('hidden');
+      toast('Logged out.');
+    }
 
-            // 250+ Metrics Grid
-            const grid = document.getElementById('metrics-grid');
-            grid.innerHTML = '';
-            
-            if(!data.premium) document.getElementById('premium-unlock').classList.remove('hidden');
+    // API
+    async function api(path, opts={}) {
+      const headers = opts.headers || {};
+      if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+      if (!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
+      const res = await fetch(path, { ...opts, headers });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status} — ${txt}`);
+      }
+      const ct = res.headers.get('Content-Type') || '';
+      if (ct.includes('application/pdf')) return res.blob();
+      if (ct.includes('application/json')) return res.json();
+      return res.text();
+    }
 
-            data.metrics.forEach((m, index) => {
-                const isLocked = !data.premium && index >= 50;
-                const card = document.createElement('div');
-                card.className = `card metric-card ${m.severity} ${isLocked ? 'premium-blur' : ''}`;
-                card.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <span class="text-[10px] font-black text-slate-400">#${String(m.num).padStart(3, '0')}</span>
-                        <div class="w-2 h-2 rounded-full ${m.severity === 'red' ? 'bg-red-500' : 'bg-emerald-500'}"></div>
-                    </div>
-                    <h5 class="text-sm font-bold text-slate-700 mb-4">Metric Signal #${m.num}</h5>
-                    <canvas id="chart-${m.num}"></canvas>
-                `;
-                grid.appendChild(card);
-                
-                new Chart(document.getElementById(`chart-${m.num}`), {
-                    type: m.chart_type,
-                    data: m.chart_data,
-                    options: { 
-                        plugins: { legend: { display: false } },
-                        scales: { x: { display: false }, y: { display: false } },
-                        maintainAspectRatio: false
-                    }
-                });
-            });
-            lucide.createIcons();
-            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-        }
+    // Audit flow
+    async function runAudit(url) {
+      $('#progress-section').classList.remove('hidden');
+      // Simulated progress
+      let p = 0;
+      const tick = () => {
+        p = Math.min(100, p + Math.random()*10+8);
+        setProgress($('#p-crawl'), Math.min(35,p)); $('#crawl-pct').textContent = Math.min(35,Math.floor(p))+'%';
+        setProgress($('#p-analyze'), Math.min(70,p)); $('#analyze-pct').textContent = Math.min(70,Math.floor(p))+'%';
+        setProgress($('#p-score'), Math.min(85,p)); $('#score-pct').textContent = Math.min(85,Math.floor(p))+'%';
+        setProgress($('#p-report'), Math.min(100,p)); $('#report-pct').textContent = Math.min(100,Math.floor(p))+'%';
+        const ring = document.getElementById('hero-progress');
+        ring && ring.setAttribute('stroke-dashoffset', String(753*(1-Math.min(1,p/100))));
+        document.getElementById('hero-progress-pct').textContent = Math.floor(p)+'%';
+        if (p < 100) setTimeout(tick, 120);
+      }; tick();
 
-        async function downloadPDF() {
-            const url = document.getElementById('website-url').value;
-            window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
-        }
+      const payload = await api(`/audit?url=${encodeURIComponent(url)}`);
+      confettiBurst();
+      $('#summary-section').classList.remove('hidden');
+      $('#dashboard-section').classList.remove('hidden');
 
-        async function startStripe() {
-            const res = await fetch('/billing/checkout', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            });
-            const data = await res.json();
-            if (data.url) window.location.href = data.url;
-            else alert("Please Login to Subscribe.");
-        }
+      // Render summary
+      $('#grade-badge').textContent = payload.grade;
+      $('#exec-summary').textContent = payload.summary;
+      $('#strengths').innerHTML = payload.strengths.map(s => `<li>${s}</li>`).join('');
+      $('#weaknesses').innerHTML = payload.weaknesses.map(s => `<li>${s}</li>`).join('');
+      $('#priority').innerHTML = payload.priority.map(s => `<li>${s}</li>`).join('');
 
-        function logout() {
-            currentToken = null;
-            location.reload();
-        }
-    </script>
+      // Charts
+      if (payload.overall_gauge) {
+        state.charts.overallGauge = chart($('#overall-gauge'), 'doughnut', payload.overall_gauge);
+      }
+      if (payload.category_chart) {
+        state.charts.category = chart($('#category-chart'), 'bar', payload.category_chart);
+      }
+      if (payload.health_gauge) {
+        state.charts.healthGauge = chart($('#health-gauge'), 'doughnut', payload.health_gauge);
+      }
+      if (payload.issues_chart) {
+        state.charts.issues = chart($('#issues-chart'), 'bar', payload.issues_chart);
+      }
+
+      // Premium blur
+      const blur = $('#premium-blur');
+      blur.classList.toggle('hidden', !!payload.premium);
+
+      // Metrics grid
+      const grid = $('#metrics-grid');
+      grid.innerHTML = '';
+      payload.metrics.forEach(m => {
+        const pad = String(m.num).padStart(3,'0');
+        const card = document.createElement('div');
+        card.className = `glass p-4 metric-card ${severityClass(m.severity)}`;
+        card.innerHTML = `
+          <h5 class="text-sm font-bold mb-2">${pad}. Metric ${pad}</h5>
+          <div class="h-48"><canvas id="chart-${pad}"></canvas></div>
+        `;
+        grid.appendChild(card);
+        const ctx = document.getElementById(`chart-${pad}`);
+        chart(ctx, (m.chart_type || 'bar'), m.chart_data);
+      });
+
+      // Remaining audits (for registered)
+      if (typeof payload.remaining !== 'undefined' && payload.remaining !== null) {
+        document.getElementById('remaining').textContent = payload.remaining;
+        state.freeRemaining = payload.remaining;
+        localStorage.setItem('fftech_remaining', payload.remaining);
+      }
+    }
+
+    // Export PDF
+    document.getElementById('export-pdf').addEventListener('click', async () => {
+      const url = document.getElementById('website-url').value || 'https://example.com';
+      const pdf = await api(`/export-pdf?url=${encodeURIComponent(url)}`);
+      const blobUrl = URL.createObjectURL(pdf);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `fftech_audit_${Date.now()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    });
+
+    // Form handlers
+    document.getElementById('audit-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = document.getElementById('website-url').value.trim();
+      if (!url) return toast('Please enter a website URL.');
+      try { await runAudit(url); } catch (err) { toast(err.message); }
+    });
+
+    // Registration / Login (prompt-based to keep single-file)
+    document.getElementById('open-register').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = prompt('Email:');
+      const password = prompt('Password (min 8 chars):');
+      const timezone = prompt('Timezone (e.g., Asia/Karachi):', 'Asia/Karachi');
+      if (!email || !password) return;
+      try {
+        const res = await api('/register', { method: 'POST', body: JSON.stringify({ email, password, timezone }) });
+        toast(res.message || 'Registration submitted. Check email for verification.');
+      } catch (err) { toast(err.message); }
+    });
+
+    document.getElementById('open-login').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const email = prompt('Email:');
+      const password = prompt('Password:');
+      if (!email || !password) return;
+      try {
+        const res = await api('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+        $('#user-email').textContent = email;
+        saveSession(res.token, res.role, res.free_audits_remaining, res.subscribed);
+      } catch (err) { toast(err.message); }
+    });
+
+    document.getElementById('logout').addEventListener('click', (e) => {
+      e.preventDefault();
+      clearSession();
+    });
+
+    // Add site
+    document.getElementById('add-site-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!state.token) return toast('Login required.');
+      const url = document.getElementById('add-site-url').value.trim();
+      if (!url) return toast('Enter a site URL.');
+      try {
+        const res = await api('/websites', { method: 'POST', body: JSON.stringify({ url }) });
+        toast(res.message || 'Site added.');
+      } catch (err) { toast(err.message); }
+    });
+
+    // Schedule
+    document.getElementById('schedule-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!state.token) return toast('Login required.');
+      const payload = {
+        website_url: document.getElementById('schedule-url').value.trim(),
+        time_of_day: document.getElementById('schedule-time').value || '09:00',
+        timezone: document.getElementById('schedule-tz').value || 'UTC',
+        daily_report: document.getElementById('schedule-daily').checked,
+        accumulated_report: document.getElementById('schedule-acc').checked,
+        enabled: true
+      };
+      if (!payload.website_url) return toast('Enter a site URL.');
+      try {
+        const res = await api('/schedule', { method: 'POST', body: JSON.stringify(payload) });
+        toast(res.message || 'Schedule saved.');
+        await refreshSchedules();
+      } catch (err) { toast(err.message); }
+    });
+
+    async function refreshSchedules() {
+      if (!state.token) return;
+      try {
+        const sched = await api('/schedules');
+        const list = document.getElementById('schedules-list');
+        list.innerHTML = (sched || []).map(s => `
+          <div class="glass px-3 py-2 flex justify-between">
+            <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) —
+              daily: ${s.daily_report} · accumulated: ${s.accumulated_report}</span>
+            <span class="opacity-60">last: ${s.last_run_at ?? '—'}</span>
+          </div>
+        `).join('');
+      } catch (err) { /* silent */ }
+    }
+
+    // Settings
+    document.getElementById('settings-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!state.token) return toast('Login required.');
+      const payload = {
+        timezone: document.getElementById('settings-tz').value || 'UTC',
+        notify_daily_default: document.getElementById('settings-daily').checked,
+        notify_acc_default: document.getElementById('settings-acc').checked
+      };
+      try {
+        const res = await api('/settings', { method: 'POST', body: JSON.stringify(payload) });
+        toast(res.message || 'Settings updated.');
+      } catch (err) { toast(err.message); }
+    });
+
+    // Billing
+    async function openCheckout() {
+      if (!state.token) return toast('Login required.');
+      try {
+        const res = await api('/billing/checkout', { method: 'POST' });
+        if (res.url) window.location.href = res.url;
+        else toast(res.message || 'Subscription activated (demo).');
+      } catch (err) { toast(err.message); }
+    }
+    document.getElementById('subscribe-btn-panel').addEventListener('click', openCheckout);
+    document.getElementById('subscribe-btn').addEventListener('click', openCheckout);
+
+    // Admin
+    async function refreshAdmin() {
+      if (state.role !== 'admin') return;
+      try {
+        const users = await api('/admin/users');
+        const audits = await api('/admin/audits');
+        const u = document.getElementById('admin-users'); const a = document.getElementById('admin-audits');
+        u.innerHTML = users.map(x => `
+          <div class="glass px-3 py-2 flex justify-between">
+            <span>${x.email} · role:${x.role} · verified:${x.verified}</span>
+            <span class="opacity-60">tz:${x.timezone} · sub:${x.subscribed}</span>
+          </div>
+        `).join('');
+        a.innerHTML = audits.map(x => `
+          <div class="glass px-3 py-2 flex justify-between">
+            <span>${x.url} · grade:${x.grade} · overall:${x.overall}%</span>
+            <span class="opacity-60">errors:${x.errors} · warnings:${x.warnings}</span>
+          </div>
+        `).join('');
+        document.getElementById('admin-panel').classList.remove('hidden');
+      } catch (err) { /* silent */ }
+    }
+
+    // Init
+    (function init() {
+      document.getElementById('year').textContent = new Date().getFullYear();
+      loadSession(); refreshSchedules(); refreshAdmin();
+      // Hero ring initial
+      const ring = document.getElementById('hero-progress');
+      ring && ring.setAttribute('stroke-dasharray', '753');
+      ring && ring.setAttribute('stroke-dashoffset', '753');
+    })();
+  </script>
 </body>
 </html>
