@@ -9,7 +9,9 @@
 # - Railway healthcheck: /health + bind to $PORT
 # - SAFE DB INIT + SAFE SESSIONS (graceful when DB is down)
 # - Flexible HTML linking (conditionally mounted):
-#     /page/<name> (raw HTML from ./pages), /template/<name> (Jinja), /static/* (assets)
+#     /page/<name> (raw HTML from ./pages, auto-injected assets/flags)
+#     /template/<name> (Jinja with flags)
+#     /static/* (assets)
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from contextlib import contextmanager
@@ -25,7 +27,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextRes
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.requests import Request as FastAPIRequest
 from pydantic import BaseModel, EmailStr, Field
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, text as sa_text
@@ -227,7 +228,7 @@ def ping():
 
 # Global exception handler: avoid Railway “failed to respond” page
 @app.exception_handler(Exception)
-async def global_exception_handler(request: FastAPIRequest, exc: Exception):
+async def global_exception_handler(request: Request, exc: Exception):
     try:
         print("[UNCAUGHT ERROR]", type(exc).__name__, str(exc))
     except Exception:
@@ -263,8 +264,87 @@ if HAS_PAGES:
 else:
     print("[INIT] Skipping Jinja templates mount (pages directory not present).")
 
+# ---------------- HTML FLEX: FLAGS + INJECTORS ----------------
+from dataclasses import dataclass
+
+@dataclass
+class UIFlags:
+    show_auth: bool = True
+    demo_mode: bool = False
+    stripe_enabled: bool = bool(STRIPE_SECRET_KEY)
+    animations: bool = True
+    charts: bool = True
+    tailwind: bool = True
+
+def get_ui_flags(user=None) -> UIFlags:
+    return UIFlags(
+        show_auth = (user is None),
+        demo_mode = not bool(STRIPE_SECRET_KEY),
+        stripe_enabled = bool(STRIPE_SECRET_KEY),
+        animations = True,
+        charts = True,
+        tailwind = True,
+    )
+
+def inject_head_assets(html: str, flags: UIFlags) -> str:
+    """
+    Inject Tailwind, Chart.js, Fonts & Icons into raw HTML.
+    If </head> exists -> insert before it; else prepend to HTML.
+    """
+    head_inject = []
+    if flags.tailwind:
+        head_inject.append('https://cdn.tailwindcss.com</script>')
+    if flags.charts:
+        head_inject.append('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js   head_inject.append('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap')
+    head_inject.append('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css')
+
+    payload = "\n".join(head_inject) + """
+<style>
+  body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background-color: #f8fafc; }
+  .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(226,232,240,0.8); }
+  .grade-badge { text-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
+  .status-pulse { width: 14px; height: 14px; background: #6366f1; border-radius: 50%; display: inline-block; animation: pulse 1.5s infinite; }
+  @keyframes pulse {
+    0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+    100% { transform: scale(0.9); }
+  }
+</style>
+""".strip()
+
+    low = html.lower()
+    if "</head>" in low:
+        idx = low.rfind("</head>")
+        return html[:idx] + payload + html[idx:]
+    else:
+        return payload + "\n" + html
+
+def inject_bootstrap_script(html: str, app_name: str, flags: UIFlags) -> str:
+    """
+    Expose Python flags & app name to front-end scripts on raw HTML pages.
+    """
+    boot = f"""
+<script>
+  window.__FF_FLAGS__ = {json.dumps(flags.__dict__)};
+  window.__APP_NAME__ = {json.dumps(app_name)};
+</script>
+""".strip()
+    low = html.lower()
+    if "</body>" in low:
+        idx = low.rfind("</body>")
+        return html[:idx] + boot + html[idx:]
+    else:
+        return html + "\n" + boot
+
 @app.get("/page/{name}", response_class=HTMLResponse)
-def get_plain_page(name: str):
+def get_flexible_page(name: str, request: Request):
+    """
+    Flexible raw HTML loader with auto-injection:
+    - Reads ./pages/<name>.html as raw text.
+    - Injects Tailwind/Chart.js/fonts into <head>.
+    - Injects window.__FF_FLAGS__ + window.__APP_NAME__ into <body>.
+    - Leaves original HTML structure intact.
+    """
     if not HAS_PAGES:
         raise HTTPException(status_code=404, detail="Pages directory not available")
     if any(ch in name for ch in ("..", "/", "\\")):
@@ -273,7 +353,11 @@ def get_plain_page(name: str):
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Page not found")
     with open(path, "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        raw = f.read()
+    flags = get_ui_flags()
+    html = inject_head_assets(raw, flags)
+    html = inject_bootstrap_script(html, APP_NAME, flags)
+    return HTMLResponse(html)
 
 @app.get("/template/{name}", response_class=HTMLResponse)
 def get_jinja_page(name: str, request: Request):
@@ -281,7 +365,7 @@ def get_jinja_page(name: str, request: Request):
         raise HTTPException(status_code=404, detail="Templates not available")
     if any(ch in name for ch in ("..", "/", "\\")):
         raise HTTPException(status_code=400, detail="Invalid template name")
-    return templates.TemplateResponse(f"{name}.html", {"request": request, "app_name": APP_NAME})
+    return templates.TemplateResponse(f"{name}.html", {"request": request, "app_name": APP_NAME, "flags": get_ui_flags()})
 
 # ---------------- NETWORK HELPERS ----------------
 def safe_request(url: str, method: str = "GET", **kwargs):
@@ -313,7 +397,7 @@ def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
 def is_blocking_script(tag) -> bool:
     return tag.name == "script" and not (tag.get("async") or tag.get("defer") or tag.get("type")=="module")
 
-def crawl_internal(seed_url: str, max_pages: int = 60):  # fewer pages for speed
+def crawl_internal(seed_url: str, max_pages: int = 60):
     visited, queue, results, host = set(), [(seed_url, 0)], [], urlparse(seed_url).netloc
     while queue and len(results) < max_pages:
         url, depth = queue.pop(0)
@@ -539,39 +623,13 @@ def run_actual_audit(target_url: str) -> dict:
         "cat_scores": cat_scores,
     }
 
-# ---------------- REFINED INDEX_HTML ----------------
+# ---------------- REFINED INDEX_HTML (fallback, assets injected at runtime) ----------------
 INDEX_HTML = r"""<!DOCTYPE html>
 <html lang='en'>
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>FF TECH — Professional AI Audit</title>
-    
-    <!-- Tailwind & Chart.js -->
-    https://cdn.tailwindcss.com</script>
-    https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
-
-    <!-- Fonts & Icons -->
-    https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap
-    https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
-
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
-        
-        /* Pulse Animation for the Loader */
-        .status-pulse { 
-            width: 14px; height: 14px; background: #6366f1; border-radius: 50%; 
-            display: inline-block; animation: pulse 1.5s infinite; 
-        }
-        @keyframes pulse { 
-            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 
-            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } 
-            100% { transform: scale(0.9); } 
-        }
-        .hidden { display: none !important; }
-        .grade-badge { text-shadow: 0 0 15px rgba(99, 102, 241, 0.3); }
-    </style>
 </head>
 <body class="text-slate-900">
     <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
@@ -704,15 +762,18 @@ INDEX_HTML = r"""<!DOCTYPE html>
 </html>
 """
 
+# ---------------- Routes: Home uses Jinja if available, else inject into fallback HTML ----------------
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    # Prefer the template if pages/ exists, else fallback to inline INDEX_HTML
     try:
-        if 'templates' in globals() and templates is not None:
-            return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME})
+        if templates is not None:
+            return templates.TemplateResponse("index.html", {"request": request, "app_name": APP_NAME, "flags": get_ui_flags()})
     except Exception:
         pass
-    return HTMLResponse(INDEX_HTML)
+    flags = get_ui_flags()
+    html = inject_head_assets(INDEX_HTML, flags)
+    html = inject_bootstrap_script(html, APP_NAME, flags)
+    return HTMLResponse(html)
 
 # ---------------- Schemas ----------------
 class RegisterIn(BaseModel):
@@ -840,10 +901,6 @@ def verify(token: str):
         user.is_verified = True; db.commit()
         return {"message": "Email verified. You can now log in."}
 
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
-
 @app.post("/login")
 def login(payload: LoginIn, request: Request):
     with safe_session() as db:
@@ -868,9 +925,6 @@ def login(payload: LoginIn, request: Request):
         return {"token": token, "role": user.role, "free_audits_remaining": user.free_audits_remaining, "subscribed": user.subscribed}
 
 # Websites & Scheduling
-class WebsiteIn(BaseModel):
-    url: str
-
 @app.post("/websites")
 def add_website(payload: WebsiteIn, authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
