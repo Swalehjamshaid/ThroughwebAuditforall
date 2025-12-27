@@ -1,380 +1,319 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{{ app_name }} — Dashboard</title>
-  https://cdn.tailwindcss.com</script>
-  https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
-  https://fonts.gstatic.com
-  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
-  <style>
-    body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .glass { background: rgba(255,255,255,.7); border:1px solid rgba(255,255,255,.35);
-             backdrop-filter: saturate(140%) blur(10px); border-radius: 18px; box-shadow: 0 10px 35px rgba(0,0,0,.15); }
-    .metric-card{border-left-width:8px}
-    .metric-green{border-color:#10b981}.metric-yellow{border-color:#f59e0b}.metric-red{border-color:#ef4444}
-    .btn-primary{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%); color:#fff}
-    .btn-primary:hover{filter:brightness(1.05)}
-    .grid-auto{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF TECH — Professional AI Audit & Monitoring</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { jakarta: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; scroll-behavior: smooth; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .premium-blur { filter: blur(14px); pointer-events: none; opacity: 0.5; }
+        .gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+        progress::-webkit-progress-value { background-color: #6366f1; border-radius: 10px; }
+        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 10px; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="text-slate-900 overflow-x-hidden">
 
-  <!-- Header -->
-  <header class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3 9-8 10-5-1-8-5-8-10V6l8-4z" stroke="white" stroke-width="1.3"/></svg>
-        <div>
-          <h1 class="text-xl md:text-2xl font-black">{{ app_name }}</h1>
-          <p class="text-xs md:text-sm opacity-80">Open audits, scheduling & certified reports</p>
-        </div>
-      </div>
-      <nav class="flex items-center gap-4">
-        <button id="btn-login" class="underline">Login</button>
-        <button id="btn-register" class="underline">Register</button>
-        <span id="user-badge" class="hidden">
-          <span class="text-sm">Signed in: <b id="user-email"></b></span>
-          <button id="btn-logout" class="ml-3 underline">Logout</button>
-        </span>
-      </nav>
-    </div>
-  </header>
-
-  <!-- Main -->
-  <main class="max-w-7xl mx-auto px-6 py-6 space-y-6">
-
-    <!-- Health/Ping -->
-    <div class="glass p-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="text-sm">Health: <b id="health-status">checking…</b></span>
-        <span class="text-sm">Ping: <b id="ping-status">checking…</b></span>
-      </div>
-      <div class="text-xs opacity-70">Server time: <span id="server-time">—</span></div>
-    </div>
-
-    <!-- Audit form -->
-    <section class="glass p-6">
-      <h2 class="text-xl font-black">Run an Audit</h2>
-      <p class="text-sm opacity-80">Enter any website URL for an immediate, visual report</p>
-      <form id="audit-form" class="mt-4 flex flex-col md:flex-row gap-3">
-        <input id="website-url" type="url" placeholder="https://example.com" required
-               class="flex-1 rounded px-4 py-3 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Run Audit</button>
-        <button id="export-pdf" class="px-5 py-3 rounded border font-bold" type="button">Export PDF</button>
-      </form>
-      <p class="mt-2 text-xs opacity-70">Free audits remaining: <span id="free-remaining">—</span></p>
-    </section>
-
-    <!-- Progress & Summary -->
-    <section id="results" class="hidden space-y-6">
-      <div class="grid md:grid-cols-2 gap-6">
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Overall</h3>
-          <canvas id="overall-gauge"></canvas>
-        </div>
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Categories</h3>
-          <canvas id="category-chart"></canvas>
-        </div>
-      </div>
-      <div class="glass p-6">
-        <h3 class="text-lg font-black">Executive Summary</h3>
-        <p id="exec-summary" class="mt-2 leading-relaxed"></p>
-      </div>
-      <div class="grid md:grid-cols-3 gap-6">
-        <div class="glass p-6">
-          <h4 class="font-black text-green-700">Strengths</h4>
-          <ul id="strengths" class="mt-3 list-disc list-inside text-sm"></ul>
-        </div>
-        <div class="glass p-6">
-          <h4 class="font-black text-rose-700">Weak Areas</h4>
-          <ul id="weaknesses" class="mt-3 list-disc list-inside text-sm"></ul>
-        </div>
-        <div class="glass p-6">
-          <h4 class="font-black text-amber-700">Priority Fixes</h4>
-          <ul id="priority" class="mt-3 list-disc list-inside text-sm"></ul>
-        </div>
-      </div>
-      <div class="glass p-6">
-        <h4 class="text-lg font-black mb-3">Metrics (sample)</h4>
-        <div id="metrics-grid" class="grid-auto"></div>
-      </div>
-    </section>
-
-    <!-- Account & Scheduling -->
-    <section class="glass p-6">
-      <h2 class="text-xl font-black">Account & Scheduling</h2>
-      <div class="grid md:grid-cols-2 gap-6 mt-4">
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Add Website</h3>
-          <form id="add-site-form" class="space-y-3">
-            <input id="add-site-url" type="url" placeholder="https://example.com"
-                   class="w-full rounded px-4 py-3 border border-slate-300" required>
-            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Add</button>
-          </form>
-        </div>
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Schedule Daily Audit</h3>
-          <form id="schedule-form" class="space-y-3">
-            <input id="schedule-url" type="url" placeholder="https://example.com"
-                   class="w-full rounded px-4 py-3 border border-slate-300" required>
-            <div class="grid grid-cols-3 gap-3">
-              <input id="schedule-time" type="time" class="rounded px-4 py-3 border border-slate-300" value="09:00">
-              <input id="schedule-date" type="date" class="rounded px-4 py-3 border border-slate-300">
-              <input id="schedule-tz" type="text" class="rounded px-4 py-3 border border-slate-300" value="Asia/Karachi">
+    <nav class="fixed w-full z-[60] glass border-b border-slate-200 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i class="fas fa-shield-virus"></i>
+                </div>
+                <h1 class="text-xl font-extrabold tracking-tighter">FF TECH <span class="text-slate-400 font-normal">AUDIT</span></h1>
             </div>
-            <div class="grid grid-cols-2 gap-3 text-sm">
-              <label class="flex items-center gap-2"><input id="schedule-daily" type="checkbox" checked> Daily Report</label>
-              <label class="flex items-center gap-2"><input id="schedule-acc" type="checkbox" checked> Accumulated Report</label>
+            
+            <div id="nav-guest" class="flex items-center gap-4">
+                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600">Login</button>
+                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-xl hover:bg-black transition-all">Free Trial</button>
             </div>
-            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Save Schedule</button>
-          </form>
+            
+            <div id="nav-user" class="hidden flex items-center gap-6">
+                <span class="text-xs font-bold bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full" id="user-display-email">User</span>
+                <button onclick="logout()" class="text-rose-600 font-bold text-sm"><i class="fas fa-power-off"></i></button>
+            </div>
         </div>
-      </div>
+    </nav>
 
-      <div class="grid md:grid-cols-2 gap-6 mt-6">
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Your Schedules</h3>
-          <div id="schedules-list" class="space-y-2 text-sm opacity-90"></div>
+    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+        
+        <section class="text-center mb-16 animate-fade-in">
+            <h2 class="text-5xl md:text-7xl font-black tracking-tight mb-6">Technical <span class="text-transparent bg-clip-text gradient-bg">Intelligence.</span></h2>
+            <p class="text-slate-500 max-w-2xl mx-auto text-lg mb-10 font-medium">Analyze 250+ technical signals and set up automated health monitors with certified PDF reporting.</p>
+            
+            <form id="audit-form" class="max-w-3xl mx-auto p-2 glass rounded-3xl shadow-2xl flex flex-col md:flex-row gap-2 border-2 border-white">
+                <input id="target-url" type="url" placeholder="Enter URL (e.g. https://google.com)" required
+                       class="flex-1 px-6 py-4 rounded-2xl bg-transparent outline-none font-bold text-lg">
+                <button type="submit" class="gradient-bg text-white px-10 py-4 rounded-2xl font-black text-lg shadow-lg hover:scale-105 transition-all">
+                    START AUDIT
+                </button>
+            </form>
+            <p class="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Available Credits: <span id="val-remaining" class="text-brand-600 font-black">—</span>
+            </p>
+        </section>
+
+        <div id="audit-loading" class="hidden max-w-2xl mx-auto glass rounded-[2.5rem] p-10 shadow-xl mb-12 animate-fade-in">
+            <div class="flex justify-between items-end mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="animate-spin rounded-full h-4 w-4 border-2 border-brand-500 border-t-transparent"></div>
+                    <span class="font-bold text-brand-600 italic">Performing internal link crawl...</span>
+                </div>
+                <span id="load-pct" class="text-3xl font-black">0%</span>
+            </div>
+            <progress id="bar-progress" class="w-full h-3" value="0" max="100"></progress>
         </div>
-        <div class="glass p-4">
-          <h3 class="font-bold mb-2">Settings & Billing</h3>
-          <form id="settings-form" class="space-y-3">
-            <input id="settings-tz" type="text" placeholder="Asia/Karachi"
-                   class="w-full rounded px-4 py-3 border border-slate-300">
-            <label class="flex items-center gap-2 text-sm"><input id="settings-daily" type="checkbox"> Default: Daily emails</label>
-            <label class="flex items-center gap-2 text-sm"><input id="settings-acc" type="checkbox"> Default: Accumulated emails</label>
-            <button class="btn-primary px-5 py-3 rounded font-bold" type="submit">Save Settings</button>
-          </form>
-          <div class="mt-3">
-            <button id="subscribe-btn" class="btn-primary px-5 py-3 rounded font-bold">$5/month — Subscribe</button>
-          </div>
+
+        <div id="audit-results" class="hidden space-y-12 animate-fade-in">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="glass rounded-[3rem] p-10 flex flex-col items-center justify-center border-b-4 border-brand-500">
+                    <div class="relative w-44 h-44 mb-4">
+                        <canvas id="chart-overall"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="val-grade" class="text-6xl font-black text-slate-900">--</span>
+                            <span id="val-score" class="text-slate-400 font-bold">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Health Score</p>
+                </div>
+
+                <div class="lg:col-span-2 glass rounded-[3rem] p-10 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-8">
+                        <h3 class="text-2xl font-black">Executive Summary</h3>
+                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
+                            <i class="fas fa-file-pdf"></i> Download Report
+                        </button>
+                    </div>
+                    <p id="val-summary" class="text-slate-500 font-medium leading-relaxed mb-10 italic"></p>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bg-rose-50 p-6 rounded-[2rem] text-center border border-rose-100">
+                            <div id="val-errors" class="text-3xl font-black text-rose-500">0</div>
+                            <div class="text-[10px] font-bold text-rose-400 uppercase">Errors</div>
+                        </div>
+                        <div class="bg-amber-50 p-6 rounded-[2rem] text-center border border-amber-100">
+                            <div id="val-warnings" class="text-3xl font-black text-amber-500">0</div>
+                            <div class="text-[10px] font-bold text-amber-400 uppercase">Warnings</div>
+                        </div>
+                        <div class="bg-indigo-50 p-6 rounded-[2rem] text-center border border-indigo-100">
+                            <div id="val-notices" class="text-3xl font-black text-indigo-500">0</div>
+                            <div class="text-[10px] font-bold text-indigo-400 uppercase">Notices</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-3xl font-black tracking-tighter mb-8">Technical Signals</h3>
+                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+                    </div>
+
+                <div id="paywall-lock" class="hidden mt-12 glass rounded-[4rem] p-20 text-center border-2 border-brand-200 shadow-2xl">
+                    <i class="fas fa-lock text-4xl text-brand-500 mb-6"></i>
+                    <h4 class="text-4xl font-black mb-4 tracking-tight">Access Restricted</h4>
+                    <p class="text-slate-500 text-lg mb-10 max-w-xl mx-auto">Public audits are limited to top-level signals. Unlock all 250 checkpoints and daily automation for $5/mo.</p>
+                    <button onclick="checkout()" class="gradient-bg text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-xl shadow-brand-500/20">Go Premium</button>
+                </div>
+            </div>
+
+            <section id="scheduler-panel" class="hidden pt-20 border-t border-slate-200">
+                <div class="flex items-center gap-4 mb-10">
+                    <div class="w-14 h-14 gradient-bg rounded-2xl flex items-center justify-center text-white shadow-xl">
+                        <i class="fas fa-calendar-alt text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-3xl font-black tracking-tighter">Daily Monitors</h3>
+                        <p class="text-slate-400 font-bold text-sm">Automated audits and email reporting</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <div class="glass p-10 rounded-[3rem]">
+                        <form id="schedule-form" class="space-y-6">
+                            <div>
+                                <label class="text-[10px] font-black uppercase text-slate-400 ml-2 mb-2 block">Monitor URL</label>
+                                <input id="sch-url" type="url" placeholder="https://site.com" required class="w-full p-5 rounded-2xl border font-bold outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-[10px] font-black uppercase text-slate-400 ml-2 mb-2 block">Time (UTC)</label>
+                                    <input id="sch-time" type="time" value="09:00" class="w-full p-5 rounded-2xl border font-bold">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black uppercase text-slate-400 ml-2 mb-2 block">Timezone</label>
+                                    <input id="sch-tz" type="text" value="UTC" class="w-full p-5 rounded-2xl border font-bold">
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black shadow-lg">Set Active Monitor</button>
+                        </form>
+                    </div>
+                    <div id="sch-list-container" class="space-y-4">
+                        </div>
+                </div>
+            </section>
         </div>
-      </div>
-    </section>
+    </main>
 
-  </main>
-
-  <!-- Footer -->
-  <footer class="py-10">
-    <div class="max-w-7xl mx-auto px-6">
-      <div class="glass p-6 text-center">
-        <p class="font-black">FF Tech © <span id="year"></span></p>
-        <p class="text-xs opacity-70">Professional Scheduled Audit & Reporting · International Standard</p>
-      </div>
+    <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl">
+            <h3 class="text-3xl font-black mb-8">Login</h3>
+            <form id="login-form" class="space-y-4">
+                <input id="l-email" type="email" placeholder="Email" required class="w-full p-4 border rounded-2xl font-bold">
+                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 border rounded-2xl font-bold">
+                <button type="submit" class="w-full gradient-bg text-white py-5 rounded-2xl font-black">Sign In</button>
+            </form>
+            <button onclick="toggleModal('login-modal')" class="w-full mt-4 text-slate-400 font-bold uppercase text-xs">Cancel</button>
+        </div>
     </div>
-  </footer>
 
-  <script>
-    const $ = s => document.querySelector(s);
-    const state = { token: null, role: null, subscribed: false, freeRemaining: null, charts: {} };
+    <script>
+        const state = { token: localStorage.getItem('token'), charts: {} };
+        const $ = s => document.querySelector(s);
 
-    function toast(msg){ console.log('[Toast]', msg); }
+        function toggleModal(id) { $('#'+id).classList.toggle('hidden'); }
 
-    // Very small helper for API calls
-    async function api(path, opts = {}){
-      const headers = opts.headers || {};
-      if(state.token) headers['Authorization'] = 'Bearer ' + state.token;
-      if(!headers['Content-Type'] && opts.body) headers['Content-Type'] = 'application/json';
-      const res = await fetch(path, { ...opts, headers });
-      if(!res.ok){
-        const txt = await res.text().catch(()=> '');
-        throw new Error(`HTTP ${res.status} ${txt}`);
-      }
-      const ct = res.headers.get('Content-Type') || '';
-      if(ct.includes('application/pdf')) return res.blob();
-      if(ct.includes('application/json')) return res.json();
-      return res.text();
-    }
+        async function api(path, method = 'GET', body = null) {
+            const h = { 'Content-Type': 'application/json' };
+            if (state.token) h['Authorization'] = 'Bearer ' + state.token;
+            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
+            if (res.status === 401) { logout(); return; }
+            return res.json();
+        }
 
-    function chart(ctx, type, data){
-      return new Chart(ctx, {
-        type, data, options: { plugins: { legend: { display: false } }, responsive: true }
-      });
-    }
+        $('#audit-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const url = $('#target-url').value;
+            $('#audit-loading').classList.remove('hidden');
+            $('#audit-results').classList.add('hidden');
+            
+            let p = 0;
+            const timer = setInterval(() => {
+                p = Math.min(p + 5, 99);
+                $('#bar-progress').value = p;
+                $('#load-pct').innerText = p + '%';
+            }, 300);
 
-    function severityClass(sev){
-      return sev === 'green' ? 'metric-green' : (sev === 'yellow' ? 'metric-yellow' : 'metric-red');
-    }
+            try {
+                const data = await api(`/audit?url=${encodeURIComponent(url)}`);
+                clearInterval(timer);
+                renderReport(data);
+            } catch (err) { clearInterval(timer); alert('Service unreachable. Try again.'); }
+        };
 
-    function saveSession(token, role, remaining, subscribed, email){
-      localStorage.setItem('fftech_token', token);
-      localStorage.setItem('fftech_role', role || 'user');
-      localStorage.setItem('fftech_remaining', remaining ?? '');
-      localStorage.setItem('fftech_subscribed', subscribed ? 'true' : 'false');
-      localStorage.setItem('fftech_email', email || '');
-      state.token = token; state.role = role; state.freeRemaining = remaining; state.subscribed = subscribed;
-      $('#user-email').textContent = email || '';
-      $('#user-badge').classList.remove('hidden');
-      $('#btn-login').classList.add('hidden');
-      $('#btn-register').classList.add('hidden');
-    }
+        function renderReport(data) {
+            $('#audit-loading').classList.add('hidden');
+            $('#audit-results').classList.remove('hidden');
 
-    function clearSession(){
-      ['fftech_token','fftech_role','fftech_remaining','fftech_subscribed','fftech_email'].forEach(k=> localStorage.removeItem(k));
-      state.token = null; state.role = null; state.subscribed = false; state.freeRemaining = null;
-      $('#user-badge').classList.add('hidden');
-      $('#btn-login').classList.remove('hidden');
-      $('#btn-register').classList.remove('hidden');
-    }
+            $('#val-grade').innerText = data.grade;
+            $('#val-score').innerText = data.overall + '%';
+            $('#val-summary').innerText = data.summary;
+            $('#val-errors').innerText = data.errors;
+            $('#val-warnings').innerText = data.warnings;
+            $('#val-notices').innerText = data.notices;
+            $('#val-remaining').innerText = data.remaining ?? 'Unlimited';
 
-    function loadSession(){
-      const t = localStorage.getItem('fftech_token');
-      const role = localStorage.getItem('fftech_role');
-      const sub = localStorage.getItem('fftech_subscribed') === 'true';
-      const rem = localStorage.getItem('fftech_remaining');
-      const email = localStorage.getItem('fftech_email') || '';
-      if(t){
-        state.token = t; state.role = role; state.subscribed = sub; state.freeRemaining = rem ? parseInt(rem) : null;
-        $('#user-email').textContent = email;
-        $('#user-badge').classList.remove('hidden');
-        $('#btn-login').classList.add('hidden');
-        $('#btn-register').classList.add('hidden');
-      }
-    }
+            if(state.charts.overall) state.charts.overall.destroy();
+            state.charts.overall = new Chart($('#chart-overall'), {
+                type: 'doughnut', data: data.overall_gauge, options: { cutout: '80%', plugins: { legend: { display: false } } }
+            });
 
-    async function updateHealth(){
-      try{
-        const health = await api('/health');
-        $('#health-status').textContent = 'OK';
-        $('#server-time').textContent = health.time || '—';
-      }catch{ $('#health-status').textContent = 'error'; }
-      try{
-        const ping = await api('/ping');
-        $('#ping-status').textContent = ping === 'pong' ? 'OK' : '—';
-      }catch{ $('#ping-status').textContent = 'error'; }
-    }
+            const grid = $('#metrics-grid'); grid.innerHTML = '';
+            data.metrics.forEach(m => {
+                const card = document.createElement('div');
+                card.className = 'glass p-6 rounded-3xl border border-slate-100 shadow-sm';
+                card.innerHTML = `<h5 class="text-[9px] font-black text-slate-400 uppercase mb-3 tracking-widest">Signal ${m.num}</h5><canvas id="m-${m.num}" height="140"></canvas>`;
+                grid.appendChild(card);
+                new Chart($(`#m-${m.num}`), { type: m.chart_type, data: m.chart_data, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
+            });
 
-    async function runAudit(url){
-      const payload = await api(`/audit?url=${encodeURIComponent(url)}`);
-      $('#results').classList.remove('hidden');
+            if(!data.premium) {
+                grid.classList.add('premium-blur');
+                $('#paywall-lock').classList.remove('hidden');
+            } else {
+                grid.classList.remove('premium-blur');
+                $('#paywall-lock').classList.add('hidden');
+            }
+        }
 
-      $('#free-remaining').textContent = payload.remaining ?? '—';
-      $('#exec-summary').textContent = payload.summary;
-      $('#strengths').innerHTML = (payload.strengths || []).map(s => `<li>${s}</li>`).join('');
-      $('#weaknesses').innerHTML = (payload.weaknesses || []).map(s => `<li>${s}</li>`).join('');
-      $('#priority').innerHTML  = (payload.priority  || []).map(s => `<li>${s}</li>`).join('');
+        async function loadSchedules() {
+            const list = await api('/schedules');
+            const container = $('#sch-list-container');
+            container.innerHTML = '';
+            list.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'glass p-6 rounded-2xl flex justify-between items-center';
+                div.innerHTML = `<div><p class="font-bold text-sm text-brand-600">${s.website_url}</p><p class="text-[10px] font-bold text-slate-400">Daily at ${s.time_of_day} UTC</p></div><i class="fas fa-check-circle text-emerald-500"></i>`;
+                container.appendChild(div);
+            });
+        }
 
-      if(payload.overall_gauge){ chart($('#overall-gauge'), 'doughnut', payload.overall_gauge); }
-      if(payload.category_chart){ chart($('#category-chart'), 'bar', payload.category_chart); }
+        $('#schedule-form').onsubmit = async (e) => {
+            e.preventDefault();
+            await api('/schedule', 'POST', {
+                website_url: $('#sch-url').value,
+                time_of_day: $('#sch-time').value,
+                timezone: $('#sch-tz').value,
+                enabled: true
+            });
+            $('#sch-url').value = '';
+            loadSchedules();
+        };
 
-      const grid = $('#metrics-grid'); grid.innerHTML = '';
-      (payload.metrics || []).slice(0, 24).forEach(m => {
-        const pad = String(m.num).padStart(3,'0');
-        const card = document.createElement('div');
-        card.className = `glass p-4 metric-card ${severityClass(m.severity)}`;
-        card.innerHTML = `<h5 class="text-sm font-bold mb-2">${pad}. Metric ${pad}</h5><div class="h-48"><canvas id="chart-${pad}"></canvas></div>`;
-        grid.appendChild(card);
-        chart(document.getElementById(`chart-${pad}`), (m.chart_type || 'bar'), m.chart_data);
-      });
-    }
+        function downloadPDF() {
+            const url = $('#target-url').value;
+            window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
+        }
 
-    // Events
-    $('#audit-form').addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const url = $('#website-url').value.trim();
-      if(!url) return toast('Enter a website URL.');
-      try { await runAudit(url); } catch(err){ toast(err.message); }
-    });
+        async function checkout() {
+            const res = await api('/billing/checkout', 'POST');
+            if (res.url) window.location.href = res.url; else location.reload();
+        }
 
-    $('#export-pdf').addEventListener('click', async ()=>{
-      const url = $('#website-url').value || 'https://example.com';
-      try{
-        const pdf = await api(`/export-pdf?url=${encodeURIComponent(url)}`);
-        const blobUrl = URL.createObjectURL(pdf);
-        const a = document.createElement('a');
-        a.href = blobUrl; a.download = `fftech_audit_${Date.now()}.pdf`; a.click();
-        URL.revokeObjectURL(blobUrl);
-      }catch(err){ toast(err.message); }
-    });
+        $('#login-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: $('#l-email').value, password: $('#l-pass').value })
+            });
+            const d = await res.json();
+            if (d.token) { localStorage.setItem('token', d.token); location.reload(); }
+            else alert('Invalid credentials');
+        };
 
-    $('#btn-register').addEventListener('click', async ()=>{
-      const email = prompt('Email:'); const password = prompt('Password (min 8 chars):'); const timezone = prompt('Timezone:', 'Asia/Karachi');
-      if(!email || !password) return;
-      try{
-        const res = await api('/register', { method:'POST', body: JSON.stringify({ email, password, timezone }) });
-        toast(res.message || 'Registration successful.');
-      }catch(err){ toast(err.message); }
-    });
+        function logout() { localStorage.removeItem('token'); location.reload(); }
 
-    $('#btn-login').addEventListener('click', async ()=>{
-      const email = prompt('Email:'); const password = prompt('Password:');
-      if(!email || !password) return;
-      try{
-        const res = await api('/login', { method:'POST', body: JSON.stringify({ email, password }) });
-        saveSession(res.token, res.role, res.free_audits_remaining, res.subscribed, email);
-      }catch(err){ toast(err.message); }
-    });
-
-    $('#btn-logout').addEventListener('click', (e)=>{ e.preventDefault(); clearSession(); });
-
-    // Add website
-    $('#add-site-form').addEventListener('submit', async (e)=>{
-      e.preventDefault(); if(!state.token) return toast('Login required.');
-      const url = $('#add-site-url').value.trim(); if(!url) return toast('Enter a URL.');
-      try{ const res = await api('/websites', { method:'POST', body: JSON.stringify({ url }) }); toast(res.message || 'Added.'); }
-      catch(err){ toast(err.message); }
-    });
-
-    // Schedule
-    $('#schedule-form').addEventListener('submit', async (e)=>{
-      e.preventDefault(); if(!state.token) return toast('Login required.');
-      const payload = {
-        website_url: $('#schedule-url').value.trim(),
-        time_of_day:  $('#schedule-time').value || '09:00',
-        preferred_date: $('#schedule-date').value || null,
-        timezone: $('#schedule-tz').value || 'UTC',
-        daily_report: $('#schedule-daily').checked,
-        accumulated_report: $('#schedule-acc').checked,
-        enabled: true
-      };
-      if(!payload.website_url) return toast('Enter a site URL.');
-      try{ const res = await api('/schedule', { method:'POST', body: JSON.stringify(payload) });
-        toast(res.message || 'Schedule saved.'); await refreshSchedules();
-      }catch(err){ toast(err.message); }
-    });
-
-    async function refreshSchedules(){
-      if(!state.token) return;
-      try{
-        const sched = await api('/schedules');
-        const list = $('#schedules-list');
-        list.innerHTML = (sched || []).map(s => `
-          <div class="glass px-3 py-2 flex justify-between">
-            <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} · accumulated:${s.accumulated_report}</span>
-            <span class="opacity-60">last: ${s.last_run_at ?? '—'}</span>
-          </div>
-        `).join('');
-      }catch{}
-    }
-
-    // Settings
-    $('#settings-form').addEventListener('submit', async (e)=>{
-      e.preventDefault(); if(!state.token) return toast('Login required.');
-      const payload = { timezone: $('#settings-tz').value || 'UTC', notify_daily_default: $('#settings-daily').checked, notify_acc_default: $('#settings-acc').checked };
-      try{ const res = await api('/settings', { method:'POST', body: JSON.stringify(payload) }); toast(res.message || 'Settings updated.'); }
-      catch(err){ toast(err.message); }
-    });
-
-    // Billing
-    $('#subscribe-btn').addEventListener('click', async ()=>{
-      if(!state.token) return toast('Login required.');
-      try{
-        const res = await api('/billing/checkout', { method:'POST' });
-        if(res.url) window.location.href = res.url; else toast(res.message || 'Subscription activated (demo).');
-      }catch(err){ toast(err.message); }
-    });
-
-    // Init
-    (async function init(){
-      $('#year').textContent = new Date().getFullYear();
-      loadSession();
-      await updateHealth();
-      await refreshSchedules();
-    })();
-  </script>
+        (async function init() {
+            if (state.token) {
+                $('#nav-guest').classList.add('hidden');
+                $('#nav-user').classList.remove('hidden');
+                const billing = await api('/billing/status');
+                if (billing.subscribed) {
+                    $('#scheduler-panel').classList.remove('hidden');
+                    loadSchedules();
+                }
+            }
+        })();
+    </script>
 </body>
 </html>
