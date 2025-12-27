@@ -8,12 +8,17 @@
 # - Stripe checkout/webhook (demo fallback if not configured)
 # - Railway healthcheck: /health + bind to $PORT
 # - SAFE DB INIT + SAFE SESSIONS (graceful when DB is down)
-# - Flexible HTML linking: /page/<name>, /template/<name>, /static/*
+# - Flexible HTML linking:
+#     * /page/<name> (raw HTML from ./pages)
+#     * /template/<name> (Jinja renders from ./pages)
+#     * /static/* (assets from ./static)
+#   (All three are mounted only if directories exist or are auto-created)
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
+from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -29,7 +34,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
-# Stripe (lazy import in handlers to avoid boot crash if missing)
+# Stripe (lazy import inside handlers as needed)
 try:
     import stripe
 except Exception:
@@ -40,6 +45,7 @@ except Exception:
 # -----------------------------------------------
 APP_NAME = "FF Tech — Professional AI Website Audit Platform"
 USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_demo.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -63,6 +69,12 @@ STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", APP_BASE_URL + "/success")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", APP_BASE_URL + "/cancel")
+
+# Optional auto-create for static/templates folders (avoids RuntimeError)
+AUTO_CREATE_STATIC = os.getenv("AUTO_CREATE_STATIC", "true").lower() == "true"
+AUTO_CREATE_PAGES = os.getenv("AUTO_CREATE_PAGES", "true").lower() == "true"
+STATIC_DIR = os.getenv("STATIC_DIR", "static")
+PAGES_DIR = os.getenv("PAGES_DIR", "pages")
 
 # -----------------------------------------------
 # DB setup (lazy; safe init later)
@@ -203,7 +215,7 @@ def jwt_verify(token: str, key: str = SECRET_KEY) -> dict:
         raise HTTPException(status_code=401, detail=str(e))
 
 # -----------------------------------------------
-# FastAPI app + CORS + HTML linking
+# FastAPI app + CORS + flexible HTML linking
 # -----------------------------------------------
 app = FastAPI(title=APP_NAME)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -213,15 +225,42 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 async def health_check():
     return {"status": "healthy", "time": datetime.utcnow().isoformat()}
 
-# Static & templates (link any HTML)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="pages")
+# --- Conditionally ensure/mount static and pages ---
+def ensure_dir(path: str, auto_create: bool) -> bool:
+    if os.path.isdir(path):
+        return True
+    if auto_create:
+        try:
+            os.makedirs(path, exist_ok=True)
+            print(f"[INIT] Created missing directory: {path}")
+            return True
+        except Exception as e:
+            print(f"[INIT WARNING] Could not create directory '{path}': {e}")
+            return False
+    print(f"[INIT] Directory '{path}' not found (mount skipped).")
+    return False
+
+HAS_STATIC = ensure_dir(STATIC_DIR, AUTO_CREATE_STATIC)
+HAS_PAGES = ensure_dir(PAGES_DIR, AUTO_CREATE_PAGES)
+
+if HAS_STATIC:
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+else:
+    print("[INIT] Skipping /static mount (directory not present).")
+
+templates: Optional[Jinja2Templates] = None
+if HAS_PAGES:
+    templates = Jinja2Templates(directory=PAGES_DIR)
+else:
+    print("[INIT] Skipping Jinja templates mount (pages directory not present).")
 
 @app.get("/page/{name}", response_class=HTMLResponse)
 def get_plain_page(name: str):
+    if not HAS_PAGES:
+        raise HTTPException(status_code=404, detail="Pages directory not available")
     if any(ch in name for ch in ("..", "/", "\\")):
         raise HTTPException(status_code=400, detail="Invalid page name")
-    path = os.path.join("pages", f"{name}.html")
+    path = os.path.join(PAGES_DIR, f"{name}.html")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Page not found")
     with open(path, "r", encoding="utf-8") as f:
@@ -229,6 +268,8 @@ def get_plain_page(name: str):
 
 @app.get("/template/{name}", response_class=HTMLResponse)
 def get_jinja_page(name: str, request: Request):
+    if not HAS_PAGES or not templates:
+        raise HTTPException(status_code=404, detail="Templates not available")
     if any(ch in name for ch in ("..", "/", "\\")):
         raise HTTPException(status_code=400, detail="Invalid template name")
     return templates.TemplateResponse(f"{name}.html", {"request": request, "app_name": APP_NAME})
@@ -346,7 +387,6 @@ def run_actual_audit(target_url: str) -> dict:
     robots_ok = bool(robots_head and robots_head.status_code < 400)
     sitemap_ok = bool(sitemap_head and sitemap_head.status_code < 400)
 
-    # Internal crawl
     crawled = crawl_internal(resp.url, max_pages=100)
     statuses = {"2xx":0,"3xx":0,"4xx":0,"5xx":0,None:0}
     redirect_chains = 0
@@ -368,7 +408,6 @@ def run_actual_audit(target_url: str) -> dict:
         if row.get("status") in (404, 410):
             broken_internal += 1
 
-    # Scoring
     seo_score = 100
     if not title_tag: seo_score -= 20
     if title_tag and (len(title_tag) < 10 or len(title_tag) > 65): seo_score -= 8
@@ -405,11 +444,11 @@ def run_actual_audit(target_url: str) -> dict:
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     sec_score = 100
-    if not hsts: sec_score -= 18
-    if not csp: sec_score -= 18
-    if not xfo: sec_score -= 10
-    if not xcto: sec_score -= 8
-    if not refpol: sec_score -= 6
+    if not headers.get("Strict-Transport-Security"): sec_score -= 18
+    if not headers.get("Content-Security-Policy"): sec_score -= 18
+    if not headers.get("X-Frame-Options"): sec_score -= 10
+    if not headers.get("X-Content-Type-Options"): sec_score -= 8
+    if not headers.get("Referrer-Policy"): sec_score -= 6
     if mixed: sec_score -= 25
 
     overall = round(0.26 * seo_score + 0.28 * perf_score + 0.14 * a11y_score + 0.12 * bp_score + 0.20 * sec_score)
@@ -480,9 +519,10 @@ def run_actual_audit(target_url: str) -> dict:
     add_metric(3, 80 if warnings <= 2 else 50)
     for n in range(4, 251):
         base = overall if n<=55 else (cat2_total if n<=75 else (seo_score if n<=110 else (perf_score if n<=131 else (sec_score if n<=185 else 70))))
-        metrics.append({"num": n, "severity": "green" if base>=80 else "yellow" if base>=60 else "red",
+        pass_pct = max(10, min(100, base - ((n%7)*2)))
+        metrics.append({"num": n, "severity": "green" if pass_pct>=80 else "yellow" if pass_pct>=60 else "red",
                         "chart_type": "bar" if n%5 else "doughnut",
-                        "chart_data": {"labels": ["Pass","Fail"], "datasets":[{"data":[max(10,min(100, base - ((n%7)*2))), 100-max(10,min(100, base - ((n%7)*2)))], "backgroundColor": ["#10b981","#ef4444"], "borderWidth":0}]}})
+                        "chart_data": {"labels": ["Pass","Fail"], "datasets":[{"data":[pass_pct, 100-pass_pct], "backgroundColor": ["#10b981","#ef4444"], "borderWidth":0}]}})
 
     return {
         "grade": grade, "summary": exec_summary, "strengths": strengths, "weaknesses": weaknesses, "priority": priority,
@@ -493,7 +533,7 @@ def run_actual_audit(target_url: str) -> dict:
     }
 
 # -----------------------------------------------
-# Minimal landing page (no stray backticks)
+# Minimal landing page (safe)
 # -----------------------------------------------
 INDEX_HTML = r"""<!DOCTYPE html>
 <html lang='en'>
@@ -535,19 +575,27 @@ class LoginIn(BaseModel):
 
 class ScheduleIn(BaseModel):
     website_url: str
-    time_of_day: str
+    time_of_day: str         # "HH:MM"
     timezone: str
     preferred_date: str | None = None
     daily_report: bool = True
     accumulated_report: bool = True
     enabled: bool = True
 
+class WebsiteIn(BaseModel):
+    url: str
+
+class SettingsIn(BaseModel):
+    timezone: str
+    notify_daily_default: bool
+    notify_acc_default: bool
+
 # -----------------------------------------------
 # Routes (DB-safe)
 # -----------------------------------------------
 @app.get("/export-pdf")
 def export_pdf(url: str = Query(...)):
-    # Lazy reportlab import
+    # Lazy import avoids boot issues
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
@@ -644,10 +692,6 @@ def verify(token: str):
         user.is_verified = True; db.commit()
         return {"message": "Email verified. You can now log in."}
 
-class LoginIn(BaseModel):
-    email: EmailStr
-    password: str
-
 @app.post("/login")
 def login(payload: LoginIn, request: Request):
     with safe_session() as db:
@@ -674,9 +718,6 @@ def login(payload: LoginIn, request: Request):
 # -----------------------------------------------
 # Websites & Scheduling
 # -----------------------------------------------
-class WebsiteIn(BaseModel):
-    url: str
-
 @app.post("/websites")
 def add_website(payload: WebsiteIn, authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -948,3 +989,25 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run("app:app", host="0.0.0.0", port=port)
+
+# -----------------------------------------------
+# Email sending (placed last to keep code tidy)
+# -----------------------------------------------
+def send_email(to_email: str, subject: str, body: str, attachments: list[tuple[str, bytes]] | None = None):
+    """SMTP send if configured; else print (dev)."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS or not EMAIL_SENDER:
+        print(f"[EMAIL FAKE SEND] To: {to_email} | Subject: {subject}\n{body[:500]}\nAttachments: {len(attachments or [])}")
+        return
+    import ssl, smtplib
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg["From"] = EMAIL_SENDER
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+    for fname, data in (attachments or []):
+        msg.add_attachment(data, maintype="application", subtype="pdf", filename=fname)
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server.starttls(context=ssl.create_default_context())
+        server.login(SMTP_USER, SMTP_PASS)
+        server.send_message(msg)
