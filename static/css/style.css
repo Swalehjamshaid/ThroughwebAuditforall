@@ -1,71 +1,28 @@
-/* --- Global Reset & Smoothness --- */
-* {
-    transition: all 0.2s ease-in-out;
-}
-
-/* --- Status Pulse Indicator --- */
-/* Used to show the crawler is active */
+/* Custom status pulse for crawl indicator */
 .status-pulse {
     width: 12px;
     height: 12px;
-    background-color: #6366f1; /* Brand Indigo */
+    background-color: #6366f1;
     border-radius: 50%;
     display: inline-block;
     box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
-    animation: pulse-animation 1.5s infinite;
+    animation: pulse 1.5s infinite;
 }
 
-@keyframes pulse-animation {
+@keyframes pulse {
     0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
     70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
 }
 
-/* --- Glassmorphism Entry Animation --- */
 .glass-entry {
-    animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Metric Grid Fade-In --- */
-#metrics-grid > div {
-    animation: fadeIn 0.5s ease-out forwards;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.98); }
-    to { opacity: 1; transform: scale(1); }
-}
-
-/* --- Premium Lock Overlay Animation --- */
-#paywall-lock {
-    animation: lockShake 4s ease-in-out infinite;
-}
-
-@keyframes lockShake {
-    0%, 100% { transform: rotate(0deg); }
-    2% { transform: rotate(1deg); }
-    4% { transform: rotate(-1deg); }
-    6% { transform: rotate(0deg); }
-}
-
-/* --- Progress Bar Styling --- */
-progress {
-    appearance: none;
-    -webkit-appearance: none;
-}
-
-progress::-webkit-progress-bar {
-    background-color: #f1f5f9;
-    border-radius: 100px;
-}
-
-progress::-webkit-progress-value {
-    background: linear-gradient(90deg, #6366f1, #a855f7);
-    border-radius: 100px;
-    transition: width 0.4s ease;
-}
+/* Fix for standard Tailwind hide/show */
+.hidden { display: none !important; }
