@@ -3,215 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH — Professional AI Website Audit</title>
-    
+    <title>{{ app_name }}</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/main.js" defer></script>
+
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; scroll-behavior: smooth; }
-        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
-        .status-pulse { 
-            width: 14px; height: 14px; background: #6366f1; border-radius: 50%; 
-            display: inline-block; animation: pulse 1.5s infinite; 
-        }
-        @keyframes pulse { 
-            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); } 
-            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); } 
-            100% { transform: scale(0.9); } 
-        }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.8); }
+        .admin-tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 800; }
         .hidden { display: none !important; }
-        .admin-tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; }
     </style>
 </head>
 <body class="text-slate-900">
 
     <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.reload()">
-            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
                 <i class="fas fa-robot text-xs"></i>
             </div>
             <span class="font-extrabold tracking-tighter text-xl italic uppercase">FF TECH</span>
         </div>
         
-        <div id="nav-actions" class="flex items-center gap-4">
+        <div class="flex items-center gap-4">
             <div id="nav-links" class="hidden md:flex gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400 mr-4">
-                <button onclick="showSection('hero')" class="hover:text-indigo-600">Audit</button>
-                <button onclick="loadSchedules()" class="auth-only hidden hover:text-indigo-600">Schedules</button>
-                <button onclick="loadAdmin()" class="admin-only hidden text-rose-500">Admin</button>
+                <button onclick="showSection('section-audit')">Audit Engine</button>
+                <button onclick="showSection('section-schedules')" class="auth-only hidden">Monitoring</button>
+                <button onclick="loadAdmin()" class="admin-only hidden text-rose-500">Admin Console</button>
             </div>
-            <button id="auth-btn" onclick="openAuthModal()" class="text-sm font-bold text-slate-600">Login</button>
-            <button id="upgrade-btn" onclick="checkoutStripe()" class="hidden bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-indigo-100">Go Pro</button>
+            <button id="auth-btn" onclick="openModal('auth-modal')" class="text-xs font-black uppercase tracking-widest text-slate-600">Login</button>
+            <button id="pro-btn" onclick="subscribe()" class="hidden bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-indigo-100 transition hover:scale-105">Go Pro</button>
         </div>
     </nav>
 
     <main class="pt-32 pb-20 px-6 max-w-6xl mx-auto">
         
-        <section id="hero" class="section-view text-center mb-16">
+        <section id="section-audit" class="section-view text-center mb-16">
             <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tighter">AI Website <span class="text-indigo-600">Audit.</span></h1>
-            <p class="text-slate-400 mb-10 text-lg font-medium max-w-2xl mx-auto italic">Technical signals for SEO, Performance, and Security. Verified in seconds.</p>
+            <p class="text-slate-400 mb-10 text-lg font-medium max-w-2xl mx-auto italic">Verified technical health across 250+ technical SEO & performance signals.</p>
             
             <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
-                <input id="url-input" type="url" placeholder="https://example.com" required 
-                       class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
-                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase tracking-tighter">
-                    Analyze Site
-                </button>
+                <input id="url-input" type="url" placeholder="https://example.com" required class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
+                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition shadow-xl uppercase tracking-tighter">Analyze</button>
             </form>
         </section>
 
-        <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem] border border-indigo-50">
-            <div class="status-pulse mb-4"></div>
-            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">CRAWLING PAGES & CHECKING HEADERS...</p>
+        <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem]">
+            <div class="status-pulse mb-4 mx-auto"></div>
+            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">CRAWLING PAGES & GENERATING INSIGHTS...</p>
         </div>
 
-        <div id="results-view" class="hidden space-y-8 animate-in fade-in duration-700">
+        <div id="results-view" class="hidden space-y-8">
+            
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative">
+                <div class="bg-white p-10 rounded-[3rem] shadow-sm border flex flex-col items-center justify-center relative">
                     <canvas id="mainChart" width="220" height="220"></canvas>
                     <div class="absolute inset-0 flex flex-col items-center justify-center pt-6">
                         <div id="grade-display" class="text-7xl font-black text-indigo-600 italic tracking-tighter">--</div>
-                        <div class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Grade</div>
                     </div>
                 </div>
                 
                 <div class="md:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-center">
                     <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-[0.3em]">Executive Summary</h3>
-                        <button onclick="exportPDF()" class="text-indigo-600 font-bold text-xs"><i class="fas fa-file-pdf mr-1"></i> PDF</button>
+                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Executive Intelligence</h3>
+                        <button onclick="downloadPDF()" class="text-indigo-600 font-bold text-xs uppercase"><i class="fas fa-file-pdf mr-1"></i> Export 5-Page PDF</button>
                     </div>
                     <p id="summary-text" class="text-slate-600 leading-relaxed text-lg font-medium italic mb-8"></p>
                     <div class="flex gap-3">
                          <div class="bg-indigo-50 px-5 py-3 rounded-2xl">
-                            <span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Health Score</span>
+                            <span class="text-[10px] font-black text-indigo-400 block uppercase mb-1 tracking-widest">Overall Score</span>
                             <span id="score-text" class="font-bold text-indigo-600 text-xl">0%</span>
                          </div>
-                         <div id="pro-badge" class="hidden bg-emerald-50 px-5 py-3 rounded-2xl flex items-center">
-                            <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest"><i class="fas fa-check-circle mr-1"></i> Pro Results</span>
-                         </div>
                     </div>
                 </div>
             </div>
-
-            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
-
-            <div id="paywall-cta" class="hidden p-12 bg-slate-900 rounded-[3rem] text-white text-center">
-                <h3 class="text-2xl font-bold mb-4">Unlock 200+ Additional Technical Signals</h3>
-                <p class="text-slate-400 mb-8 max-w-md mx-auto">Get deep insights, automated scheduling, and certified PDF reports with a Professional subscription.</p>
-                <button onclick="checkoutStripe()" class="bg-indigo-600 px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-xl shadow-indigo-500/20">Upgrade for $5/mo</button>
-            </div>
+            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-6 gap-4"></div>
         </div>
 
-        <section id="schedules-view" class="section-view hidden">
-            <div class="flex justify-between items-center mb-10">
-                <h2 class="text-4xl font-black tracking-tighter">My <span class="text-indigo-600">Schedules</span></h2>
-                <button onclick="openScheduleModal()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl">+ New Audit</button>
+        <section id="section-admin" class="section-view hidden">
+            <h2 class="text-4xl font-black tracking-tight mb-10 text-rose-500 uppercase italic">Admin Oversight</h2>
+            <div class="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
+                <div class="flex border-b bg-slate-50/50">
+                    <button id="tab-users" onclick="adminTab('users')" class="px-8 py-4 text-[10px] font-black uppercase admin-tab-active border-r">Users List</button>
+                    <button id="tab-audits" onclick="adminTab('audits')" class="px-8 py-4 text-[10px] font-black uppercase">Audit History</button>
+                </div>
+                <div id="admin-table-container" class="p-6 overflow-x-auto min-h-[300px]"></div>
             </div>
-            <div id="schedule-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
         </section>
 
-        <section id="admin-view" class="section-view hidden">
-            <h2 class="text-4xl font-black tracking-tighter mb-10 text-rose-500">Admin Panel</h2>
-            <div class="bg-white rounded-[2.5rem] border overflow-hidden shadow-sm">
-                <div class="flex border-b bg-slate-50/50">
-                    <button onclick="setAdminTab('users')" id="tab-btn-users" class="px-8 py-4 text-xs font-black uppercase tracking-widest admin-tab-active">Users</button>
-                    <button onclick="setAdminTab('audits')" id="tab-btn-audits" class="px-8 py-4 text-xs font-black uppercase tracking-widest">Audit Logs</button>
-                </div>
-                <div id="admin-content" class="p-6 overflow-x-auto"></div>
-            </div>
-        </section>
     </main>
 
-    <div id="auth-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
-        <div class="relative bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl">
-            <h2 id="auth-title" class="text-3xl font-black mb-2">Welcome Back</h2>
-            <p id="auth-subtitle" class="text-slate-400 text-sm mb-8">Access your dashboard and professional reports.</p>
+    <div id="auth-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative">
+            <h2 id="auth-title" class="text-3xl font-black mb-6">Login</h2>
             <form onsubmit="handleAuth(event)" class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email Address" required class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-bold border-none">
-                <input type="password" id="auth-pass" placeholder="Password" required class="w-full p-4 bg-slate-50 rounded-xl outline-none focus:ring-2 ring-indigo-500 font-bold border-none">
-                <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-100 mt-4">Continue</button>
+                <input type="email" id="auth-email" placeholder="Email" required class="w-full p-4 bg-slate-50 rounded-xl border-none font-bold">
+                <input type="password" id="auth-pass" placeholder="Password" required class="w-full p-4 bg-slate-50 rounded-xl border-none font-bold">
+                <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg">Continue</button>
             </form>
-            <button onclick="toggleAuthMode()" id="auth-toggle" class="w-full mt-6 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-indigo-600">Need an account? Sign Up</button>
-        </div>
-    </div>
-
-    <div id="schedule-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6">
-        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeScheduleModal()"></div>
-        <div class="relative bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl">
-            <h2 class="text-3xl font-black mb-6">Schedule <span class="text-indigo-600">Audit</span></h2>
-            <form onsubmit="handleSchedule(event)" class="space-y-6">
-                <div>
-                    <label class="text-[10px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Website URL</label>
-                    <input type="url" id="sch-url" placeholder="https://..." required class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-[10px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Daily Time</label>
-                        <input type="time" id="sch-time" value="09:00" class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-black uppercase text-slate-400 block mb-2 tracking-widest">Timezone</label>
-                        <select id="sch-tz" class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
-                            <option value="UTC">UTC</option>
-                            <option value="America/New_York">EST</option>
-                            <option value="Europe/London">GMT</option>
-                        </select>
-                    </div>
-                </div>
-                <button type="submit" class="w-full py-4 bg-slate-900 text-white rounded-xl font-bold shadow-xl">Activate Monitoring</button>
-            </form>
+            <button onclick="toggleAuthMode()" id="auth-switch" class="w-full mt-6 text-[10px] font-black text-slate-400 uppercase text-center block">Need an account? Sign Up</button>
         </div>
     </div>
 
     <script>
-        let currentUser = null;
-        let authToken = localStorage.getItem('token');
-        let currentChart = null;
-        let isLoginMode = true;
+        let token = localStorage.getItem('token');
+        let chart = null;
+        let isLogin = true;
 
-        // --- Initialization ---
-        if (authToken) fetchUserStatus();
-
-        async function fetchUserStatus() {
-            try {
-                const res = await fetch('/billing/status', {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                if (res.ok) {
-                    currentUser = await res.json();
-                    updateUI();
-                } else {
-                    logout();
-                }
-            } catch (e) { console.error("Session fetch failed", e); }
-        }
-
-        function updateUI() {
-            document.getElementById('auth-btn').innerText = 'Logout';
-            document.getElementById('auth-btn').onclick = logout;
-            document.querySelectorAll('.auth-only').forEach(el => el.classList.remove('hidden'));
-            
-            if (!currentUser.subscribed) {
-                document.getElementById('upgrade-btn').classList.remove('hidden');
-            } else {
-                document.getElementById('upgrade-btn').classList.add('hidden');
-            }
-
-            // Simple admin check based on token data (decode payload)
-            try {
-                const payload = JSON.parse(atob(authToken.split('.')[1]));
-                if (payload.role === 'admin') {
-                    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
-                }
-            } catch(e){}
-        }
-
-        function logout() {
-            localStorage.removeItem('token');
-            location.reload();
+        // API Handler with JWT support
+        async function api(path, method = 'GET', body = null) {
+            const h = { 'Content-Type': 'application/json' };
+            if (token) h['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
+            if (res.status === 401) { localStorage.removeItem('token'); location.reload(); }
+            return res.json();
         }
 
         function showSection(id) {
@@ -219,190 +129,103 @@
             document.getElementById(id).classList.remove('hidden');
         }
 
-        // --- Audit Logic ---
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        // Core Audit Logic
         document.getElementById('audit-form').onsubmit = async (e) => {
             e.preventDefault();
             const url = document.getElementById('url-input').value;
             
-            document.getElementById('loading-zone').classList.remove('hidden');
+            if (typeof fadeToggle === "function") fadeToggle('loading-zone', true);
+            else document.getElementById('loading-zone').classList.remove('hidden');
+            
             document.getElementById('results-view').classList.add('hidden');
-            showSection('hero');
 
-            try {
-                const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-                const res = await fetch(`/audit?url=${encodeURIComponent(url)}`, { headers });
-                const data = await res.json();
-                
-                renderResults(data);
-            } catch (err) {
-                alert("The audit server is currently busy. Please try again in a few moments.");
-            } finally {
-                document.getElementById('loading-zone').classList.add('hidden');
-            }
-        };
+            const data = await api(`/audit?url=${encodeURIComponent(url)}`);
+            
+            if (typeof fadeToggle === "function") fadeToggle('loading-zone', false);
+            else document.getElementById('loading-zone').classList.add('hidden');
 
-        function renderResults(data) {
             document.getElementById('results-view').classList.remove('hidden');
+            document.getElementById('results-view').classList.add('glass-entry'); // From your CSS
+
             document.getElementById('grade-display').innerText = data.grade;
             document.getElementById('summary-text').innerText = data.summary;
             document.getElementById('score-text').innerText = data.overall + '%';
 
-            // Pro Logic
-            if (data.premium) {
-                document.getElementById('pro-badge').classList.remove('hidden');
-                document.getElementById('paywall-cta').classList.add('hidden');
-            } else {
-                document.getElementById('pro-badge').classList.add('hidden');
-                document.getElementById('paywall-cta').classList.remove('hidden');
-            }
-
-            // Gauge
-            if (currentChart) currentChart.destroy();
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            currentChart = new Chart(ctx, {
+            if (chart) chart.destroy();
+            chart = new Chart(document.getElementById('mainChart').getContext('2d'), {
                 type: 'doughnut',
                 data: data.overall_gauge,
-                options: { cutout: '88%', plugins: { legend: { display: false } } }
+                options: { cutout: '85%', plugins: { legend: { display: false } } }
             });
 
-            // Grid
-            const grid = document.getElementById('metrics-grid');
-            grid.innerHTML = data.metrics.slice(0, 12).map(m => {
-                const passPct = m.chart_data.datasets[0].data[0];
-                const color = m.severity === 'green' ? 'bg-indigo-500' : (m.severity === 'yellow' ? 'bg-amber-500' : 'bg-rose-500');
-                return `
-                <div class="bg-white p-6 rounded-3xl border border-slate-50 shadow-sm text-center">
-                    <div class="text-[9px] font-black text-slate-300 uppercase mb-3 tracking-widest">Signal ${m.num}</div>
-                    <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full ${color}" style="width: ${passPct}%"></div>
+            document.getElementById('metrics-grid').innerHTML = data.metrics.slice(0, 12).map(m => `
+                <div class="bg-white p-5 rounded-3xl border shadow-sm text-center">
+                    <div class="text-[8px] font-black text-slate-300 uppercase mb-3">Signal ${m.num}</div>
+                    <div class="h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-500" style="width: ${m.chart_data.datasets[0].data[0]}%"></div>
                     </div>
-                </div>`;
-            }).join('');
-        }
+                </div>`).join('');
+        };
 
-        // --- Schedules Logic ---
-        async function loadSchedules() {
-            showSection('schedules-view');
-            const res = await fetch('/schedules', { headers: { 'Authorization': `Bearer ${authToken}` } });
-            const data = await res.json();
+        // Admin Oversight
+        async function adminTab(type) {
+            const container = document.getElementById('admin-table-container');
+            document.getElementById('tab-users').classList.toggle('admin-tab-active', type === 'users');
+            document.getElementById('tab-audits').classList.toggle('admin-tab-active', type === 'audits');
             
-            const list = document.getElementById('schedule-list');
-            list.innerHTML = data.map(s => `
-                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex justify-between items-center">
-                    <div>
-                        <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Automated Audit</div>
-                        <h4 class="font-bold text-lg text-slate-800 truncate max-w-xs">${s.website_url}</h4>
-                        <div class="text-xs font-bold text-slate-400 mt-1">${s.time_of_day} ${s.timezone} • Daily Reports</div>
-                    </div>
-                    <div class="text-right">
-                        <div class="bg-emerald-50 text-emerald-600 text-[10px] font-black px-4 py-1.5 rounded-full uppercase">Active</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function handleSchedule(e) {
-            e.preventDefault();
-            const payload = {
-                website_url: document.getElementById('sch-url').value,
-                time_of_day: document.getElementById('sch-time').value,
-                timezone: document.getElementById('sch-tz').value
-            };
-            const res = await fetch('/schedule', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                closeScheduleModal();
-                loadSchedules();
-            }
-        }
-
-        // --- Admin Logic ---
-        async function loadAdmin() {
-            showSection('admin-view');
-            setAdminTab('users');
-        }
-
-        async function setAdminTab(tab) {
-            document.getElementById('tab-btn-users').classList.toggle('admin-tab-active', tab === 'users');
-            document.getElementById('tab-btn-audits').classList.toggle('admin-tab-active', tab === 'audits');
-            
-            const res = await fetch(`/admin/${tab}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
-            const data = await res.json();
-            
-            const container = document.getElementById('admin-content');
-            if (tab === 'users') {
-                container.innerHTML = `
-                <table class="w-full text-left text-xs font-medium">
-                    <thead class="bg-slate-50 text-slate-400 uppercase font-black tracking-widest">
-                        <tr><th class="p-4">Email</th><th class="p-4">Role</th><th class="p-4">Subscribed</th><th class="p-4">Audits Left</th></tr>
-                    </thead>
-                    <tbody>
-                        ${data.map(u => `<tr class="border-t"><td class="p-4 font-bold">${u.email}</td><td class="p-4">${u.role}</td><td class="p-4">${u.subscribed ? '✅' : '❌'}</td><td class="p-4">${u.free_audits_remaining}</td></tr>`).join('')}
-                    </tbody>
+            const data = await api(`/admin/${type}`);
+            if (type === 'users') {
+                container.innerHTML = `<table class="w-full text-left text-xs border-collapse font-bold">
+                    <tr class="border-b uppercase text-[9px] font-black text-slate-400">
+                        <th class="p-4">User</th><th class="p-4">Sub</th><th class="p-4">Remaining</th>
+                    </tr>
+                    ${data.map(u => `<tr class="border-b hover:bg-slate-50 transition"><td class="p-4">${u.email}</td><td class="p-4">${u.subscribed ? '👑 PRO' : 'FREE'}</td><td class="p-4">${u.free_audits_remaining}</td></tr>`).join('')}
                 </table>`;
             } else {
-                container.innerHTML = `
-                <table class="w-full text-left text-xs font-medium">
-                    <thead class="bg-slate-50 text-slate-400 uppercase font-black tracking-widest">
-                        <tr><th class="p-4">URL</th><th class="p-4">Grade</th><th class="p-4">Overall</th><th class="p-4">Date</th></tr>
-                    </thead>
-                    <tbody>
-                        ${data.map(a => `<tr class="border-t"><td class="p-4 font-bold truncate max-w-xs">${a.url}</td><td class="p-4 font-black text-indigo-600">${a.grade}</td><td class="p-4">${a.overall}%</td><td class="p-4">${new Date(a.created_at).toLocaleDateString()}</td></tr>`).join('')}
-                    </tbody>
+                container.innerHTML = `<table class="w-full text-left text-xs border-collapse font-bold">
+                    <tr class="border-b uppercase text-[9px] font-black text-slate-400">
+                        <th class="p-4">Website</th><th class="p-4">Grade</th><th class="p-4">Score</th>
+                    </tr>
+                    ${data.map(a => `<tr class="border-b hover:bg-slate-50 transition"><td class="p-4 text-indigo-600 truncate max-w-[150px]">${a.url}</td><td class="p-4 font-black">${a.grade}</td><td class="p-4">${a.overall}%</td></tr>`).join('')}
                 </table>`;
             }
         }
 
-        // --- Modal & Billing Helpers ---
-        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
-        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
-        function openScheduleModal() { document.getElementById('schedule-modal').classList.remove('hidden'); }
-        function closeScheduleModal() { document.getElementById('schedule-modal').classList.add('hidden'); }
+        function loadAdmin() { showSection('section-admin'); adminTab('users'); }
 
-        function toggleAuthMode() {
-            isLoginMode = !isLoginMode;
-            document.getElementById('auth-title').innerText = isLoginMode ? 'Welcome Back' : 'Create Account';
-            document.getElementById('auth-toggle').innerText = isLoginMode ? 'Need an account? Sign Up' : 'Have an account? Login';
-        }
-
+        // Onboarding & Billing
         async function handleAuth(e) {
             e.preventDefault();
-            const endpoint = isLoginMode ? '/login' : '/register';
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-pass').value;
-
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            
-            if (data.token) {
-                localStorage.setItem('token', data.token);
-                location.reload();
-            } else {
-                alert(data.message || data.detail || "Authentication failed");
-            }
+            const data = await api(isLogin ? '/login' : '/register', 'POST', { email, password });
+            if (data.token) { localStorage.setItem('token', data.token); location.reload(); }
         }
 
-        async function checkoutStripe() {
-            if (!authToken) return openAuthModal();
-            const res = await fetch('/billing/checkout', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            const data = await res.json();
+        function toggleAuthMode() { isLogin = !isLogin; document.getElementById('auth-title').innerText = isLogin ? 'Login' : 'Sign Up'; }
+        
+        async function subscribe() {
+            const data = await api('/billing/checkout', 'POST');
             if (data.url) window.location.href = data.url;
-            else alert(data.message); // Demo fallback
+            else { alert(data.message); location.reload(); }
         }
 
-        function exportPDF() {
+        function downloadPDF() {
             const url = document.getElementById('url-input').value;
             window.location.href = `/export-pdf?url=${encodeURIComponent(url)}`;
+        }
+
+        // Init Session State
+        if (token) {
+            document.getElementById('auth-btn').innerText = 'Logout';
+            document.getElementById('auth-btn').onclick = () => { localStorage.removeItem('token'); location.reload(); };
+            document.querySelectorAll('.auth-only').forEach(el => el.classList.remove('hidden'));
+            api('/billing/status').then(d => { if (d && !d.subscribed) document.getElementById('pro-btn')?.classList.remove('hidden'); });
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (payload.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
         }
     </script>
 </body>
