@@ -3,184 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech | Professional AI Website Audit</title>
+    <title>FF Tech — World-Class AI Audit Dashboard</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
-        .gradient-brand { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
-        .card { background: white; border-radius: 1.5rem; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); transition: 0.3s; }
-        .metric-card { border-left: 6px solid; }
-        .green { border-color: #10b981; }
-        .yellow { border-color: #f59e0b; }
-        .red { border-color: #ef4444; }
-        .premium-blur { filter: blur(8px); pointer-events: none; opacity: 0.6; }
-        canvas { max-height: 200px; width: 100% !important; }
+        .brand-gradient { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+        .glass-panel { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
+        .card { background: white; border-radius: 1.5rem; border: 1px solid #e2e8f0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .metric-card { border-left-width: 6px; }
+        .green { border-left-color: #10b981; }
+        .yellow { border-left-color: #f59e0b; }
+        .red { border-left-color: #ef4444; }
+        .premium-blur { filter: blur(12px); pointer-events: none; opacity: 0.5; }
+        .nav-link { font-weight: 700; font-size: 0.875rem; color: #64748b; transition: color 0.2s; }
+        .nav-link:hover { color: #4f46e5; }
+        canvas { max-height: 220px; width: 100% !important; }
     </style>
 </head>
 <body class="antialiased">
 
-    <nav class="glass sticky top-0 z-50 px-8 py-4 flex justify-between items-center border-b border-slate-200">
+    <nav class="glass-panel sticky top-0 z-50 px-8 py-4 flex justify-between items-center border-b border-slate-200">
         <div class="flex items-center gap-2">
-            <div class="gradient-brand p-2 rounded-lg text-white"><i data-lucide="shield-check"></i></div>
-            <span class="text-2xl font-black tracking-tighter uppercase">FF Tech</span>
+            <div class="brand-gradient p-2 rounded-lg text-white"><i data-lucide="shield-check"></i></div>
+            <span class="text-2xl font-black tracking-tighter uppercase text-slate-900">FF TECH</span>
         </div>
-        <div id="auth-nav" class="flex items-center gap-4">
-            <div id="guest-zone" class="flex gap-3">
-                <button onclick="auth('login')" class="text-sm font-bold text-slate-500">Login</button>
-                <button onclick="auth('register')" class="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-bold">Register</button>
+        <div class="flex items-center gap-8">
+            <div id="guest-nav" class="flex gap-6">
+                <button onclick="auth('login')" class="nav-link">LOGIN</button>
+                <button onclick="auth('register')" class="bg-slate-900 text-white px-6 py-2 rounded-full text-xs font-black shadow-lg">REGISTER</button>
             </div>
-            <div id="user-zone" class="hidden flex items-center gap-4 border-l pl-4 border-slate-200">
-                <span id="display-email" class="text-xs font-bold text-indigo-600"></span>
-                <button onclick="logout()" class="text-xs font-black text-rose-500 uppercase">Logout</button>
+            <div id="user-nav" class="hidden flex items-center gap-6 border-l pl-8 border-slate-200">
+                <div class="text-right">
+                    <p id="nav-email" class="text-xs font-bold text-indigo-600"></p>
+                    <p id="nav-credits" class="text-[10px] text-slate-400 font-bold uppercase"></p>
+                </div>
+                <button onclick="logout()" class="text-xs font-black text-rose-500 hover:text-rose-700">LOGOUT</button>
             </div>
         </div>
     </nav>
 
-    <section class="gradient-brand text-white pt-24 pb-20 px-8 relative overflow-hidden">
+    <section class="brand-gradient text-white pt-24 pb-20 px-8 relative overflow-hidden">
         <div class="max-w-4xl mx-auto text-center relative z-10">
-            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">AI Audit Intelligence</h1>
-            <p class="text-xl opacity-90 mb-10 font-medium">250+ Signals • Scheduled Reporting • Certified PDF Output</p>
+            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tight leading-tight">Professional AI <br>Website Intelligence</h1>
+            <p class="text-xl opacity-90 mb-10 font-medium">Advanced 250+ Signal Crawler • Scheduled Automation • Certified Compliance</p>
             
-            <form id="audit-form" class="bg-white p-2 rounded-[2rem] shadow-2xl flex flex-col md:flex-row gap-2">
-                <input type="url" id="audit-url" placeholder="https://your-website.com" required 
-                       class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl">
-                <button type="submit" class="gradient-brand px-10 py-5 rounded-[1.8rem] font-black text-lg hover:scale-[1.02] transition">
-                    Analyze Website
+            <form id="audit-form" class="bg-white p-2 rounded-3xl shadow-2xl flex flex-col md:flex-row gap-3">
+                <input type="url" id="audit-url" placeholder="Enter URL (e.g., https://example.com)" required 
+                       class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl bg-slate-50 border border-slate-100 focus:bg-white transition">
+                <button type="submit" class="brand-gradient px-12 py-5 rounded-2xl font-black text-lg hover:scale-[1.02] active:scale-95 transition shadow-lg">
+                    RUN AUDIT
                 </button>
             </form>
-            <p class="mt-6 text-sm font-bold opacity-80 uppercase tracking-widest">
-                Free Audits Left: <span id="remaining-ui">10</span>
-            </p>
+            <div class="mt-8 flex justify-center gap-8 text-[11px] font-black uppercase tracking-[0.2em] opacity-80">
+                <span class="flex items-center gap-2"><i data-lucide="clock" class="w-4"></i> Free Audits: <span id="remaining-count">10</span></span>
+                <span class="flex items-center gap-2"><i data-lucide="shield" class="w-4"></i> 256-bit Secure</span>
+                <span class="flex items-center gap-2"><i data-lucide="cpu" class="w-4"></i> AI Powered</span>
+            </div>
         </div>
     </section>
 
-    <main id="dashboard" class="hidden max-w-7xl mx-auto py-16 px-8">
+    <main id="audit-results" class="hidden max-w-7xl mx-auto py-16 px-8 space-y-12">
         
-        <div class="grid lg:grid-cols-3 gap-8 mb-16">
-            <div class="lg:col-span-1 text-center lg:text-left space-y-6">
-                <div id="grade-badge" class="text-9xl font-black inline-block px-10 py-6 bg-indigo-50 text-indigo-600 rounded-3xl shadow-inner">A+</div>
-                <h2 class="text-4xl font-black text-slate-900">Executive Summary</h2>
-                <p id="summary-text" class="text-lg text-slate-500 leading-relaxed italic"></p>
-                <button onclick="exportPDF()" class="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 shadow-xl">
-                    <i data-lucide="file-text"></i> Download Certified PDF
+        <div class="grid lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1 card p-8 text-center flex flex-col justify-center items-center">
+                <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Certified Grade</p>
+                <div id="grade-badge" class="text-9xl font-black text-indigo-600 mb-6 leading-none">A+</div>
+                <div class="w-full h-px bg-slate-100 mb-6"></div>
+                <button onclick="downloadPDF()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3">
+                    <i data-lucide="file-text"></i> Export Certified PDF
                 </button>
             </div>
             <div class="lg:col-span-2 card p-8">
-                <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Category Intelligence Score</h3>
-                <canvas id="category-chart"></canvas>
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-xl font-black text-slate-900 uppercase tracking-tight">Executive Intelligence Summary</h2>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">#FF-TECH-V3</span>
+                </div>
+                <p id="summary-text" class="text-slate-600 leading-relaxed text-lg italic"></p>
+                <div class="mt-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="p-4 bg-slate-50 rounded-2xl text-center"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Overall</p><p id="val-overall" class="text-2xl font-black text-indigo-600"></p></div>
+                    <div class="p-4 bg-rose-50 rounded-2xl text-center"><p class="text-[10px] font-bold text-rose-400 uppercase mb-1">Errors</p><p id="val-errors" class="text-2xl font-black text-rose-600"></p></div>
+                    <div class="p-4 bg-amber-50 rounded-2xl text-center"><p class="text-[10px] font-bold text-amber-400 uppercase mb-1">Warnings</p><p id="val-warnings" class="text-2xl font-black text-amber-600"></p></div>
+                    <div class="p-4 bg-blue-50 rounded-2xl text-center"><p class="text-[10px] font-bold text-blue-400 uppercase mb-1">Notices</p><p id="val-notices" class="text-2xl font-black text-blue-600"></p></div>
+                </div>
             </div>
         </div>
 
-        <div class="grid md:grid-cols-3 gap-6 mb-16">
-            <div class="card p-8 bg-emerald-50 border border-emerald-100">
-                <h4 class="text-emerald-900 font-bold mb-4 flex items-center gap-2"><i data-lucide="check-circle" class="w-5"></i> Strengths</h4>
-                <ul id="strengths-ui" class="text-sm space-y-2 text-emerald-700"></ul>
-            </div>
-            <div class="card p-8 bg-rose-50 border border-rose-100">
-                <h4 class="text-rose-900 font-bold mb-4 flex items-center gap-2"><i data-lucide="alert-circle" class="w-5"></i> Weaknesses</h4>
-                <ul id="weaknesses-ui" class="text-sm space-y-2 text-rose-700"></ul>
-            </div>
-            <div class="card p-8 bg-amber-50 border border-amber-100">
-                <h4 class="text-amber-900 font-bold mb-4 flex items-center gap-2"><i data-lucide="zap" class="w-5"></i> Priorities</h4>
-                <ul id="priority-ui" class="text-sm space-y-2 text-amber-700"></ul>
-            </div>
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="card p-8 border-t-8 border-emerald-500"><h4 class="font-black text-emerald-600 mb-6 flex items-center gap-2"><i data-lucide="smile"></i> Strengths</h4><ul id="strengths-list" class="text-sm space-y-3 text-slate-600"></ul></div>
+            <div class="card p-8 border-t-8 border-rose-500"><h4 class="font-black text-rose-600 mb-6 flex items-center gap-2"><i data-lucide="frown"></i> Weak Areas</h4><ul id="weaknesses-list" class="text-sm space-y-3 text-slate-600"></ul></div>
+            <div class="card p-8 border-t-8 border-amber-500"><h4 class="font-black text-amber-600 mb-6 flex items-center gap-2"><i data-lucide="list-checks"></i> Priority Fixes</h4><ul id="priority-list" class="text-sm space-y-3 text-slate-600"></ul></div>
         </div>
 
-        <div class="flex justify-between items-end mb-8">
-            <h3 class="text-3xl font-black text-slate-900">Deep-Dive Signals (250+)</h3>
-            <button id="sub-btn" onclick="checkout()" class="hidden bg-indigo-600 text-white px-6 py-2 rounded-full text-xs font-black shadow-lg">UNLOCK ALL METRICS</button>
+        <div class="card p-8">
+            <h4 class="text-xl font-black mb-8">Category Intelligence Breakdown</h4>
+            <div class="h-[400px]"><canvas id="category-chart"></canvas></div>
         </div>
-        <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <div>
+            <div class="flex justify-between items-end mb-8">
+                <div>
+                    <h3 class="text-3xl font-black text-slate-900 uppercase tracking-tighter">Deep Signal Analysis</h3>
+                    <p class="text-slate-400 text-sm font-bold">Comprehensive data from 250+ individual audit points.</p>
+                </div>
+                <button id="premium-banner" onclick="startCheckout()" class="hidden brand-gradient text-white px-8 py-3 rounded-full text-xs font-black shadow-xl">UNLOCK 250+ PREMIUM METRICS</button>
             </div>
+            <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                </div>
+        </div>
     </main>
 
-    <footer class="bg-slate-900 text-slate-500 py-20 px-8 text-center border-t border-slate-800">
-        <p class="text-white font-black text-xl mb-2 tracking-tighter uppercase">FF Tech International</p>
-        <p class="text-[10px] uppercase font-bold opacity-40 tracking-[0.3em]">AI Audit Verification Platform v3.0</p>
+    <section id="user-panel" class="hidden max-w-7xl mx-auto py-16 px-8 border-t border-slate-200 mt-12 bg-white/50">
+        <h3 class="text-3xl font-black mb-10 tracking-tight">Audit Control Center</h3>
+        <div class="grid lg:grid-cols-2 gap-8">
+            <div class="card p-8">
+                <h4 class="text-lg font-black mb-6">Schedule Automation</h4>
+                <form id="schedule-form" class="space-y-4">
+                    <input id="sched-url" type="url" placeholder="URL to schedule" class="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-indigo-500 transition">
+                    <div class="grid grid-cols-2 gap-4">
+                        <input id="sched-time" type="time" class="p-4 bg-slate-50 rounded-xl border border-slate-200" value="09:00">
+                        <input id="sched-tz" type="text" placeholder="Timezone (e.g. UTC)" class="p-4 bg-slate-50 rounded-xl border border-slate-200" value="UTC">
+                    </div>
+                    <div class="flex gap-6 py-2">
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-500"><input id="sched-daily" type="checkbox" checked> DAILY REPORT</label>
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-500"><input id="sched-acc" type="checkbox" checked> ACCUMULATED</label>
+                    </div>
+                    <button class="brand-gradient w-full py-4 rounded-xl font-black text-white shadow-lg">SAVE SCHEDULE</button>
+                </form>
+            </div>
+            <div class="card p-8">
+                <h4 class="text-lg font-black mb-6">Active Schedules</h4>
+                <div id="schedules-list" class="space-y-3">
+                    <p class="text-slate-400 text-sm italic">No schedules active...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-slate-900 text-slate-500 py-20 px-8 text-center mt-20">
+        <div class="flex justify-center mb-8">
+            <div class="brand-gradient p-3 rounded-2xl text-white"><i data-lucide="shield-check" class="w-8 h-8"></i></div>
+        </div>
+        <p class="text-white font-black text-2xl mb-2 tracking-tighter uppercase">FF Tech International</p>
+        <p class="text-xs uppercase font-bold opacity-40 mb-10 tracking-[0.4em]">Proprietary AI Website Audit System v3.1</p>
+        <div class="max-w-md mx-auto h-px bg-slate-800 mb-8"></div>
+        <p class="text-[10px]">© 2025 FF Tech. All rights reserved. Built for Railway High-Performance Deployments.</p>
     </footer>
 
     <script>
         lucide.createIcons();
-        let currentToken = localStorage.getItem('token');
-        let categoryChart = null;
+        let TOKEN = localStorage.getItem('jwt');
+        let CAT_CHART = null;
 
-        // Initialize state
-        if(currentToken) {
-            document.getElementById('guest-zone').classList.add('hidden');
-            document.getElementById('user-zone').classList.remove('hidden');
-            document.getElementById('display-email').innerText = localStorage.getItem('email');
+        // Initialize User state
+        if(TOKEN) {
+            document.getElementById('guest-nav').classList.add('hidden');
+            document.getElementById('user-nav').classList.remove('hidden');
+            document.getElementById('user-panel').classList.remove('hidden');
+            document.getElementById('nav-email').innerText = localStorage.getItem('email');
+            fetchSchedules();
         }
 
+        // 1. Audit Submission
         document.getElementById('audit-form').onsubmit = async (e) => {
             e.preventDefault();
             const url = document.getElementById('audit-url').value;
             const btn = e.target.querySelector('button');
-            
-            btn.innerText = "Analyzing Signals...";
+            btn.innerText = "Processing Signals...";
             btn.disabled = true;
 
-            const headers = currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {};
+            const headers = TOKEN ? { 'Authorization': `Bearer ${TOKEN}` } : {};
             
             try {
                 const res = await fetch(`/audit?url=${encodeURIComponent(url)}`, { headers });
                 const data = await res.json();
-                renderAudit(data);
+                renderReport(data);
             } catch (err) {
-                alert("Audit failed. Ensure your backend is running.");
+                alert("Audit Engine Error. Please check backend logs.");
             } finally {
-                btn.innerText = "Analyze Website";
+                btn.innerText = "RUN AUDIT";
                 btn.disabled = false;
             }
         };
 
-        function renderAudit(data) {
-            document.getElementById('dashboard').classList.remove('hidden');
+        // 2. Render Full Data Mapping
+        function renderReport(data) {
+            document.getElementById('audit-results').classList.remove('hidden');
             document.getElementById('grade-badge').innerText = data.grade;
             document.getElementById('summary-text').innerText = data.summary;
-            document.getElementById('remaining-ui').innerText = data.remaining ?? '10';
+            document.getElementById('remaining-count').innerText = data.remaining ?? '10';
+            document.getElementById('nav-credits').innerText = `Audits Left: ${data.remaining ?? '10'}`;
 
-            // Render Lists
+            // Totals
+            document.getElementById('val-overall').innerText = data.overall + '%';
+            document.getElementById('val-errors').innerText = data.errors;
+            document.getElementById('val-warnings').innerText = data.warnings;
+            document.getElementById('val-notices').innerText = data.notices;
+
+            // Lists mapping
             ['strengths', 'weaknesses', 'priority'].forEach(key => {
-                const container = document.getElementById(`${key}-ui`);
-                container.innerHTML = data[key].map(item => `<li>• ${item}</li>`).join('');
+                const ul = document.getElementById(`${key}-list`);
+                ul.innerHTML = data[key].map(item => `<li class="flex items-start gap-2"><i data-lucide="chevron-right" class="w-4 h-4 mt-1 opacity-50"></i>${item}</li>`).join('');
             });
 
-            // Handle Subscription UI
-            if(!data.premium) document.getElementById('sub-btn').classList.remove('hidden');
+            // Premium Logic
+            if(!data.premium) document.getElementById('premium-banner').classList.remove('hidden');
 
-            // Category Chart
-            const ctx = document.getElementById('category-chart').getContext('2d');
-            if(categoryChart) categoryChart.destroy();
-            categoryChart = new Chart(ctx, {
+            // Category Charts
+            const catCtx = document.getElementById('category-chart').getContext('2d');
+            if(CAT_CHART) CAT_CHART.destroy();
+            CAT_CHART = new Chart(catCtx, {
                 type: 'bar',
                 data: data.category_chart,
-                options: { responsive: true, maintainAspectRatio: false }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } } }
             });
 
-            // Metrics Injection (mapping the 250 items from Python)
+            // 250+ Metrics Injection
             const grid = document.getElementById('metrics-grid');
             grid.innerHTML = '';
             
             data.metrics.forEach((m, idx) => {
-                const blur = (!data.premium && idx > 49) ? 'premium-blur' : '';
+                const isBlurred = !data.premium && idx > 49;
                 const card = document.createElement('div');
-                card.className = `card p-6 metric-card ${m.severity} ${blur}`;
+                card.className = `card p-6 metric-card ${m.severity} ${isBlurred ? 'premium-blur' : ''}`;
                 card.innerHTML = `
                     <div class="flex justify-between items-center mb-4">
                         <span class="text-[10px] font-black text-slate-400">SIG-${String(m.num).padStart(3, '0')}</span>
                         <div class="w-2 h-2 rounded-full ${m.severity === 'red' ? 'bg-rose-500' : 'bg-emerald-500'}"></div>
                     </div>
-                    <canvas id="metric-${m.num}"></canvas>
+                    <canvas id="m-chart-${m.num}"></canvas>
                 `;
                 grid.appendChild(card);
                 
-                new Chart(document.getElementById(`metric-${m.num}`), {
+                new Chart(document.getElementById(`m-chart-${m.num}`), {
                     type: m.chart_type,
                     data: m.chart_data,
                     options: { 
@@ -190,27 +250,32 @@
                     }
                 });
             });
+
             lucide.createIcons();
+            document.getElementById('audit-results').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // 3. User Authentication
         async function auth(type) {
-            const email = prompt("Email:");
-            const password = prompt("Password:");
+            const email = prompt("Enter Email:");
+            const password = prompt("Enter Password (min 8 chars):");
             if(!email || !password) return;
 
-            const res = await fetch(`/${type}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if(data.token) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('email', email);
-                location.reload();
-            } else {
-                alert(data.detail || "Error");
-            }
+            try {
+                const res = await fetch(`/${type}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if(data.token) {
+                    localStorage.setItem('jwt', data.token);
+                    localStorage.setItem('email', email);
+                    location.reload();
+                } else {
+                    alert(data.detail || "Authentication Failed.");
+                }
+            } catch (err) { alert("Server connection error."); }
         }
 
         function logout() {
@@ -218,19 +283,49 @@
             location.reload();
         }
 
-        function exportPDF() {
+        // 4. Scheduling Logic
+        document.getElementById('schedule-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const payload = {
+                website_url: document.getElementById('sched-url').value,
+                time_of_day: document.getElementById('sched-time').value,
+                timezone: document.getElementById('sched-tz').value,
+                daily_report: document.getElementById('sched-daily').checked,
+                accumulated_report: document.getElementById('sched-acc').checked
+            };
+            
+            await fetch('/schedule', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert("Schedule Activated.");
+            fetchSchedules();
+        };
+
+        async function fetchSchedules() {
+            const res = await fetch('/schedules', { headers: { 'Authorization': `Bearer ${TOKEN}` } });
+            const list = await res.json();
+            const container = document.getElementById('schedules-list');
+            container.innerHTML = list.map(s => `
+                <div class="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div><p class="text-sm font-black text-slate-800">${s.website_url}</p><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${s.time_of_day} ${s.timezone}</p></div>
+                    <div class="flex gap-2"><span class="bg-indigo-100 text-indigo-600 px-2 py-1 rounded text-[8px] font-bold">DAILY: ${s.daily_report}</span></div>
+                </div>
+            `).join('') || '<p class="text-slate-400 text-sm italic">No schedules active...</p>';
+        }
+
+        // 5. Billing & PDF
+        function downloadPDF() {
             const url = document.getElementById('audit-url').value;
             window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
         }
 
-        async function checkout() {
-            const res = await fetch('/billing/checkout', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${currentToken}` }
-            });
+        async function startCheckout() {
+            const res = await fetch('/billing/checkout', { method: 'POST', headers: { 'Authorization': `Bearer ${TOKEN}` } });
             const data = await res.json();
             if(data.url) window.location.href = data.url;
-            else alert(data.message || "Checkout currently demo-mode.");
+            else alert(data.message || "Subscription activated in demo mode.");
         }
     </script>
 </body>
