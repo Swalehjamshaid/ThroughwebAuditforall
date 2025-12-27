@@ -1,240 +1,178 @@
-import os, io, hmac, json, time, base64, secrets, asyncio
-from datetime import datetime, timezone
-from urllib.parse import urlparse, urljoin
-
-import requests
-from bs4 import BeautifulSoup
-
-from fastapi import FastAPI, Request, Depends, HTTPException, Query, Header
-from fastapi.responses import HTMLResponse, JSONResponse, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr, Field
-
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, text
-from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.exc import OperationalError
-
-try:
-    import stripe
-except ImportError:
-    stripe = None
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.lib.units import mm
-from reportlab.graphics.shapes import Drawing
-from reportlab.graphics.charts.piecharts import Pie
-from reportlab.graphics.charts.barcharts import VerticalBarChart
-from reportlab.graphics import renderPDF
-
-# --- Configuration ---
-APP_NAME = "FF Tech — Professional AI Website Audit Platform"
-USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_demo.db")
-
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
-APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
-SMTP_HOST = os.getenv("SMTP_HOST", ""); SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", ""); SMTP_PASS = os.getenv("SMTP_PASS", "")
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@fftech.io")
-SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "60"))
-
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-if stripe and STRIPE_SECRET_KEY:
-    stripe.api_key = STRIPE_SECRET_KEY
-
-# --- DB Models ---
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    email = Column(String(255), unique=True, index=True)
-    password_hash = Column(String(256)); password_salt = Column(String(64))
-    is_verified = Column(Boolean, default=False); role = Column(String(32), default="user")
-    timezone = Column(String(64), default="UTC"); free_audits_remaining = Column(Integer, default=10)
-    subscribed = Column(Boolean, default=False); stripe_customer_id = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-class Website(Base):
-    __tablename__ = "websites"
-    id = Column(Integer, primary_key=True); user_id = Column(Integer, ForeignKey("users.id"))
-    url = Column(String(2048)); active = Column(Boolean, default=True)
-
-class Schedule(Base):
-    __tablename__ = "schedules"
-    id = Column(Integer, primary_key=True); user_id = Column(Integer, ForeignKey("users.id"))
-    website_id = Column(Integer, ForeignKey("websites.id")); enabled = Column(Boolean, default=True)
-    time_of_day = Column(String(8), default="09:00"); timezone = Column(String(64), default="UTC")
-    daily_report = Column(Boolean, default=True); last_run_at = Column(DateTime)
-
-class Audit(Base):
-    __tablename__ = "audits"
-    id = Column(Integer, primary_key=True); website_id = Column(Integer, ForeignKey("websites.id"))
-    url = Column(String(2048)); created_at = Column(DateTime, default=datetime.utcnow)
-    overall = Column(Integer); grade = Column(String(8)); summary = Column(Text)
-    cat_scores_json = Column(Text); metrics_json = Column(Text); premium = Column(Boolean, default=False)
-
-# --- Engine Setup ---
-engine_kwargs = {"connect_args": {"check_same_thread": False}} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, **engine_kwargs)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-
-# --- Logic & Engine ---
-def run_actual_audit(target_url: str) -> dict:
-    url = (target_url if target_url.startswith("http") else "https://" + target_url).strip()
-    try:
-        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=10)
-        score = 88 if r.status_code == 200 else 30
-        metrics = []
-        for i in range(1, 251):
-            m_score = max(10, score - (i % 15))
-            metrics.append({
-                "num": i, "severity": "green" if m_score > 70 else "yellow" if m_score > 40 else "red",
-                "chart_type": "bar" if i % 2 == 0 else "doughnut",
-                "chart_data": {"labels": ["Pass", "Fail"], "datasets": [{"data": [m_score, 100-m_score], "backgroundColor": ["#6366f1", "#e2e8f0"]}]}
-            })
-        return {
-            "grade": "A" if score > 80 else "F", "overall": score, "summary": f"Full technical analysis of {url} completed.",
-            "errors": 2, "warnings": 4, "notices": 12, "metrics": metrics, "premium": False,
-            "strengths": ["SSL Valid", "Security Headers Active"], "weaknesses": ["Slow TTFB", "Uncompressed Assets"],
-            "priority": ["Compress Images", "Minify JS"], "overall_gauge": {"datasets": [{"data": [score, 100-score], "backgroundColor": ["#6366f1", "#f1f5f9"]}]},
-            "category_chart": {"labels": ["SEO", "Perf", "Sec", "A11y"], "datasets": [{"data": [90, 75, 80, 85], "backgroundColor": "#6366f1"}]}
-        }
-    except:
-        return {"grade": "F", "overall": 0, "summary": "Site Unreachable", "errors": 1, "warnings": 0, "notices": 0, "metrics": [], "premium": False, "strengths": [], "weaknesses": ["Offline"], "priority": ["Check DNS"]}
-
-# --- UI Layout ---
-INDEX_HTML = r"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech — Enterprise Web Audit</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 1); }
-        .premium-blur { filter: blur(12px); pointer-events: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF Tech — AI Website Audit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+.glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(226,232,240,1); }
+.premium-blur { filter: blur(12px); pointer-events: none; }
+.category-header { cursor: pointer; transition: background 0.3s; }
+.category-header:hover { background: rgba(99,102,241,0.1); }
+#progress-container { display: none; }
+</style>
 </head>
 <body class="text-slate-900">
-    <header class="p-6 flex justify-between items-center max-w-7xl mx-auto">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl"><i class="fas fa-shield-halved"></i></div>
-            <h1 class="font-extrabold text-2xl tracking-tighter">FF TECH <span class="font-normal text-slate-400 text-sm">PRO</span></h1>
-        </div>
-        <div id="auth-nav" class="flex gap-4">
-            <button onclick="alert('Auth logic active')" class="font-bold text-slate-600">Login</button>
-            <button onclick="alert('Auth logic active')" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Join</button>
-        </div>
-    </header>
 
-    <section class="max-w-4xl mx-auto px-6 py-20 text-center">
-        <h2 class="text-6xl font-extrabold mb-4 tracking-tight">Technical <span class="text-indigo-600">Audits.</span></h2>
-        <p class="text-slate-500 text-lg mb-10">250+ technical checkpoints, Security analysis, and PDF exports.</p>
-        <form id="audit-form" class="flex flex-col md:flex-row gap-3 p-3 glass rounded-2xl shadow-xl">
-            <input id="website-url" type="url" placeholder="https://example.com" required class="flex-1 bg-transparent px-4 py-3 outline-none font-bold">
-            <button type="submit" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg">ANALYZE</button>
-        </form>
-    </section>
+<header class="p-6 flex justify-between items-center max-w-7xl mx-auto">
+    <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-xl">
+            <i class="fas fa-shield-halved"></i>
+        </div>
+        <h1 class="font-extrabold text-2xl tracking-tighter">FF TECH <span class="font-normal text-slate-400 text-sm">PRO</span></h1>
+    </div>
+    <div id="auth-nav" class="flex gap-4">
+        <button onclick="alert('Login logic')" class="font-bold text-slate-600">Login</button>
+        <button onclick="alert('Join logic')" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">Join</button>
+    </div>
+</header>
 
-    <section id="results" class="hidden max-w-7xl mx-auto px-6 pb-20 space-y-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="glass p-8 rounded-[2rem] text-center flex flex-col items-center justify-center">
-                <canvas id="score-gauge" width="200" height="200"></canvas>
-                <h3 id="grade-badge" class="text-6xl font-black text-indigo-600 mt-4">A+</h3>
+<section class="max-w-4xl mx-auto px-6 py-20 text-center">
+    <h2 class="text-6xl font-extrabold mb-4 tracking-tight">Technical <span class="text-indigo-600">Audits.</span></h2>
+    <p class="text-slate-500 text-lg mb-10">250+ technical checkpoints, Security analysis, and PDF exports.</p>
+    <form id="audit-form" class="flex flex-col md:flex-row gap-3 p-3 glass rounded-2xl shadow-xl">
+        <input id="website-url" type="url" placeholder="https://example.com" required class="flex-1 bg-transparent px-4 py-3 outline-none font-bold">
+        <button type="submit" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg">ANALYZE</button>
+    </form>
+    <div id="progress-container" class="mt-6">
+        <div class="glass p-4 rounded-xl">
+            <p id="progress-text" class="font-bold text-indigo-600 mb-2">Audit Progress: 0%</p>
+            <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+                <div id="progress-bar" class="bg-indigo-600 h-4 w-0 transition-all"></div>
             </div>
-            <div class="lg:col-span-2 glass p-10 rounded-[2rem]">
-                <h3 class="text-3xl font-bold mb-4">Executive Summary</h3>
-                <p id="summary-text" class="text-slate-500 leading-relaxed mb-6"></p>
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="bg-slate-50 p-4 rounded-xl text-center"><p id="stat-err" class="text-2xl font-black text-rose-500">0</p><p class="text-[10px] font-bold text-slate-400">ERRORS</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl text-center"><p id="stat-warn" class="text-2xl font-black text-amber-500">0</p><p class="text-[10px] font-bold text-slate-400">WARNINGS</p></div>
-                    <div class="bg-slate-50 p-4 rounded-xl text-center"><p id="stat-not" class="text-2xl font-black text-indigo-500">0</p><p class="text-[10px] font-bold text-slate-400">NOTICES</p></div>
+        </div>
+    </div>
+</section>
+
+<section id="results" class="hidden max-w-7xl mx-auto px-6 pb-20 space-y-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="glass p-8 rounded-[2rem] text-center flex flex-col items-center justify-center">
+            <canvas id="score-gauge" width="200" height="200"></canvas>
+            <h3 id="grade-badge" class="text-6xl font-black text-indigo-600 mt-4">A+</h3>
+        </div>
+        <div class="lg:col-span-2 glass p-10 rounded-[2rem]">
+            <h3 class="text-3xl font-bold mb-4">Executive Summary</h3>
+            <p id="summary-text" class="text-slate-500 leading-relaxed mb-6"></p>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-50 p-4 rounded-xl text-center">
+                    <p id="stat-err" class="text-2xl font-black text-rose-500">0</p>
+                    <p class="text-[10px] font-bold text-slate-400">ERRORS</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl text-center">
+                    <p id="stat-warn" class="text-2xl font-black text-amber-500">0</p>
+                    <p class="text-[10px] font-bold text-slate-400">WARNINGS</p>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-xl text-center">
+                    <p id="stat-not" class="text-2xl font-black text-indigo-500">0</p>
+                    <p class="text-[10px] font-bold text-slate-400">NOTICES</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
-    </section>
+    <div id="categories-grid" class="space-y-6"></div>
+</section>
 
-    <script>
-        const $ = s => document.querySelector(s);
-        let charts = {};
+<script>
+const $ = s => document.querySelector(s);
+let charts = {};
 
-        $('#audit-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const url = $('#website-url').value;
-            const res = await fetch(`/audit?url=${encodeURIComponent(url)}`);
-            const data = await res.json();
-            render(data);
+function categorizeMetrics(metrics) {
+    const categories = { SEO: [], Perf: [], Sec: [], A11y: [] };
+    metrics.forEach((m, i) => {
+        const catKeys = Object.keys(categories);
+        const cat = catKeys[i % catKeys.length];
+        categories[cat].push(m);
+    });
+    return categories;
+}
+
+$('#audit-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const url = $('#website-url').value;
+
+    $('#progress-container').style.display = 'block';
+    $('#results').classList.add('hidden');
+    let progress = 0;
+    $('#progress-bar').style.width = '0%';
+    $('#progress-text').innerText = 'Audit Progress: 0%';
+
+    // Simulate progressive audit
+    const res = await fetch(`/audit?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    const metricsCount = data.metrics.length;
+    const categories = categorizeMetrics(data.metrics);
+
+    const interval = setInterval(() => {
+        progress += 1;
+        if(progress > 100) progress = 100;
+        $('#progress-bar').style.width = progress + '%';
+        $('#progress-text').innerText = 'Audit Progress: ' + progress + '%';
+        if(progress === 100) clearInterval(interval);
+    }, 30);
+
+    // Render gradually each category after 30% progress
+    setTimeout(() => renderAudit(data, categories), 1000);
+};
+
+function renderAudit(data, categories) {
+    $('#results').classList.remove('hidden');
+    $('#progress-container').style.display = 'none';
+
+    $('#grade-badge').innerText = data.grade;
+    $('#summary-text').innerText = data.summary;
+    $('#stat-err').innerText = data.errors;
+    $('#stat-warn').innerText = data.warnings;
+    $('#stat-not').innerText = data.notices;
+
+    if(charts.score) charts.score.destroy();
+    charts.score = new Chart($('#score-gauge'), {
+        type: 'doughnut',
+        data: data.overall_gauge,
+        options: { cutout: '80%', plugins: { legend: { display: false } } }
+    });
+
+    const container = $('#categories-grid');
+    container.innerHTML = '';
+
+    for(const [cat, metrics] of Object.entries(categories)) {
+        const catDiv = document.createElement('div');
+        catDiv.className = 'glass p-6 rounded-2xl';
+        catDiv.innerHTML = `<div class="category-header flex justify-between items-center p-2 mb-4 font-bold text-indigo-600 text-lg rounded cursor-pointer">
+                                <span>${cat} (${metrics.length})</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                            <div class="metrics-list grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>`;
+        container.appendChild(catDiv);
+
+        const header = catDiv.querySelector('.category-header');
+        const metricsList = catDiv.querySelector('.metrics-list');
+        metricsList.style.display = 'none';
+        header.onclick = () => {
+            metricsList.style.display = metricsList.style.display === 'none' ? 'grid' : 'none';
         };
 
-        function render(data) {
-            $('#results').classList.remove('hidden');
-            $('#grade-badge').innerText = data.grade;
-            $('#summary-text').innerText = data.summary;
-            $('#stat-err').innerText = data.errors;
-            $('#stat-warn').innerText = data.warnings;
-            $('#stat-not').innerText = data.notices;
-
-            if(charts.score) charts.score.destroy();
-            charts.score = new Chart($('#score-gauge'), {
-                type: 'doughnut', data: data.overall_gauge, options: { cutout: '80%', plugins: { legend: { display: false } } }
-            });
-
-            const grid = $('#metrics-grid'); grid.innerHTML = '';
-            data.metrics.forEach(m => {
-                const d = document.createElement('div');
-                d.className = 'glass p-6 rounded-2xl';
-                d.innerHTML = `<h5 class="text-[10px] font-bold text-slate-400 mb-4 tracking-widest uppercase">Signal ${m.num}</h5><canvas id="m-${m.num}" height="150"></canvas>`;
-                grid.appendChild(d);
-                new Chart($(`#m-${m.num}`), { type: m.chart_type, data: m.chart_data, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
-            });
-        }
-    </script>
+        metrics.forEach((m, index) => {
+            setTimeout(() => {
+                const mDiv = document.createElement('div');
+                mDiv.className = 'glass p-4 rounded-2xl';
+                mDiv.innerHTML = `<h5 class="text-[10px] font-bold text-slate-400 mb-2 tracking-widest uppercase">Signal ${m.num}</h5>
+                                  <canvas id="m-${cat}-${m.num}" height="120"></canvas>`;
+                metricsList.appendChild(mDiv);
+                new Chart($(`#m-${cat}-${m.num}`), {
+                    type: m.chart_type,
+                    data: m.chart_data,
+                    options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+                });
+            }, index * 20); // gradually render each metric
+        });
+    }
+}
+</script>
 </body>
-</html>"""
-
-# --- FastAPI Setup ---
-app = FastAPI(title=APP_NAME)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-@app.get("/health")
-async def health(): return {"status": "healthy"}
-
-@app.get("/", response_class=HTMLResponse)
-def home(): return HTMLResponse(INDEX_HTML)
-
-@app.get("/audit")
-def audit(url: str): return JSONResponse(run_actual_audit(url))
-
-async def init_db():
-    for i in range(10):
-        try:
-            with engine.connect() as conn: conn.execute(text("SELECT 1"))
-            Base.metadata.create_all(bind=engine)
-            print("[DB] Initialized")
-            return
-        except:
-            print(f"[DB] Retry {i+1}...")
-            await asyncio.sleep(2)
-
-@app.on_event("startup")
-async def startup():
-    asyncio.create_task(init_db())
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+</html>
