@@ -1,291 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH — Professional AI Audit Dashboard</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { jakarta: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' } }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fcfdfe; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.8); }
-        .premium-blur { filter: blur(16px); pointer-events: none; opacity: 0.5; }
-        .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
-        progress::-webkit-progress-value { background-color: #6366f1; border-radius: 20px; }
-        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 20px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FF Tech AI Website Audit</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body class="text-slate-900 overflow-x-hidden">
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
 
-    <nav class="fixed w-full z-50 glass border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center text-white shadow-lg">
-                    <i class="fas fa-bolt text-lg"></i>
-                </div>
-                <h1 class="text-xl font-extrabold tracking-tighter">FF TECH <span class="font-normal text-slate-400">PRO</span></h1>
-            </div>
-            
-            <div id="nav-auth" class="flex items-center gap-6">
-                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600 hover:text-brand-600">Sign In</button>
-                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-xl">Start Free</button>
-            </div>
-            
-            <div id="nav-user" class="hidden flex items-center gap-6">
-                <div class="text-right">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">Authenticated</p>
-                    <p id="user-display-email" class="text-xs font-bold text-brand-600"></p>
-                </div>
-                <button onclick="logout()" class="text-rose-600 hover:text-rose-700 transition-colors"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
-        </div>
-    </nav>
+<main class="p-6 max-w-5xl mx-auto">
 
-    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
-        
-        <section class="text-center mb-16">
-            <h2 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">Technical <span class="text-transparent bg-clip-text gradient-bg">Audits.</span></h2>
-            <p class="text-slate-500 max-w-xl mx-auto text-lg">Crawl internal links, analyze security headers, and generate certified 5-page PDF reports instantly.</p>
-            
-            <form id="audit-form" class="mt-10 max-w-3xl mx-auto p-2 glass rounded-3xl shadow-2xl flex flex-col md:flex-row gap-2 border-2 border-white">
-                <input id="input-url" type="url" placeholder="https://yourwebsite.com" required
-                       class="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-lg">
-                <button type="submit" class="gradient-bg text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-brand-500/20 hover:scale-[1.02] transition-all">
-                    ANALYZE
-                </button>
-            </form>
-            <div id="audit-status-bar" class="mt-4 flex justify-center gap-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                <span>Free Audits Remaining: <span id="val-remaining" class="text-slate-900">10</span></span>
-            </div>
-        </section>
+<h1 class="text-3xl font-bold mb-6">FF Tech — Website Audit Platform</h1>
 
-        <div id="audit-loading" class="hidden max-w-4xl mx-auto glass rounded-[2.5rem] p-10 shadow-2xl mb-20">
-            <div class="flex justify-between items-end mb-6">
-                <div>
-                    <h3 class="text-2xl font-black mb-1">Crawl in Progress...</h3>
-                    <p class="text-slate-400 font-medium italic">Simulating deep analyze of 250+ signal metrics</p>
-                </div>
-                <span id="load-pct" class="text-4xl font-black text-brand-600">0%</span>
-            </div>
-            <progress id="bar-progress" class="w-full h-4" value="0" max="100"></progress>
-        </div>
+<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
+  <h2 class="text-xl font-semibold mb-2">Open Access Audit</h2>
+  <form id="audit-form" class="flex gap-2">
+    <input id="website-url" type="url" placeholder="https://example.com" class="flex-1 p-2 rounded border border-gray-300" required>
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Run Audit</button>
+  </form>
+</section>
 
-        <div id="audit-results" class="hidden space-y-12">
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="glass rounded-[3rem] p-10 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div class="relative w-48 h-48 mb-6">
-                        <canvas id="chart-overall"></canvas>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span id="val-grade" class="text-6xl font-black text-slate-900">A+</span>
-                            <span id="val-score" class="text-slate-400 font-bold">0%</span>
-                        </div>
-                    </div>
-                    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Health Index</p>
-                </div>
+<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
+  <h2 class="text-xl font-semibold mb-2">User Registration</h2>
+  <form id="register-form" class="flex flex-col gap-2">
+    <input id="reg-email" type="email" placeholder="Email" class="p-2 rounded border border-gray-300" required>
+    <input id="reg-password" type="password" placeholder="Password (min 8 chars)" class="p-2 rounded border border-gray-300" required>
+    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Register</button>
+  </form>
+  <div id="register-msg" class="mt-2"></div>
+</section>
 
-                <div class="lg:col-span-2 glass rounded-[3rem] p-10 shadow-sm relative overflow-hidden">
-                    <div class="flex justify-between items-start mb-8">
-                        <h3 class="text-3xl font-black tracking-tight">Executive Summary</h3>
-                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg">
-                            <i class="fas fa-file-pdf"></i> Certified PDF
-                        </button>
-                    </div>
-                    <p id="val-summary" class="text-slate-500 text-lg leading-relaxed mb-10 italic"></p>
-                    <div class="grid grid-cols-3 gap-6">
-                        <div class="bg-rose-50 p-6 rounded-3xl border border-rose-100 text-center">
-                            <div id="val-errors" class="text-3xl font-black text-rose-500">0</div>
-                            <div class="text-[10px] font-bold text-rose-400 uppercase">Errors</div>
-                        </div>
-                        <div class="bg-amber-50 p-6 rounded-3xl border border-amber-100 text-center">
-                            <div id="val-warnings" class="text-3xl font-black text-amber-500">0</div>
-                            <div class="text-[10px] font-bold text-amber-400 uppercase">Warnings</div>
-                        </div>
-                        <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 text-center">
-                            <div id="val-notices" class="text-3xl font-black text-indigo-500">0</div>
-                            <div class="text-[10px] font-bold text-indigo-400 uppercase">Notices</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<section class="mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
+  <h2 class="text-xl font-semibold mb-2">User Login</h2>
+  <form id="login-form" class="flex flex-col gap-2">
+    <input id="login-email" type="email" placeholder="Email" class="p-2 rounded border border-gray-300" required>
+    <input id="login-password" type="password" placeholder="Password" class="p-2 rounded border border-gray-300" required>
+    <button type="submit" class="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700">Login</button>
+  </form>
+  <div id="login-msg" class="mt-2"></div>
+</section>
 
-            <div>
-                <div class="flex items-center justify-between mb-10">
-                    <h3 class="text-4xl font-black tracking-tighter">Technical Checkpoints</h3>
-                    <div id="badge-premium" class="hidden bg-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-xs font-black">
-                        <i class="fas fa-crown mr-2"></i> PREMIUM MEMBER ACCESS
-                    </div>
-                </div>
+<section id="summary" class="hidden mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
+  <h2 class="text-xl font-semibold mb-2">Audit Summary</h2>
+  <pre id="out" class="whitespace-pre-wrap"></pre>
+  <button id="export-pdf" class="mt-2 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Export PDF</button>
+</section>
 
-                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    </div>
+<section id="charts" class="hidden mb-8 p-4 bg-white dark:bg-gray-800 shadow rounded">
+  <h2 class="text-xl font-semibold mb-2">Charts</h2>
+  <canvas id="overallGauge" class="mb-4"></canvas>
+  <canvas id="issuesChart" class="mb-4"></canvas>
+  <canvas id="categoryChart" class="mb-4"></canvas>
+</section>
 
-                <div id="paywall-lock" class="hidden mt-12 glass rounded-[4rem] p-20 text-center border-2 border-brand-200 shadow-2xl relative">
-                    <i class="fas fa-lock text-4xl text-brand-500 mb-6"></i>
-                    <h4 class="text-4xl font-black mb-4 tracking-tight">Unlock All 250+ Signals</h4>
-                    <p class="text-slate-500 text-lg mb-10 max-w-xl mx-auto">Public users are restricted to top-level signals. Subscribe for $5/mo to unlock deep analysis and automated daily monitors.</p>
-                    <button onclick="checkout()" class="gradient-bg text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-xl shadow-brand-500/20">Go Premium - $5/mo</button>
-                </div>
-            </div>
+<script>
+let authToken = null;
 
-            <div id="scheduler-panel" class="hidden pt-20 border-t border-slate-200">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-20">
-                    <div>
-                        <h3 class="text-4xl font-black mb-6">Automated Monitoring</h3>
-                        <form id="schedule-form" class="space-y-4">
-                            <input id="sch-url" type="url" placeholder="Site to monitor" required class="w-full p-5 rounded-2xl border bg-slate-50/50 outline-none font-bold">
-                            <div class="grid grid-cols-2 gap-4">
-                                <input id="sch-time" type="time" class="p-5 rounded-2xl border font-bold">
-                                <input id="sch-tz" type="text" placeholder="Asia/Karachi" class="p-5 rounded-2xl border font-bold">
-                            </div>
-                            <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-lg">Save Monitor</button>
-                        </form>
-                    </div>
-                    <div class="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl">
-                        <h4 class="font-black text-brand-500 uppercase text-xs mb-8 tracking-widest">Active Monitors</h4>
-                        <div id="sch-list" class="space-y-4">
-                            </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+// --- Audit Form ---
+document.getElementById('audit-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const url = document.getElementById('website-url').value;
+  const headers = authToken ? { "Authorization": "Bearer " + authToken } : {};
+  const res = await fetch('/audit?url=' + encodeURIComponent(url), { headers });
+  const data = await res.json();
 
-    <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6">
-        <div class="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl">
-            <h3 class="text-3xl font-black mb-8 tracking-tight">Welcome Back</h3>
-            <form id="login-form" class="space-y-4">
-                <input id="l-email" type="email" placeholder="Email" required class="w-full p-4 rounded-xl border font-bold">
-                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 rounded-xl border font-bold">
-                <button type="submit" class="w-full gradient-bg text-white py-4 rounded-xl font-black">Sign In</button>
-            </form>
-            <button onclick="toggleModal('login-modal')" class="w-full mt-4 text-slate-400 font-bold uppercase text-xs tracking-widest">Close</button>
-        </div>
-    </div>
+  document.getElementById('summary').classList.remove('hidden');
+  document.getElementById('charts').classList.remove('hidden');
+  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
 
-    <script>
-        const state = { token: localStorage.getItem('token'), charts: {} };
-        const $ = s => document.querySelector(s);
+  // Charts
+  const overallCtx = document.getElementById('overallGauge').getContext('2d');
+  new Chart(overallCtx, { type: 'doughnut', data: data.overall_gauge, options: { responsive:true }});
 
-        function toggleModal(id) { $('#'+id).classList.toggle('hidden'); }
+  const issuesCtx = document.getElementById('issuesChart').getContext('2d');
+  new Chart(issuesCtx, { type: 'bar', data: data.issues_chart, options: { responsive:true }});
 
-        async function api(path, method = 'GET', body = null) {
-            const h = { 'Content-Type': 'application/json' };
-            if (state.token) h['Authorization'] = 'Bearer ' + state.token;
-            return fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
-        }
+  const catCtx = document.getElementById('categoryChart').getContext('2d');
+  new Chart(catCtx, { type: 'bar', data: data.category_chart, options: { responsive:true }});
+});
 
-        $('#audit-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const url = $('#input-url').value;
-            $('#audit-loading').classList.remove('hidden');
-            $('#audit-results').classList.add('hidden');
-            
-            let p = 0;
-            const timer = setInterval(() => {
-                p = Math.min(p + 5, 99);
-                $('#bar-progress').value = p;
-                $('#load-pct').innerText = p + '%';
-            }, 300);
+// --- Export PDF ---
+document.getElementById('export-pdf').addEventListener('click', async () => {
+  const url = document.getElementById('website-url').value;
+  const headers = authToken ? { "Authorization": "Bearer " + authToken } : {};
+  const res = await fetch('/export-pdf?url=' + encodeURIComponent(url), { headers });
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fftech_audit.pdf';
+  a.click();
+});
 
-            try {
-                const res = await api(`/audit?url=${encodeURIComponent(url)}`);
-                const data = await res.json();
-                clearInterval(timer);
-                renderReport(data);
-            } catch (err) { alert('Audit connection failed.'); clearInterval(timer); }
-        };
+// --- Registration ---
+document.getElementById('register-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const payload = {
+    email: document.getElementById('reg-email').value,
+    password: document.getElementById('reg-password').value,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  };
+  const res = await fetch('/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  document.getElementById('register-msg').textContent = data.message || JSON.stringify(data);
+});
 
-        function renderReport(data) {
-            $('#audit-loading').classList.add('hidden');
-            $('#audit-results').classList.remove('hidden');
+// --- Login ---
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const payload = {
+    email: document.getElementById('login-email').value,
+    password: document.getElementById('login-password').value
+  };
+  const res = await fetch('/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if(data.token){ authToken = data.token; document.getElementById('login-msg').textContent = "Login successful"; }
+  else document.getElementById('login-msg').textContent = data.message || "Login failed";
+});
+</script>
 
-            // Header & Scores
-            $('#val-grade').innerText = data.grade;
-            $('#val-score').innerText = data.overall + '%';
-            $('#val-summary').innerText = data.summary;
-            $('#val-errors').innerText = data.errors;
-            $('#val-warnings').innerText = data.warnings;
-            $('#val-notices').innerText = data.notices;
-            $('#val-remaining').innerText = data.remaining ?? '--';
-
-            // Charts
-            if(state.charts.overall) state.charts.overall.destroy();
-            state.charts.overall = new Chart($('#chart-overall'), {
-                type: 'doughnut', data: data.overall_gauge, options: { cutout: '80%', plugins: { legend: { display: false } } }
-            });
-
-            const grid = $('#metrics-grid'); grid.innerHTML = '';
-            data.metrics.forEach(m => {
-                const card = document.createElement('div');
-                card.className = 'glass p-6 rounded-3xl border border-slate-100';
-                card.innerHTML = `<h5 class="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Signal ${m.num}</h5><canvas id="m-${m.num}" height="140"></canvas>`;
-                grid.appendChild(card);
-                new Chart($(`#m-${m.num}`), { type: m.chart_type, data: m.chart_data, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
-            });
-
-            // Paywall logic
-            if(!data.premium) {
-                grid.classList.add('premium-blur');
-                $('#paywall-lock').classList.remove('hidden');
-                $('#badge-premium').classList.add('hidden');
-            } else {
-                grid.classList.remove('premium-blur');
-                $('#paywall-lock').classList.add('hidden');
-                $('#badge-premium').classList.remove('hidden');
-            }
-        }
-
-        async function downloadPDF() {
-            const url = $('#input-url').value;
-            window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
-        }
-
-        async function checkout() {
-            const res = await api('/billing/checkout', 'POST');
-            const data = await res.json();
-            if (data.url) window.location.href = data.url; else alert(data.message);
-        }
-
-        $('#login-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const res = await api('/login', 'POST', { email: $('#l-email').value, password: $('#l-pass').value });
-            if (res.ok) {
-                const d = await res.json();
-                localStorage.setItem('token', d.token);
-                location.reload();
-            } else { alert('Login failed.'); }
-        };
-
-        function logout() { localStorage.removeItem('token'); location.reload(); }
-
-        (async function init() {
-            if (state.token) {
-                $('#nav-auth').classList.add('hidden');
-                $('#nav-user').classList.remove('hidden');
-                const res = await api('/settings');
-                if (res.ok) {
-                    const u = await res.json();
-                    $('#user-display-email').innerText = u.subscribed ? '👑 Premium Member' : 'Free Member';
-                    if (u.subscribed) $('#scheduler-panel').classList.remove('hidden');
-                }
-            }
-        })();
-    </script>
+</main>
 </body>
 </html>
