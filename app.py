@@ -4,15 +4,12 @@
 # - Open Access audits (unlimited, limited metrics)
 # - Registered users: FREE_AUDITS_LIMIT (5–10) -> $5/mo subscription
 # - Email verification, scheduling (preferred time/date, timezone)
-# - 5-page PDF export (minimal example included)
+# - Certified PDF export (minimal example)
 # - Stripe checkout/webhook (demo fallback if not configured)
 # - Railway healthcheck: /health + bind to $PORT
 # - SAFE DB INIT + SAFE SESSIONS (graceful when DB is down)
-# - Flexible HTML linking:
-#     * /page/<name> (raw HTML from ./pages)
-#     * /template/<name> (Jinja renders from ./pages)
-#     * /static/* (assets from ./static)
-#   (All three are mounted only if directories exist or are auto-created)
+# - Flexible HTML linking (conditionally mounted):
+#     /page/<name> (raw HTML from ./pages), /template/<name> (Jinja), /static/* (assets)
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from contextlib import contextmanager
@@ -34,15 +31,13 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
-# Stripe (lazy import inside handlers as needed)
+# Stripe (lazy import inside handlers to avoid boot issues)
 try:
     import stripe
 except Exception:
     stripe = None
 
-# -----------------------------------------------
-# Config
-# -----------------------------------------------
+# ---------------- CONFIG ----------------
 APP_NAME = "FF Tech — Professional AI Website Audit Platform"
 USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
 
@@ -53,7 +48,7 @@ if DATABASE_URL.startswith("postgres://"):
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
-FREE_AUDITS_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))  # set 5–10 in env
+FREE_AUDITS_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))  # set to 5–10 as you wish
 SUBSCRIPTION_PRICE_USD = os.getenv("SUBSCRIPTION_PRICE_USD", "5")
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -70,15 +65,13 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", APP_BASE_URL + "/success")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", APP_BASE_URL + "/cancel")
 
-# Optional auto-create for static/templates folders (avoids RuntimeError)
+# Auto-create folders to avoid mount errors
 AUTO_CREATE_STATIC = os.getenv("AUTO_CREATE_STATIC", "true").lower() == "true"
 AUTO_CREATE_PAGES = os.getenv("AUTO_CREATE_PAGES", "true").lower() == "true"
 STATIC_DIR = os.getenv("STATIC_DIR", "static")
 PAGES_DIR = os.getenv("PAGES_DIR", "pages")
 
-# -----------------------------------------------
-# DB setup (lazy; safe init later)
-# -----------------------------------------------
+# ---------------- DB SETUP ----------------
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
@@ -151,9 +144,7 @@ class LoginLog(Base):
     success = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# -----------------------------------------------
-# SAFE SESSION: prevents OperationalError crashes
-# -----------------------------------------------
+# ---------------- SAFE SESSION ----------------
 @contextmanager
 def safe_session():
     db = None
@@ -174,9 +165,7 @@ def safe_session():
         except Exception:
             pass
 
-# -----------------------------------------------
-# Security helpers (PBKDF2 + minimal JWT)
-# -----------------------------------------------
+# ---------------- SECURITY ----------------
 def hash_password(password: str, salt: str) -> str:
     import hashlib
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000)
@@ -214,18 +203,16 @@ def jwt_verify(token: str, key: str = SECRET_KEY) -> dict:
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
-# -----------------------------------------------
-# FastAPI app + CORS + flexible HTML linking
-# -----------------------------------------------
+# ---------------- APP + CORS ----------------
 app = FastAPI(title=APP_NAME)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Healthcheck is fast and DB‑independent
+# Healthcheck (DB‑independent)
 @app.get("/health", response_class=JSONResponse)
 async def health_check():
     return {"status": "healthy", "time": datetime.utcnow().isoformat()}
 
-# --- Conditionally ensure/mount static and pages ---
+# ---------------- FLEXIBLE HTML LINKING ----------------
 def ensure_dir(path: str, auto_create: bool) -> bool:
     if os.path.isdir(path):
         return True
@@ -241,7 +228,7 @@ def ensure_dir(path: str, auto_create: bool) -> bool:
     return False
 
 HAS_STATIC = ensure_dir(STATIC_DIR, AUTO_CREATE_STATIC)
-HAS_PAGES = ensure_dir(PAGES_DIR, AUTO_CREATE_PAGES)
+HAS_PAGES  = ensure_dir(PAGES_DIR,  AUTO_CREATE_PAGES)
 
 if HAS_STATIC:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -274,9 +261,7 @@ def get_jinja_page(name: str, request: Request):
         raise HTTPException(status_code=400, detail="Invalid template name")
     return templates.TemplateResponse(f"{name}.html", {"request": request, "app_name": APP_NAME})
 
-# -----------------------------------------------
-# Networking helpers
-# -----------------------------------------------
+# ---------------- NETWORK HELPERS ----------------
 def safe_request(url: str, method: str = "GET", **kwargs):
     try:
         kwargs.setdefault("timeout", (10, 20))
@@ -293,9 +278,7 @@ def normalize_url(raw: str) -> str:
     if not parsed.scheme: raw = "https://" + raw
     return raw
 
-# -----------------------------------------------
-# Audit engine (realistic heuristics)
-# -----------------------------------------------
+# ---------------- AUDIT ENGINE ----------------
 def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
     if scheme != "https": return False
     for tag in soup.find_all(["img","script","link","iframe","video","audio","source"]):
@@ -408,6 +391,7 @@ def run_actual_audit(target_url: str) -> dict:
         if row.get("status") in (404, 410):
             broken_internal += 1
 
+    # Scoring (heuristics)
     seo_score = 100
     if not title_tag: seo_score -= 20
     if title_tag and (len(title_tag) < 10 or len(title_tag) > 65): seo_score -= 8
@@ -440,7 +424,6 @@ def run_actual_audit(target_url: str) -> dict:
     bp_score = 100
     if scheme != "https": bp_score -= 35
     if mixed: bp_score -= 15
-    if not sitemap_ok: bp_score -= 6
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     sec_score = 100
@@ -452,6 +435,7 @@ def run_actual_audit(target_url: str) -> dict:
     if mixed: sec_score -= 25
 
     overall = round(0.26 * seo_score + 0.28 * perf_score + 0.14 * a11y_score + 0.12 * bp_score + 0.20 * sec_score)
+
     def grade_from_score(score: int) -> str:
         if score >= 95: return "A+"
         if score >= 90: return "A"
@@ -463,28 +447,28 @@ def run_actual_audit(target_url: str) -> dict:
 
     errors = (1 if scheme != "https" else 0) + (1 if mixed else 0) + broken_internal
     warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0) + (1 if blocking_script_count > 0 else 0)
-    notices = (1 if not csp else 0) + (1 if not sitemap_ok else 0) + (1 if not robots_ok else 0)
+    notices = (1 if not headers.get("Content-Security-Policy") else 0) + (1 if not sitemap_ok else 0) + (1 if not robots_ok else 0)
 
     cat2_base = 100
     penalty = (statuses["4xx"] * 2) + (statuses["5xx"] * 3) + (redirect_chains * 1.5) + (broken_internal * 2)
     cat2_total = max(30, min(100, int(cat2_base - penalty)))
     cat_scores = {"SEO": seo_score, "Performance": perf_score, "Security": sec_score, "Accessibility": a11y_score, "Mobile": 85 if viewport_meta else 60}
-    totals = {"cat1": overall, "cat2": cat2_total, "cat3": seo_score, "cat4": perf_score, "cat5": int(0.6 * sec_score + 0.4 * (85 if viewport_meta else 60)), "overall": overall}
+    totals = {"cat1": overall, "cat2": cat2_total, "cat3": seo_score, "cat4": perf_score, "cat5": int(0.6*sec_score + 0.4*(85 if viewport_meta else 60)), "overall": overall}
 
     exec_summary = (
         f"FF Tech audited {resp.url}, overall health {overall}% (grade {grade}). "
-        f"Payload {size_mb:.2f} MB, TTFB {ttfb_ms} ms; optimization advised. "
-        f"Strengthen SEO (H1, meta, canonical, alt, JSON‑LD), add security headers (HSTS, CSP, XFO, XCTO, Referrer‑Policy), "
-        f"eliminate mixed content, and fix broken links."
+        f"Payload {size_mb:.2f} MB, TTFB {ttfb_ms} ms; optimize SEO (H1/meta/canonical/alt/JSON‑LD), "
+        f"add security headers (HSTS/CSP/XFO/XCTO/Referrer‑Policy), remove mixed content, and fix broken links."
     )
 
     def gauge(score: int):
         color = "#10b981" if score >= 80 else "#f59e0b" if score >= 60 else "#ef4444"
         return {"labels":["Score","Remaining"],"datasets":[{"data":[score,100-score],"backgroundColor":[color,"#e5e7eb"],"borderWidth":0}]}
+
     overall_gauge = gauge(overall)
-    health_gauge = gauge(overall)
-    issues_chart = {"labels":["Errors","Warnings","Notices"],"datasets":[{"data":[errors,warnings,notices],"backgroundColor":["#ef4444","#f59e0b","#3b82f6"]}]}
-    category_chart = {"labels": list(cat_scores.keys()), "datasets":[{"label":"Score","data": list(cat_scores.values()), "backgroundColor":["#6366f1","#f59e0b","#10b981","#ef4444","#0ea5e9"]}]}
+    health_gauge  = gauge(overall)
+    issues_chart  = {"labels":["Errors","Warnings","Notices"],"datasets":[{"data":[errors,warnings,notices],"backgroundColor":["#ef4444","#f59e0b","#3b82f6"]}]}
+    category_chart= {"labels": list(cat_scores.keys()), "datasets":[{"label":"Score","data": list(cat_scores.values()), "backgroundColor":["#6366f1","#f59e0b","#10b981","#ef4444","#0ea5e9"]}]}
 
     strengths = []
     if sec_score >= 80 and scheme == "https": strengths.append("HTTPS with baseline security headers.")
@@ -495,9 +479,9 @@ def run_actual_audit(target_url: str) -> dict:
 
     weaknesses = []
     if perf_score < 80: weaknesses.append("Render‑blocking JS/CSS impacting interactivity.")
-    if seo_score < 80: weaknesses.append("Meta/canonical coverage inconsistent.")
-    if a11y_score < 80: weaknesses.append("Alt text and ARIA landmarks incomplete.")
-    if sec_score < 90: weaknesses.append("HSTS/CSP/XFO/XCTO/Referrer‑Policy missing.")
+    if seo_score  < 80: weaknesses.append("Meta/canonical coverage inconsistent.")
+    if a11y_score< 80: weaknesses.append("Alt text and ARIA landmarks incomplete.")
+    if sec_score  < 90: weaknesses.append("HSTS/CSP/XFO/XCTO/Referrer‑Policy missing.")
     if not weaknesses: weaknesses = ["Further analysis required for advanced issues."]
 
     priority = [
@@ -532,9 +516,7 @@ def run_actual_audit(target_url: str) -> dict:
         "cat_scores": cat_scores,
     }
 
-# -----------------------------------------------
-# Minimal landing page (safe)
-# -----------------------------------------------
+# ---------------- Minimal landing page ----------------
 INDEX_HTML = r"""<!DOCTYPE html>
 <html lang='en'>
 <head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>
@@ -561,9 +543,7 @@ document.getElementById('audit-form').addEventListener('submit',async(e)=>{e.pre
 def home():
     return HTMLResponse(INDEX_HTML)
 
-# -----------------------------------------------
-# API Schemas
-# -----------------------------------------------
+# ---------------- Schemas ----------------
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
@@ -590,12 +570,9 @@ class SettingsIn(BaseModel):
     notify_daily_default: bool
     notify_acc_default: bool
 
-# -----------------------------------------------
-# Routes (DB-safe)
-# -----------------------------------------------
+# ---------------- Routes (DB-safe) ----------------
 @app.get("/export-pdf")
 def export_pdf(url: str = Query(...)):
-    # Lazy import avoids boot issues
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
     from reportlab.lib.units import mm
@@ -715,9 +692,10 @@ def login(payload: LoginIn, request: Request):
         token = jwt_sign({"uid": user.id, "role": user.role}, exp_minutes=60*24*7)
         return {"token": token, "role": user.role, "free_audits_remaining": user.free_audits_remaining, "subscribed": user.subscribed}
 
-# -----------------------------------------------
 # Websites & Scheduling
-# -----------------------------------------------
+class WebsiteIn(BaseModel):
+    url: str
+
 @app.post("/websites")
 def add_website(payload: WebsiteIn, authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -782,9 +760,7 @@ def list_schedules(authorization: str | None = Header(None)):
                         "last_run_at": s.last_run_at.isoformat() if s.last_run_at else None})
         return out
 
-# -----------------------------------------------
-# Billing (Stripe, lazy import)
-# -----------------------------------------------
+# ---------------- Billing (Stripe, lazy import) ----------------
 @app.get("/billing/status")
 def billing_status(authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -857,9 +833,7 @@ async def billing_webhook(request: Request):
             print("[STRIPE WEBHOOK ERROR]", e)
     return {"received": True}
 
-# -----------------------------------------------
-# Admin
-# -----------------------------------------------
+# ---------------- Admin ----------------
 @app.get("/admin/users")
 def admin_users(authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -889,21 +863,17 @@ def admin_audits(authorization: str | None = Header(None)):
                  "grade": a.grade, "errors": a.errors, "warnings": a.warnings, "notices": a.notices,
                  "created_at": a.created_at.isoformat()} for a in audits]
 
-# -----------------------------------------------
-# Scheduler (skips when DB down; hardened)
-# -----------------------------------------------
+# ---------------- Scheduler (hardened) ----------------
 async def scheduler_loop():
     await asyncio.sleep(3)
     while True:
         try:
             with safe_session() as db:
                 if not db:
-                    await asyncio.sleep(SCHEDULER_INTERVAL)
-                    continue
+                    await asyncio.sleep(SCHEDULER_INTERVAL); continue
 
                 now_utc = datetime.utcnow().replace(second=0, microsecond=0)
 
-                # Guard the schedules query (prevents undefined-column crash)
                 try:
                     schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
                 except Exception as e:
@@ -937,7 +907,8 @@ async def scheduler_loop():
                             site = db.query(Website).get(s.website_id)
                             if not site: continue
                             payload = run_actual_audit(site.url)
-                            # Minimal PDF (lazy import inside loop)
+
+                            # Minimal PDF email
                             from reportlab.lib.pagesizes import A4
                             from reportlab.pdfgen import canvas
                             from reportlab.lib.units import mm
@@ -947,6 +918,7 @@ async def scheduler_loop():
                             subj = f"FF Tech Audit — {site.url} ({payload['grade']} / {payload['overall']}%)"
                             body = "Your scheduled audit is ready.\nCertified PDF attached.\n— FF Tech"
                             send_email(user.email, subj, body, [(f"fftech_audit_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.pdf", pdf_bytes)])
+
                             row = Audit(
                                 website_id=site.id, url=site.url, overall=payload["overall"], grade=payload["grade"],
                                 errors=payload["errors"], warnings=payload["warnings"], notices=payload["notices"],
@@ -961,44 +933,49 @@ async def scheduler_loop():
 
         await asyncio.sleep(SCHEDULER_INTERVAL)
 
-# -----------------------------------------------
-# SAFE DB INIT (+ schema patches)
-# -----------------------------------------------
-def apply_schema_patches(conn):
-    """Add missing columns to schedules table (idempotent)."""
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS time_of_day varchar(8)
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS timezone varchar(64) DEFAULT 'UTC'
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS daily_report boolean DEFAULT true
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS accumulated_report boolean DEFAULT true
-    """))
-    conn.execute(sa_text("""
-        ALTER TABLE schedules
-        ADD COLUMN IF NOT EXISTS last_run_at timestamp NULL
-    """))
+# ---------------- SAFE DB INIT (+ committed schema patches) ----------------
+def apply_schema_patches_committed():
+    """
+    Add missing columns on 'schedules' inside a committed transaction.
+    Fixes 'UndefinedColumn: schedules.enabled' and related errors.
+    """
+    with engine.begin() as conn:  # ensures commit
+        # ensure base tables exist
+        Base.metadata.create_all(bind=engine)
+        # patch columns
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS time_of_day varchar(8)
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS timezone varchar(64) DEFAULT 'UTC'
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS daily_report boolean DEFAULT true
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS accumulated_report boolean DEFAULT true
+        """))
+        conn.execute(sa_text("""
+            ALTER TABLE schedules
+            ADD COLUMN IF NOT EXISTS last_run_at timestamp NULL
+        """))
 
 async def init_db():
     max_attempts = int(os.getenv("DB_CONNECT_MAX_ATTEMPTS", "10"))
     delay = float(os.getenv("DB_CONNECT_RETRY_DELAY", "2"))
-    # Log sanitized URL
+    # sanitized DB URL log
     try:
         sanitized = DATABASE_URL
         if "@" in sanitized and "://" in sanitized:
@@ -1013,10 +990,10 @@ async def init_db():
         pass
     for attempt in range(1, max_attempts + 1):
         try:
-            with engine.connect() as conn:
+            # ping & patch inside a committed transaction
+            with engine.begin() as conn:
                 conn.execute(sa_text("SELECT 1"))
-                Base.metadata.create_all(bind=engine)
-                apply_schema_patches(conn)
+            apply_schema_patches_committed()
             print("[DB] Connected and tables ensured")
             return
         except OperationalError as e:
@@ -1031,17 +1008,13 @@ async def on_startup():
     asyncio.create_task(init_db())
     asyncio.create_task(scheduler_loop())
 
-# -----------------------------------------------
-# MAIN (bind to $PORT for Railway)
-# -----------------------------------------------
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run("app:app", host="0.0.0.0", port=port)
 
-# -----------------------------------------------
-# Email sending (placed last to keep code tidy)
-# -----------------------------------------------
+# ---------------- EMAIL SENDING ----------------
 def send_email(to_email: str, subject: str, body: str, attachments: list[tuple[str, bytes]] | None = None):
     """SMTP send if configured; else print (dev)."""
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS or not EMAIL_SENDER:
