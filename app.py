@@ -50,7 +50,7 @@ if DATABASE_URL.startswith("postgres://"):
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
-FREE_AUDITS_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))  # set to 5–10 as you wish
+FREE_AUDITS_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))
 SUBSCRIPTION_PRICE_USD = os.getenv("SUBSCRIPTION_PRICE_USD", "5")
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -59,7 +59,7 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@fftech.io")
 
-SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "60"))  # set 0 to disable while stabilizing
+SCHEDULER_INTERVAL = int(os.getenv("SCHEDULER_INTERVAL", "60"))  # set 0 to disable
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
@@ -116,7 +116,7 @@ class Schedule(Base):
     timezone = Column(String(64), default="UTC")
     daily_report = Column(Boolean, default=True)
     accumulated_report = Column(Boolean, default=True)
-    preferred_date = Column(DateTime, nullable=True)    # first run date
+    preferred_date = Column(DateTime, nullable=True)
     last_run_at = Column(DateTime)
 
 class Audit(Base):
@@ -289,13 +289,17 @@ def get_ui_flags(user=None) -> UIFlags:
 def inject_head_assets(html: str, flags: UIFlags) -> str:
     """
     Inject Tailwind, Chart.js, Fonts & Icons into raw HTML.
-    If </head> exists -> insert before it; else prepend to HTML.
+    If </head> exists (case-insensitive), insert before it; else prepend to the HTML.
     """
     head_inject = []
+
     if flags.tailwind:
         head_inject.append('https://cdn.tailwindcss.com</script>')
+
     if flags.charts:
-        head_inject.append('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js   head_inject.append('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap')
+        head_inject.append('https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>')
+
+    head_inject.append('<link href="https://fonts.googleapis.com/css2?family=Plus+:wght@400;700;800&display=swap')
     head_inject.append('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css')
 
     payload = "\n".join(head_inject) + """
@@ -322,6 +326,7 @@ def inject_head_assets(html: str, flags: UIFlags) -> str:
 def inject_bootstrap_script(html: str, app_name: str, flags: UIFlags) -> str:
     """
     Expose Python flags & app name to front-end scripts on raw HTML pages.
+    Inserts before </body> when present; else appends to end.
     """
     boot = f"""
 <script>
@@ -340,10 +345,9 @@ def inject_bootstrap_script(html: str, app_name: str, flags: UIFlags) -> str:
 def get_flexible_page(name: str, request: Request):
     """
     Flexible raw HTML loader with auto-injection:
-    - Reads ./pages/<name>.html as raw text.
-    - Injects Tailwind/Chart.js/fonts into <head>.
-    - Injects window.__FF_FLAGS__ + window.__APP_NAME__ into <body>.
-    - Leaves original HTML structure intact.
+    - Reads ./pages/<name>.html
+    - Injects Tailwind/Chart.js/fonts in <head>
+    - Injects window.__FF_FLAGS__ + window.__APP_NAME__ in <body>
     """
     if not HAS_PAGES:
         raise HTTPException(status_code=404, detail="Pages directory not available")
@@ -370,8 +374,7 @@ def get_jinja_page(name: str, request: Request):
 # ---------------- NETWORK HELPERS ----------------
 def safe_request(url: str, method: str = "GET", **kwargs):
     try:
-        # Short timeouts to avoid hanging worker (prevents “failed to respond”)
-        kwargs.setdefault("timeout", (8, 12))  # connect=8s, read=12s
+        kwargs.setdefault("timeout", (8, 12))  # connect, read
         kwargs.setdefault("allow_redirects", True)
         kwargs.setdefault("headers", {"User-Agent": USER_AGENT})
         return requests.request(method.upper(), url, **kwargs)
@@ -464,11 +467,6 @@ def run_actual_audit(target_url: str) -> dict:
     viewport_meta = bool(soup.find("meta", attrs={"name":"viewport"}))
 
     headers = resp.headers or {}
-    hsts = headers.get("Strict-Transport-Security")
-    csp = headers.get("Content-Security-Policy")
-    xfo = headers.get("X-Frame-Options")
-    xcto = headers.get("X-Content-Type-Options")
-    refpol = headers.get("Referrer-Policy")
     mixed = detect_mixed_content(soup, scheme)
 
     origin = f"{urlparse(resp.url).scheme}://{urlparse(resp.url).netloc}"
@@ -532,11 +530,19 @@ def run_actual_audit(target_url: str) -> dict:
     if redirect_chains > 0: bp_score -= min(12, redirect_chains * 2)
 
     sec_score = 100
-    if not headers.get("Strict-Transport-Security"): sec_score -= 18
-    if not headers.get("Content-Security-Policy"): sec_score -= 18
-    if not headers.get("X-Frame-Options"): sec_score -= 10
-    if not headers.get("X-Content-Type-Options"): sec_score -= 8
-    if not headers.get("Referrer-Policy"): sec_score -= 6
+    # Header presence checks (info only)
+    headers_present = {
+        "Strict-Transport-Security": bool(headers.get("Strict-Transport-Security")),
+        "Content-Security-Policy": bool(headers.get("Content-Security-Policy")),
+        "X-Frame-Options": bool(headers.get("X-Frame-Options")),
+        "X-Content-Type-Options": bool(headers.get("X-Content-Type-Options")),
+        "Referrer-Policy": bool(headers.get("Referrer-Policy")),
+    }
+    if not headers_present["Strict-Transport-Security"]: sec_score -= 18
+    if not headers_present["Content-Security-Policy"]: sec_score -= 18
+    if not headers_present["X-Frame-Options"]: sec_score -= 10
+    if not headers_present["X-Content-Type-Options"]: sec_score -= 8
+    if not headers_present["Referrer-Policy"]: sec_score -= 6
     if mixed: sec_score -= 25
 
     overall = round(0.26 * seo_score + 0.28 * perf_score + 0.14 * a11y_score + 0.12 * bp_score + 0.20 * sec_score)
@@ -552,7 +558,7 @@ def run_actual_audit(target_url: str) -> dict:
 
     errors = broken_internal + (1 if mixed else 0)
     warnings = (1 if ttfb_ms > 800 else 0) + (1 if size_mb > 1.0 else 0)
-    notices = (1 if not headers.get("Content-Security-Policy") else 0) + (1 if not robots_ok else 0) + (1 if not sitemap_ok else 0)
+    notices = (1 if not headers_present["Content-Security-Policy"] else 0) + (1 if not robots_ok else 0) + (1 if not sitemap_ok else 0)
 
     cat2_base = 100
     penalty = (statuses["4xx"] * 2) + (statuses["5xx"] * 3) + (redirect_chains * 1.5) + (broken_internal * 2)
@@ -623,7 +629,7 @@ def run_actual_audit(target_url: str) -> dict:
         "cat_scores": cat_scores,
     }
 
-# ---------------- REFINED INDEX_HTML (fallback, assets injected at runtime) ----------------
+# ---------------- REFINED INDEX_HTML (fallback; assets injected at runtime) ----------------
 INDEX_HTML = r"""<!DOCTYPE html>
 <html lang='en'>
 <head>
@@ -699,7 +705,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
             document.getElementById('results-view').classList.add('hidden');
 
             try {
-                // Fetch Audit Data from your /audit route
                 const response = await fetch('/audit?url=' + encodeURIComponent(urlInput));
                 if (!response.ok) throw new Error('Audit failed: ' + response.status);
                 const data = await response.json();
@@ -734,7 +739,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
                 const grid = document.getElementById('metrics-grid');
                 const metrics = Array.isArray(data.metrics) ? data.metrics.slice(0, 12) : [];
                 grid.innerHTML = metrics.map(m => {
-                    // Derive "pass" percentage from chart_data if present
                     let passPct = 0;
                     try {
                         const ds = m?.chart_data?.datasets?.[0]?.data || [];
@@ -924,7 +928,6 @@ def login(payload: LoginIn, request: Request):
         token = jwt_sign({"uid": user.id, "role": user.role}, exp_minutes=60*24*7)
         return {"token": token, "role": user.role, "free_audits_remaining": user.free_audits_remaining, "subscribed": user.subscribed}
 
-# Websites & Scheduling
 @app.post("/websites")
 def add_website(payload: WebsiteIn, authorization: str | None = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
@@ -982,7 +985,8 @@ def list_schedules(authorization: str | None = Header(None)):
         rows = db.query(Schedule).filter(Schedule.user_id == data.get("uid")).all()
         out = []
         for s in rows:
-            site = db.query(Website).get(s.website_id)
+            # SQLAlchemy 2.x: use Session.get for safe primary key lookup
+            site = db.get(Website, s.website_id)
             out.append({"id": s.id, "website_url": site.url if site else None, "enabled": s.enabled,
                         "time_of_day": s.time_of_day, "timezone": s.timezone,
                         "daily_report": s.daily_report, "accumulated_report": s.accumulated_report,
@@ -1117,7 +1121,7 @@ async def scheduler_loop():
 
                 for s in schedules:
                     try:
-                        user = db.query(User).get(s.user_id)
+                        user = db.get(User, s.user_id)
                         if not user or not user.subscribed:
                             continue
 
@@ -1138,7 +1142,7 @@ async def scheduler_loop():
 
                         should_run = (now_utc >= scheduled_utc and (not s.last_run_at or s.last_run_at < scheduled_utc))
                         if should_run:
-                            site = db.query(Website).get(s.website_id)
+                            site = db.get(Website, s.website_id)
                             if not site: continue
                             payload = run_actual_audit(site.url)
 
@@ -1170,41 +1174,41 @@ async def scheduler_loop():
 # ---------------- SAFE DB INIT (+ committed schema patches) ----------------
 def apply_schema_patches_committed():
     """
-    Add missing columns on 'schedules' inside a committed transaction.
-    Fixes 'UndefinedColumn: schedules.enabled' and related errors.
+    Ensure tables and attempt to add missing columns on 'schedules'.
+    Uses dialect-aware statements and ignores 'column exists' errors.
     """
-    with engine.begin() as conn:  # ensures commit
-        # ensure base tables exist
+    with engine.begin() as conn:
+        # Ensure base tables exist
         Base.metadata.create_all(bind=engine)
-        # patch columns
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS time_of_day varchar(8)
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS timezone varchar(64) DEFAULT 'UTC'
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS daily_report boolean DEFAULT true
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS accumulated_report boolean DEFAULT true
-        """))
-        conn.execute(sa_text("""
-            ALTER TABLE schedules
-            ADD COLUMN IF NOT EXISTS last_run_at timestamp NULL
-        """))
+
+        dialect = engine.dialect.name  # 'sqlite', 'postgresql', etc.
+
+        # Helper: run ALTER and ignore failures (existing columns)
+        def try_alter(stmt: str):
+            try:
+                conn.execute(sa_text(stmt))
+            except Exception as e:
+                # Log once; continue without crashing
+                print("[SCHEMA PATCH WARN]", str(e)[:200])
+
+        if dialect == "sqlite":
+            # SQLite doesn't support IF NOT EXISTS in ALTER COLUMN; best-effort adds
+            try_alter("ALTER TABLE schedules ADD COLUMN enabled boolean DEFAULT 1")
+            try_alter("ALTER TABLE schedules ADD COLUMN preferred_date timestamp NULL")
+            try_alter("ALTER TABLE schedules ADD COLUMN time_of_day varchar(8)")
+            try_alter("ALTER TABLE schedules ADD COLUMN timezone varchar(64) DEFAULT 'UTC'")
+            try_alter("ALTER TABLE schedules ADD COLUMN daily_report boolean DEFAULT 1")
+            try_alter("ALTER TABLE schedules ADD COLUMN accumulated_report boolean DEFAULT 1")
+            try_alter("ALTER TABLE schedules ADD COLUMN last_run_at timestamp NULL")
+        else:
+            # Postgres/MySQL variants accept IF NOT EXISTS
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS enabled boolean DEFAULT true")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS preferred_date timestamp NULL")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS time_of_day varchar(8)")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS timezone varchar(64) DEFAULT 'UTC'")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS daily_report boolean DEFAULT true")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS accumulated_report boolean DEFAULT true")
+            try_alter("ALTER TABLE schedules ADD COLUMN IF NOT EXISTS last_run_at timestamp NULL")
 
 async def init_db():
     max_attempts = int(os.getenv("DB_CONNECT_MAX_ATTEMPTS", "10"))
@@ -1224,7 +1228,6 @@ async def init_db():
         pass
     for attempt in range(1, max_attempts + 1):
         try:
-            # ping & patch inside a committed transaction
             with engine.begin() as conn:
                 conn.execute(sa_text("SELECT 1"))
             apply_schema_patches_committed()
