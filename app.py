@@ -1,4 +1,3 @@
-
 # app.py
 # FF Tech — Professional Web Audit Dashboard (International Standard)
 # Features:
@@ -48,6 +47,11 @@ from reportlab.graphics import renderPDF
 APP_NAME = "FF Tech — Professional AI Website Audit Platform"
 USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_demo.db")
+
+# REFINEMENT: Fix for Railway/Heroku Postgres URL prefix
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
@@ -642,8 +646,8 @@ class LoginIn(BaseModel):
 
 class ScheduleIn(BaseModel):
     website_url: str
-    time_of_day: str         # "HH:MM"
-    timezone: str            # e.g., "Asia/Karachi"
+    time_of_day: str          # "HH:MM"
+    timezone: str             # e.g., "Asia/Karachi"
     daily_report: bool = True
     accumulated_report: bool = True
     enabled: bool = True
@@ -671,12 +675,12 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <meta charset='UTF-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <title>FF Tech — Professional Audit</title>
-https://cdn.tailwindcss.com</script>
+<script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={theme:{extend:{fontFamily:{inter:['Inter','system-ui','sans-serif']},colors:{brand:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},emerald:{500:'#10b981'},amber:{500:'#f59e0b'},rose:{500:'#ef4444'}}}}}</script>
-https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
-https://fonts.gstatic.com
-https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
-https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
 body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 700px at 10% 10%,#eef2ff,transparent),radial-gradient(1200px 700px at 90% 90%,#f1f5f9,transparent)}
 .glass{background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.35);backdrop-filter:saturate(140%) blur(10px);box-shadow:0 25px 50px rgba(0,0,0,.22);border-radius:24px}
@@ -700,9 +704,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
       </div>
     </div>
     <nav class='flex items-center gap-6'>
-      #Login</a>
-      #Register</a>
-      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> · #Logout</a></span>
+      <a href='#' id='open-login'>Login</a>
+      <a href='#' id='open-register'>Register</a>
+      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> · <a href='#' id='logout'>Logout</a></span>
     </nav>
   </div>
 </header>
