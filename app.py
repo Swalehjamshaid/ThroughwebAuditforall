@@ -1,4 +1,3 @@
-
 # app.py
 # FF Tech — AI Website Audit SaaS + Ultra-Flexible Web Integrator
 # ---------------------------------------------------------------------------
@@ -96,50 +95,196 @@ body {
 .hidden { display: none !important; }
 .ff-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
 .ff-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 1rem; padding: 1.25rem; }
+.glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.3); }
+.status-pulse { width: 10px; height: 10px; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 """
 
+# MASTER INTEGRATED UI - PRESERVING ALL LOGIC BUT UPGRADING PRESENTATION
 INDEX_HTML_FALLBACK = r"""<!DOCTYPE html>
 <html lang='en'>
 <head>
   <meta charset='UTF-8'>
   <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-  <title>FF Tech — Flexible Audit</title>
+  <title>FF Tech — AI Website Audit SaaS</title>
 </head>
-<body class="text-slate-900">
-  <main class="ff-container">
-    <h1 style="font-weight:900;letter-spacing:-0.02em;">FF Tech — AI Website Audit SaaS</h1>
-    <p>Drop <code>pages/index.html</code> to override this screen, or serve any file via <code>/page/&lt;path&gt;</code>.</p>
-    <form id="audit-form" style="margin-top:1rem; display:flex; gap:8px;">
-      <input id="url-input" type="url" placeholder="https://example.com" required style="flex:1;padding:0.8rem;border-radius:0.6rem;border:1px solid #e5e7eb;">
-      <button type="submit" style="padding:0.8rem 1rem;border-radius:0.6rem;background:#6366f1;color:#fff;font-weight:700;">Run Audit</button>
-      <button type="button" id="pdf-btn" style="padding:0.8rem 1rem;border-radius:0.6rem;background:#111827;color:#fff;font-weight:700;">Export PDF</button>
-    </form>
-    <div id="results" class="ff-card hidden" style="margin-top:1rem;">
-      <h2>Results</h2>
-      <p id="summary"></p>
-      <canvas id="overallChart" width="260" height="260"></canvas>
+<body class="text-slate-900 bg-slate-50">
+  <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
+    <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+      <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+        <i class="fas fa-robot text-lg"></i>
+      </div>
+      <span class="font-extrabold tracking-tighter text-2xl italic uppercase">FF TECH</span>
     </div>
+    <div class="flex items-center gap-6">
+      <div id="nav-links" class="hidden md:flex gap-8 text-[11px] font-black uppercase tracking-widest text-slate-400">
+        <button onclick="showSection('section-audit')">Audit Engine</button>
+        <button id="nav-monitor" onclick="loadSchedules()" class="hidden auth-only">Monitoring</button>
+        <button id="nav-admin" onclick="loadAdmin()" class="hidden admin-only text-rose-500">Admin</button>
+      </div>
+      <button id="auth-btn" onclick="openModal('auth-modal')" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 transition hover:scale-105">Login</button>
+    </div>
+  </nav>
+
+  <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+    <section id="section-audit" class="section-view text-center space-y-12">
+      <div class="max-w-3xl mx-auto">
+        <h1 class="text-6xl md:text-8xl font-black mb-6 tracking-tight leading-none">AI Website <br><span class="text-indigo-600">Audit.</span></h1>
+        <p class="text-slate-400 text-xl font-medium italic">Deep-crawling 200 technical signals for SEO, Performance, and Security.</p>
+      </div>
+
+      <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-3 p-3 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100">
+        <input id="url-input" type="url" placeholder="https://example.com" required class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl bg-slate-50">
+        <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.8rem] font-black text-lg hover:bg-indigo-700 transition shadow-xl uppercase tracking-tighter">Analyze</button>
+      </form>
+
+      <div id="loading-zone" class="hidden py-10">
+        <div class="status-pulse bg-indigo-600 mb-4 mx-auto"></div>
+        <p class="font-black text-indigo-600 tracking-[0.3em] uppercase text-xs animate-pulse">CRAWLING 200+ SIGNALS...</p>
+      </div>
+
+      <div id="results-dashboard" class="hidden space-y-8 text-left animate-in fade-in duration-500">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative">
+            <canvas id="gaugeChart" width="280" height="280"></canvas>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pt-8">
+              <span id="res-grade" class="text-8xl font-black text-indigo-600 italic leading-none">--</span>
+            </div>
+          </div>
+          <div class="lg:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Executive Summary</h3>
+                <button onclick="downloadPDF()" class="text-indigo-600 font-bold text-xs uppercase underline underline-offset-4">Export 5-Page PDF</button>
+              </div>
+              <p id="res-summary" class="text-slate-600 text-xl font-medium leading-relaxed italic mb-8"></p>
+            </div>
+            <div id="metric-grid-mini" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="section-schedules" class="section-view hidden space-y-8">
+      <div class="flex justify-between items-end">
+        <h2 class="text-4xl font-black tracking-tight">Monitoring <span class="text-indigo-600">Center</span></h2>
+        <button onclick="openModal('modal-schedule')" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase shadow-lg">New Schedule</button>
+      </div>
+      <div id="schedule-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </section>
+
+    <section id="section-admin" class="section-view hidden space-y-8">
+      <h2 class="text-4xl font-black tracking-tight text-rose-500">Global Admin Oversight</h2>
+      <div class="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
+        <div id="admin-table-container" class="p-8 overflow-x-auto text-xs font-bold"></div>
+      </div>
+    </section>
   </main>
+
+  <div id="auth-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+    <div class="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative text-center">
+      <h2 class="text-3xl font-black mb-2">Magic Login</h2>
+      <p class="text-slate-400 mb-8 font-medium">Passwordless access. Link sent to email.</p>
+      <form onsubmit="handleAuth(event)" class="space-y-4">
+        <input type="email" id="auth-email" placeholder="Email Address" required class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
+        <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl">Send Magic Link</button>
+      </form>
+      <button onclick="closeModal('auth-modal')" class="mt-6 text-xs font-bold text-slate-300 uppercase tracking-widest">Cancel</button>
+    </div>
+  </div>
+
   <script>
-    let chart = null;
+    let token = localStorage.getItem('ff_token');
+    let gaugeChart = null;
+
+    function showSection(id) {
+      document.querySelectorAll('.section-view').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    async function api(path, method = 'GET', body = null) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : null });
+      if (res.status === 401) { localStorage.removeItem('ff_token'); location.reload(); }
+      return res.json();
+    }
+
     document.getElementById('audit-form').onsubmit = async (e) => {
       e.preventDefault();
+      const url = document.getElementById('url-input').value;
+      document.getElementById('loading-zone').classList.remove('hidden');
+      document.getElementById('results-dashboard').classList.add('hidden');
+
+      const data = await api(`/audit?url=${encodeURIComponent(url)}`);
+      document.getElementById('loading-zone').classList.add('hidden');
+      document.getElementById('results-dashboard').classList.remove('hidden');
+
+      document.getElementById('res-grade').innerText = data.grade;
+      document.getElementById('res-summary').innerText = data.summary;
+
+      if (gaugeChart) gaugeChart.destroy();
+      const ctx = document.getElementById('gaugeChart').getContext('2d');
+      gaugeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: data.charts.overall_gauge,
+        options: { cutout: '80%', plugins: { legend: { display: false } } }
+      });
+      
+      document.getElementById('metric-grid-mini').innerHTML = data.metrics.slice(0, 4).map(m => `
+        <div class="bg-slate-50 p-4 rounded-2xl">
+          <span class="block text-[10px] font-black text-slate-400 uppercase mb-1 truncate">${m.name}</span>
+          <span class="text-xl font-black text-indigo-600">${m.value || 'N/A'}</span>
+        </div>
+      `).join('');
+    };
+
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById('auth-email').value;
+      const res = await api('/register', 'POST', { email });
+      alert(res.message);
+      closeModal('auth-modal');
+    }
+
+    async function loadAdmin() {
+      showSection('section-admin');
+      const data = await api('/admin/users');
+      document.getElementById('admin-table-container').innerHTML = `
+        <table class="w-full text-left">
+          <tr class="border-b uppercase text-slate-400"><th class="p-4">Email</th><th class="p-4">Credits</th><th class="p-4">Sub</th></tr>
+          ${data.map(u => `<tr class="border-b"> <td class="p-4">${u.email}</td> <td class="p-4">${u.free_audits_remaining}</td> <td class="p-4">${u.subscribed ? '👑' : '-'}</td> </tr>`).join('')}
+        </table>`;
+    }
+
+    async function loadSchedules() {
+      showSection('section-schedules');
+      const data = await api('/schedules');
+      document.getElementById('schedule-list').innerHTML = data.map(s => `
+        <div class="bg-white p-8 rounded-[2.5rem] border shadow-sm flex justify-between items-center">
+          <div><h4 class="font-black text-xl">${s.website_url}</h4><p class="text-slate-400 font-medium">${s.time_of_day}</p></div>
+          <div class="status-pulse bg-emerald-500"></div>
+        </div>`).join('');
+    }
+
+    function downloadPDF() {
+      const url = document.getElementById('url-input').value;
+      window.location = `/export-pdf?url=${encodeURIComponent(url)}`;
+    }
+
+    if (token) {
+      document.getElementById('auth-btn').innerText = 'LOGOUT';
+      document.getElementById('auth-btn').onclick = () => { localStorage.removeItem('ff_token'); location.reload(); };
+      document.querySelectorAll('.auth-only').forEach(el => el.classList.remove('hidden'));
       try {
-        const url = document.getElementById('url-input').value;
-        const res = await fetch('/audit?url=' + encodeURIComponent(url));
-        const data = await res.json();
-        document.getElementById('results').classList.remove('hidden');
-        document.getElementById('summary').innerText = data.summary || '';
-        const ctx = document.getElementById('overallChart').getContext('2d');
-        if (chart) chart.destroy();
-        chart = new Chart(ctx, { type:'doughnut', data:data.charts.overall_gauge,
-          options:{ cutout:'80%', plugins:{legend:{display:false}} }});
-      } catch(e){ alert('Audit failed'); }
-    };
-    document.getElementById('pdf-btn').onclick = () => {
-      const url = document.getElementById('url-input').value || 'https://example.com';
-      window.location = '/export-pdf?url=' + encodeURIComponent(url);
-    };
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+      } catch(e) {}
+    }
   </script>
 </body>
 </html>
@@ -227,21 +372,21 @@ def _inject_head(html: str, flags: UIFlags) -> str:
     if flags.tailwind:
         for url in INJECTOR.cdn_scripts_head:
             if "tailwindcss" in url and not _has_asset(html_low, url):
-                tags.append(f'{url}</script>')
+                tags.append(f'<script src="{url}"></script>')
     if flags.charts:
         for url in INJECTOR.cdn_scripts_head:
             if "chart" in url and not _has_asset(html_low, url):
-                tags.append(f'{url}</script>')
+                tags.append(f'<script src="{url}"></script>')
 
     # Styles
     for url in INJECTOR.cdn_styles:
-        if not _has_asset(html_low, url): tags.append(f'{url}')
+        if not _has_asset(html_low, url): tags.append(f'<link rel="stylesheet" href="{url}">')
     for url in INJECTOR.local_styles:
-        if not _has_asset(html_low, url): tags.append(f'{url}')
+        if not _has_asset(html_low, url): tags.append(f'<link rel="stylesheet" href="{url}">')
 
     # Local head scripts
     for url in INJECTOR.local_scripts_head:
-        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'<script src="{url}"></script>')
 
     # Inline CSS
     if INJECTOR.base_inline_css.strip():
@@ -256,11 +401,11 @@ def _inject_body(html: str, flags: UIFlags) -> str:
 
     # Local body scripts
     for url in INJECTOR.local_scripts_body:
-        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'<script src="{url}"></script>')
 
     # CDN body scripts (optional)
     for url in INJECTOR.cdn_scripts_body:
-        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'<script src="{url}"></script>')
 
     # Flags bootstrap
     tags.append(f"<script>window.__FF_FLAGS__={json.dumps(asdict(flags))};window.__APP_NAME__={json.dumps(APP_NAME)};</script>")
