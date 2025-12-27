@@ -3,143 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ app_name }}</title>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="/static/js/main.js" defer></script>
-
+    <title>FF TECH — AI Website Audit SaaS</title>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(14px); border: 1px solid rgba(226, 232, 240, 0.8); }
-        .admin-tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 800; }
-        .hidden { display: none !important; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.3); }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; }
+        .status-pulse { width: 10px; height: 10px; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        .grid-signal { transition: transform 0.2s; cursor: pointer; }
+        .grid-signal:hover { transform: translateY(-2px); }
     </style>
 </head>
-<body class="text-slate-900">
+<body class="bg-slate-50 text-slate-900">
 
     <nav class="fixed w-full z-50 glass border-b px-6 py-4 flex justify-between items-center">
         <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
-            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg">
-                <i class="fas fa-robot text-xs"></i>
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                <i class="fas fa-robot text-lg"></i>
             </div>
-            <span class="font-extrabold tracking-tighter text-xl italic uppercase">FF TECH</span>
+            <span class="font-extrabold tracking-tighter text-2xl italic uppercase">FF TECH</span>
         </div>
-        
-        <div class="flex items-center gap-4">
-            <div id="nav-links" class="hidden md:flex gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400 mr-4">
-                <button onclick="showSection('section-audit')">Audit Engine</button>
-                <button onclick="loadSchedules()" class="auth-only hidden">Monitoring</button>
-                <button onclick="loadAdmin()" class="admin-only hidden text-rose-500">Admin Console</button>
+        <div class="flex items-center gap-6">
+            <div id="nav-links" class="hidden md:flex gap-8 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                <button onclick="showSection('section-audit')" class="hover:text-indigo-600">Audit Engine</button>
+                <button id="nav-monitor" onclick="loadSchedules()" class="hidden hover:text-indigo-600 auth-only">Monitoring</button>
+                <button id="nav-admin" onclick="loadAdmin()" class="hidden text-rose-500 hover:text-rose-600 admin-only">Admin</button>
             </div>
-            <button id="auth-btn" onclick="openModal('auth-modal')" class="text-xs font-black uppercase tracking-widest text-slate-600">Login</button>
-            <button id="pro-btn" onclick="subscribe()" class="hidden bg-indigo-600 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg transition hover:scale-105">Go Pro</button>
+            <div id="auth-area">
+                <button id="login-btn" onclick="openModal('modal-auth')" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-indigo-100 transition hover:scale-105">Login</button>
+                <button id="logout-btn" onclick="logout()" class="hidden text-xs font-bold text-slate-400 hover:text-slate-600 auth-only">Logout</button>
+            </div>
         </div>
     </nav>
 
-    <main class="pt-32 pb-20 px-6 max-w-6xl mx-auto">
+    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
         
-        <section id="section-audit" class="section-view text-center mb-16">
-            <h1 class="text-5xl md:text-7xl font-black mb-6 tracking-tighter">AI Website <span class="text-indigo-600">Audit.</span></h1>
-            <p class="text-slate-400 mb-10 text-lg font-medium max-w-2xl mx-auto italic">Verified technical health across 250+ technical SEO & performance signals.</p>
-            
-            <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-2 p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100">
-                <input id="url-input" type="url" placeholder="https://example.com" required class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl">
-                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-lg hover:bg-indigo-700 transition shadow-xl uppercase tracking-tighter">Analyze</button>
+        <section id="section-audit" class="section-view text-center space-y-12">
+            <div class="max-w-3xl mx-auto">
+                <h1 class="text-6xl md:text-8xl font-black mb-6 tracking-tight leading-none">AI Website <br><span class="text-indigo-600">Audit.</span></h1>
+                <p class="text-slate-400 text-xl font-medium italic">Deep-crawling 200 technical signals for SEO, Performance, and Security.</p>
+            </div>
+
+            <form id="audit-form" class="max-w-2xl mx-auto flex flex-col md:flex-row gap-3 p-3 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100">
+                <input id="url-input" type="url" placeholder="https://example.com" required 
+                       class="flex-1 p-5 outline-none font-bold text-lg rounded-2xl bg-slate-50">
+                <button type="submit" class="bg-indigo-600 text-white px-10 py-5 rounded-[1.8rem] font-black text-lg hover:bg-indigo-700 transition shadow-xl uppercase tracking-tighter">
+                    Run Analysis
+                </button>
             </form>
-        </section>
 
-        <div id="loading-zone" class="hidden text-center py-20 glass rounded-[3rem]">
-            <div class="status-pulse mb-4 mx-auto"></div>
-            <p class="font-black text-indigo-600 tracking-[0.2em] animate-pulse uppercase text-xs">CRAWLING & GENERATING INSIGHTS...</p>
-        </div>
+            <div id="audit-loader" class="hidden py-10">
+                <div class="status-pulse bg-indigo-600 mb-4 mx-auto"></div>
+                <p class="font-black text-indigo-600 tracking-[0.3em] uppercase text-xs animate-pulse">Engine Crawling Signals...</p>
+            </div>
 
-        <div id="results-view" class="hidden space-y-8">
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="bg-white p-10 rounded-[3rem] shadow-sm border flex flex-col items-center justify-center relative">
-                    <canvas id="mainChart" width="220" height="220"></canvas>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center pt-6">
-                        <div id="grade-display" class="text-7xl font-black text-indigo-600 italic tracking-tighter">--</div>
+            <div id="results-dashboard" class="hidden space-y-8 text-left">
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col items-center justify-center relative">
+                        <canvas id="gaugeChart" width="280" height="280"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pt-8">
+                            <span id="res-grade" class="text-8xl font-black text-indigo-600 italic leading-none">--</span>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Executive Summary</h3>
+                                <button onclick="downloadPDF()" class="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                    <i class="fas fa-file-pdf mr-2"></i> Export PDF
+                                </button>
+                            </div>
+                            <p id="res-summary" class="text-slate-600 text-xl font-medium leading-relaxed italic mb-8"></p>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-rose-50 p-4 rounded-2xl">
+                                <span class="block text-[10px] font-black text-rose-400 uppercase mb-1">Errors</span>
+                                <span id="res-errors" class="text-2xl font-black text-rose-600">0</span>
+                            </div>
+                            <div class="bg-amber-50 p-4 rounded-2xl">
+                                <span class="block text-[10px] font-black text-amber-400 uppercase mb-1">Warnings</span>
+                                <span id="res-warnings" class="text-2xl font-black text-amber-600">0</span>
+                            </div>
+                            <div class="bg-indigo-50 p-4 rounded-2xl">
+                                <span class="block text-[10px] font-black text-indigo-400 uppercase mb-1">Notices</span>
+                                <span id="res-notices" class="text-2xl font-black text-indigo-600">0</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="md:col-span-2 bg-white p-10 rounded-[3rem] shadow-sm border border-slate-100 flex flex-col justify-center">
-                    <div class="flex justify-between items-start mb-4">
-                        <h3 class="text-xs font-black text-slate-300 uppercase tracking-widest">Executive Summary</h3>
-                        <button onclick="downloadPDF()" class="text-indigo-600 font-bold text-xs uppercase"><i class="fas fa-file-pdf mr-1"></i> Export 5-Page PDF</button>
+
+                <div class="space-y-6">
+                    <div class="flex justify-between items-end">
+                        <h3 class="text-2xl font-black tracking-tight">Technical <span class="text-indigo-600">Signals</span></h3>
+                        <div id="premium-lock" class="text-xs font-bold text-rose-500 uppercase tracking-widest hidden">
+                            <i class="fas fa-lock mr-1"></i> Register to unlock all 200 signals
+                        </div>
                     </div>
-                    <p id="summary-text" class="text-slate-600 leading-relaxed text-lg font-medium italic mb-8"></p>
-                    <div class="bg-indigo-50 inline-block px-5 py-3 rounded-2xl w-fit">
-                        <span id="score-text" class="font-bold text-indigo-600 text-xl">0% Health</span>
-                    </div>
+                    <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-2 overflow-hidden">
+                        </div>
                 </div>
             </div>
-            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-6 gap-4"></div>
-        </div>
-
-        <section id="section-schedules" class="section-view hidden">
-            <div class="flex justify-between items-center mb-8">
-                <h2 class="text-3xl font-black">Monitoring</h2>
-                <button onclick="openModal('modal-schedule')" class="bg-indigo-600 text-white px-6 py-3 rounded-xl text-xs font-bold uppercase">New Schedule</button>
-            </div>
-            <div id="schedule-list" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
         </section>
 
-        <section id="section-admin" class="section-view hidden">
-            <div class="bg-white rounded-[2.5rem] border shadow-sm overflow-hidden">
+        <section id="section-schedules" class="section-view hidden space-y-8">
+            <div class="flex justify-between items-end">
+                <h2 class="text-4xl font-black tracking-tight">Monitoring <span class="text-indigo-600">Center</span></h2>
+                <button onclick="openModal('modal-schedule')" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">New Schedule</button>
+            </div>
+            <div id="schedule-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                </div>
+        </section>
+
+        <section id="section-admin" class="section-view hidden space-y-12">
+            <h2 class="text-4xl font-black tracking-tight text-rose-500">Global Oversight</h2>
+            <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
                 <div class="flex border-b bg-slate-50/50">
-                    <button id="tab-users" onclick="adminTab('users')" class="px-8 py-4 text-[10px] font-black uppercase admin-tab-active border-r">Users</button>
-                    <button id="tab-audits" onclick="adminTab('audits')" class="px-8 py-4 text-[10px] font-black uppercase">Audit Logs</button>
+                    <button id="admin-tab-users" onclick="adminView('users')" class="px-8 py-4 text-[10px] font-black uppercase tracking-widest tab-active">User Database</button>
+                    <button id="admin-tab-audits" onclick="adminView('audits')" class="px-8 py-4 text-[10px] font-black uppercase tracking-widest">Global Audit Logs</button>
                 </div>
-                <div id="admin-table-container" class="p-6 overflow-x-auto min-h-[300px]"></div>
+                <div id="admin-content" class="p-8 overflow-x-auto"></div>
             </div>
         </section>
+
     </main>
 
-    <div id="auth-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative">
-            <h2 id="auth-title" class="text-3xl font-black mb-6">Login</h2>
-            <form onsubmit="handleAuth(event)" class="space-y-4">
-                <input type="email" id="auth-email" placeholder="Email" required class="w-full p-4 bg-slate-50 rounded-xl border-none font-bold">
-                <input type="password" id="auth-pass" placeholder="Password" required class="w-full p-4 bg-slate-50 rounded-xl border-none font-bold">
-                <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold">Continue</button>
+    <div id="modal-auth" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
+        <div class="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative text-center">
+            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-6">
+                <i class="fas fa-magic"></i>
+            </div>
+            <h2 class="text-3xl font-black mb-2 leading-none">Passwordless Login</h2>
+            <p class="text-slate-400 mb-8 font-medium">We'll email you a secure magic link to sign in instantly.</p>
+            <form onsubmit="handleRegister(event)" class="space-y-4">
+                <input type="email" id="auth-email" placeholder="Email Address" required 
+                       class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
+                <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl">Send Magic Link</button>
             </form>
-            <button onclick="toggleAuthMode()" id="auth-switch" class="w-full mt-6 text-[10px] font-black text-slate-400 uppercase text-center block">Need an account? Sign Up</button>
+            <button onclick="closeModal('modal-auth')" class="mt-6 text-xs font-bold text-slate-300 uppercase tracking-widest hover:text-slate-500">Cancel</button>
         </div>
     </div>
 
-    <div id="modal-schedule" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+    <div id="modal-schedule" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
         <div class="bg-white w-full max-w-lg p-10 rounded-[3rem] shadow-2xl relative">
-            <h2 class="text-2xl font-black mb-6">New Monitoring Schedule</h2>
-            <form onsubmit="handleCreateSchedule(event)" class="space-y-4">
-                <input type="url" id="sched-url" placeholder="https://website.com" required class="w-full p-4 bg-slate-50 rounded-xl font-bold">
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="time" id="sched-time" value="09:00" class="p-4 bg-slate-50 rounded-xl font-bold">
-                    <select id="sched-tz" class="p-4 bg-slate-50 rounded-xl font-bold"><option value="UTC">UTC</option></select>
+            <h2 class="text-3xl font-black mb-8">Schedule Monitoring</h2>
+            <form onsubmit="handleCreateSchedule(event)" class="space-y-6">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Target Website</label>
+                    <input type="url" id="sched-url" placeholder="https://example.com" required class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
                 </div>
-                <button type="submit" class="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold">Enable Monitoring</button>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Daily Time (HH:MM)</label>
+                        <input type="time" id="sched-time" value="09:00" required class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Timezone</label>
+                        <select id="sched-tz" class="w-full p-4 bg-slate-50 rounded-xl font-bold border-none">
+                            <option value="UTC">UTC</option>
+                            <option value="America/New_York">EST</option>
+                            <option value="Europe/London">GMT</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100">Save Configuration</button>
             </form>
-            <button onclick="closeModal('modal-schedule')" class="absolute top-8 right-8 text-slate-300">Close</button>
+            <button onclick="closeModal('modal-schedule')" class="absolute top-10 right-10 text-slate-300 hover:text-slate-500"><i class="fas fa-times text-xl"></i></button>
         </div>
     </div>
 
     <script>
-        let token = localStorage.getItem('token');
-        let chart = null;
-        let isLogin = true;
+        let token = localStorage.getItem('ff_token');
+        let gaugeChart = null;
 
-        async function api(path, method = 'GET', body = null) {
-            const h = { 'Content-Type': 'application/json' };
-            if (token) h['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
-            if (res.status === 401) { localStorage.removeItem('token'); location.reload(); }
-            return res.json();
-        }
-
+        // --- Core Helpers ---
         function showSection(id) {
             document.querySelectorAll('.section-view').forEach(s => s.classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
@@ -148,79 +184,151 @@
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        // AUDIT HANDLER
+        async function api(path, method = 'GET', body = null) {
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : null });
+            if (res.status === 401) logout();
+            return res.json();
+        }
+
+        // --- Audit Flow ---
         document.getElementById('audit-form').onsubmit = async (e) => {
             e.preventDefault();
             const url = document.getElementById('url-input').value;
-            fadeToggle('loading-zone', true);
-            document.getElementById('results-view').classList.add('hidden');
+            document.getElementById('audit-loader').classList.remove('hidden');
+            document.getElementById('results-dashboard').classList.add('hidden');
+
             const data = await api(`/audit?url=${encodeURIComponent(url)}`);
-            fadeToggle('loading-zone', false);
-            document.getElementById('results-view').classList.remove('hidden');
-            document.getElementById('grade-display').innerText = data.grade;
-            document.getElementById('summary-text').innerText = data.summary;
-            document.getElementById('score-text').innerText = data.overall + '% Health';
-            if (chart) chart.destroy();
-            chart = new Chart(document.getElementById('mainChart'), {
-                type: 'doughnut', data: data.overall_gauge, options: { cutout: '85%', plugins: { legend: { display: false } } }
+            document.getElementById('audit-loader').classList.add('hidden');
+            document.getElementById('results-dashboard').classList.remove('hidden');
+
+            // Render Gauges
+            document.getElementById('res-grade').innerText = data.grade;
+            document.getElementById('res-summary').innerText = data.summary;
+            document.getElementById('res-errors').innerText = data.errors;
+            document.getElementById('res-warnings').innerText = data.warnings;
+            document.getElementById('res-notices').innerText = data.notices;
+
+            if (gaugeChart) gaugeChart.destroy();
+            const ctx = document.getElementById('gaugeChart').getContext('2d');
+            gaugeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: data.charts.overall_gauge,
+                options: { cutout: '80%', plugins: { legend: { display: false } } }
             });
-            document.getElementById('metrics-grid').innerHTML = data.metrics.slice(0, 12).map(m => `
-                <div class="bg-white p-4 rounded-3xl border shadow-sm text-center">
-                    <div class="text-[8px] font-black text-slate-300 uppercase mb-2">Signal ${m.num}</div>
-                    <div class="h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-indigo-500" style="width: ${m.chart_data.datasets[0].data[0]}%"></div>
-                    </div>
-                </div>`).join('');
+
+            // Render 200 Metrics Grid
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = data.metrics.map(m => `
+                <div class="grid-signal flex flex-col items-center justify-center p-2 rounded-lg ${m.value !== null ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-300'}" title="${m.name}">
+                    <span class="text-[8px] font-black">${m.id}</span>
+                </div>
+            `).join('');
+
+            if (!data.premium) document.getElementById('premium-lock').classList.remove('hidden');
+            else document.getElementById('premium-lock').classList.add('hidden');
         };
 
-        // MONITORING LOGIC
+        // --- Monitoring Flow ---
         async function loadSchedules() {
             showSection('section-schedules');
             const data = await api('/schedules');
-            document.getElementById('schedule-list').innerHTML = data.map(s => `
-                <div class="bg-white p-6 rounded-[2rem] border shadow-sm">
-                    <h4 class="font-bold truncate">${s.website_url}</h4>
-                    <p class="text-xs text-slate-400">Daily at ${s.time_of_day} ${s.timezone}</p>
-                </div>`).join('');
+            const list = document.getElementById('schedule-list');
+            list.innerHTML = data.map(s => `
+                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex justify-between items-center">
+                    <div>
+                        <h4 class="font-black text-xl mb-1">${s.website_url}</h4>
+                        <p class="text-slate-400 font-medium italic text-xs">Daily at ${s.time_of_day} (${s.timezone})</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[9px] font-black uppercase text-indigo-400 block mb-2">Last Run: ${s.last_run_at || 'Pending'}</span>
+                        <div class="status-pulse ${s.enabled ? 'bg-emerald-500' : 'bg-slate-300'}"></div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         async function handleCreateSchedule(e) {
             e.preventDefault();
-            const payload = { website_url: document.getElementById('sched-url').value, time_of_day: document.getElementById('sched-time').value, timezone: document.getElementById('sched-tz').value };
-            await api('/schedule', 'POST', payload);
+            const body = {
+                website_url: document.getElementById('sched-url').value,
+                time_of_day: document.getElementById('sched-time').value,
+                timezone: document.getElementById('sched-tz').value,
+            };
+            await api('/schedule', 'POST', body);
             closeModal('modal-schedule');
             loadSchedules();
         }
 
-        // ADMIN LOGIC
-        async function adminTab(type) {
-            const container = document.getElementById('admin-table-container');
+        // --- Admin Flow ---
+        async function adminView(type) {
+            document.getElementById('admin-tab-users').classList.toggle('tab-active', type === 'users');
+            document.getElementById('admin-tab-audits').classList.toggle('tab-active', type === 'audits');
             const data = await api(`/admin/${type}`);
-            container.innerHTML = `<table class="w-full text-left text-xs">
-                <tr class="border-b uppercase text-[9px] font-black text-slate-400"><th class="p-4">Entry</th><th class="p-4">Details</th></tr>
-                ${data.map(d => `<tr class="border-b hover:bg-slate-50"><td class="p-4">${d.email || d.url}</td><td class="p-4">${d.role || d.grade}</td></tr>`).join('')}
-            </table>`;
+            const content = document.getElementById('admin-content');
+            
+            if (type === 'users') {
+                content.innerHTML = `
+                    <table class="w-full text-left text-xs font-bold">
+                        <tr class="text-slate-400 uppercase text-[9px] border-b">
+                            <th class="p-4">Email</th><th class="p-4">Role</th><th class="p-4">Subscribed</th><th class="p-4">Credits</th>
+                        </tr>
+                        ${data.map(u => `
+                            <tr class="border-b">
+                                <td class="p-4 font-black text-slate-700">${u.email}</td>
+                                <td class="p-4"><span class="bg-slate-100 px-2 py-1 rounded capitalize">${u.role}</span></td>
+                                <td class="p-4 text-indigo-600">${u.subscribed ? '👑 PRO' : 'Free'}</td>
+                                <td class="p-4">${u.free_audits_remaining}</td>
+                            </tr>
+                        `).join('')}
+                    </table>`;
+            } else {
+                content.innerHTML = `
+                    <table class="w-full text-left text-xs font-bold">
+                        <tr class="text-slate-400 uppercase text-[9px] border-b">
+                            <th class="p-4">Target URL</th><th class="p-4">Grade</th><th class="p-4">Score</th><th class="p-4">Issues</th>
+                        </tr>
+                        ${data.map(a => `
+                            <tr class="border-b">
+                                <td class="p-4 font-black truncate max-w-xs text-indigo-600">${a.url}</td>
+                                <td class="p-4 text-xl italic font-black">${a.grade}</td>
+                                <td class="p-4">${a.overall}%</td>
+                                <td class="p-4 text-rose-500">${a.errors}e / ${a.warnings}w</td>
+                            </tr>
+                        `).join('')}
+                    </table>`;
+            }
         }
-        function loadAdmin() { showSection('section-admin'); adminTab('users'); }
 
-        // AUTH & BILLING
-        async function handleAuth(e) {
+        function loadAdmin() { showSection('section-admin'); adminView('users'); }
+
+        // --- Auth Helpers ---
+        async function handleRegister(e) {
             e.preventDefault();
-            const data = await api(isLogin ? '/login' : '/register', 'POST', { email: document.getElementById('auth-email').value, password: document.getElementById('auth-pass').value });
-            if (data.token) { localStorage.setItem('token', data.token); location.reload(); }
+            const email = document.getElementById('auth-email').value;
+            const res = await api('/register', 'POST', { email });
+            alert(res.message);
+            closeModal('modal-auth');
         }
-        function toggleAuthMode() { isLogin = !isLogin; document.getElementById('auth-title').innerText = isLogin ? 'Login' : 'Sign Up'; }
-        async function subscribe() { const data = await api('/billing/checkout', 'POST'); if (data.url) window.location.href = data.url; }
-        function downloadPDF() { window.location.href = `/export-pdf?url=${encodeURIComponent(document.getElementById('url-input').value)}`; }
 
-        // INIT
+        function logout() { localStorage.removeItem('ff_token'); location.reload(); }
+
+        function downloadPDF() {
+            const url = document.getElementById('url-input').value;
+            window.location = `/export-pdf?url=${encodeURIComponent(url)}`;
+        }
+
+        // --- Init ---
         if (token) {
-            document.getElementById('auth-btn').innerText = 'Logout';
-            document.getElementById('auth-btn').onclick = () => { localStorage.removeItem('token'); location.reload(); };
             document.querySelectorAll('.auth-only').forEach(el => el.classList.remove('hidden'));
-            api('/billing/status').then(d => { if (d && !d.subscribed) document.getElementById('pro-btn')?.classList.remove('hidden'); });
-            const p = JSON.parse(atob(token.split('.')[1]));
-            if (p.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+            document.getElementById('login-btn').classList.add('hidden');
+            
+            // Check role from JWT payload
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                if (payload.role === 'admin') document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+            } catch(e) {}
         }
     </script>
 </body>
