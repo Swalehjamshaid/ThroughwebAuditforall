@@ -1,272 +1,152 @@
-# MASTER INTEGRATED UI - HIGH-FIDELITY SaaS VERSION
-INDEX_HTML_FALLBACK = r"""<!DOCTYPE html>
-<html lang='en'>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>FF TECH — AI Website Audit SaaS</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech AI | Professional Website Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.2); }
-        .dark-glass { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .status-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
-        .gradient-text { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0B1221; }
+        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .gradient-text { background: linear-gradient(90deg, #3B82F6, #2DD4BF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-    <nav class="fixed top-0 w-full z-50 glass border-b border-slate-200/50 px-6 py-3 flex justify-between items-center">
-        <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-indigo-200 shadow-lg">
-                <i class="fas fa-bolt-lightning"></i>
-            </div>
-            <span class="font-extrabold tracking-tighter text-2xl italic uppercase">FF TECH</span>
-        </div>
-        
-        <div class="flex items-center gap-4">
-            <div id="nav-actions" class="hidden md:flex items-center gap-6 text-[11px] font-black uppercase tracking-widest text-slate-400 mr-6">
-                <button onclick="showSection('section-audit')" class="hover:text-indigo-600 transition">Audit Engine</button>
-                <button id="nav-monitor" onclick="loadSchedules()" class="hidden auth-only hover:text-indigo-600 transition">Monitoring</button>
-                <button id="nav-admin" onclick="loadAdmin()" class="hidden admin-only text-rose-500 hover:text-rose-600 transition">Admin</button>
-            </div>
-            <button id="auth-btn" onclick="openModal('auth-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 transition shadow-lg transition-all active:scale-95">
-                Login / Register
-            </button>
+<body class="text-gray-100 min-h-screen">
+
+    <nav class="border-b border-white/10 py-4 px-6 flex justify-between items-center glass sticky top-0 z-50">
+        <div class="text-xl font-extrabold tracking-tight gradient-text">FF TECH AI</div>
+        <div class="flex gap-4">
+            <button onclick="toggleLogin()" class="text-sm font-semibold hover:text-blue-400 transition">Login</button>
+            <button id="logoutBtn" onclick="logout()" class="hidden text-sm font-semibold text-red-400">Logout</button>
         </div>
     </nav>
 
-    <main class="pt-28 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
-        <section id="section-audit" class="section-view space-y-12">
-            <div class="text-center max-w-3xl mx-auto space-y-6">
-                <h1 class="text-5xl md:text-7xl font-black tracking-tighter leading-none">
-                    Next-Gen <span class="gradient-text">Website Intelligence.</span>
-                </h1>
-                <p class="text-slate-500 text-lg md:text-xl font-medium">
-                    Analyze 200+ metrics in seconds. Deep-crawl SEO, Performance, and Security infrastructure.
-                </p>
+    <main class="max-w-6xl mx-auto p-6">
+        <section class="text-center py-12">
+            <h1 class="text-5xl font-extrabold mb-4">Analyze Your <span class="gradient-text">Web Performance</span></h1>
+            <p class="text-gray-400 mb-8">Professional AI-powered audits with 200+ data points.</p>
+            
+            <div class="max-w-2xl mx-auto flex gap-2">
+                <input id="auditUrl" type="url" placeholder="https://example.com" class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition">Run Audit</button>
+            </div>
+            <div id="loader" class="hidden mt-4 text-blue-400 animate-pulse">FF Tech AI Engine Analyzing...</div>
+        </section>
+
+        <div id="results" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="glass p-6 rounded-3xl col-span-1 flex flex-col items-center justify-center">
+                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">Overall Score</h3>
+                <div class="relative">
+                    <canvas id="scoreChart" width="200" height="200"></canvas>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span id="scoreText" class="text-4xl font-black">0%</span>
+                        <span id="gradeText" class="text-blue-400 font-bold">Grade: F</span>
+                    </div>
+                </div>
             </div>
 
-            <form id="audit-form" class="max-w-3xl mx-auto group">
-                <div class="relative flex items-center p-2 bg-white rounded-[2rem] shadow-2xl border border-slate-100 transition-all focus-within:ring-4 focus-within:ring-indigo-100">
-                    <div class="pl-6 text-slate-400">
-                        <i class="fas fa-globe text-xl"></i>
-                    </div>
-                    <input id="url-input" type="url" placeholder="https://example.com" required 
-                        class="w-full p-5 bg-transparent outline-none font-bold text-lg text-slate-700 placeholder:text-slate-300">
-                    <button type="submit" class="bg-indigo-600 text-white h-14 px-8 md:px-12 rounded-[1.5rem] font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition shadow-xl active:scale-95">
-                        Run Audit
+            <div class="glass p-6 rounded-3xl col-span-2">
+                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">Executive Summary</h3>
+                <p id="summaryText" class="text-gray-300 leading-relaxed italic"></p>
+                <div class="mt-6 flex gap-3">
+                    <button id="pdfBtn" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+                        <span>📄 Download PDF Report</span>
                     </button>
                 </div>
-            </form>
-
-            <div id="loading-zone" class="hidden text-center py-20">
-                <div class="inline-block relative">
-                    <div class="w-20 h-20 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <i class="fas fa-search text-indigo-600 animate-bounce"></i>
-                    </div>
-                </div>
-                <p class="mt-6 font-black text-indigo-600 uppercase tracking-[0.3em] text-[10px]">Processing 200+ Signals</p>
             </div>
 
-            <div id="results-dashboard" class="hidden space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div class="lg:col-span-1 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 text-center">Site Health Score</h3>
-                        <div class="relative flex items-center justify-center">
-                            <canvas id="gaugeChart" width="220" height="220"></canvas>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span id="res-grade" class="text-7xl font-black gradient-text italic leading-none">--</span>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase mt-2">Certified Grade</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-3 bg-slate-900 text-white p-8 md:p-12 rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                        <div class="absolute top-0 right-0 p-12 opacity-10 text-9xl">
-                            <i class="fas fa-quote-right"></i>
-                        </div>
-                        <div class="relative z-10">
-                            <div class="flex justify-between items-start mb-8">
-                                <span class="px-4 py-1 bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 rounded-full text-[9px] font-black uppercase tracking-widest">AI Audit Summary</span>
-                                <button onclick="downloadPDF()" class="text-white/50 hover:text-white transition flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                                    <i class="fas fa-file-pdf"></i> Download PDF
-                                </button>
-                            </div>
-                            <p id="res-summary" class="text-xl md:text-2xl font-medium leading-relaxed italic text-slate-300 max-w-2xl"></p>
-                        </div>
-
-                        <div id="mini-metrics" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
-                            </div>
-                    </div>
-                </div>
-
-                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                    <div class="flex justify-between items-center mb-8">
-                        <h3 class="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                            <span class="w-2 h-2 bg-indigo-600 rounded-full"></span> 
-                            Full Technical Matrix <span class="text-slate-300 font-medium">(200 Signals)</span>
-                        </h3>
-                        <div class="flex gap-2">
-                            <div class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase">
-                                <span class="w-3 h-3 bg-rose-500 rounded-sm"></span> Errors
-                            </div>
-                            <div class="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase ml-3">
-                                <span class="w-3 h-3 bg-emerald-500 rounded-sm"></span> Optimized
-                            </div>
-                        </div>
-                    </div>
-                    <div id="full-matrix" class="grid grid-cols-5 md:grid-cols-10 lg:grid-cols-20 gap-2">
-                        </div>
+            <div class="glass p-6 rounded-3xl col-span-full overflow-hidden">
+                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">All Metrics (1-200)</h3>
+                <div class="overflow-x-auto h-96">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-[#0B1221]">
+                            <tr class="text-gray-500 text-sm border-b border-white/5">
+                                <th class="py-3 px-2">ID</th>
+                                <th class="py-3">Name</th>
+                                <th class="py-3">Category</th>
+                                <th class="py-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricsBody" class="text-sm divide-y divide-white/5"></tbody>
+                    </table>
                 </div>
             </div>
-        </section>
-
-        <section id="section-monitor" class="section-view hidden space-y-8">
-            <div class="flex justify-between items-end">
-                <div>
-                    <h2 class="text-4xl font-black tracking-tighter">Scheduled <span class="text-indigo-600">Monitors</span></h2>
-                    <p class="text-slate-400 font-medium">Automated recurring audits and PDF reports.</p>
-                </div>
-                <button onclick="openModal('modal-schedule')" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg">Add Website</button>
-            </div>
-            <div id="schedule-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                </div>
-        </section>
+        </div>
     </main>
 
-    <div id="auth-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative text-center scale-up">
-            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">
-                <i class="fas fa-envelope-open-text"></i>
-            </div>
-            <h2 class="text-3xl font-black mb-2 tracking-tight italic">Magic Login</h2>
-            <p class="text-slate-400 mb-8 text-sm">No password needed. Enter your email to receive a secure login link.</p>
-            <form onsubmit="handleAuth(event)" class="space-y-4 text-left">
-                <div>
-                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2 block">Email Address</label>
-                    <input type="email" id="auth-email" placeholder="you@company.com" required 
-                        class="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-transparent focus:border-indigo-600 transition outline-none">
-                </div>
-                <button type="submit" class="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition">
-                    Send Link
-                </button>
-            </form>
-            <button onclick="closeModal('auth-modal')" class="mt-8 text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] hover:text-slate-900 transition">Close Window</button>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
-        let gaugeChart = null;
-        let token = localStorage.getItem('ff_token');
+        const API_BASE = window.location.origin;
+        let mainChart;
 
-        function showSection(id) {
-            document.querySelectorAll('.section-view').forEach(s => s.classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-        }
+        async function runAudit() {
+            const url = document.getElementById('auditUrl').value;
+            if(!url) return alert("Enter a URL");
 
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        async function api(path, method = 'GET', body = null) {
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : null });
-            if (res.status === 401) { localStorage.removeItem('ff_token'); location.reload(); }
-            return res.json();
-        }
-
-        document.getElementById('audit-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const url = document.getElementById('url-input').value;
-            const loading = document.getElementById('loading-zone');
-            const dashboard = document.getElementById('results-dashboard');
-
-            loading.classList.remove('hidden');
-            dashboard.classList.add('hidden');
-            window.scrollTo({ top: loading.offsetTop - 100, behavior: 'smooth' });
-
+            document.getElementById('loader').classList.remove('hidden');
+            const token = localStorage.getItem('fftech_token');
+            const endpoint = token ? '/api/audit/user' : '/api/audit/open';
+            
             try {
-                const data = await api(`/audit?url=${encodeURIComponent(url)}`);
-                loading.classList.add('hidden');
-                dashboard.classList.remove('hidden');
-
-                document.getElementById('res-grade').innerText = data.grade;
-                document.getElementById('res-summary').innerText = data.summary;
-
-                // Gauge Chart
-                if (gaugeChart) gaugeChart.destroy();
-                const ctx = document.getElementById('gaugeChart').getContext('2d');
-                gaugeChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: data.charts.overall_gauge,
-                    options: { 
-                        cutout: '85%', 
-                        plugins: { legend: { display: false } },
-                        animation: { animateRotate: true, duration: 2000 }
-                    }
+                const res = await fetch(API_BASE + endpoint, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(token && { 'Authorization': `Bearer ${token}` })
+                    },
+                    body: JSON.stringify({ url })
                 });
-
-                // Mini Cards
-                const categories = [
-                    { label: 'Errors', val: data.errors, icon: 'fa-circle-xmark', color: 'text-rose-500' },
-                    { label: 'Warnings', val: data.warnings, icon: 'fa-triangle-exclamation', color: 'text-amber-500' },
-                    { label: 'Notices', val: data.notices, icon: 'fa-circle-info', color: 'text-blue-500' },
-                    { label: 'Signals', val: data.metrics.length, icon: 'fa-bolt', color: 'text-indigo-400' }
-                ];
-                document.getElementById('mini-metrics').innerHTML = categories.map(c => `
-                    <div class="bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <i class="fas ${c.icon} ${c.color} mb-2"></i>
-                        <span class="block text-[9px] font-black uppercase text-slate-500 tracking-widest">${c.label}</span>
-                        <span class="text-xl font-black">${c.val}</span>
-                    </div>
-                `).join('');
-
-                // 200 Metric blocks
-                document.getElementById('full-matrix').innerHTML = data.metrics.map(m => `
-                    <div class="group relative">
-                        <div class="h-4 rounded-sm transition-all duration-500 ${m.value > 0 || m.value === true ? 'bg-indigo-600' : 'bg-rose-500'}"></div>
-                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                            <div class="bg-slate-900 text-white text-[9px] font-bold p-3 rounded-lg shadow-xl w-40 text-center uppercase tracking-tighter">
-                                ${m.name} <br> <span class="text-indigo-400 mt-1 block">${m.value || 'Fail'}</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-            } catch(err) {
-                loading.classList.add('hidden');
-                alert('Analysis failed. Please check the URL.');
+                const data = await res.json();
+                renderAudit(data);
+            } catch (e) {
+                alert("Audit failed. Check backend connection.");
+            } finally {
+                document.getElementById('loader').classList.add('hidden');
             }
-        };
-
-        async function handleAuth(e) {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value;
-            const res = await api('/register', 'POST', { email });
-            alert(res.message);
-            closeModal('auth-modal');
         }
 
-        function downloadPDF() {
-            const url = document.getElementById('url-input').value;
-            window.location = `/export-pdf?url=${encodeURIComponent(url)}`;
-        }
+        function renderAudit(data) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('scoreText').innerText = data.score + "%";
+            document.getElementById('gradeText').innerText = "Grade: " + data.grade;
+            document.getElementById('summaryText').innerText = data.metrics[3].value;
 
-        // Initialize UI State
-        if (token) {
-            document.getElementById('auth-btn').innerText = 'DASHBOARD LOGOUT';
-            document.getElementById('auth-btn').onclick = () => { localStorage.removeItem('ff_token'); location.reload(); };
-            document.querySelectorAll('.auth-only').forEach(e => e.classList.remove('hidden'));
+            // Update PDF button logic
+            const pdfUrl = data.audit_id ? `/api/report/${data.audit_id}.pdf` : `/api/report/open.pdf`;
+            document.getElementById('pdfBtn').onclick = () => window.open(API_BASE + pdfUrl);
+
+            // Populate Table
+            const tbody = document.getElementById('metricsBody');
+            tbody.innerHTML = '';
+            Object.entries(data.metrics).forEach(([id, m]) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 text-gray-500">${id}</td>
+                    <td class="py-3 font-semibold">${m.name || 'Analysis Signal'}</td>
+                    <td class="py-3"><span class="px-2 py-1 rounded bg-white/5 text-xs">Technical</span></td>
+                    <td class="py-3 ${m.value == 0 ? 'text-red-400' : 'text-green-400'}">${m.detail || 'Optimized'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Score Chart
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            if(mainChart) mainChart.destroy();
+            mainChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [data.score, 100 - data.score],
+                        backgroundColor: ['#3B82F6', '#1F2937'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: { cutout: '80%', plugins: { legend: { display: false } } }
+            });
         }
     </script>
 </body>
 </html>
-"""
