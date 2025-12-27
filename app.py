@@ -2,13 +2,16 @@
 # app.py
 # FF Tech — AI Website Audit SaaS + Ultra-Flexible Web Integrator
 # ---------------------------------------------------------------------------
-# - Serves ANY frontend (raw HTML, SPA builds, Markdown, Jinja) from ./pages with smart asset injection
-# - Open Access + Registered (passwordless magic link) access model, JWT auth
-# - Audit Engine returns FULL 200 metrics grouped by category (placeholders for external-data items)
-# - Chart.js-ready datasets for graphs (overall gauge, issues pie, category bars)
-# - Certified 5-page PDF report with charts, narrative, and branding
-# - Stripe subscriptions (real/demo), daily scheduler with PDF email delivery
-# - Admin endpoints, DB-safe sessions, health checks, runtime-extensible asset injector
+# - Frontend-agnostic: serves raw HTML, SPA builds, Markdown, Jinja from ./pages
+# - Smart duplicate-safe asset injection (CDN + local /static), runtime-extensible
+# - Open Access + Registered (passwordless magic link) with JWT
+# - AI audit engine -> 200 metrics grouped by category + Chart.js datasets
+# - 5-page PDF report with charts & branding
+# - Stripe subscriptions (real or demo), async scheduler with email+PDF
+# - Admin endpoints, DB-safe sessions, health checks
+#
+# Healthcheck FIX: /health returns 200 immediately, independent of DB.
+# Startup tasks (DB init, scheduler) run asynchronously in background.
 
 import os, io, hmac, json, time, base64, secrets, asyncio, mimetypes
 from dataclasses import dataclass, asdict
@@ -31,7 +34,7 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, B
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
-# Optional Stripe
+# Stripe optional
 try:
     import stripe
 except Exception:
@@ -68,7 +71,7 @@ PAGES_DIR = os.getenv("PAGES_DIR", "pages")
 AUTO_CREATE_STATIC = os.getenv("AUTO_CREATE_STATIC", "true").lower() == "true"
 AUTO_CREATE_PAGES  = os.getenv("AUTO_CREATE_PAGES", "true").lower() == "true"
 
-# Runtime-extensible asset injection defaults
+# Runtime-extensible injector defaults
 LOCAL_STYLES_DEFAULT        = ["/static/css/style.css"]
 LOCAL_SCRIPTS_HEAD_DEFAULT  = []
 LOCAL_SCRIPTS_BODY_DEFAULT  = ["/static/js/app.js"]
@@ -88,6 +91,7 @@ html { scroll-behavior: smooth; }
 body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   background-color: #f8fafc;
+  margin: 0;
 }
 .hidden { display: none !important; }
 .ff-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
@@ -150,8 +154,7 @@ app.add_middleware(
 )
 
 def ensure_dir(path: str, auto_create: bool) -> bool:
-    if os.path.isdir(path):
-        return True
+    if os.path.isdir(path): return True
     if auto_create:
         try:
             os.makedirs(path, exist_ok=True)
@@ -214,14 +217,11 @@ class InjectorState:
 INJECTOR = InjectorState()
 
 def _has_asset(html_low: str, url: str) -> bool:
-    try:
-        return url.lower() in html_low
-    except Exception:
-        return False
+    try: return url.lower() in html_low
+    except Exception: return False
 
 def _inject_head(html: str, flags: UIFlags) -> str:
-    html_low = html.lower()
-    tags = []
+    html_low = html.lower(); tags = []
 
     # CDN scripts (head)
     if flags.tailwind:
@@ -233,20 +233,17 @@ def _inject_head(html: str, flags: UIFlags) -> str:
             if "chart" in url and not _has_asset(html_low, url):
                 tags.append(f'{url}</script>')
 
-    # Styles (CDN + local)
+    # Styles
     for url in INJECTOR.cdn_styles:
-        if not _has_asset(html_low, url):
-            tags.append(f'<url}')
+        if not _has_asset(html_low, url): tags.append(f'{url}')
     for url in INJECTOR.local_styles:
-        if not _has_asset(html_low, url):
-            tags.append(f'{url}')
+        if not _has_asset(html_low, url): tags.append(f'{url}')
 
     # Local head scripts
     for url in INJECTOR.local_scripts_head:
-        if not _has_asset(html_low, url):
-            tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
 
-    # Base inline CSS
+    # Inline CSS
     if INJECTOR.base_inline_css.strip():
         tags.append(f"<style>{INJECTOR.base_inline_css}</style>")
 
@@ -255,18 +252,15 @@ def _inject_head(html: str, flags: UIFlags) -> str:
     return html[:idx] + payload + html[idx:] if idx != -1 else payload + "\n" + html
 
 def _inject_body(html: str, flags: UIFlags) -> str:
-    html_low = html.lower()
-    tags = []
+    html_low = html.lower(); tags = []
 
     # Local body scripts
     for url in INJECTOR.local_scripts_body:
-        if not _has_asset(html_low, url):
-            tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
 
     # CDN body scripts (optional)
     for url in INJECTOR.cdn_scripts_body:
-        if not _has_asset(html_low, url):
-            tags.append(f'{url}</script>')
+        if not _has_asset(html_low, url): tags.append(f'{url}</script>')
 
     # Flags bootstrap
     tags.append(f"<script>window.__FF_FLAGS__={json.dumps(asdict(flags))};window.__APP_NAME__={json.dumps(APP_NAME)};</script>")
@@ -281,10 +275,11 @@ def inject_all(html: str, flags: Optional[UIFlags] = None) -> str:
     html = _inject_body(html, flags)
     return html
 
-# ---------------------- HEALTH + ASSETS ----------------------
+# ---------------------- HEALTH (FIXED: instant 200 OK) ----------------------
 @app.get("/health", response_class=JSONResponse)
 def health():
-    return {"status": "healthy", "time": datetime.utcnow().isoformat()}
+    # Independent of DB or external services; returns 200 immediately.
+    return {"status": "ok", "time": datetime.utcnow().isoformat(), "app": APP_NAME}
 
 @app.get("/ping", response_class=PlainTextResponse)
 def ping(): return PlainTextResponse("pong")
@@ -477,8 +472,7 @@ def safe_session():
     finally:
         try:
             if db: db.close()
-        except Exception:
-            pass
+        except Exception: pass
 
 # ---------------------- SECURITY (magic link + JWT) ----------------------
 def jwt_sign(payload: dict, key: str = SECRET_KEY, exp_minutes: int = 60) -> str:
@@ -561,7 +555,7 @@ def normalize_url(raw: str) -> str:
     if not parsed.scheme: raw = "https://" + raw
     return raw
 
-# ---------------------- AUDIT ENGINE (all 200 metrics skeleton) ----------------------
+# ---------------------- AUDIT ENGINE (200 metrics grouped) ----------------------
 def detect_mixed_content(soup: BeautifulSoup, scheme: str) -> bool:
     if scheme != "https": return False
     for tag in soup.find_all(["img","script","link","iframe","video","audio","source"]):
@@ -602,7 +596,7 @@ def run_actual_audit(target_url: str) -> dict:
     url = normalize_url(target_url)
     resp = safe_request(url, "GET")
 
-    # If unreachable, return full structure with placeholders
+    # Unreachable: full structure with zeros/placeholders
     if not resp or (resp.status_code and resp.status_code >= 400):
         charts = {
             "overall_gauge":{"labels":["Score","Remaining"],"datasets":[{"data":[0,100],"backgroundColor":["#ef4444","#e5e7eb"],"borderWidth":0}]} ,
@@ -612,26 +606,17 @@ def run_actual_audit(target_url: str) -> dict:
         }
         cat_scores = {"Executive":0,"Health":0,"Crawl/Index":0,"On-Page SEO":0,"Performance":0,"Mobile/Sec/Intl":0,"Competitors":0,"Broken Links":0,"Opportunities":0}
         metrics = [{"id": i, "name": f"Metric {i}", "value": 0, "category": "Executive Summary"} for i in range(1,201)]
-        return {
-            "overall":0,"grade":"F",
-            "summary":f"{url} unreachable. Fix availability (HTTP 2xx), DNS/TLS, and ensure HTTPS.",
-            "errors":1,"warnings":0,"notices":0,
-            "charts": charts,
-            "cat_scores": cat_scores,
-            "metrics": metrics,
-            "premium": False
-        }
+        return {"overall":0,"grade":"F","summary":f"{url} unreachable.","errors":1,"warnings":0,"notices":0,"charts":charts,"cat_scores":cat_scores,"metrics":metrics,"premium":False}
 
     html = resp.text or ""
     soup = BeautifulSoup(html, "html.parser")
     scheme = urlparse(resp.url).scheme or "https"
 
-    # Base measures
+    # Measures
     ttfb_ms = int(resp.elapsed.total_seconds() * 1000)
     page_size_bytes = len(resp.content or b"")
     size_mb = page_size_bytes / (1024.0*1024.0)
 
-    # On-page SEO & meta
     title_tag = soup.title.string.strip() if soup.title and soup.title.string else ""
     meta_desc = (soup.find("meta", attrs={"name":"description"}) or {}).get("content") or ""
     meta_desc = meta_desc.strip()
@@ -669,7 +654,7 @@ def run_actual_audit(target_url: str) -> dict:
         if (row.get("redirects") or 0) >= 2: redirect_chains += 1
         if row.get("status") in (404,410): broken_internal += 1
 
-    # Heuristic scoring
+    # Scoring heuristics
     seo_score = 100
     if not title_tag: seo_score -= 20
     if title_tag and (len(title_tag) < 10 or len(title_tag) > 65): seo_score -= 8
@@ -733,9 +718,9 @@ def run_actual_audit(target_url: str) -> dict:
         "On-Page SEO": seo_score,
         "Performance": perf_score,
         "Mobile/Sec/Intl": int(0.5*sec_score + 0.5*(85 if viewport_meta else 60)),
-        "Competitors": 60,   # placeholder until external provider integrated
+        "Competitors": 60,   # placeholder
         "Broken Links": max(0, 100 - broken_internal*5),
-        "Opportunities": 70, # placeholder heuristic
+        "Opportunities": 70, # placeholder
     }
 
     exec_summary = (
@@ -744,7 +729,6 @@ def run_actual_audit(target_url: str) -> dict:
         f"add security headers (HSTS/CSP/XFO/XCTO/Referrer-Policy), and fix broken links."
     )
 
-    # Chart.js datasets
     def gauge(score: int, color_good="#10b981"):
         color = color_good if score >= 80 else "#f59e0b" if score >= 60 else "#ef4444"
         return {"labels":["Score","Remaining"],"datasets":[{"data":[score,100-score],"backgroundColor":[color,"#e5e7eb"],"borderWidth":0}]}
@@ -759,13 +743,12 @@ def run_actual_audit(target_url: str) -> dict:
                                       "backgroundColor":["#6366f1","#22c55e","#0ea5e9","#f59e0b","#10b981","#ef4444","#8b5cf6","#fb7185","#14b8a6"]}]},
     }
 
-    # Build ALL 200 metrics (real checks + placeholders)
     metrics: List[Dict] = []
     def add_metrics(start_id: int, items: List[tuple], category: str):
         for idx,(name,val) in enumerate(items, start=start_id):
             metrics.append({"id": idx, "name": name, "value": val, "category": category})
 
-    # A. Executive Summary & Grading (1–10)
+    # A. Executive (1–10)
     add_metrics(1, [
         ("Overall Site Health Score (%)", overall),
         ("Website Grade (A+ to D)", grade),
@@ -779,7 +762,7 @@ def run_actual_audit(target_url: str) -> dict:
         ("Print / Certified Export Readiness", 1),
     ], "Executive Summary")
 
-    # B. Overall Site Health (11–20)
+    # B. Health (11–20)
     add_metrics(11, [
         ("Site Health Score", cat_scores["Health"]),
         ("Total Errors", errors),
@@ -793,7 +776,7 @@ def run_actual_audit(target_url: str) -> dict:
         ("Audit Completion Status", 1),
     ], "Overall Site Health")
 
-    # C. Crawlability & Indexation (21–40)
+    # C. Crawl & Index (21–40)
     add_metrics(21, [
         ("HTTP 2xx Pages", statuses["2xx"]),
         ("HTTP 3xx Pages", statuses["3xx"]),
@@ -939,7 +922,7 @@ def run_actual_audit(target_url: str) -> dict:
         ("Overall Stability Index", None),
     ], "Mobile, Security & International")
 
-    # G. Competitor Analysis (151–167) — placeholders
+    # G. Competitor Analysis (151–167) placeholders
     comp_names = [
         "Competitor Health Score","Competitor Performance Comparison","Competitor Core Web Vitals Comparison",
         "Competitor SEO Issues Comparison","Competitor Broken Links Comparison","Competitor Authority Score",
@@ -985,7 +968,7 @@ def run_actual_audit(target_url: str) -> dict:
         "charts": charts,
         "cat_scores": cat_scores,
         "metrics": metrics,
-        "premium": False,   # overridden per user in handler
+        "premium": False,   # set per user in handler
     }
 
 # ---------------------- PDF (5 pages, charts & branding) ----------------------
@@ -1016,7 +999,7 @@ def export_pdf(url: str = Query(...)):
         c.setFont("Helvetica", 9); c.setFillColor(colors.slategray)
         c.drawString(20*mm, 12*mm, "© FF Tech — Certified Website Audit • support@fftech.io")
 
-    # Page 1
+    # Page 1: cover
     header_footer("Certified Audit Report")
     c.setFont("Helvetica-Bold", 24); c.setFillColor(colors.indigo)
     c.drawString(20*mm, H-65*mm, "Executive Website Health")
@@ -1026,7 +1009,7 @@ def export_pdf(url: str = Query(...)):
     c.drawString(20*mm, H-100*mm, f"Overall Score: {payload['overall']}%")
     c.showPage()
 
-    # Page 2
+    # Page 2: gauges & issues
     header_footer("Score Gauge & Issues Breakdown")
     d1 = Drawing(180, 180)
     p1 = Pie(); p1.x = 40; p1.y = 20; p1.width = 100; p1.height = 100
@@ -1044,7 +1027,7 @@ def export_pdf(url: str = Query(...)):
     renderPDF.draw(d2, c, 115*mm, H-180*mm)
     c.showPage()
 
-    # Page 3
+    # Page 3: categories
     header_footer("Category Scores")
     labels = list(payload["cat_scores"].keys()); vals = list(payload["cat_scores"].values())
     d3 = Drawing(400, 220)
@@ -1057,7 +1040,7 @@ def export_pdf(url: str = Query(...)):
     renderPDF.draw(d3, c, 20*mm, H-230*mm)
     c.showPage()
 
-    # Page 4
+    # Page 4: narrative
     header_footer("Strengths, Weaknesses & Priorities")
     c.setFont("Helvetica", 11)
     summary = payload["summary"]; lines = []
@@ -1080,7 +1063,7 @@ def export_pdf(url: str = Query(...)):
     bullets("Priority Fixes", ["Add HSTS/CSP/XFO/XCTO/Referrer-Policy.","Defer/async JS; inline critical CSS.","Compress images; enable caching."], colors.Color(0.39,0.33,0.94))
     c.showPage()
 
-    # Page 5
+    # Page 5: signals
     header_footer("Top Signals Snapshot")
     top = payload["metrics"][:12]
     labels = [m["name"][:18] for m in top]
@@ -1269,7 +1252,7 @@ async def billing_webhook(request: Request):
             if type_ in ("checkout.session.completed","invoice.payment_succeeded"):
                 email = data.get("customer_details", {}).get("email") or data.get("customer_email")
                 if not email and data.get("customer"):
-                    cust = _stripe.Customer.retrieve(data["customer"]); email = cust.get("email")
+                    cust = stripe.Customer.retrieve(data["customer"]); email = cust.get("email")
                 if email:
                     user = db.query(User).filter(User.email == email.lower()).first()
                     if user:
@@ -1308,7 +1291,7 @@ def admin_audits(authorization: str | None = Header(None)):
                  "grade": a.grade, "errors": a.errors, "warnings": a.warnings, "notices": a.notices,
                  "created_at": a.created_at.isoformat()} for a in audits]
 
-# ---------------------- Scheduler ----------------------
+# ---------------------- Scheduler (async; non-blocking) ----------------------
 async def scheduler_loop():
     await asyncio.sleep(3)
     while True:
@@ -1355,7 +1338,7 @@ async def scheduler_loop():
             print("[SCHEDULER ERROR]", e)
         await asyncio.sleep(SCHEDULER_INTERVAL)
 
-# ---------------------- DB INIT ----------------------
+# ---------------------- DB INIT (async; non-blocking) ----------------------
 def apply_schema_patches_committed():
     with engine.begin() as conn:
         Base.metadata.create_all(bind=engine)
@@ -1388,6 +1371,7 @@ async def init_db():
 
 @app.on_event("startup")
 async def on_startup():
+    # Healthcheck FIX: do not block startup; these run in background
     asyncio.create_task(init_db())
     if SCHEDULER_INTERVAL > 0:
         asyncio.create_task(scheduler_loop())
