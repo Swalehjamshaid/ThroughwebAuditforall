@@ -5,13 +5,14 @@
 # - Single-page HTML (CDN-only)
 # - Actual audits: requests + BeautifulSoup + internal crawler
 # - 250+ metrics (unique IDs, visual charts)
-# - Open access vs registered logic (10 free audits → $5/month Stripe)
-# - Users add websites and schedule audits (time + timezone; daily/accumulated)
-# - SMTP email delivery with 5-page Certified PDF (FF Tech)
+# - Open access vs registered logic (5–10 free audits → $5/month Stripe)
+# - Users add websites and schedule audits (preferred time/date + timezone; daily/accumulated)
+# - SMTP email delivery with 5-page Certified PDF
 # - Admin endpoints
 # - Settings (timezone + notification prefs)
-# - Stripe Checkout & Webhook integration (safe fallbacks)
+# - Stripe Checkout & Webhook integration (safe fallbacks; demo mode when unconfigured)
 # - Railway healthcheck fix: /health + bind to PORT + SAFE DB INIT
+# - Flexible HTML linking: /page/<name>, /template/<name>, /static/*
 
 import os, io, hmac, json, time, base64, secrets, asyncio
 from datetime import datetime, timezone
@@ -21,23 +22,25 @@ import requests
 from bs4 import BeautifulSoup
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Query, Header
-from fastapi.responses import HTMLResponse, JSONResponse, Response, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, EmailStr, Field
 
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, ForeignKey, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.exc import OperationalError
 
-# Stripe (guarded import so missing SDK doesn't crash app boot)
+# Stripe (guarded import)
 try:
     import stripe
 except Exception as e:
     stripe = None
     print("[STRIPE WARNING] Stripe SDK not installed:", e)
 
-# PDF
+# PDF libs
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
@@ -53,13 +56,15 @@ from reportlab.graphics import renderPDF
 APP_NAME = "FF Tech — Professional AI Website Audit Platform"
 USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_demo.db")
-
-# REFINEMENT: Fix for old "postgres://" prefix
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
+
+# Flexible free audits (set 5–10 via env)
+FREE_AUDITS_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))
+SUBSCRIPTION_PRICE_USD = os.getenv("SUBSCRIPTION_PRICE_USD", "5")
 
 # SMTP config (for scheduled emails)
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -80,7 +85,7 @@ if stripe and STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
 # -----------------------------------------------
-# DB setup (lazy; DO NOT connect at import time)
+# DB setup (lazy; safe init later)
 # -----------------------------------------------
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):
@@ -98,7 +103,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     role = Column(String(32), default="user")  # user | admin
     timezone = Column(String(64), default="UTC")
-    free_audits_remaining = Column(Integer, default=10)
+    free_audits_remaining = Column(Integer, default=FREE_AUDITS_LIMIT)
     subscribed = Column(Boolean, default=False)
     stripe_customer_id = Column(String(255))  # optional
     notify_daily_default = Column(Boolean, default=True)
@@ -120,10 +125,11 @@ class Schedule(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     website_id = Column(Integer, ForeignKey("websites.id"), nullable=False)
     enabled = Column(Boolean, default=True)
-    time_of_day = Column(String(8), default="09:00")  # HH:MM
+    time_of_day = Column(String(8), default="09:00")  # HH:MM local time
     timezone = Column(String(64), default="UTC")
     daily_report = Column(Boolean, default=True)
     accumulated_report = Column(Boolean, default=True)
+    preferred_date = Column(DateTime, nullable=True)  # First run date
     last_run_at = Column(DateTime)
 
 class Audit(Base):
@@ -153,7 +159,6 @@ class LoginLog(Base):
     success = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# DO NOT call Base.metadata.create_all() here — it attempts DB connect and can crash the app.
 
 # -----------------------------------------------
 # Security helpers (PBKDF2 + minimal JWT)
@@ -380,7 +385,7 @@ def run_actual_audit(target_url: str) -> dict:
         if row.get("status") in (404, 410):
             broken_internal += 1
 
-    # External broken links: homepage external <a> targets
+    # External broken links: homepage external anchors
     broken_external = 0
     try:
         for a in soup.find_all("a"):
@@ -475,27 +480,16 @@ def run_actual_audit(target_url: str) -> dict:
         "overall": overall
     }
 
-    # Executive summary
-    max_depth = 0
-    try:
-        # compute safe max depth
-        depth_counts = {}
-        # Already computed above; leaving max_depth = 0 for brevity
-        pass
-    except Exception:
-        pass
-
     exec_summary = (
         f"FF Tech audited {resp.url}, producing an overall health score of {overall}% (grade {grade}). "
         f"Performance shows a payload of {size_mb:.2f} MB and server TTFB around {ttfb_ms} ms; "
-        f"render‑blocking scripts and multiple stylesheets may delay interactivity. On‑page SEO can be strengthened "
-        f"by ensuring one H1, descriptive meta, canonical links, alt attributes, and JSON‑LD structured data. "
-        f"Security posture needs attention: HSTS/CSP/XFO/XCTO/Referrer‑Policy and mixed content checks. "
-        f"Prioritize compression (Brotli/GZIP), deferring non‑critical JS, caching/CDN, fixing broken links, "
+        f"{blocking_script_count} render‑blocking scripts and {stylesheet_count} stylesheets may delay interactivity. "
+        f"On‑page SEO can be strengthened (H1, meta, canonical, alt, JSON‑LD). Security posture needs attention: "
+        f"HSTS/CSP/XFO/XCTO/Referrer‑Policy and mixed content checks. Prioritize compression (Brotli/GZIP), deferring "
+        f"non‑critical JS, caching/CDN, fixing broken links (internal {broken_internal}, external {broken_external}), "
         f"and enabling security headers to improve Core Web Vitals and reduce risk."
     )
 
-    # Gauges/charts
     def chart_gauge(score: int):
         color = "#10b981" if score >= 80 else "#f59e0b" if score >= 60 else "#ef4444"
         return {"labels": ["Score","Remaining"], "datasets": [{"data": [score, 100-score], "backgroundColor": [color, "#e5e7eb"], "borderWidth": 0}]}
@@ -531,7 +525,6 @@ def run_actual_audit(target_url: str) -> dict:
         "Add HSTS, CSP, X‑Frame‑Options, X‑Content‑Type‑Options, Referrer‑Policy."
     ]
 
-    # Build 250 metrics
     metrics = []
     def add_metric(num: int, pass_pct: float, chart_type: str = "bar"):
         fail_pct = max(0, 100 - int(pass_pct))
@@ -543,7 +536,7 @@ def run_actual_audit(target_url: str) -> dict:
     add_metric(2, 100 if errors == 0 else 40)
     add_metric(3, 80 if warnings <= 2 else 50)
     for n in range(4, 251):
-        base = overall if n<=55 else (overall if n<=75 else (overall if n<=110 else (overall if n<=131 else (overall if n<=185 else 70))))
+        base = overall if n<=55 else (cat2_total if n<=75 else (seo_score if n<=110 else (perf_score if n<=131 else (sec_score if n<=185 else 70))))
         add_metric(n, max(10, min(100, base - ((n%7)*2))), "bar" if n%5 else "doughnut")
 
     return {
@@ -657,8 +650,9 @@ class LoginIn(BaseModel):
 
 class ScheduleIn(BaseModel):
     website_url: str
-    time_of_day: str          # "HH:MM"
-    timezone: str             # e.g., "Asia/Karachi"
+    time_of_day: str         # "HH:MM"
+    timezone: str            # e.g., "Asia/Karachi"
+    preferred_date: str | None = None  # "YYYY-MM-DD" or ISO date
     daily_report: bool = True
     accumulated_report: bool = True
     enabled: bool = True
@@ -672,29 +666,45 @@ class SettingsIn(BaseModel):
     notify_acc_default: bool
 
 # -----------------------------------------------
-# FastAPI app + CORS
+# FastAPI app + CORS + HTML linking
 # -----------------------------------------------
 app = FastAPI(title=APP_NAME)
-
-# --- HEALTH CHECK (fast, non-blocking) ---
-@app.get("/health", response_class=JSONResponse)
-async def health_check():
-    """Railway pings this to see if the container is alive."""
-    return {"status": "healthy", "time": datetime.utcnow().isoformat()}
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+# Serve static assets
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Jinja templates in pages/
+templates = Jinja2Templates(directory="pages")
+
+@app.get("/page/{name}", response_class=HTMLResponse)
+def get_plain_page(name: str):
+    """Serve raw HTML from pages/<name>.html."""
+    if any(ch in name for ch in ("..", "/", "\\")):
+        raise HTTPException(status_code=400, detail="Invalid page name")
+    path = os.path.join("pages", f"{name}.html")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Page not found")
+    with open(path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
+
+@app.get("/template/{name}", response_class=HTMLResponse)
+def get_jinja_page(name: str, request: Request):
+    """Render Jinja template from pages/<name>.html."""
+    if any(ch in name for ch in ("..", "/", "\\")):
+        raise HTTPException(status_code=400, detail="Invalid template name")
+    return templates.TemplateResponse(f"{name}.html", {"request": request, "app_name": APP_NAME})
+
 # -----------------------------------------------
-# Embedded world‑class HTML (single-page; CDN-only)
+# Minimal embedded HTML landing (CDN-only)
 # -----------------------------------------------
 INDEX_HTML = r"""<!DOCTYPE html>
-<html lang='en' data-theme='light'>
+<html lang='en'>
 <head>
 <meta charset='UTF-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <title>FF Tech — Professional Audit</title>
 https://cdn.tailwindcss.com</script>
-<script>tailwind.config={theme:{extend:{fontFamily:{inter:['Inter','system-ui','sans-serif']},colors:{brand:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},emerald:{500:'#10b981'},amber:{500:'#f59e0b'},rose:{500:'#ef4444'}}}}}</script>
 https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
 https://fonts.gstatic.com
 https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
@@ -712,7 +722,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
 </style>
 </head>
 <body class='text-slate-800'>
-<header class='gradient-hero text-white shadow-2xl fixed inset-x-0 top-0 z-50'>
+<header class='gradient-hero text-white shadow-2xl'>
   <div class='max-w-7xl mx-auto px-6 py-5 flex items-center justify-between'>
     <div class='flex items-center gap-4'>
       <i class='fas fa-shield-halved text-3xl'></i>
@@ -729,38 +739,21 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
   </div>
 </header>
 
-<section id='hero' class='pt-36 pb-12'>
+<section id='hero' class='pt-10 pb-12'>
   <div class='max-w-7xl mx-auto px-6'>
     <div class='glass p-8 md:p-12'>
       <div class='flex flex-col md:flex-row items-center gap-10'>
         <div class='flex-1 text-center md:text-left'>
-          <h2 class='text-4xl md:text-6xl font-black tracking-tight'>Professional Website Audits, <span class='text-brand-200'>Scheduled</span></h2>
-          <p class='mt-3 opacity-80'>250+ metrics · Certified PDF · SEO, Performance, Security, Mobile & Accessibility</p>
+          <h2 class='text-4xl md:text-6xl font-black tracking-tight'>Open Audits for Everyone</h2>
+          <p class='mt-3 opacity-80'>Enter any website URL to get an immediate audit report. Unlimited open audits.</p>
           <form id='audit-form' class='mt-6 flex items-center gap-3'>
             <input id='website-url' type='url' placeholder='https://example.com'
                    class='flex-1 rounded-xl px-4 py-3 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900' required>
-            <button class='btn-gradient px-6 py-3 rounded-xl font-bold' type='submit'>Run Free Audit</button>
+            <button class='btn-gradient px-6 py-3 rounded-xl font-bold' type='submit'>Run Audit</button>
           </form>
-          <p class='mt-3 text-sm opacity-80'>Free Audits Remaining: <span id='remaining' class='font-extrabold'>—</span></p>
+          <p class='mt-3 text-sm opacity-80'>Registered users: 5–10 free full audits, then $5/month for daily email reports.</p>
+          <p class='mt-1 text-sm opacity-80'>Free Audits Remaining: <span id='remaining' class='font-extrabold'>—</span></p>
         </div>
-        <div class='w-full md:w-96 h-64 bg-white/10 rounded-2xl border border-white/20 relative overflow-hidden'>
-          <svg class='absolute inset-0' viewBox='0 0 300 300'>
-            <circle cx='150' cy='150' r='120' stroke='#e5e7eb' stroke-width='10' fill='none'></circle>
-            <circle id='hero-progress' cx='150' cy='150' r='120' stroke='url(#grad)' stroke-width='10' fill='none' stroke-dasharray='753' stroke-dashoffset='753'></circle>
-            <defs><linearGradient id='grad' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='#4f46e5'/><stop offset='100%' stop-color='#7c3aed'/></linearGradient></defs>
-          </svg>
-          <div class='absolute inset-0 flex items-center justify-center'>
-            <div class='text-center'>
-              <span class='text-xl font-bold'>Audit Progress</span>
-              <div id='hero-progress-pct' class='text-3xl font-black'>0%</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class='mt-4 flex items-center gap-6 text-slate-700'>
-        <span class='flex items-center gap-2'><i class='fas fa-lock'></i> Secure</span>
-        <span class='flex items-center gap-2'><i class='fas fa-bolt'></i> Instant</span>
-        <span class='flex items-center gap-2'><i class='fas fa-certificate'></i> Certified</span>
       </div>
     </div>
   </div>
@@ -771,18 +764,10 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
     <div class='glass p-8'>
       <h3 class='text-2xl font-black mb-6'>Audit in Progress</h3>
       <div class='space-y-4'>
-        <div class='flex items-center gap-3'>
-          <span class='w-28 font-bold'>Crawling</span><progress id='p-crawl' class='w-full h-3' value='0' max='100'></progress><span id='crawl-pct' class='w-16 text-right font-black'>0%</span>
-        </div>
-        <div class='flex items-center gap-3'>
-          <span class='w-28 font-bold'>Analyzing</span><progress id='p-analyze' class='w-full h-3' value='0' max='100'></progress><span id='analyze-pct' class='w-16 text-right font-black'>0%</span>
-        </div>
-        <div class='flex items-center gap-3'>
-          <span class='w-28 font-bold'>Scoring</span><progress id='p-score' class='w-full h-3' value='0' max='100'></progress><span id='score-pct' class='w-16 text-right font-black'>0%</span>
-        </div>
-        <div class='flex items-center gap-3'>
-          <span class='w-28 font-bold'>Reporting</span><progress id='p-report' class='w-full h-3' value='0' max='100'></progress><span id='report-pct' class='w-16 text-right font-black'>0%</span>
-        </div>
+        <div class='flex items-center gap-3'><span class='w-28 font-bold'>Crawling</span><progress id='p-crawl' class='w-full h-3' value='0' max='100'></progress><span id='crawl-pct' class='w-16 text-right font-black'>0%</span></div>
+        <div class='flex items-center gap-3'><span class='w-28 font-bold'>Analyzing</span><progress id='p-analyze' class='w-full h-3' value='0' max='100'></progress><span id='analyze-pct' class='w-16 text-right font-black'>0%</span></div>
+        <div class='flex items-center gap-3'><span class='w-28 font-bold'>Scoring</span><progress id='p-score' class='w-full h-3' value='0' max='100'></progress><span id='score-pct' class='w-16 text-right font-black'>0%</span></div>
+        <div class='flex items-center gap-3'><span class='w-28 font-bold'>Reporting</span><progress id='p-report' class='w-full h-3' value='0' max='100'></progress><span id='report-pct' class='w-16 text-right font-black'>0%</span></div>
       </div>
       <div class='mt-6 grid md:grid-cols-2 gap-6'>
         <div class='glass p-4'><canvas id='health-gauge'></canvas></div>
@@ -824,6 +809,55 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
       <div class='relative'>
         <div id='premium-blur' class='absolute inset-0 blur-premium hidden'></div>
         <div id='metrics-grid' class='grid-auto mt-6'></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id='user-panel' class='hidden pb-12'>
+  <div class='max-w-7xl mx-auto px-6'>
+    <div class='grid md:grid-cols-3 gap-6'>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Add Website</h4>
+        <form id='add-site-form' class='space-y-3'>
+          <input id='add-site-url' type='url' placeholder='https://example.com' class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' required />
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Add</button>
+        </form>
+      </div>
+      <div class='glass p-6 md:col-span-2'>
+        <h4 class='text-xl font-black mb-3'>Schedule Audit</h4>
+        <form id='schedule-form' class='space-y-3'>
+          <input id='schedule-url' type='url' placeholder='https://example.com' class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' required />
+          <div class='grid grid-cols-3 gap-4'>
+            <input id='schedule-time' type='time' class='rounded-xl px-4 py-3 border border-slate-300' value='09:00' />
+            <input id='schedule-date' type='date' class='rounded-xl px-4 py-3 border border-slate-300' />
+            <input id='schedule-tz' type='text' class='rounded-xl px-4 py-3 border border-slate-300' placeholder='Asia/Karachi' value='Asia/Karachi' />
+          </div>
+          <div class='grid grid-cols-2 gap-4'>
+            <label class='flex items-center gap-2'><input id='schedule-daily' type='checkbox' checked /> Daily Report</label>
+            <label class='flex items-center gap-2'><input id='schedule-acc' type='checkbox' checked /> Accumulated Report</label>
+          </div>
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Save Schedule</button>
+        </form>
+      </div>
+    </div>
+
+    <div class='grid md:grid-cols-2 gap-6 mt-6'>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Your Schedules</h4>
+        <div id='schedules-list' class='space-y-2 text-sm'></div>
+      </div>
+      <div class='glass p-6'>
+        <h4 class='text-xl font-black mb-3'>Settings</h4>
+        <form id='settings-form' class='space-y-3'>
+          <input id='settings-tz' type='text' placeholder='Asia/Karachi' class='w-full rounded-xl px-4 py-3 border border-slate-300 text-slate-900' />
+          <label class='flex items-center gap-2'><input id='settings-daily' type='checkbox' /> Default: Daily emails</label>
+          <label class='flex items-center gap-2'><input id='settings-acc' type='checkbox' /> Default: Accumulated emails</label>
+          <button class='btn-gradient px-5 py-3 rounded-xl font-bold'>Save Settings</button>
+        </form>
+        <div class='mt-4'>
+          <button id='subscribe-btn-panel' class='btn-gradient px-6 py-3 rounded-xl font-bold'>$5/month — Subscribe</button>
+        </div>
       </div>
     </div>
   </div>
@@ -887,8 +921,6 @@ async function runAudit(url){
     setProgress($('#p-analyze'),Math.min(70,p)); $('#analyze-pct').textContent=Math.min(70,Math.floor(p))+'%';
     setProgress($('#p-score'),Math.min(85,p)); $('#score-pct').textContent=Math.min(85,Math.floor(p))+'%';
     setProgress($('#p-report'),Math.min(100,p)); $('#report-pct').textContent=Math.min(100,Math.floor(p))+'%';
-    const ring=document.getElementById('hero-progress'); if(ring){ring.setAttribute('stroke-dashoffset', String(753*(1-Math.min(1,p/100))))}
-    document.getElementById('hero-progress-pct').textContent=Math.floor(p)+'%';
     if(p<100) setTimeout(tick,120);
   }; tick();
 
@@ -920,7 +952,6 @@ async function runAudit(url){
     state.freeRemaining=payload.remaining; localStorage.setItem('fftech_remaining', payload.remaining);
   }
 }
-
 document.getElementById('audit-form').addEventListener('submit',async(e)=>{
   e.preventDefault();
   const url=document.getElementById('website-url').value.trim();
@@ -960,18 +991,32 @@ document.getElementById('add-site-form').addEventListener('submit',async(e)=>{
 // Schedule
 document.getElementById('schedule-form').addEventListener('submit',async(e)=>{
   e.preventDefault(); if(!state.token) return toast('Login required.');
-  const payload={website_url:$('#schedule-url').value.trim(),time_of_day:$('#schedule-time').value||'09:00',
-    timezone:$('#schedule-tz').value||'UTC',daily_report:$('#schedule-daily').checked,accumulated_report:$('#schedule-acc').checked,enabled:true};
+  const payload={
+    website_url:$('#schedule-url').value.trim(),
+    time_of_day:$('#schedule-time').value||'09:00',
+    preferred_date:$('#schedule-date').value||null,
+    timezone:$('#schedule-tz').value||'UTC',
+    daily_report:$('#schedule-daily').checked,
+    accumulated_report:$('#schedule-acc').checked,
+    enabled:true
+  };
   if(!payload.website_url) return toast('Enter a site URL.');
-  try{const res=await api('/schedule',{method:'POST',body:JSON.stringify(payload)}); toast(res.message||'Schedule saved.'); await refreshSchedules();}catch(err){toast(err.message)}
+  try{
+    const res=await api('/schedule',{method:'POST',body:JSON.stringify(payload)});
+    toast(res.message||'Schedule saved.');
+    await refreshSchedules();
+  }catch(err){toast(err.message)}
 });
 async function refreshSchedules(){
   if(!state.token) return;
-  try{const sched=await api('/schedules'); const list=$('#schedules-list'); list.innerHTML=(sched||[]).map(s=>`
-    <div class='glass px-3 py-2 flex justify-between'>
-      <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} · accumulated:${s.accumulated_report}</span>
-      <span class='opacity-60'>last: ${s.last_run_at ?? '—'}</span>
-    </div>`).join('');
+  try{
+    const sched=await api('/schedules');
+    const list=$('#schedules-list');
+    list.innerHTML=(sched||[]).map(s=>`
+      <div class='glass px-3 py-2 flex justify-between'>
+        <span>• ${s.website_url} — ${s.time_of_day} (${s.timezone}) — daily:${s.daily_report} · accumulated:${s.accumulated_report}</span>
+        <span class='opacity-60'>last: ${s.last_run_at ?? '—'}</span>
+      </div>`).join('');
   }catch(err){}
 }
 
@@ -984,13 +1029,17 @@ document.getElementById('settings-form').addEventListener('submit',async(e)=>{
 
 // Billing
 async function openCheckout(){ if(!state.token) return toast('Login required.');
-  try{const res=await api('/billing/checkout',{method:'POST'}); if(res.url) window.location.href=res.url; else toast(res.message||'Subscription activated (demo).');}
-  catch(err){toast(err.message)}
+  try{
+    const res=await api('/billing/checkout',{method:'POST'});
+    if(res.url) window.location.href=res.url; else toast(res.message||'Subscription activated (demo).');
+  }catch(err){toast(err.message)}
 }
 document.getElementById('subscribe-btn-panel').addEventListener('click',openCheckout);
 
-(function init(){ document.getElementById('year').textContent=new Date().getFullYear(); loadSession(); refreshSchedules();
-  const ring=document.getElementById('hero-progress'); if(ring){ring.setAttribute('stroke-dasharray','753'); ring.setAttribute('stroke-dashoffset','753');}
+(function init(){
+  document.getElementById('year').textContent=new Date().getFullYear();
+  loadSession();
+  refreshSchedules();
 })();
 </script>
 </body>
@@ -1003,6 +1052,11 @@ document.getElementById('subscribe-btn-panel').addEventListener('click',openChec
 @app.get("/", response_class=HTMLResponse)
 def home(): return HTMLResponse(INDEX_HTML)
 
+# --- Healthcheck (Railway) ---
+@app.get("/health", response_class=JSONResponse)
+async def health_check():
+    return {"status":"healthy","time": datetime.utcnow().isoformat()}
+
 # --- Public & Registered audit ---
 @app.get("/audit", response_class=JSONResponse)
 def audit(url: str = Query(..., description="Website URL to audit"),
@@ -1010,38 +1064,42 @@ def audit(url: str = Query(..., description="Website URL to audit"),
           db=Depends(get_db)):
     payload = run_actual_audit(url)
 
-    is_registered = False
     user = None
     if authorization and authorization.startswith("Bearer "):
         try:
             data = jwt_verify(authorization.split(" ",1)[1])
             user = db.query(User).filter(User.id == data.get("uid")).first()
-            is_registered = bool(user)
         except Exception:
-            is_registered = False
+            user = None
 
-    if not is_registered:
+    if not user:
+        # OPEN ACCESS: unlimited audits, limited metrics (no login)
         payload["metrics"] = payload["metrics"][:50]
         payload["premium"] = False
         payload["remaining"] = None
     else:
-        if not user.subscribed and user.free_audits_remaining <= 0:
+        remaining = user.free_audits_remaining or 0
+        is_subscribed = bool(user.subscribed)
+        if not is_subscribed and remaining <= 0:
             payload["metrics"] = payload["metrics"][:50]
             payload["premium"] = False
-            payload["remaining"] = user.free_audits_remaining
+            payload["remaining"] = remaining
         else:
             payload["premium"] = True
-            payload["remaining"] = user.free_audits_remaining
-            if not user.subscribed and user.free_audits_remaining > 0:
-                user.free_audits_remaining -= 1
+            payload["remaining"] = remaining
+            if not is_subscribed and remaining > 0:
+                user.free_audits_remaining = max(0, remaining - 1)
                 db.commit()
 
-    site = db.query(Website).filter(Website.url == normalize_url(url)).first()
+    # Persist summary
+    norm = normalize_url(url)
+    site = db.query(Website).filter(Website.url == norm).first()
     if not site:
-        site = Website(url=normalize_url(url), user_id=(user.id if user else None), active=True)
+        site = Website(url=norm, user_id=(user.id if user else None), active=True)
         db.add(site); db.commit(); db.refresh(site)
+
     row = Audit(
-        website_id=site.id, url=normalize_url(url),
+        website_id=site.id, url=norm,
         overall=payload["overall"], grade=payload["grade"],
         errors=payload["errors"], warnings=payload["warnings"], notices=payload["notices"],
         summary=payload["summary"], cat_scores_json=json.dumps(payload["cat_scores"]),
@@ -1065,6 +1123,10 @@ def export_pdf(url: str = Query(..., description="Website URL to audit and expor
     return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 # --- Registration, verification, login (JWT) ---
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str
+
 @app.post("/register")
 def register(payload: RegisterIn, db=Depends(get_db)):
     email = payload.email.lower().strip()
@@ -1072,7 +1134,7 @@ def register(payload: RegisterIn, db=Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     pwd_hash, salt = create_user_password(payload.password)
     user = User(email=email, password_hash=pwd_hash, password_salt=salt, timezone=payload.timezone,
-                notify_daily_default=True, notify_acc_default=True)
+                notify_daily_default=True, notify_acc_default=True, free_audits_remaining=FREE_AUDITS_LIMIT)
     db.add(user); db.commit(); db.refresh(user)
     token = jwt_sign({"uid": user.id, "act": "verify"}, exp_minutes=60*24)
     verify_link = f"{APP_BASE_URL}/verify?token={token}"
@@ -1128,10 +1190,17 @@ def create_schedule(payload: ScheduleIn, user: User = Depends(get_current_user),
     if not site:
         site = Website(url=url, user_id=user.id, active=True)
         db.add(site); db.commit(); db.refresh(site)
+    pref_dt = None
+    if payload.preferred_date:
+        try:
+            pref_dt = datetime.fromisoformat(payload.preferred_date.strip())
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid preferred_date format. Use YYYY-MM-DD or ISO8601.")
     sched = Schedule(
         user_id=user.id, website_id=site.id, enabled=payload.enabled,
         time_of_day=payload.time_of_day, timezone=payload.timezone,
-        daily_report=payload.daily_report, accumulated_report=payload.accumulated_report
+        daily_report=payload.daily_report, accumulated_report=payload.accumulated_report,
+        preferred_date=pref_dt
     )
     db.add(sched); db.commit(); db.refresh(sched)
     return {"message":"Schedule saved", "id": sched.id}
@@ -1174,7 +1243,6 @@ def billing_status(user: User = Depends(get_current_user)):
 
 @app.post("/billing/checkout")
 def billing_checkout(user: User = Depends(get_current_user), db=Depends(get_db)):
-    # Demo mode if Stripe SDK/keys missing
     if (not stripe) or (not STRIPE_SECRET_KEY) or (not STRIPE_PRICE_ID):
         user.subscribed = True
         db.commit()
@@ -1242,7 +1310,7 @@ def admin_audits(admin: User = Depends(require_admin), db=Depends(get_db)):
              "created_at": a.created_at.isoformat()} for a in audits]
 
 # -----------------------------------------------
-# Scheduler loop (daily/accumulated email delivery)
+# Scheduler loop (daily email delivery for subscribed users)
 # -----------------------------------------------
 async def scheduler_loop():
     await asyncio.sleep(3)
@@ -1252,26 +1320,36 @@ async def scheduler_loop():
             now_utc = datetime.utcnow().replace(second=0, microsecond=0)
             schedules = db.query(Schedule).filter(Schedule.enabled == True).all()
             for s in schedules:
+                user = db.query(User).get(s.user_id)
+                if not user or not user.subscribed:
+                    continue  # Only subscribed users receive scheduled emails
+
                 hh, mm = map(int, (s.time_of_day or "09:00").split(":"))
                 tzname = s.timezone or "UTC"
                 try:
                     from zoneinfo import ZoneInfo
                     tz = ZoneInfo(tzname)
                     local_now = now_utc.replace(tzinfo=timezone.utc).astimezone(tz)
-                    scheduled_local = local_now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    if s.preferred_date:
+                        # Use preferred_date as the first run day at selected local time
+                        local_first = s.preferred_date.replace(tzinfo=timezone.utc).astimezone(tz)
+                        scheduled_local = local_first.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    else:
+                        scheduled_local = local_now.replace(hour=hh, minute=mm, second=0, microsecond=0)
                     scheduled_utc = scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
                 except Exception:
                     scheduled_utc = now_utc.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
                 should_run = (now_utc >= scheduled_utc and (not s.last_run_at or s.last_run_at < scheduled_utc))
                 if should_run:
                     site = db.query(Website).get(s.website_id)
+                    if not site: continue
                     payload = run_actual_audit(site.url)
                     pdf_bytes = generate_pdf_5pages(site.url, {
                         "grade": payload["grade"], "overall": payload["overall"], "summary": payload["summary"],
                         "strengths": payload["strengths"], "weaknesses": payload["weaknesses"], "priority": payload["priority"],
                         "errors": payload["errors"], "warnings": payload["warnings"], "notices": payload["notices"], "totals": payload["totals"],
                     })
-                    user = db.query(User).get(s.user_id)
                     subj = f"FF Tech Audit — {site.url} ({payload['grade']} / {payload['overall']}%)"
                     body = "Your scheduled audit is ready.\n\n" \
                            f"Website: {site.url}\nGrade: {payload['grade']}\nHealth: {payload['overall']}%\n" \
@@ -1293,14 +1371,12 @@ async def scheduler_loop():
         await asyncio.sleep(SCHEDULER_INTERVAL)
 
 # -----------------------------------------------
-# SAFE DB INIT at startup (with retries & no crash)
+# SAFE DB INIT at startup (retries, no crash)
 # -----------------------------------------------
 async def init_db():
     """Try connecting to DB and ensure tables; do not crash app if DB not yet reachable."""
     max_attempts = int(os.getenv("DB_CONNECT_MAX_ATTEMPTS", "10"))
-    delay = float(os.getenv("DB_CONNECT_RETRY_DELAY", "2"))  # seconds
-
-    # Log sanitized DB URL for debugging (password masked)
+    delay = float(os.getenv("DB_CONNECT_RETRY_DELAY", "2"))
     try:
         sanitized = DATABASE_URL
         if "@" in sanitized and "://" in sanitized:
