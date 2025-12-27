@@ -1,17 +1,4 @@
+
+# nixpacks.toml — safe minimal (optional)
 [phases.setup]
-nixPkgs = ["python3", "gcc"]
-
-[phases.install]
-cmds = ["python -m venv /opt/venv && /opt/venv/bin/pip install -r requirements.txt"]
-
-[phases.build]
-cmds = ["/opt/venv/bin/pip install -r requirements.txt"]
-
-[start]
-# We use the full path to uvicorn to ensure it's found in the virtual env
-cmd = "/opt/venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT"
-
-[variables]
-# This helps the app find the virtual environment packages
-PYTHONPATH = "/app"
-PATH = "/opt/venv/bin:$PATH"
+# no custom packages; let Procfile/railway.json control the start command
