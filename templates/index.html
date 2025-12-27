@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH — Professional AI Audit & Monitoring</title>
+    <title>FF TECH — Professional AI Audit Platform</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
+    <link rel="stylesheet" href="/static/css/style.css">
+
     <script>
         tailwind.config = {
             theme: {
@@ -24,15 +26,13 @@
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
         .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(226, 232, 240, 0.8); }
-        .premium-blur { filter: blur(12px); pointer-events: none; opacity: 0.5; }
+        .premium-blur { filter: blur(14px); pointer-events: none; opacity: 0.5; }
         .gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        progress::-webkit-progress-value { background-color: #6366f1; border-radius: 10px; }
-        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 10px; }
     </style>
 </head>
 <body class="text-slate-900">
 
-    <nav class="fixed w-full z-50 glass border-b border-slate-200 px-6 py-4">
+    <nav class="fixed w-full z-[60] glass border-b border-slate-200 px-6 py-4">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center text-white shadow-lg">
@@ -42,129 +42,139 @@
             </div>
             
             <div id="nav-guest" class="flex items-center gap-4">
-                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600">Login</button>
-                <button onclick="toggleModal('login-modal')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-xl">Get Started</button>
+                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600 hover:text-brand-600">Login</button>
+                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-xl hover:scale-105 transition-all">Start Audit</button>
             </div>
             
             <div id="nav-user" class="hidden flex items-center gap-6">
-                <span id="user-display-email" class="text-xs font-bold bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">User</span>
-                <button onclick="logout()" class="text-rose-600 font-bold text-sm"><i class="fas fa-sign-out-alt"></i></button>
+                <div class="text-right">
+                    <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Status</p>
+                    <span id="user-display-email" class="text-xs font-bold text-brand-600"></span>
+                </div>
+                <button onclick="logout()" class="text-rose-500 hover:text-rose-700 transition-colors"><i class="fas fa-power-off"></i></button>
             </div>
         </div>
     </nav>
 
     <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
-        <section class="text-center mb-16">
-            <h2 class="text-5xl md:text-6xl font-black mb-6">Deep <span class="text-brand-600">Website Audits.</span></h2>
-            <form id="audit-form" class="max-w-3xl mx-auto p-2 glass rounded-3xl shadow-2xl flex flex-col md:flex-row gap-2 border-2 border-white">
-                <input id="target-url" type="url" placeholder="https://example.com" required
+        <section class="text-center mb-16 glass-entry">
+            <h2 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">Intelligence <span class="text-brand-600">Audit.</span></h2>
+            <p class="text-slate-400 text-lg italic mb-10 max-w-xl mx-auto font-medium">Deep crawl signal analysis and certified reporting engine.</p>
+            
+            <form id="audit-form" class="max-w-3xl mx-auto p-2 glass rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row gap-2 border-2 border-white">
+                <input id="target-url" type="url" placeholder="https://google.com" required
                        class="flex-1 px-6 py-4 rounded-2xl bg-transparent outline-none font-bold text-lg">
-                <button type="submit" class="gradient-bg text-white px-10 py-4 rounded-2xl font-black text-lg shadow-lg hover:scale-105 transition-all">
-                    RUN AUDIT
+                <button type="submit" class="gradient-bg text-white px-10 py-4 rounded-2xl font-black text-lg shadow-lg hover:brightness-110">
+                    ANALYZE
                 </button>
             </form>
-            <p class="mt-4 text-xs font-bold text-slate-400 uppercase">
+            <p class="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
                 Free Credits Remaining: <span id="val-remaining" class="text-slate-900">—</span>
             </p>
         </section>
 
-        <div id="audit-loading" class="hidden max-w-2xl mx-auto glass rounded-[2rem] p-8 shadow-xl mb-10">
-            <div class="flex justify-between items-end mb-4 font-bold">
-                <span class="text-brand-600 animate-pulse italic">Scanning 250+ technical signals...</span>
-                <span id="load-pct">0%</span>
+        <div id="audit-loading" class="hidden max-w-3xl mx-auto glass rounded-[3rem] p-10 shadow-2xl mb-12">
+            <div class="flex justify-between items-end mb-4">
+                <div class="flex items-center gap-3">
+                    <span class="status-pulse"></span>
+                    <span class="font-bold text-brand-600 italic">Simulating Deep Network Crawl...</span>
+                </div>
+                <span id="load-pct" class="text-4xl font-black">0%</span>
             </div>
-            <progress id="bar-progress" class="w-full h-3" value="0" max="100"></progress>
+            <progress id="bar-progress" class="w-full h-4" value="0" max="100"></progress>
         </div>
 
-        <div id="audit-results" class="hidden space-y-8">
+        <div id="audit-results" class="hidden space-y-10 animate-fade-in">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="glass rounded-[2.5rem] p-8 flex flex-col items-center justify-center">
-                    <div class="relative w-40 h-40">
+                <div class="glass rounded-[3rem] p-10 flex flex-col items-center justify-center border-b-4 border-brand-500">
+                    <div class="relative w-48 h-48 mb-4">
                         <canvas id="chart-overall"></canvas>
                         <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span id="val-grade" class="text-5xl font-black">--</span>
+                            <span id="val-grade" class="text-6xl font-black">--</span>
                             <span id="val-score" class="text-slate-400 font-bold text-sm">0%</span>
                         </div>
                     </div>
                 </div>
-                <div class="lg:col-span-2 glass rounded-[2.5rem] p-8">
+                <div class="lg:col-span-2 glass rounded-[3rem] p-10 shadow-sm">
                     <div class="flex justify-between items-start mb-6">
-                        <h3 class="text-2xl font-bold">Executive Summary</h3>
-                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold">
-                            <i class="fas fa-file-pdf mr-2"></i>Export PDF
+                        <h3 class="text-2xl font-black">Executive Summary</h3>
+                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                            <i class="fas fa-file-pdf"></i> Export PDF
                         </button>
                     </div>
-                    <p id="val-summary" class="text-slate-500 text-sm leading-relaxed mb-6"></p>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-rose-50 p-4 rounded-2xl text-center border border-rose-100">
-                            <div id="val-errors" class="text-2xl font-black text-rose-600">0</div>
-                            <div class="text-[10px] font-bold text-rose-400">Errors</div>
+                    <p id="val-summary" class="text-slate-500 text-sm leading-relaxed mb-10 italic"></p>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bg-rose-50 p-6 rounded-3xl text-center border border-rose-100">
+                            <div id="val-errors" class="text-3xl font-black text-rose-600">0</div>
+                            <div class="text-[10px] font-bold text-rose-400 uppercase">Errors</div>
                         </div>
-                        <div class="bg-amber-50 p-4 rounded-2xl text-center border border-amber-100">
-                            <div id="val-warnings" class="text-2xl font-black text-amber-600">0</div>
-                            <div class="text-[10px] font-bold text-amber-400">Warnings</div>
+                        <div class="bg-amber-50 p-6 rounded-3xl text-center border border-amber-100">
+                            <div id="val-warnings" class="text-3xl font-black text-amber-600">0</div>
+                            <div class="text-[10px] font-bold text-amber-400 uppercase">Warnings</div>
                         </div>
-                        <div class="bg-blue-50 p-4 rounded-2xl text-center border border-blue-100">
-                            <div id="val-notices" class="text-2xl font-black text-blue-600">0</div>
-                            <div class="text-[10px] font-bold text-blue-400">Notices</div>
+                        <div class="bg-indigo-50 p-6 rounded-3xl text-center border border-indigo-100">
+                            <div id="val-notices" class="text-3xl font-black text-indigo-600">0</div>
+                            <div class="text-[10px] font-bold text-indigo-400 uppercase">Notices</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div>
-                <h3 class="text-xl font-bold mb-6">Signal Checklist</h3>
-                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+                <h3 class="text-2xl font-black mb-8 tracking-tighter">Technical Signal Checkpoints (250+)</h3>
+                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"></div>
                 
-                <div id="paywall-lock" class="hidden mt-10 glass rounded-[3rem] p-16 text-center border-2 border-brand-200">
-                    <i class="fas fa-lock text-3xl text-brand-500 mb-4"></i>
-                    <h4 class="text-2xl font-black mb-4">Unlock Full 250+ Signal Analysis</h4>
-                    <p class="text-slate-500 mb-8 max-w-md mx-auto text-sm">Automated monitoring and detailed audits are reserved for premium members.</p>
-                    <button onclick="checkout()" class="gradient-bg text-white px-8 py-4 rounded-2xl font-black shadow-lg">Upgrade - $5/mo</button>
+                <div id="paywall-lock" class="hidden mt-12 glass rounded-[4rem] p-20 text-center border-2 border-brand-200">
+                    <i class="fas fa-lock text-4xl text-brand-500 mb-6"></i>
+                    <h4 class="text-3xl font-black mb-4">Unlock Full Analysis</h4>
+                    <p class="text-slate-500 mb-10 max-w-md mx-auto">Complete signal grid and daily monitoring are for premium members.</p>
+                    <button onclick="checkout()" class="gradient-bg text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-xl hover:scale-105 transition-all">Go Premium - $5/mo</button>
                 </div>
             </div>
 
-            <div id="scheduler-panel" class="hidden pt-10 border-t border-slate-200">
-                <h3 class="text-2xl font-bold mb-6">Automated Daily Monitoring</h3>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="glass p-8 rounded-[2rem]">
+            <div id="scheduler-panel" class="hidden pt-20 border-t border-slate-200">
+                <div class="flex items-center gap-4 mb-10">
+                    <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white"><i class="fas fa-calendar"></i></div>
+                    <h3 class="text-3xl font-black">Daily Monitors</h3>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <div class="glass p-10 rounded-[3rem]">
                         <form id="schedule-form" class="space-y-4">
-                            <input id="sch-url" type="url" placeholder="URL to monitor" required class="w-full p-4 border rounded-xl bg-white font-bold">
+                            <input id="sch-url" type="url" placeholder="URL to monitor" required class="w-full p-5 rounded-2xl border bg-white font-bold">
                             <div class="grid grid-cols-2 gap-4">
-                                <input id="sch-time" type="time" value="09:00" class="w-full p-4 border rounded-xl">
-                                <input id="sch-tz" type="text" value="UTC" class="w-full p-4 border rounded-xl">
+                                <input id="sch-time" type="time" value="09:00" class="w-full p-5 rounded-2xl border font-bold">
+                                <input id="sch-tz" type="text" value="UTC" class="w-full p-5 rounded-2xl border font-bold">
                             </div>
-                            <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold">Save Schedule</button>
+                            <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-3xl font-black">Activate Schedule</button>
                         </form>
                     </div>
-                    <div id="sch-list" class="space-y-3"></div>
+                    <div id="sch-list" class="space-y-4"></div>
                 </div>
             </div>
         </div>
     </main>
 
-    <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6">
-        <div class="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl">
-            <h3 class="text-2xl font-bold mb-6">Login / Register</h3>
+    <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="bg-white rounded-[3rem] p-12 max-w-md w-full shadow-2xl">
+            <h3 class="text-3xl font-black mb-8 text-center">Sign In</h3>
             <form id="login-form" class="space-y-4">
-                <input id="l-email" type="email" placeholder="Email" required class="w-full p-4 border rounded-xl">
-                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 border rounded-xl">
-                <button type="submit" class="w-full gradient-bg text-white py-4 rounded-xl font-bold">Sign In</button>
+                <input id="l-email" type="email" placeholder="Email" required class="w-full p-4 border rounded-2xl font-bold">
+                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 border rounded-2xl font-bold">
+                <button type="submit" class="w-full gradient-bg text-white py-5 rounded-2xl font-black">Login</button>
             </form>
-            <button onclick="toggleModal('login-modal')" class="w-full mt-4 text-slate-400 text-xs font-bold uppercase">Close</button>
+            <button onclick="toggleModal('login-modal')" class="w-full mt-6 text-slate-400 font-bold uppercase text-[10px] tracking-widest">Close</button>
         </div>
     </div>
 
     <script>
         const state = { token: localStorage.getItem('token'), charts: {} };
         const $ = s => document.querySelector(s);
-        function toggleModal(id) { $('#'+id).classList.toggle('hidden'); }
 
         async function api(path, method = 'GET', body = null) {
             const h = { 'Content-Type': 'application/json' };
             if (state.token) h['Authorization'] = 'Bearer ' + state.token;
             const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
-            if (res.status === 401) { logout(); return; }
+            if (res.status === 401 && state.token) logout();
             return res.json();
         }
 
@@ -173,20 +183,23 @@
             const url = $('#target-url').value;
             $('#audit-loading').classList.remove('hidden');
             $('#audit-results').classList.add('hidden');
-            let p = 0; const t = setInterval(() => { p = Math.min(p+5, 99); $('#bar-progress').value = p; $('#load-pct').innerText = p+'%'; }, 300);
+            let p = 0; const t = setInterval(() => { p = Math.min(p+5, 99); $('#bar-progress').value = p; $('#load-pct').innerText = p+'%'; }, 250);
             try {
                 const data = await api(`/audit?url=${encodeURIComponent(url)}`);
                 clearInterval(t); renderReport(data);
-            } catch (err) { clearInterval(t); alert('Audit Failed. Check connection.'); }
+            } catch (err) { clearInterval(t); alert('Service unreachable.'); }
         };
 
         function renderReport(data) {
             $('#audit-loading').classList.add('hidden');
             $('#audit-results').classList.remove('hidden');
-            $('#val-grade').innerText = data.grade; $('#val-score').innerText = data.overall + '%';
-            $('#val-summary').innerText = data.summary; $('#val-errors').innerText = data.errors;
-            $('#val-warnings').innerText = data.warnings; $('#val-notices').innerText = data.notices;
-            $('#val-remaining').innerText = data.remaining ?? '--';
+            $('#val-grade').innerText = data.grade; 
+            $('#val-score').innerText = data.overall + '%';
+            $('#val-summary').innerText = data.summary;
+            $('#val-errors').innerText = data.errors;
+            $('#val-warnings').innerText = data.warnings;
+            $('#val-notices').innerText = data.notices;
+            $('#val-remaining').innerText = data.remaining ?? 'Guest';
 
             if(state.charts.overall) state.charts.overall.destroy();
             state.charts.overall = new Chart($('#chart-overall'), { type: 'doughnut', data: data.overall_gauge, options: { cutout: '80%', plugins: { legend: { display: false } } } });
@@ -194,8 +207,8 @@
             const grid = $('#metrics-grid'); grid.innerHTML = '';
             data.metrics.forEach(m => {
                 const card = document.createElement('div');
-                card.className = 'glass p-4 rounded-xl border border-slate-100';
-                card.innerHTML = `<h5 class="text-[9px] font-black text-slate-400 mb-2 uppercase">Signal ${m.num}</h5><canvas id="m-${m.num}" height="100"></canvas>`;
+                card.className = 'glass p-6 rounded-3xl border border-slate-100 shadow-sm';
+                card.innerHTML = `<h5 class="text-[9px] font-black text-slate-400 mb-4 uppercase tracking-widest">Signal ${m.num}</h5><canvas id="m-${m.num}" height="140"></canvas>`;
                 grid.appendChild(card);
                 new Chart($(`#m-${m.num}`), { type: m.chart_type, data: m.chart_data, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } });
             });
@@ -204,33 +217,34 @@
             else { grid.classList.remove('premium-blur'); $('#paywall-lock').classList.add('hidden'); }
         }
 
+        async function loadSchedules() {
+            const list = await api('/schedules');
+            $('#sch-list').innerHTML = list.map(s => `<div class="glass p-6 rounded-[2rem] flex justify-between"><span><b>${s.website_url}</b><br><small>${s.time_of_day} UTC</small></span><i class="fas fa-check-circle text-emerald-500"></i></div>`).join('');
+        }
+
         $('#schedule-form').onsubmit = async (e) => {
             e.preventDefault();
             await api('/schedule', 'POST', { website_url: $('#sch-url').value, time_of_day: $('#sch-time').value, timezone: $('#sch-tz').value });
             loadSchedules();
         };
 
-        async function loadSchedules() {
-            const list = await api('/schedules');
-            $('#sch-list').innerHTML = list.map(s => `<div class="glass p-4 rounded-xl flex justify-between"><span><b>${s.website_url}</b><br><small>${s.time_of_day} UTC</small></span><i class="fas fa-check text-green-500"></i></div>`).join('');
-        }
-
+        function logout() { localStorage.removeItem('token'); location.reload(); }
+        function toggleModal(id) { $('#'+id).classList.toggle('hidden'); }
         function downloadPDF() { window.open(`/export-pdf?url=${encodeURIComponent($('#target-url').value)}`, '_blank'); }
         async function checkout() { const res = await api('/billing/checkout', 'POST'); if(res.url) window.location.href = res.url; }
-        
+
         $('#login-form').onsubmit = async (e) => {
             e.preventDefault();
             const d = await api('/login', 'POST', { email: $('#l-email').value, password: $('#l-pass').value });
             if(d.token) { localStorage.setItem('token', d.token); location.reload(); }
         };
 
-        function logout() { localStorage.removeItem('token'); location.reload(); }
-
         (async function init() {
             if (state.token) {
                 $('#nav-guest').classList.add('hidden'); $('#nav-user').classList.remove('hidden');
-                const status = await api('/billing/status');
-                if (status.subscribed) { $('#scheduler-panel').classList.remove('hidden'); loadSchedules(); }
+                const s = await api('/billing/status');
+                $('#user-display-email').innerText = 'Verified';
+                if (s.subscribed) { $('#scheduler-panel').classList.remove('hidden'); loadSchedules(); }
             }
         })();
     </script>
