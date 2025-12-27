@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF TECH — AI Web Audit Platform</title>
+    <title>FF TECH — AI Intelligence Audit</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
@@ -11,219 +11,118 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/main.js" defer></script>
 
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { jakarta: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' } }
+                    colors: { brand: { 500: '#6366f1', 600: '#4f46e5' } }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-slate-50 text-slate-900 font-jakarta">
+<body class="bg-[#fcfdfe] font-jakarta text-slate-900">
 
-    <nav class="fixed w-full z-50 glass border-b border-slate-200 px-6 py-4 bg-white/80 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <h1 class="text-xl font-extrabold tracking-tighter">FF TECH</h1>
+    <nav class="fixed w-full z-50 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-8 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                <i class="fas fa-microchip"></i>
             </div>
-            
-            <div id="nav-guest" class="flex items-center gap-4">
-                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-600">Login</button>
-                <button onclick="toggleModal('reg-modal')" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-xl">Get Started</button>
-            </div>
-            
-            <div id="nav-user" class="hidden flex items-center gap-6">
-                <span id="user-display-email" class="text-xs font-bold bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full italic">User</span>
-                <button onclick="logout()" class="text-rose-600 font-bold text-sm"><i class="fas fa-sign-out-alt"></i></button>
-            </div>
+            <h1 class="text-xl font-extrabold tracking-tighter uppercase italic">FF Tech</h1>
         </div>
+        <div id="auth-status" class="flex gap-4">
+            </div>
     </nav>
 
-    <main class="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+    <main class="pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <section class="text-center mb-16">
-            <h2 class="text-5xl md:text-7xl font-black mb-6 tracking-tight">Technical <span class="text-indigo-600">Intelligence.</span></h2>
-            <form id="audit-form" class="max-w-3xl mx-auto p-2 bg-white rounded-3xl shadow-2xl flex flex-col md:flex-row gap-2 border border-slate-200">
-                <input id="target-url" type="url" placeholder="https://example.com" required
-                       class="flex-1 px-6 py-4 rounded-2xl outline-none font-bold text-lg">
-                <button type="submit" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 transition-all">
-                    RUN AUDIT
+            <h2 class="text-6xl font-black tracking-tight mb-4">Website <span class="text-brand-600">Deep Audit.</span></h2>
+            <p class="text-slate-400 mb-10 font-medium italic">250+ signal analysis powered by FF Tech Intelligence Engine</p>
+            
+            <form id="audit-form" class="max-w-2xl mx-auto relative group">
+                <input id="url-input" type="url" placeholder="https://your-website.com" required
+                       class="w-full p-6 pr-40 rounded-3xl border-2 border-slate-100 bg-white shadow-2xl shadow-indigo-100 outline-none focus:border-brand-600 transition-all text-lg font-bold">
+                <button type="submit" class="absolute right-2 top-2 bottom-2 bg-slate-900 text-white px-8 rounded-2xl font-black hover:bg-brand-600 transition-colors">
+                    ANALYZE
                 </button>
             </form>
-            <p class="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Free Credits: <span id="val-remaining" class="text-slate-900">—</span>
-            </p>
         </section>
 
-        <div id="audit-results" class="hidden space-y-8 glass-entry">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="bg-white rounded-[2.5rem] p-8 flex flex-col items-center justify-center shadow-sm border border-slate-100">
-                    <div class="relative w-40 h-40">
-                        <canvas id="chart-overall"></canvas>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <span id="val-grade" class="text-5xl font-black">--</span>
-                            <span id="val-score" class="text-slate-400 font-bold text-sm">0%</span>
-                        </div>
-                    </div>
+        <div id="loading-zone" class="hidden text-center p-10">
+            <div class="status-pulse mb-4"></div>
+            <p class="text-brand-600 font-bold animate-pulse">CRAWLING DATABASE & ANALYZING HEADERS...</p>
+        </div>
+
+        <div id="results-view" class="hidden space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-50 flex flex-col items-center justify-center">
+                    <canvas id="mainChart" class="max-w-[150px]"></canvas>
+                    <div id="grade-display" class="text-5xl font-black mt-4">--</div>
                 </div>
-                <div class="lg:col-span-2 bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
-                    <div class="flex justify-between items-start mb-6">
-                        <h3 class="text-2xl font-bold">Audit Summary</h3>
-                        <button onclick="downloadPDF()" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold">
-                            <i class="fas fa-file-pdf mr-2"></i>Export PDF
-                        </button>
-                    </div>
-                    <p id="val-summary" class="text-slate-500 text-sm leading-relaxed mb-6"></p>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-rose-50 p-4 rounded-2xl text-center">
-                            <div id="val-errors" class="text-2xl font-black text-rose-600">0</div>
-                            <div class="text-[10px] font-bold text-rose-400 uppercase tracking-tighter">Errors</div>
-                        </div>
-                        <div class="bg-amber-50 p-4 rounded-2xl text-center">
-                            <div id="val-warnings" class="text-2xl font-black text-amber-600">0</div>
-                            <div class="text-[10px] font-bold text-amber-400 uppercase tracking-tighter">Warnings</div>
-                        </div>
-                        <div class="bg-blue-50 p-4 rounded-2xl text-center">
-                            <div id="val-notices" class="text-2xl font-black text-indigo-600">0</div>
-                            <div class="text-[10px] font-bold text-indigo-400 uppercase tracking-tighter">Notices</div>
-                        </div>
-                    </div>
+
+                <div class="md:col-span-2 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-50 relative">
+                    <button onclick="copyAuditLink(window.location.href)" class="absolute top-6 right-6 text-slate-300 hover:text-brand-600">
+                        <i class="fas fa-share-nodes"></i>
+                    </button>
+                    <h3 class="text-xl font-black mb-4 uppercase tracking-widest text-slate-400">Analysis Summary</h3>
+                    <p id="summary-text" class="text-slate-600 leading-relaxed font-medium"></p>
                 </div>
             </div>
 
-            <div>
-                <h3 class="text-xl font-bold mb-6">Deep Signal Checkpoints</h3>
-                <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"></div>
-                
-                <div id="paywall-lock" class="hidden mt-10 p-12 text-center bg-indigo-50 rounded-[3rem] border-2 border-dashed border-indigo-200">
-                    <i class="fas fa-lock text-3xl text-indigo-400 mb-4"></i>
-                    <h4 class="text-xl font-black mb-2 text-indigo-900">Unlock 250+ Technical Signals</h4>
-                    <p class="text-indigo-600/70 mb-8 max-w-md mx-auto text-sm font-medium">Daily monitoring and full signal reports require a $5/mo pro subscription.</p>
-                    <button onclick="checkout()" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-indigo-700 transition-all">Upgrade to Pro</button>
+            <div id="metrics-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 </div>
-            </div>
         </div>
     </main>
 
-    <div id="login-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6">
-        <div class="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl">
-            <h3 class="text-2xl font-bold mb-6">Welcome Back</h3>
-            <form id="login-form" class="space-y-4">
-                <input id="l-email" type="email" placeholder="Email" required class="w-full p-4 border rounded-xl outline-none focus:border-indigo-500">
-                <input id="l-pass" type="password" placeholder="Password" required class="w-full p-4 border rounded-xl outline-none focus:border-indigo-500">
-                <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200">Sign In</button>
-            </form>
-            <button onclick="toggleModal('login-modal')" class="w-full mt-4 text-slate-400 text-xs font-bold uppercase">Close</button>
-        </div>
-    </div>
-
-    <div id="reg-modal" class="hidden fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6">
-        <div class="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl">
-            <h3 class="text-2xl font-bold mb-6">Create Account</h3>
-            <form id="reg-form" class="space-y-4">
-                <input id="r-email" type="email" placeholder="Email Address" required class="w-full p-4 border rounded-xl outline-none focus:border-indigo-500">
-                <input id="r-pass" type="password" placeholder="Password (Min 8 chars)" minlength="8" required class="w-full p-4 border rounded-xl outline-none focus:border-indigo-500">
-                <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200">Start Free Trial</button>
-            </form>
-            <button onclick="toggleModal('reg-modal')" class="w-full mt-4 text-slate-400 text-xs font-bold uppercase">Close</button>
-        </div>
-    </div>
-
     <script>
-        const state = { token: localStorage.getItem('token'), charts: {} };
-        const $ = s => document.querySelector(s);
-        function toggleModal(id) { $('#' + id).classList.toggle('hidden'); }
-
-        async function api(path, method = 'GET', body = null) {
-            const h = { 'Content-Type': 'application/json' };
-            if (state.token) h['Authorization'] = 'Bearer ' + state.token;
-            const res = await fetch(path, { method, headers: h, body: body ? JSON.stringify(body) : null });
-            if (res.status === 401 && state.token) { logout(); return; }
-            return res.json();
-        }
-
-        $('#audit-form').onsubmit = async (e) => {
+        const form = document.getElementById('audit-form');
+        
+        form.onsubmit = async (e) => {
             e.preventDefault();
-            const url = $('#target-url').value;
-            $('#audit-results').classList.add('hidden');
+            const url = document.getElementById('url-input').value;
             
+            // USE YOUR main.js fadeToggle helper
+            fadeToggle('loading-zone', true);
+            fadeToggle('results-view', false);
+
             try {
-                const data = await api(`/audit?url=${encodeURIComponent(url)}`);
-                renderReport(data);
-            } catch (err) { alert('Service Unavailable'); }
-        };
+                const response = await fetch(`/audit?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+                
+                // Success UI Transition
+                fadeToggle('loading-zone', false);
+                fadeToggle('results-view', true);
 
-        function renderReport(data) {
-            $('#audit-results').classList.remove('hidden');
-            $('#val-grade').innerText = data.grade; 
-            $('#val-score').innerText = data.overall + '%';
-            $('#val-summary').innerText = data.summary;
-            $('#val-errors').innerText = data.errors;
-            $('#val-warnings').innerText = data.warnings;
-            $('#val-notices').innerText = data.notices;
-            $('#val-remaining').innerText = data.remaining ?? 'Guest';
-
-            if(state.charts.overall) state.charts.overall.destroy();
-            state.charts.overall = new Chart($('#chart-overall'), { 
-                type: 'doughnut', 
-                data: data.overall_gauge, 
-                options: { cutout: '80%', plugins: { legend: { display: false } } } 
-            });
-
-            const grid = $('#metrics-grid'); 
-            grid.innerHTML = '';
-            data.metrics.forEach(m => {
-                const card = document.createElement('div');
-                card.className = 'bg-white p-4 rounded-2xl border border-slate-100 shadow-sm';
-                card.innerHTML = `<h5 class="text-[10px] font-black text-slate-400 mb-2 uppercase">Signal ${m.num}</h5><canvas id="m-${m.num}" height="100"></canvas>`;
-                grid.appendChild(card);
-                new Chart($(`#m-${m.num}`), { 
-                    type: m.chart_type, 
-                    data: m.chart_data, 
-                    options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } } 
+                // Update UI
+                document.getElementById('grade-display').innerText = data.grade;
+                document.getElementById('summary-text').innerText = data.summary;
+                
+                // Render Chart.js
+                new Chart(document.getElementById('mainChart'), {
+                    type: 'doughnut',
+                    data: data.overall_gauge,
+                    options: { cutout: '80%', plugins: { legend: { display: false } } }
                 });
-            });
 
-            if(!data.premium) { 
-                grid.classList.add('opacity-40', 'pointer-events-none', 'blur-sm'); 
-                $('#paywall-lock').classList.remove('hidden'); 
-            } else { 
-                grid.classList.remove('opacity-40', 'pointer-events-none', 'blur-sm'); 
-                $('#paywall-lock').classList.add('hidden'); 
+                // Populate Grid
+                const grid = document.getElementById('metrics-grid');
+                grid.innerHTML = data.metrics.slice(0, 12).map(m => `
+                    <div class="bg-white p-6 rounded-3xl border border-slate-50 text-center shadow-sm">
+                        <div class="text-[10px] font-black text-slate-300 uppercase mb-2">Signal ${m.num}</div>
+                        <div class="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full ${m.severity === 'green' ? 'bg-emerald-400' : 'bg-rose-400'}" style="width: 80%"></div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                alert("Audit Engine Error. Check Connection.");
+                fadeToggle('loading-zone', false);
             }
-        }
-
-        $('#login-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const d = await api('/login', 'POST', { email: $('#l-email').value, password: $('#l-pass').value });
-            if(d.token) { localStorage.setItem('token', d.token); location.reload(); }
         };
-
-        $('#reg-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const d = await api('/register', 'POST', { email: $('#r-email').value, password: $('#r-pass').value });
-            alert(d.message || d.detail);
-            if (!d.detail) toggleModal('reg-modal');
-        };
-
-        function logout() { localStorage.removeItem('token'); location.reload(); }
-        function downloadPDF() { window.open(`/export-pdf?url=${encodeURIComponent($('#target-url').value)}`, '_blank'); }
-        async function checkout() { const res = await api('/billing/checkout', 'POST'); if(res.url) window.location.href = res.url; }
-
-        (async function init() {
-            if (state.token) {
-                $('#nav-guest').classList.add('hidden');
-                $('#nav-user').classList.remove('hidden');
-                const status = await api('/billing/status');
-                $('#user-display-email').innerText = status.subscribed ? 'Pro User' : 'Free User';
-            }
-        })();
     </script>
 </body>
 </html>
