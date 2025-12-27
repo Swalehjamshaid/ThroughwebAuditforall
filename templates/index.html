@@ -3,304 +3,213 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech - Professional AI Website Audit Platform</title>
-    <!-- Tailwind CSS CDN -->
+    <title>FF Tech | Professional AI Website Audit Platform</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Font Awesome CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: 'Inter', sans-serif; background: linear-gradient(to bottom, #f9fafb, #e0e7ff); }
-        .gradient-primary { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
-        .card { @apply bg-white rounded-3xl shadow-2xl p-10 transition-all hover:shadow-3xl; }
-        .metric-card { @apply card border-l-8; }
-        .green { border-color: #10b981; }
-        .yellow { border-color: #f59e0b; }
-        .red { border-color: #ef4444; }
-        canvas { max-height: 250px; width: 100% !important; }
-        .blur-premium { filter: blur(10px); pointer-events: none; }
-        .hero-bg { background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.unsplash.com/photo-1460925895917-afdab8279a3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2426&q=80') center/cover no-repeat; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        .gradient-brand { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+        .metric-card { @apply bg-white border border-slate-200 rounded-2xl p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 relative overflow-hidden; border-left-width: 6px; }
+        .green { border-left-color: #10b981; }
+        .yellow { border-left-color: #f59e0b; }
+        .red { border-left-color: #ef4444; }
+        .chart-container { height: 100px; width: 100%; margin-top: 1rem; }
+        .premium-gate { filter: blur(8px); pointer-events: none; user-select: none; }
+        progress::-webkit-progress-value { background-color: #4f46e5; border-radius: 10px; }
+        progress::-webkit-progress-bar { background-color: #e2e8f0; border-radius: 10px; }
     </style>
 </head>
-<body class="text-gray-800">
+<body class="antialiased">
 
-    <!-- Header with Login/Register/Admin -->
-    <header class="gradient-primary text-white py-8 shadow-2xl fixed w-full top-0 z-50">
-        <div class="max-w-7xl mx-auto px-8 flex justify-between items-center">
-            <div class="flex items-center space-x-4">
-                <i class="fas fa-chart-line text-4xl"></i>
-                <h1 class="text-4xl font-extrabold">FF Tech Audit Platform</h1>
-            </div>
-            <div class="flex items-center space-x-12 text-xl">
-                <span id="user-status" class="hidden">Welcome, <span id="user-email"></span> | <a href="#" id="logout" class="underline">Logout</a></span>
-                <a href="#login" id="login-link" class="hover:text-white/80 transition">Login</a>
-                <a href="#register" id="register-link" class="hover:text-white/80 transition">Register</a>
-                <a href="#admin" id="admin-link" class="hidden hover:text-white/80 transition">Admin</a>
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 py-4 px-8 flex justify-between items-center">
+        <div class="flex items-center gap-2">
+            <div class="p-2 gradient-brand rounded-lg text-white"><i data-lucide="shield-check"></i></div>
+            <h1 class="text-2xl font-extrabold tracking-tighter text-slate-900 uppercase">FF Tech</h1>
+        </div>
+        <div class="flex items-center gap-6">
+            <div id="auth-section" class="flex items-center gap-4">
+                <span id="user-display" class="text-sm font-bold text-slate-600 hidden"></span>
+                <button onclick="toggleModal('login-modal')" class="text-sm font-bold text-slate-500 hover:text-indigo-600">Login</button>
+                <button onclick="toggleModal('register-modal')" class="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold text-sm shadow-lg shadow-slate-200">Get Started</button>
             </div>
         </div>
-    </header>
+    </nav>
 
-    <!-- Hero - Public Audit -->
-    <section id="hero" class="hero-bg text-white pt-48 pb-40 px-8">
-        <div class="max-w-6xl mx-auto text-center">
-            <h2 class="text-7xl font-black mb-10 drop-shadow-2xl">Professional Scheduled Website Audit</h2>
-            <p class="text-3xl mb-16 drop-shadow-lg">250+ Metrics • Automated Scheduling • Certified Reports</p>
-            <form id="audit-form" class="flex max-w-4xl mx-auto shadow-2xl rounded-full overflow-hidden mb-12">
-                <input type="url" id="website-url" placeholder="Enter Website URL" required class="flex-1 px-12 py-8 text-2xl text-gray-900">
-                <button type="submit" class="bg-white text-primary px-20 py-8 font-bold text-2xl hover:bg-gray-100">Run Free Audit</button>
+    <section id="hero" class="gradient-brand text-white pt-32 pb-24 px-8 relative overflow-hidden">
+        <div class="max-w-5xl mx-auto text-center relative z-10">
+            <h2 class="text-5xl md:text-7xl font-black mb-8 tracking-tight">Professional AI <br>Website Audit</h2>
+            <p class="text-xl md:text-2xl mb-12 opacity-90 max-w-3xl mx-auto font-medium">250+ Metrics • Certified PDF Reports • Automated Scheduling</p>
+            
+            <form id="audit-form" class="flex flex-col md:flex-row max-w-3xl mx-auto bg-white p-2 rounded-[2rem] shadow-2xl overflow-hidden mb-12">
+                <input type="url" id="website-url" placeholder="https://your-website.com" required class="flex-1 px-8 py-5 text-slate-900 text-lg outline-none rounded-2xl">
+                <button type="submit" class="gradient-brand px-12 py-5 rounded-[1.8rem] font-black text-lg hover:opacity-90 transition shadow-lg">Run Free Audit</button>
             </form>
-            <p class="text-2xl mb-8" id="audit-counter">Free Audits Remaining: <span id="remaining" class="font-bold">10</span></p>
-            <div class="flex justify-center space-x-12 text-2xl">
-                <span class="flex items-center"><i class="fas fa-lock mr-4"></i>Secure</span>
-                <span class="flex items-center"><i class="fas fa-bolt mr-4"></i>Instant</span>
-                <span class="flex items-center"><i class="fas fa-certificate mr-4"></i>Certified</span>
+
+            <div class="flex justify-center gap-12 text-sm font-bold uppercase tracking-widest opacity-80">
+                <span id="audits-left">Audits Remaining: 10</span>
+                <span class="flex items-center gap-2"><i data-lucide="zap"></i> Instant Results</span>
             </div>
         </div>
     </section>
 
-    <!-- Login & Register Modals -->
-    <div id="login-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
-        <div class="card p-16 max-w-md w-full">
-            <h3 class="text-5xl font-bold text-center mb-12">Login to Your Account</h3>
-            <form id="login-form" class="space-y-8">
-                <input type="email" id="login-email" placeholder="Email" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4 border-gray-300">
-                <input type="password" id="login-password" placeholder="Password" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4 border-gray-300">
-                <button type="submit" class="w-full bg-gradient-primary text-white py-6 rounded-2xl text-3xl font-bold">Login</button>
-            </form>
-            <p class="text-center mt-8 text-xl">New user? <a href="#" id="to-register" class="text-primary font-bold">Register here</a></p>
-        </div>
-    </div>
-
-    <div id="register-modal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-50">
-        <div class="card p-16 max-w-md w-full">
-            <h3 class="text-5xl font-bold text-center mb-12">Create Your Account</h3>
-            <form id="register-form" class="space-y-8">
-                <input type="email" id="reg-email" placeholder="Email" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4 border-gray-300">
-                <input type="password" id="reg-password" placeholder="Password" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4 border-gray-300">
-                <button type="submit" class="w-full bg-gradient-primary text-white py-6 rounded-2xl text-3xl font-bold">Register</button>
-            </form>
-            <p class="text-center mt-8 text-xl">Already have an account? <a href="#" id="to-login" class="text-primary font-bold">Login</a></p>
-        </div>
-    </div>
-
-    <!-- Audit Progress -->
-    <section id="progress" class="py-32 px-8 hidden">
-        <div class="max-w-6xl mx-auto card p-16">
-            <h3 class="text-6xl font-bold text-center mb-20">Audit in Progress</h3>
-            <div class="space-y-12">
-                <div class="flex items-center"><span class="w-48 text-3xl font-bold">Crawling</span><progress id="p-crawl" class="flex-1 h-10 rounded-full" value="0" max="100"></progress><span id="crawl-pct" class="w-32 text-right text-4xl font-bold ml-12">0%</span></div>
-                <div class="flex items-center"><span class="w-48 text-3xl font-bold">Analyzing</span><progress id="p-analyze" class="flex-1 h-10 rounded-full" value="0" max="100"></progress><span id="analyze-pct" class="w-32 text-right text-4xl font-bold ml-12">0%</span></div>
-                <div class="flex items-center"><span class="w-48 text-3xl font-bold">Scoring</span><progress id="p-score" class="flex-1 h-10 rounded-full" value="0" max="100"></progress><span id="score-pct" class="w-32 text-right text-4xl font-bold ml-12">0%</span></div>
-                <div class="flex items-center"><span class="w-48 text-3xl font-bold">Reporting</span><progress id="p-report" class="flex-1 h-10 rounded-full" value="0" max="100"></progress><span id="report-pct" class="w-32 text-right text-4xl font-bold ml-12">0%</span></div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-20 mt-24">
-                <div class="card"><canvas id="health-gauge"></canvas></div>
-                <div class="card"><canvas id="issues-chart"></canvas></div>
+    <section id="progress-section" class="py-20 px-8 hidden bg-slate-50">
+        <div class="max-w-4xl mx-auto bg-white rounded-[2.5rem] shadow-xl p-12 border border-slate-100">
+            <h3 class="text-3xl font-black text-center mb-12 text-slate-900 uppercase">System Analysis in Progress</h3>
+            <div class="space-y-8">
+                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Crawling</span><progress id="p-crawl" class="flex-1 h-3" value="0" max="100"></progress><span id="crawl-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
+                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Analyzing</span><progress id="p-analyze" class="flex-1 h-3" value="0" max="100"></progress><span id="analyze-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
+                <div class="flex items-center gap-4"><span class="w-32 font-black text-xs uppercase text-slate-400">Scoring</span><progress id="p-score" class="flex-1 h-3" value="0" max="100"></progress><span id="score-pct" class="w-16 text-right font-black text-indigo-600">0%</span></div>
             </div>
         </div>
     </section>
 
-    <!-- Executive Summary -->
-    <section id="summary" class="py-32 px-8 hidden">
+    <section id="summary-section" class="py-24 px-8 hidden">
         <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-24">
-                <span id="grade-badge" class="text-9xl font-black px-24 py-16 rounded-full bg-gradient-to-br from-green-100 to-green-200 text-green-700 shadow-3xl inline-block">A+</span>
-            </div>
-            <canvas id="overall-gauge" class="mx-auto mb-24" width="600" height="600"></canvas>
-            <div class="card p-20 mb-24">
-                <h3 class="text-6xl font-bold text-center mb-16">Executive Summary</h3>
-                <p id="exec-summary" class="text-3xl leading-relaxed text-center max-w-6xl mx-auto"></p>
-            </div>
-            <div class="grid md:grid-cols-3 gap-20 mb-24">
-                <div class="card bg-gradient-to-br from-green-50 to-green-100 border-8 border-green-300">
-                    <h4 class="text-5xl font-bold text-green-700 mb-12">Strengths</h4>
-                    <ul id="strengths" class="space-y-8 text-2xl"></ul>
+            <div class="grid lg:grid-cols-3 gap-12 items-center mb-24">
+                <div class="text-center lg:text-left">
+                    <span id="grade-badge" class="text-9xl font-black px-12 py-8 rounded-3xl bg-indigo-50 text-indigo-600 shadow-xl inline-block mb-8">A+</span>
+                    <h2 class="text-4xl font-black text-slate-900 mb-4">Executive Summary</h2>
+                    <p id="exec-summary" class="text-xl text-slate-500 leading-relaxed italic"></p>
                 </div>
-                <div class="card bg-gradient-to-br from-red-50 to-red-100 border-8 border-red-300">
-                    <h4 class="text-5xl font-bold text-red-700 mb-12">Weak Areas</h4>
-                    <ul id="weaknesses" class="space-y-8 text-2xl"></ul>
-                </div>
-                <div class="card bg-gradient-to-br from-amber-50 to-amber-100 border-8 border-amber-300">
-                    <h4 class="text-5xl font-bold text-amber-700 mb-12">Priority Fixes</h4>
-                    <ul id="priority" class="space-y-8 text-2xl"></ul>
+                <div class="lg:col-span-2 bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100">
+                    <canvas id="category-chart" height="300"></canvas>
                 </div>
             </div>
-            <canvas id="category-chart" class="card p-16 mb-24"></canvas>
-            <div class="text-center"><button id="export-pdf" class="bg-gradient-primary text-white px-32 py-12 rounded-full text-3xl font-bold shadow-3xl hover:scale-105 transition">Export Certified Report</button></div>
+
+            <div class="grid md:grid-cols-3 gap-8 mb-24">
+                <div class="p-8 bg-emerald-50 rounded-3xl border border-emerald-100">
+                    <h4 class="text-xl font-bold text-emerald-900 mb-6 flex items-center gap-2"><i data-lucide="trending-up"></i> Strengths</h4>
+                    <ul id="strengths-list" class="space-y-4 text-emerald-800 font-semibold"></ul>
+                </div>
+                <div class="p-8 bg-rose-50 rounded-3xl border border-rose-100">
+                    <h4 class="text-xl font-bold text-rose-900 mb-6 flex items-center gap-2"><i data-lucide="alert-circle"></i> Weaknesses</h4>
+                    <ul id="weaknesses-list" class="space-y-4 text-rose-800 font-semibold"></ul>
+                </div>
+                <div class="p-8 bg-amber-50 rounded-3xl border border-amber-100">
+                    <h4 class="text-xl font-bold text-amber-900 mb-6 flex items-center gap-2"><i data-lucide="check-square"></i> Priorities</h4>
+                    <ul id="priority-list" class="space-y-4 text-amber-800 font-semibold"></ul>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <button onclick="exportPDF()" class="bg-slate-900 text-white px-12 py-5 rounded-2xl text-xl font-bold shadow-2xl flex items-center gap-4 mx-auto hover:bg-slate-800 transition">
+                    <i data-lucide="download"></i> Download Certified PDF Report
+                </button>
+            </div>
         </div>
     </section>
 
-    <!-- Dashboard with Scheduling + All 235 Metrics -->
-    <section id="dashboard" class="py-32 px-8 hidden">
+    <section id="dashboard-section" class="py-24 px-8 hidden bg-slate-50 border-t border-slate-200">
         <div class="max-w-7xl mx-auto">
-            <h2 class="text-7xl font-black text-center mb-32">Your Audit Dashboard</h2>
-
-            <!-- Registered User: Website Management & Scheduling -->
-            <div id="user-dashboard" class="hidden mb-48">
-                <h3 class="text-6xl font-bold text-center mb-24">Website Management & Scheduling</h3>
-                <div class="grid md:grid-cols-2 gap-20 mb-32">
-                    <div class="card">
-                        <h4 class="text-5xl font-bold mb-12">Add New Website</h4>
-                        <form id="add-website-form" class="space-y-8">
-                            <input type="url" placeholder="Website URL" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4">
-                            <button type="submit" class="w-full bg-primary text-white py-6 rounded-2xl text-3xl font-bold">Add Website</button>
-                        </form>
-                    </div>
-                    <div class="card">
-                        <h4 class="text-5xl font-bold mb-12">Schedule Audit</h4>
-                        <form id="schedule-form" class="space-y-8">
-                            <select id="scheduled-website" class="w-full px-8 py-6 text-2xl rounded-2xl border-4">
-                                <option>Select Website</option>
-                            </select>
-                            <input type="time" id="schedule-time" required class="w-full px-8 py-6 text-2xl rounded-2xl border-4">
-                            <select id="schedule-timezone" class="w-full px-8 py-6 text-2xl rounded-2xl border-4">
-                                <option>Timezone</option>
-                            </select>
-                            <label class="flex items-center text-2xl"><input type="checkbox" id="daily-report" class="mr-4"> Daily Report</label>
-                            <label class="flex items-center text-2xl"><input type="checkbox" id="accumulated-report" class="mr-4"> Accumulated Report</label>
-                            <button type="submit" class="w-full bg-primary text-white py-6 rounded-2xl text-3xl font-bold">Save Schedule</button>
-                        </form>
-                    </div>
+            <h3 class="text-4xl font-black text-slate-900 mb-16 text-center">Detailed Audit Intelligence</h3>
+            <div id="metrics-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 </div>
-                <div class="card p-16">
-                    <h4 class="text-5xl font-bold text-center mb-12">Your Websites & Schedules</h4>
-                    <div id="websites-list" class="space-y-8 text-2xl"></div>
-                </div>
-            </div>
-
-            <!-- Full 235 Metrics Dashboard (Premium Blur for Non-Subscribed) -->
-            <div class="relative">
-                <div id="premium-blur" class="absolute inset-0 blur-premium hidden"></div>
-                <div class="mb-48">
-                    <h3 class="text-6xl font-bold text-center mb-24 gradient-primary text-white py-16 rounded-3xl shadow-3xl">Core Website Audit (1–185)</h3>
-                    <div class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-16">
-                        <!-- All 235 metrics with exact names, unique IDs, and charts -->
-                        <div id="metric-001" class="metric-card green"><h5 class="text-2xl font-bold mb-8">001. Site Health Score</h5><canvas id="chart-001"></canvas></div>
-                        <div id="metric-002" class="metric-card red"><h5 class="text-2xl font-bold mb-8">002. Total Errors</h5><canvas id="chart-002"></canvas></div>
-                        <div id="metric-003" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">003. Total Warnings</h5><canvas id="chart-003"></canvas></div>
-                        <div id="metric-004" class="metric-card green"><h5 class="text-2xl font-bold mb-8">004. Total Notices</h5><canvas id="chart-004"></canvas></div>
-                        <div id="metric-005" class="metric-card green"><h5 class="text-2xl font-bold mb-8">005. Total Crawled Pages</h5><canvas id="chart-005"></canvas></div>
-                        <div id="metric-006" class="metric-card green"><h5 class="text-2xl font-bold mb-8">006. Total Indexed Pages</h5><canvas id="chart-006"></canvas></div>
-                        <div id="metric-007" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">007. Issues Trend</h5><canvas id="chart-007"></canvas></div>
-                        <div id="metric-008" class="metric-card green"><h5 class="text-2xl font-bold mb-8">008. Crawl Budget Efficiency</h5><canvas id="chart-008"></canvas></div>
-                        <div id="metric-009" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">009. Orphan Pages Percentage</h5><canvas id="chart-009"></canvas></div>
-                        <div id="metric-010" class="metric-card green"><h5 class="text-2xl font-bold mb-8">010. Audit Completion Status</h5><canvas id="chart-010"></canvas></div>
-                        <div id="metric-011" class="metric-card green"><h5 class="text-2xl font-bold mb-8">011. HTTP 2xx Pages</h5><canvas id="chart-011"></canvas></div>
-                        <div id="metric-012" class="metric-card green"><h5 class="text-2xl font-bold mb-8">012. HTTP 3xx Pages</h5><canvas id="chart-012"></canvas></div>
-                        <div id="metric-013" class="metric-card red"><h5 class="text-2xl font-bold mb-8">013. HTTP 4xx Pages</h5><canvas id="chart-013"></canvas></div>
-                        <div id="metric-014" class="metric-card red"><h5 class="text-2xl font-bold mb-8">014. HTTP 5xx Pages</h5><canvas id="chart-014"></canvas></div>
-                        <div id="metric-015" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">015. Redirect Chains</h5><canvas id="chart-015"></canvas></div>
-                        <div id="metric-016" class="metric-card red"><h5 class="text-2xl font-bold mb-8">016. Redirect Loops</h5><canvas id="chart-016"></canvas></div>
-                        <div id="metric-017" class="metric-card red"><h5 class="text-2xl font-bold mb-8">017. Broken Internal Links</h5><canvas id="chart-017"></canvas></div>
-                        <div id="metric-018" class="metric-card red"><h5 class="text-2xl font-bold mb-8">018. Broken External Links</h5><canvas id="chart-018"></canvas></div>
-                        <div id="metric-019" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">019. robots.txt Blocked URLs</h5><canvas id="chart-019"></canvas></div>
-                        <div id="metric-020" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">020. Meta Robots Blocked URLs</h5><canvas id="chart-020"></canvas></div>
-                        <div id="metric-021" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">021. Non-Canonical Pages</h5><canvas id="chart-021"></canvas></div>
-                        <div id="metric-022" class="metric-card red"><h5 class="text-2xl font-bold mb-8">022. Missing Canonical Tags</h5><canvas id="chart-022"></canvas></div>
-                        <div id="metric-023" class="metric-card red"><h5 class="text-2xl font-bold mb-8">023. Incorrect Canonical Tags</h5><canvas id="chart-023"></canvas></div>
-                        <div id="metric-024" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">024. Sitemap Missing Pages</h5><canvas id="chart-024"></canvas></div>
-                        <div id="metric-025" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">025. Sitemap Not Crawled Pages</h5><canvas id="chart-025"></canvas></div>
-                        <div id="metric-026" class="metric-card red"><h5 class="text-2xl font-bold mb-8">026. Hreflang Errors</h5><canvas id="chart-026"></canvas></div>
-                        <div id="metric-027" class="metric-card red"><h5 class="text-2xl font-bold mb-8">027. Hreflang Conflicts</h5><canvas id="chart-027"></canvas></div>
-                        <div id="metric-028" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">028. Pagination Issues</h5><canvas id="chart-028"></canvas></div>
-                        <div id="metric-029" class="metric-card green"><h5 class="text-2xl font-bold mb-8">029. Crawl Depth Distribution</h5><canvas id="chart-029"></canvas></div>
-                        <div id="metric-030" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">030. Duplicate Parameter URLs</h5><canvas id="chart-030"></canvas></div>
-                        <div id="metric-031" class="metric-card red"><h5 class="text-2xl font-bold mb-8">031. Missing Title Tags</h5><canvas id="chart-031"></canvas></div>
-                        <div id="metric-032" class="metric-card red"><h5 class="text-2xl font-bold mb-8">032. Duplicate Title Tags</h5><canvas id="chart-032"></canvas></div>
-                        <div id="metric-033" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">033. Title Too Long</h5><canvas id="chart-033"></canvas></div>
-                        <div id="metric-034" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">034. Title Too Short</h5><canvas id="chart-034"></canvas></div>
-                        <div id="metric-035" class="metric-card red"><h5 class="text-2xl font-bold mb-8">035. Missing Meta Descriptions</h5><canvas id="chart-035"></canvas></div>
-                        <div id="metric-036" class="metric-card red"><h5 class="text-2xl font-bold mb-8">036. Duplicate Meta Descriptions</h5><canvas id="chart-036"></canvas></div>
-                        <div id="metric-037" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">037. Meta Too Long</h5><canvas id="chart-037"></canvas></div>
-                        <div id="metric-038" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">038. Meta Too Short</h5><canvas id="chart-038"></canvas></div>
-                        <div id="metric-039" class="metric-card red"><h5 class="text-2xl font-bold mb-8">039. Missing H1</h5><canvas id="chart-039"></canvas></div>
-                        <div id="metric-040" class="metric-card red"><h5 class="text-2xl font-bold mb-8">040. Multiple H1</h5><canvas id="chart-040"></canvas></div>
-                        <div id="metric-041" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">041. Duplicate Headings</h5><canvas id="chart-041"></canvas></div>
-                        <div id="metric-042" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">042. Thin Content Pages</h5><canvas id="chart-042"></canvas></div>
-                        <div id="metric-043" class="metric-card red"><h5 class="text-2xl font-bold mb-8">043. Duplicate Content Pages</h5><canvas id="chart-043"></canvas></div>
-                        <div id="metric-044" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">044. Low Text-to-HTML Ratio</h5><canvas id="chart-044"></canvas></div>
-                        <div id="metric-045" class="metric-card red"><h5 class="text-2xl font-bold mb-8">045. Missing Image Alt Tags</h5><canvas id="chart-045"></canvas></div>
-                        <div id="metric-046" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">046. Duplicate Alt Tags</h5><canvas id="chart-046"></canvas></div>
-                        <div id="metric-047" class="metric-card red"><h5 class="text-2xl font-bold mb-8">047. Large Uncompressed Images</h5><canvas id="chart-047"></canvas></div>
-                        <div id="metric-048" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">048. Pages Without Indexed Content</h5><canvas id="chart-048"></canvas></div>
-                        <div id="metric-049" class="metric-card red"><h5 class="text-2xl font-bold mb-8">049. Missing Structured Data</h5><canvas id="chart-049"></canvas></div>
-                        <div id="metric-050" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">050. Structured Data Errors</h5><canvas id="chart-050"></canvas></div>
-                        <div id="metric-051" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">051. Rich Snippet Warnings</h5><canvas id="chart-051"></canvas></div>
-                        <div id="metric-052" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">052. Missing Open Graph Tags</h5><canvas id="chart-052"></canvas></div>
-                        <div id="metric-053" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">053. Long URLs</h5><canvas id="chart-053"></canvas></div>
-                        <div id="metric-054" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">054. Uppercase URLs</h5><canvas id="chart-054"></canvas></div>
-                        <div id="metric-055" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">055. Non-SEO-Friendly URLs</h5><canvas id="chart-055"></canvas></div>
-                        <div id="metric-056" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">056. Too Many Internal Links</h5><canvas id="chart-056"></canvas></div>
-                        <div id="metric-057" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">057. Pages Without Incoming Links</h5><canvas id="chart-057"></canvas></div>
-                        <div id="metric-058" class="metric-card red"><h5 class="text-2xl font-bold mb-8">058. Orphan Pages</h5><canvas id="chart-058"></canvas></div>
-                        <div id="metric-059" class="metric-card red"><h5 class="text-2xl font-bold mb-8">059. Broken Anchor Links</h5><canvas id="chart-059"></canvas></div>
-                        <div id="metric-060" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">060. Redirected Internal Links</h5><canvas id="chart-060"></canvas></div>
-                        <div id="metric-061" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">061. NoFollow Internal Links</h5><canvas id="chart-061"></canvas></div>
-                        <div id="metric-062" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">062. Link Depth Issues</h5><canvas id="chart-062"></canvas></div>
-                        <div id="metric-063" class="metric-card green"><h5 class="text-2xl font-bold mb-8">063. External Links Count</h5><canvas id="chart-063"></canvas></div>
-                        <div id="metric-064" class="metric-card red"><h5 class="text-2xl font-bold mb-8">064. Broken External Links</h5><canvas id="chart-064"></canvas></div>
-                        <div id="metric-065" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">065. Anchor Text Issues</h5><canvas id="chart-065"></canvas></div>
-                        <div id="metric-066" class="metric-card red"><h5 class="text-2xl font-bold mb-8">066. Largest Contentful Paint</h5><canvas id="chart-066"></canvas></div>
-                        <div id="metric-067" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">067. First Contentful Paint</h5><canvas id="chart-067"></canvas></div>
-                        <div id="metric-068" class="metric-card red"><h5 class="text-2xl font-bold mb-8">068. Cumulative Layout Shift</h5><canvas id="chart-068"></canvas></div>
-                        <div id="metric-069" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">069. Total Blocking Time</h5><canvas id="chart-069"></canvas></div>
-                        <div id="metric-070" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">070. First Input Delay</h5><canvas id="chart-070"></canvas></div>
-                        <div id="metric-071" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">071. Speed Index</h5><canvas id="chart-071"></canvas></div>
-                        <div id="metric-072" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">072. Time to Interactive</h5><canvas id="chart-072"></canvas></div>
-                        <div id="metric-073" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">073. DOM Content Loaded</h5><canvas id="chart-073"></canvas></div>
-                        <div id="metric-074" class="metric-card red"><h5 class="text-2xl font-bold mb-8">074. Total Page Size</h5><canvas id="chart-074"></canvas></div>
-                        <div id="metric-075" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">075. Requests Per Page</h5><canvas id="chart-075"></canvas></div>
-                        <div id="metric-076" class="metric-card red"><h5 class="text-2xl font-bold mb-8">076. Unminified CSS</h5><canvas id="chart-076"></canvas></div>
-                        <div id="metric-077" class="metric-card red"><h5 class="text-2xl font-bold mb-8">077. Unminified JavaScript</h5><canvas id="chart-077"></canvas></div>
-                        <div id="metric-078" class="metric-card red"><h5 class="text-2xl font-bold mb-8">078. Render Blocking Resources</h5><canvas id="chart-078"></canvas></div>
-                        <div id="metric-079" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">079. Excessive DOM Size</h5><canvas id="chart-079"></canvas></div>
-                        <div id="metric-080" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">080. Third-Party Script Load</h5><canvas id="chart-080"></canvas></div>
-                        <div id="metric-081" class="metric-card red"><h5 class="text-2xl font-bold mb-8">081. Server Response Time</h5><canvas id="chart-081"></canvas></div>
-                        <div id="metric-082" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">082. Image Optimization</h5><canvas id="chart-082"></canvas></div>
-                        <div id="metric-083" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">083. Lazy Loading Issues</h5><canvas id="chart-083"></canvas></div>
-                        <div id="metric-084" class="metric-card red"><h5 class="text-2xl font-bold mb-8">084. Browser Caching Issues</h5><canvas id="chart-084"></canvas></div>
-                        <div id="metric-085" class="metric-card red"><h5 class="text-2xl font-bold mb-8">085. Missing GZIP / Brotli</h5><canvas id="chart-085"></canvas></div>
-                        <div id="metric-086" class="metric-card yellow"><h5 class="text-2xl font-bold mb-8">086. Resource Load Errors</h5><canvas id="chart-086"></canvas></div>
-                        <div id="metric-087" class="metric-card green"><h5 class="text-2xl font-bold mb-8">087. Mobile Friendly Test</h5><canvas id="chart-087"></canvas></div>
-                        <!-- ... continuing all metrics up to 235 with exact names ... -->
-                        <div id="metric-235" class="metric-card green"><h5 class="text-2xl font-bold mb-8">235. Overall Growth Readiness</h5><canvas id="chart-235"></canvas></div>
-                    </div>
-                </div>
-            </div>
         </div>
     </section>
 
-    <!-- Admin Panel -->
-    <section id="admin" class="py-32 px-8 hidden">
-        <div class="max-w-7xl mx-auto">
-            <h2 class="text-7xl font-black text-center mb-32">Admin Control Center</h2>
-            <div class="grid md:grid-cols-3 gap-20">
-                <div class="card">
-                    <h4 class="text-5xl font-bold mb-12">User Management</h4>
-                    <div id="admin-users" class="space-y-8 text-2xl"></div>
-                </div>
-                <div class="card">
-                    <h4 class="text-5xl font-bold mb-12">Audit Activity Logs</h4>
-                    <div id="admin-logs" class="space-y-8 text-2xl"></div>
-                </div>
-                <div class="card">
-                    <h4 class="text-5xl font-bold mb-12">System Health</h4>
-                    <div id="admin-health" class="space-y-8 text-2xl"></div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="gradient-primary text-white py-20 text-center">
-        <p class="text-5xl font-bold mb-8">FF Tech © December 27, 2025</p>
-        <p class="text-3xl">Professional Scheduled Audit & Reporting System • International Standard</p>
+    <footer class="bg-slate-950 text-slate-500 py-20 px-8 text-center border-t border-slate-900">
+        <p class="font-black text-white text-xl tracking-tighter mb-4 uppercase">FF Tech International</p>
+        <p class="text-xs font-bold uppercase tracking-widest opacity-50 mb-8">Professional Website Audit System v4.0</p>
+        <p>© 2025 FF Tech SaaS. All Rights Reserved.</p>
     </footer>
 
     <script>
-        // Role-based UI control, login/register modals, scheduling, backend integration
-        // All metric charts ready for Python to populate data and render
+        lucide.createIcons();
+        let currentToken = localStorage.getItem('token');
+        const API_BASE = ""; // Relative if hosted on same server
+
+        // UI Helpers
+        function toggleModal(id) { /* logic for login/reg modals */ }
+        
+        async function exportPDF() {
+            const url = document.getElementById('website-url').value;
+            window.open(`/export-pdf?url=${encodeURIComponent(url)}`, '_blank');
+        }
+
+        // Audit Flow Controller
+        document.getElementById('audit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('website-url').value;
+            
+            // Show Progress
+            document.getElementById('progress-section').classList.remove('hidden');
+            document.getElementById('hero').classList.add('hidden');
+            simulateProgress();
+
+            try {
+                const response = await fetch(`${API_BASE}/audit?url=${encodeURIComponent(url)}`, {
+                    headers: currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {}
+                });
+                const data = await response.json();
+                renderReport(data);
+            } catch (err) {
+                alert("Audit Failed. Please check the URL and try again.");
+            }
+        });
+
+        function simulateProgress() {
+            let p = 0;
+            const interval = setInterval(() => {
+                p += 5;
+                document.getElementById('p-crawl').value = p;
+                document.getElementById('crawl-pct').innerText = p + '%';
+                if (p >= 100) clearInterval(interval);
+            }, 150);
+        }
+
+        function renderReport(data) {
+            document.getElementById('progress-section').classList.add('hidden');
+            document.getElementById('summary-section').classList.remove('hidden');
+            document.getElementById('dashboard-section').classList.remove('hidden');
+
+            // Grade & Summary
+            document.getElementById('grade-badge').innerText = data.grade;
+            document.getElementById('exec-summary').innerText = data.summary;
+
+            // Lists
+            const renderList = (id, items) => {
+                const el = document.getElementById(id);
+                el.innerHTML = items.map(item => `<li>• ${item}</li>`).join('');
+            };
+            renderList('strengths-list', data.strengths);
+            renderList('weaknesses-list', data.weaknesses);
+            renderList('priority-list', data.priority);
+
+            // Category Chart
+            new Chart(document.getElementById('category-chart'), {
+                type: 'bar',
+                data: data.category_chart,
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // 250+ Metrics Injection
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = ''; // Clear previous
+            data.metrics.forEach(m => {
+                const card = document.createElement('div');
+                card.className = `metric-card ${m.severity}`;
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-[10px] font-black text-slate-400">METRIC #${String(m.num).padStart(3, '0')}</span>
+                        <div class="w-2 h-2 rounded-full ${m.severity === 'red' ? 'bg-red-500' : 'bg-emerald-500'}"></div>
+                    </div>
+                    <h5 class="text-sm font-bold text-slate-700 mb-4">System Signal #${m.num}</h5>
+                    <div class="chart-container"><canvas id="chart-m-${m.num}"></canvas></div>
+                `;
+                grid.appendChild(card);
+                
+                // Initialize sparkline for each metric
+                new Chart(document.getElementById(`chart-m-${m.num}`), {
+                    type: m.chart_type,
+                    data: m.chart_data,
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+                });
+            });
+        }
     </script>
 </body>
 </html>
