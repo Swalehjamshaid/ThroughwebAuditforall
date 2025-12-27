@@ -1,4 +1,8 @@
-
-# nixpacks.toml — safe minimal (optional)
 [phases.setup]
-# no custom packages; let Procfile/railway.json control the start command
+nixPkgs = ["python3", "gcc"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "uvicorn app:app --host 0.0.0.0 --port $PORT"
