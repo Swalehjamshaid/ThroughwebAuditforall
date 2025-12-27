@@ -1,3 +1,4 @@
+
 # app.py
 # FF Tech — Professional Web Audit Dashboard (International Standard)
 # Features:
@@ -47,15 +48,10 @@ from reportlab.graphics import renderPDF
 APP_NAME = "FF Tech — Professional AI Website Audit Platform"
 USER_AGENT = os.getenv("USER_AGENT", "FFTech-Audit/3.0 (+https://fftech.io)")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_demo.db")
-
-# REFINEMENT: Fix for Railway/Heroku Postgres URL prefix
-if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
 SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_hex(32))
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")
 
-# SMTP config (for scheduled emails)
+# SMTP config
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
@@ -406,9 +402,9 @@ def run_actual_audit(target_url: str) -> dict:
     if size_mb > 2.0: perf_score -= 35
     elif size_mb > 1.0: perf_score -= 20
     if ttfb_ms > 1500: perf_score -= 35
-    elif 800 < ttfb_ms <= 1500: perf_score -= 18
+    elif ttfb_ms > 800: perf_score -= 18
     if blocking_script_count > 3: perf_score -= 18
-    elif 0 < blocking_script_count <= 3: perf_score -= 10
+    elif blocking_script_count > 0: perf_score -= 10
     if stylesheet_count > 4: perf_score -= 6
 
     a11y_score = 100
@@ -469,7 +465,7 @@ def run_actual_audit(target_url: str) -> dict:
         "overall": overall
     }
 
-    # Executive summary (≈200 words)
+    # Executive summary
     max_depth = max(depth_counts) if depth_counts else 0
     exec_summary = (
         f"FF Tech audited {resp.url}, producing an overall health score of {overall}% (grade {grade}). "
@@ -557,7 +553,7 @@ def run_actual_audit(target_url: str) -> dict:
     }
 
 # -----------------------------------------------
-# PDF (5 pages)
+# PDF helpers
 # -----------------------------------------------
 def draw_donut_gauge(c: canvas.Canvas, cx, cy, r, score):
     d = Drawing(r*2, r*2); p = Pie(); p.x=0; p.y=0; p.width=r*2; p.height=r*2
@@ -618,7 +614,7 @@ def generate_pdf_5pages(url: str, payload: dict) -> bytes:
     for p in payload.get("priority", [])[:5]: c.drawString(22*mm, y3, f"– {p}"); y3 -= 7*mm
     c.showPage()
 
-    # 4: Trend & Resources (overview)
+    # 4: Trend & Resources
     header("Trend & Resources (Overview)")
     draw_bar(c, 20*mm, H - 120*mm, W - 40*mm, 60*mm, [f"W{i}" for i in range(1,9)], [max(50,min(100,payload["overall"]+(i%3)*5)) for i in range(1,9)], "#10b981")
     draw_bar(c, 20*mm, 40*mm, W - 40*mm, 70*mm, ["Size (MB)","Requests","Blocking JS","Stylesheets","TTFB (ms)"], [3.0, 80, 3, 4, 900], "#f59e0b")
@@ -646,8 +642,8 @@ class LoginIn(BaseModel):
 
 class ScheduleIn(BaseModel):
     website_url: str
-    time_of_day: str          # "HH:MM"
-    timezone: str             # e.g., "Asia/Karachi"
+    time_of_day: str         # "HH:MM"
+    timezone: str            # e.g., "Asia/Karachi"
     daily_report: bool = True
     accumulated_report: bool = True
     enabled: bool = True
@@ -664,17 +660,10 @@ class SettingsIn(BaseModel):
 # FastAPI app + CORS
 # -----------------------------------------------
 app = FastAPI(title=APP_NAME)
-
-# --- PLACE HEALTH CHECK HERE ---
-@app.get("/health", response_class=JSONResponse)
-async def health_check():
-    """Railway pings this to see if the container is alive."""
-    return {"status": "healthy", "time": datetime.utcnow().isoformat()}
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # -----------------------------------------------
-# Embedded world‑class HTML (single-page; CDN-only)
+# Embedded world‑class HTML (CDN-only)
 # -----------------------------------------------
 INDEX_HTML = r"""<!DOCTYPE html>
 <html lang='en' data-theme='light'>
@@ -682,12 +671,11 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <meta charset='UTF-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <title>FF Tech — Professional Audit</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script>tailwind.config={theme:{extend:{fontFamily:{inter:['Inter','system-ui','sans-serif']},colors:{brand:{50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81'},emerald:{500:'#10b981'},amber:{500:'#f59e0b'},rose:{500:'#ef4444'}}}}}</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
-<link rel="preconnect" href="https://fonts.gstatic.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+https://cdn.tailwindcss.com</script>
+https://cdn.jsdelivr.net/npm/chart.js@4.4.1</script>
+https://fonts.gstatic.com
+https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap
+https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
 <style>
 body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 700px at 10% 10%,#eef2ff,transparent),radial-gradient(1200px 700px at 90% 90%,#f1f5f9,transparent)}
 .glass{background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.35);backdrop-filter:saturate(140%) blur(10px);box-shadow:0 25px 50px rgba(0,0,0,.22);border-radius:24px}
@@ -711,9 +699,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:radial-gradient(1200px 
       </div>
     </div>
     <nav class='flex items-center gap-6'>
-      <a href='#' id='open-login'>Login</a>
-      <a href='#' id='open-register'>Register</a>
-      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> · <a href='#' id='logout'>Logout</a></span>
+      #Login</a>
+      #Register</a>
+      <span id='user-status' class='hidden'>Welcome, <span id='user-email'></span> · #Logout</a></span>
     </nav>
   </div>
 </header>
@@ -1043,6 +1031,11 @@ document.getElementById('subscribe-btn-panel').addEventListener('click',openChec
 @app.get("/", response_class=HTMLResponse)
 def home(): return HTMLResponse(INDEX_HTML)
 
+# --- Healthcheck (Railway) ---
+@app.get("/health", response_class=JSONResponse)
+def health():
+    return {"status":"ok","time": datetime.utcnow().isoformat()}
+
 # --- Public & Registered audit ---
 @app.get("/audit", response_class=JSONResponse)
 def audit(url: str = Query(..., description="Website URL to audit"),
@@ -1281,7 +1274,7 @@ def admin_audits(admin: User = Depends(require_admin), db=Depends(get_db)):
              "created_at": a.created_at.isoformat()} for a in audits]
 
 # -----------------------------------------------
-# Scheduler loop (daily/accumulated email delivery)
+# Scheduler loop
 # -----------------------------------------------
 async def scheduler_loop():
     await asyncio.sleep(3)
