@@ -1,1 +1,3 @@
-# This file can be empty; it just makes fftech_audit a package.
+
+# fftech_audit/__init__.py
+# Make fftech_audit a Python package
