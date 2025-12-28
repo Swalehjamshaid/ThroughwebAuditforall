@@ -10,3 +10,4 @@ jinja2
 python-dotenv
 alembic
 passlib[bcrypt]
+python-multipart
