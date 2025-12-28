@@ -1,85 +1,28 @@
 
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
-  <head>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <title>{{ title or "FF Tech AI • Website Audit" }}</title>
-    https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap
-    <style>
-      :root{
-        --surface:#0f172a; --card:#111827; --border:#334155; --text:#e2e8f0; --muted:#94a3b8; --link:#93c5fd;
-        --brand-blue:#2563eb; --brand-indigo:#4f46e5; --brand-green:#16a34a; --accent-graph:#2E86C1;
-      }
-      [data-theme="light"]{
-        --surface:#f7fafc; --card:#ffffff; --border:#e2e8f0; --text:#0f172a; --muted:#475569; --link:#2563eb;
-        --accent-graph:#2563eb;
-      }
-      body{margin:0;background:var(--surface);color:var(--text);font:16px/1.6 'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
-      a{color:var(--link);text-decoration:none}
-      .header{background:linear-gradient(90deg,#1e3a8a,#4338ca,#6d28d9);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 10px 28px rgba(0,0,0,.35)}
-      .container{max-width:1100px;margin:0 auto;padding:0 16px}
-      .btn{background:var(--brand-blue);color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
-      .btn.secondary{background:var(--border);color:var(--text)}
-      .btn.success{background:var(--brand-green);color:#022c22}
-      .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
-      .input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
-      .muted{color:var(--muted)}
-      .badge{display:inline-block;background:var(--border);color:var(--text);padding:6px 10px;border-radius:999px;margin-right:8px}
-      .progress{background:var(--border);border-radius:12px;height:14px;width:100%;overflow:hidden}
-      .progress > div{height:100%;background:linear-gradient(90deg,var(--brand-green),#22c55e);border-radius:12px;transition:width .4s ease}
-      .grid{display:grid;gap:16px}
-      .grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
-      .grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
-      .grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
-      /* donuts */
-      .donut{width:140px;height:140px;border-radius:50%;position:relative;margin:0 auto;background:conic-gradient(var(--brand-green) var(--p,0%), var(--border) 0)}
-      .donut::before{content:"";position:absolute;inset:18px;border-radius:50%;background:var(--card)}
-      .center{text-align:center}
-      /* table */
-      table{width:100%;border-collapse:collapse}
-      th,td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
-      thead tr{background:rgba(11,18,32,.6)}
-      tbody tr:hover{background:rgba(22,32,51,.35)}
-      th.sortable{cursor:pointer;user-select:none}
-      .sort-ind{margin-left:6px;color:var(--muted)}
-      /* overlay */
-      .overlay{position:fixed;inset:0;background:rgba(2,6,23,.6);display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px);z-index:1000}
-      .overlay.show{display:flex}
-      .overlay-card{background:#0b1220;border:1px solid var(--border);border-radius:16px;padding:24px;min-width:280px;color:#cbd5e1;box-shadow:0 14px 36px rgba(0,0,0,.5)}
-      .spinner{width:38px;height:38px;border:3px solid #93c5fd;border-top-color:transparent;border-radius:999px;animation:spin .9s linear infinite}
-      @keyframes spin{to{transform:rotate(360deg)}}
-    </style>
-    {% block head_extra %}{% endblock %}
-  </head>
-  <body>
-    <div id="overlay" class="overlay"><div class="overlay-card"><div class="spinner"></div><p style="margin-top:10px">Running audit… please wait</p></div></div>
-    <header class="header">
-      <div class="container" style="display:flex;justify-content:space-between;align-items:center">
-        <h1 style="margin:0;color:#fff;font-weight:800">FF TECH AI</h1>
-        <div>
-          <button class="btn secondary" onclick="toggleTheme()">Theme</button>
-          <button class="btn secondary" onclick="alert('Registration coming soon')">Registration</button>
-          <button class="btn" onclick="alert('Logged out')">Logout</button>
-        </div>
-      </div>
-    </header>
-    <main class="container">
-      {% block content %}{% endblock %}
-    </main>
-    {% block scripts %}{% endblock %}
-    <script>
-      // theme toggle (persist)
-      (function(){const t=localStorage.getItem('fftech_theme')||'dark';document.documentElement.setAttribute('data-theme',t)})();
-      function toggleTheme(){
-        const cur=document.documentElement.getAttribute('data-theme')||'dark';
-        const nxt=cur==='dark'?'light':'dark';
-        document.documentElement.setAttribute('data-theme',nxt);
-        localStorage.setItem('fftech_theme',nxt);
-      }
-      // overlay helpers (for progressive enhancement)
-      function showOverlay(){document.getElementById('overlay').classList.add('show')}
-      function hideOverlay(){document.getElementById('overlay').classList.remove('show')}
-    </script>
-  </body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+  <section class="center" style="margin-top:24px">
+    <h2 style="font-weight:800;margin:0">Audit any website in seconds</h2>
+    <p class="muted">Choose <strong>Open Audit URL</strong> or <strong>Registration</strong> for premium features.</p>
+    {% if error %}<p style="color:#ef4444">{{ error }}</p>{% endif %}
+  </section>
+
+  <div class="grid two" style="margin-top:20px">
+    <div class="card">
+      <h3 style="margin-top:0">Open Audit URL</h3>
+      /audit/open
+        <input class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required>
+        <div style="margin-top:10px"><button class="btn">Run Audit</button></div>
+      </form>
+      <p class="muted" style="margin-top:8px">No login required. View results instantly.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">Registration / Login</h3>
+      <p class="muted">Magic link &amp; OTP flows can be added here (coming soon).</p>
+      <button class="btn secondary" onclick="alert('Registration coming soon')">Send Magic Link</button>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:24px">Build: {{ build_marker }}</p>
+{% endblock %}
