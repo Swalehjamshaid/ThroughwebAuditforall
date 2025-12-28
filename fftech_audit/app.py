@@ -12,12 +12,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, EmailStr
 
-# Local modules (ensure these files exist and are correct)
-from db import (
+# ✅ Package-relative imports (fixes ModuleNotFoundError)
+from .db import (
     SessionLocal, get_db, Base, engine,
     User, Audit, Schedule, ensure_schedule_columns
 )
-from auth_email import (
+from .auth_email import (
     send_magic_link,
     verify_magic_link_and_issue_token,
     send_verification_code,
@@ -25,8 +25,8 @@ from auth_email import (
     verify_session_token,
     send_email_with_pdf,
 )
-from audit_engine import AuditEngine, METRIC_DESCRIPTORS, now_utc, is_valid_url
-from ui_and_pdf import build_pdf_report
+from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, now_utc, is_valid_url
+from .ui_and_pdf import build_pdf_report
 
 # ---------------- Config ----------------
 APP_NAME = "FF Tech AI Website Audit SaaS"
@@ -71,7 +71,7 @@ def home():
     if os.path.exists(template_path):
         return FileResponse(template_path)
 
-    # Fallback HTML if no template file exists
+    # ✅ Clean fallback HTML
     return HTMLResponse(
         """
         <!doctype html>
@@ -92,7 +92,7 @@ def home():
           <p>Service is running.</p>
           <ul>
             <li>/health/health</a> — Healthcheck</li>
-            <li><a href="/</a> — API Docs (Swagger)</li>
+            <li>/docs/docs</a> — API Docs (Swagger)</li>
           </ul>
         </body>
         </html>
