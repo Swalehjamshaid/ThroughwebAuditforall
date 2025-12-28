@@ -2,15 +2,16 @@
 {% extends "base.html" %}
 {% block content %}
 <section>
-  <h2 class="section-title" style="display:flex;align-items:center;gap:12px">
-    Audit Result
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <h2 class="section-title">Audit Result</h2>
     <span class="badge">Grade: {{ grade }}</span>
-  </h2>
+  </div>
   <p class="text-muted">URL: <strong>{{ url }}</strong></p>
+
   <div class="progress" style="margin-top:12px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
   <p class="text-muted" style="margin-top:6px">Score: {{ score }}%</p>
 
-  <!-- Severity -->
+  <!-- Severity badges -->
   <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
     <span class="badge">Errors: {{ severity.errors }}</span>
     <span class="badge">Warnings: {{ severity.warnings }}</span>
@@ -72,11 +73,17 @@
 </section>
 
 <script>
-  // Donuts
+  // Donuts (Chart.js)
   (function(){
     const cat = {{ category|tojson }};
-    const donut = (el, val)=> new Chart(el, { type:'doughnut', data:{ labels:['Score','Remaining'],
-      datasets:[{ data:[val,100-val], backgroundColor: ['#16a34a','#334155'], borderWidth:0 }] }, options:{cutout:'70%'} });
+    const donut = (el, val)=> new Chart(el, {
+      type:'doughnut',
+      data:{
+        labels:['Score','Remaining'],
+        datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }]
+      },
+      options:{ cutout:'70%' }
+    });
     donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
     donut(document.getElementById('donutSEO'),    cat['On-Page SEO']);
     donut(document.getElementById('donutPerf'),   cat['Performance']);
@@ -84,7 +91,7 @@
     donut(document.getElementById('donutMobile'), cat['Mobile']);
   })();
 
-  // Sort/init
+  // Build table (using helpers in static/app.js)
   window.currentAudit = {
     metrics: (function(){
       const M = {};
