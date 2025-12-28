@@ -4,8 +4,8 @@ import os, ssl, json, time, hmac, hashlib, base64, random, string, datetime
 from typing import Dict, Any
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
+from passlib.hash import bcrypt
 
-# ✅ Relative import fixes
 from .db import User, MagicLink, EmailCode
 
 SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_SECRET_32+CHARS")
@@ -50,20 +50,21 @@ def verify_session_token(token: str) -> Dict[str, Any]:
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
 
-# ------------- Magic Link -------------
-def send_magic_link(email: str, request: Request, db: Session):
+# ------------- Verification Link -------------
+def send_verification_link(email: str, request: Request, db: Session):
     email = email.lower().strip()
-    token = generate_token({"email": email, "purpose": "magic"}, exp_minutes=30)
-    ml = MagicLink(email=email, token=token, expires_at=now_utc() + datetime.timedelta(minutes=30), used=False)
+    token = generate_token({"email": email, "purpose": "verify"}, exp_minutes=60*24)
+    ml = MagicLink(email=email, token=token, purpose="verify",
+                   expires_at=now_utc() + datetime.timedelta(days=1), used=False)
     db.add(ml); db.commit()
     verify_url = f"{str(request.base_url).rstrip('/')}/auth/verify-link?token={token}"
-    print(f"[DEV] Magic link for {email}: {verify_url}")
+    print(f"[DEV] Verification link for {email}: {verify_url}")
 
     if not (SMTP_HOST and SMTP_PORT and SMTP_USER and SMTP_PASS and SMTP_FROM):
         return
 
-    subject = "FF Tech Login Link"
-    body = f"Click to log in:\n\n{verify_url}\n\nThis link expires in 30 minutes."
+    subject = "FF Tech • Verify your account"
+    body = f"Hello,\n\nClick to verify your account:\n{verify_url}\n\nLink valid for 24 hours."
     message = f"From: {SMTP_FROM}\r\nTo: {email}\r\nSubject: {subject}\r\n\r\n{body}"
 
     import smtplib
@@ -72,7 +73,8 @@ def send_magic_link(email: str, request: Request, db: Session):
         server.starttls(context=context); server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(SMTP_FROM, [email], message)
 
-def verify_magic_link_and_issue_token(token: str, db: Session) -> str:
+def verify_magic_or_verify_link(token: str, db: Session) -> str:
+    """Accept both magic login and verify token; mark verified, issue session JWT."""
     try:
         h_b64, p_b64, s_b64 = token.split(".")
         signing_input = f"{h_b64}.{p_b64}".encode()
@@ -83,20 +85,21 @@ def verify_magic_link_and_issue_token(token: str, db: Session) -> str:
         payload = json.loads(base64url_decode(p_b64))
         if int(time.time()) > payload.get("exp", 0):
             raise ValueError("Expired")
-        if payload.get("purpose") != "magic":
-            raise ValueError("Invalid purpose")
+        purpose = payload.get("purpose")
         email = payload.get("email")
+        if purpose not in ("magic", "verify"):
+            raise ValueError("Invalid purpose")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid magic link: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid link: {e}")
 
     ml = db.query(MagicLink).filter(MagicLink.token == token).first()
     if not ml or ml.used or ml.expires_at < now_utc():
-        raise HTTPException(status_code=400, detail="Magic link invalid or expired")
+        raise HTTPException(status_code=400, detail="Link invalid or expired")
 
     ml.used = True
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        user = User(email=email, verified=True, plan="free")
+        user = User(email=email, verified=True, plan="free")  # may be created later in /auth/register
         db.add(user)
     else:
         user.verified = True
@@ -104,6 +107,16 @@ def verify_magic_link_and_issue_token(token: str, db: Session) -> str:
 
     session_token = generate_token({"email": email, "purpose": "session"})
     return session_token
+
+# ------------- Password Utilities -------------
+def hash_password(plain: str) -> str:
+    return bcrypt.hash(plain)
+
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.verify(plain, hashed)
+    except Exception:
+        return False
 
 # ------------- OTP (optional) -------------
 def send_verification_code(email: str, request: Request, db: Session):
