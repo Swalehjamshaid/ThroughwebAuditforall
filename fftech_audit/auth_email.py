@@ -1,18 +1,12 @@
 
-# auth_email.py
-"""
-Auth via Email:
-- Magic Link: send a secure link; user calls /auth/verify-link with the token; backend issues session token.
-- Optional OTP: send a 6-digit code; user submits code; backend verifies and issues token.
-- Session token: HMAC-signed JWT-like (stateless).
-- SMTP optional: if not configured, links/codes logged to server output for dev.
-"""
-
+# fftech_audit/auth_email.py
 import os, ssl, json, time, hmac, hashlib, base64, random, string, datetime
 from typing import Dict, Any
 from fastapi import HTTPException, Request
 from sqlalchemy.orm import Session
-from db import User, MagicLink, EmailCode
+
+# ✅ Relative import fixes
+from .db import User, MagicLink, EmailCode
 
 SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE_ME_SECRET_32+CHARS")
 SMTP_HOST = os.getenv("SMTP_HOST")
