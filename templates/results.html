@@ -1,0 +1,180 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <section style="margin-top:24px">
+    <h2 style="font-weight:800;margin:0">Audit Results</h2>
+    <p class="muted">URL: {{ url }}{{ url }}</a></p>
+  </section>
+
+  <div class="grid three" style="margin-top:16px">
+    <div class="card">
+      <h3 style="margin-top:0">Executive Summary</h3>
+      <p>{{ summary }}</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Score &amp; Grade</h3>
+      <div>
+        <span class="badge">Score: {{ score }}%</span>
+        <span class="badge">Grade: {{ grade }}</span>
+      </div>
+      <div class="progress" style="margin-top:8px"><div style="width: {{ score }}%"></div></div>
+      <div style="margin-top:12px">
+        <canvas id="catBar" height="120"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Severity</h3>
+      <div>
+        <span class="badge">Errors: {{ severity.errors }}</span>
+        <span class="badge">Warnings: {{ severity.warnings }}</span>
+        <span class="badge">Notices: {{ severity.notices }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">Category Overview</h3>
+    <div class="grid five" style="margin-top:8px">
+      <div class="center">
+        <div class="donut" style="--p: {{ category['Crawlability'] }}%"></div>
+        <div class="muted" style="margin-top:6px">Crawlability ({{ category['Crawlability']|int }}%)</div>
+      </div>
+      <div class="center">
+        <div class="donut" style="--p: {{ category['On-Page SEO'] }}%"></div>
+        <div class="muted" style="margin-top:6px">On‑Page SEO ({{ category['On-Page SEO']|int }}%)</div>
+      </div>
+      <div class="center">
+        <div class="donut" style="--p: {{ category['Performance'] }}%"></div>
+        <div class="muted" style="margin-top:6px">Performance ({{ category['Performance']|int }}%)</div>
+      </div>
+      <div class="center">
+        <div class="donut" style="--p: {{ category['Security'] }}%"></div>
+        <div class="muted" style="margin-top:6px">Security ({{ category['Security']|int }}%)</div>
+      </div>
+      <div class="center">
+        <div class="donut" style="--p: {{ category['Mobile'] }}%"></div>
+        <div class="muted" style="margin-top:6px">Mobile ({{ category['Mobile']|int }}%)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">Report</h3>
+    {% if allow_pdf %}
+      /api/report/open.pdf
+        <input type="hidden" name="url" value="{{ url }}">
+        <button class="btn success">Download PDF</button>
+      </form>
+    {% else %}
+      <button class="btn success" disabled title="Sign in to download PDF">Download PDF (Sign‑in required)</button>
+      <p class="muted" style="margin-top:6px">Open Audit users can view results only.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">All Metrics (1–200)</h3>
+    <div style="margin:8px 0">
+      <input id="filterText" class="input" placeholder="Filter by name/category/value…" oninput="filterMetrics()">
+    </div>
+    <table id="metricsTable">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="id">ID <span class="sort-ind"></span></th>
+          <th class="sortable" data-col="name">Name <span class="sort-ind"></span></th>
+          <th class="sortable" data-col="category">Category <span class="sort-ind"></span></th>
+          <th class="sortable" data-col="value">Value <span class="sort-ind"></span></th>
+          <th class="sortable" data-col="detail">Detail <span class="sort-ind"></span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr data-name="{{ r.name|lower }}" data-cat="{{ r.category|lower }}" data-val="{{ r.value|string|lower }}">
+            <td>{{ r.id }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.category }}</td>
+            <td>{{ r.value }}</td>
+            <td>{{ r.detail }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p id="metricsCount" class="muted" style="margin-top:6px">Showing {{ rows|length }} metrics</p>
+  </div>
+
+  <p class="muted" style="margin-top:24px">Build: {{ build_marker }}</p>
+{% endblock %}
+
+{% block scripts %}
+  <!-- Minimal JS for sorting, filtering, bar chart -->
+  https://cdn.jsdelivr.net/npm/chart.js</script>
+  <script>
+    // category bar chart
+    (function(){
+      const data = {
+        labels: ["Crawlability","On-Page SEO","Performance","Security","Mobile"],
+        datasets: [{ data: [
+          {{ category['Crawlability']|int }},
+          {{ category['On-Page SEO']|int }},
+          {{ category['Performance']|int }},
+          {{ category['Security']|int }},
+          {{ category['Mobile']|int }}
+        ], backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--accent-graph').trim() || '#2E86C1', borderRadius:6 }]
+      };
+      new Chart(document.getElementById('catBar'), { type:'bar', data, options:{ scales:{ y:{ min:0, max:100 } } } });
+    })();
+
+    // sorting
+    let sortState = { col: 'id', dir: 'asc' };
+    const table = document.getElementById('metricsTable');
+    const tbody = table.querySelector('tbody');
+    function compare(a,b,col,dir){
+      const idx = {id:0,name:1,category:2,value:3,detail:4}[col];
+      let va = a.children[idx].textContent, vb = b.children[idx].textContent;
+      if (col === 'id'){ return (dir==='asc') ? (parseInt(va)-parseInt(vb)) : (parseInt(vb)-parseInt(va)); }
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)){ return (dir==='asc') ? (na-nb) : (nb-na); }
+      va = va.toLowerCase(); vb = vb.toLowerCase();
+      return (dir==='asc') ? va.localeCompare(vb) : vb.localeCompare(va);
+    }
+    function applySort(){
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      rows.sort((a,b)=>compare(a,b,sortState.col,sortState.dir));
+      rows.forEach(r=>tbody.appendChild(r));
+      updateSortIndicators();
+      updateCount();
+    }
+    function updateSortIndicators(){
+      document.querySelectorAll('th.sortable .sort-ind').forEach(el=>el.textContent='');
+      const active = document.querySelector(`th.sortable[data-col="${sortState.col}"] .sort-ind`);
+      if (active) active.textContent = sortState.dir==='asc' ? '▲' : '▼';
+    }
+    function updateCount(){
+      const visible = Array.from(tbody.querySelectorAll('tr')).filter(tr=>tr.style.display!=='none').length;
+      document.getElementById('metricsCount').textContent = `Showing ${visible} metrics • Sorted by ${sortState.col} (${sortState.dir})`;
+    }
+    document.querySelectorAll('th.sortable').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const col = th.dataset.col;
+        if (sortState.col === col){ sortState.dir = sortState.dir==='asc'?'desc':'asc'; }
+        else { sortState.col = col; sortState.dir = 'asc'; }
+        applySort();
+      });
+    });
+    applySort();
+
+    // filter
+    function filterMetrics(){
+      const q = (document.getElementById('filterText').value||'').trim().toLowerCase();
+      const rows = tbody.querySelectorAll('tr');
+      let shown = 0;
+      rows.forEach(tr=>{
+        const match = !q || tr.dataset.name.includes(q) || tr.dataset.cat.includes(q) || tr.dataset.val.includes(q);
+        tr.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      document.getElementById('metricsCount').textContent =
+        `Showing ${shown} metrics • Sorted by ${sortState.col} (${sortState.dir})`;
+    }
+    window.filterMetrics = filterMetrics;
+  </script>
+{% endblock %}
