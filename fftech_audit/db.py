@@ -31,7 +31,9 @@ def get_db():
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
+    name = Column(String(255), default="")
     email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), default="")  # bcrypt hash
     verified = Column(Boolean, default=False)
     plan = Column(String(32), default="free")
     audits_count = Column(Integer, default=0)
@@ -54,7 +56,7 @@ class Schedule(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url = Column(String(2048), nullable=False)
-    frequency = Column(String(32), default="weekly")
+    frequency = Column(String(32), default="weekly")  # 'daily' or 'weekly'
     enabled = Column(Boolean, default=True)
     next_run_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -63,6 +65,7 @@ class MagicLink(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String(255), index=True, nullable=False)
     token = Column(String(512), nullable=False)
+    purpose = Column(String(32), default="magic")  # magic or verify
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
@@ -111,7 +114,26 @@ def ensure_schedule_columns():
             except Exception as e:
                 print(f"[DB] DDL failed '{ddl}': {e}")
 
+def ensure_user_columns():
+    """Ensure name & password_hash exist for legacy DBs."""
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    existing = {col["name"] for col in insp.get_columns("users")}
+    ddls = []
+    if "name" not in existing:
+        ddls.append("ALTER TABLE users ADD COLUMN name TEXT;")
+    if "password_hash" not in existing:
+        ddls.append("ALTER TABLE users ADD COLUMN password_hash TEXT;")
+    with engine.begin() as conn:
+        for ddl in ddls:
+            try:
+                conn.execute(text(ddl)); print(f"[DB] Added column: {ddl}")
+            except Exception as e:
+                print(f"[DB] DDL failed '{ddl}': {e}")
+
 try:
     ensure_schedule_columns()
+    ensure_user_columns()
 except Exception as e:
-    print(f"[DB] ensure_schedule_columns failed: {e}")
+    print(f"[DB] ensure_* failed: {e}")
