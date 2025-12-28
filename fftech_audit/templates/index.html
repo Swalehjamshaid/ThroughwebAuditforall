@@ -5,19 +5,12 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>FF Tech AI • Website Audit</title>
-
-  <!-- Tailwind CSS -->
-  https://cdn.tailwindcss.com</script>
-  <!-- Chart.js -->
+  https://cdn.tailwindcss.com
   https://cdn.jsdelivr.net/npm/chart.js</script>
-  <!-- Google Font -->
-  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap
-
-  <!-- Custom styles -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&display=swap
   /static/app.css
 </head>
 <body class="bg-slate-900 text-slate-100 font-inter">
-  <!-- Full-screen audit overlay -->
   <div id="overlay" class="overlay hidden">
     <div class="overlay-card">
       <div class="loader-xl"></div>
@@ -25,131 +18,53 @@
     </div>
   </div>
 
-  <!-- Header -->
   <header class="header">
     <div class="container mx-auto px-4 py-5 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <span class="brand-dot"></span>
-        <h1 class="text-white text-2xl font-extrabold tracking-wide">FF TECH AI</h1>
-        <span class="text-blue-100 font-semibold">Website Audit</span>
-      </div>
-      <div class="flex items-center gap-2">
+      <h1 class="text-white text-2xl font-extrabold">FF TECH AI</h1>
+      <div class="flex gap-2">
         <button class="btn-secondary" onclick="showLogin()">Login</button>
         <button class="btn-primary" onclick="logout()">Logout</button>
       </div>
     </div>
   </header>
 
-  <!-- Hero -->
   <section class="container mx-auto px-4 mt-8 text-center">
-    <h2 class="text-3xl md:text-4xl font-extrabold leading-tight">Audit any website in seconds</h2>
-    <p class="text-slate-400 mt-3">
-      Choose <strong>Open URL</strong> for instant checks, or <strong>Login</strong> for history, PDF exports & scheduling.
-    </p>
+    <h2 class="text-3xl font-extrabold">Audit any website in seconds</h2>
+    <p class="text-slate-400 mt-3">Choose <strong>Open URL</strong> or <strong>Login</strong> for advanced features.</p>
   </section>
 
-  <!-- Two Options -->
   <main class="container mx-auto px-4 py-8">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Open URL -->
       <div class="card glass">
-        <div class="flex items-center justify-between">
-          <h3 class="section-title">Open URL</h3>
-        </div>
+        <h3 class="section-title">Open URL</h3>
         <form onsubmit="runOpenAudit(event)" class="mt-4 space-y-3">
           <input id="urlOpen" class="input" type="url" placeholder="https://example.com" required />
           <button id="btnOpen" class="btn-primary w-full">Run Audit</button>
-          <p class="muted text-center">No login required.</p>
         </form>
       </div>
 
-      <!-- Login -->
       <div class="card glass">
         <h3 class="section-title">Login (Magic Link / OTP)</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          <form onsubmit="requestLink(event)" class="space-y-3">
-            <label class="label">Send magic link</label>
-            <input id="emailInput" type="email" class="input" placeholder="you@example.com" required />
-            <button class="btn-secondary w-full">Send Magic Link</button>
-          </form>
-          <form onsubmit="requestCode(event)" class="space-y-3">
-            <label class="label">Send OTP code</label>
-            <input id="emailCode" type="email" class="input" placeholder="you@example.com" required />
-            <button class="btn-secondary w-full">Send Code</button>
-          </form>
-          <form onsubmit="verifyCode(event)" class="space-y-3 md:col-span-2">
-            <label class="label">Verify & Login</label>
-            <input id="codeInput" class="input" minlength="4" maxlength="8" placeholder="Enter code" required />
-            <button class="btn-success w-full">Verify Code & Login</button>
-          </form>
-        </div>
-        <p class="muted mt-3">Logged-in users get saved history, PDF exports & scheduling.</p>
+        <form onsubmit="requestLink(event)" class="space-y-3">
+          <input id="emailInput" type="email" class="input" placeholder="you@example.com" required />
+          <button class="btn-secondary w-full">Send Magic Link</button>
+        </form>
       </div>
     </div>
 
-    <!-- Results -->
     <section id="results" class="space-y-6 mt-10 hidden">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="card">
-          <h4 class="section-subtitle">Executive Summary</h4>
-          <p id="summary" class="prose-sm prose-invert leading-relaxed mt-2"></p>
-        </div>
-        <div class="card">
-          <h4 class="section-subtitle">Score & Grade</h4>
-          <div id="scoreGrade" class="mt-2 flex flex-wrap items-center gap-2"></div>
-          <div class="progress mt-3"><div id="scoreBar" class="progress-fill" style="width:0%"></div></div>
-          <canvas id="catChart" height="160" class="mt-4"></canvas>
-        </div>
-        <div class="card">
-          <h4 class="section-subtitle">Severity</h4>
-          <div id="severity" class="mt-2 flex flex-wrap gap-2"></div>
-        </div>
-      </div>
-
       <div class="card">
-        <h4 class="section-subtitle">Category Charts</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
-          <canvas id="chartCrawl"></canvas>
-          <canvas id="chartSEO"></canvas>
-          <canvas id="chartPerf"></canvas>
-          <canvas id="chartSec"></canvas>
-          <canvas id="chartMobile"></canvas>
-        </div>
+        <h4 class="section-subtitle">Executive Summary</h4>
+        <p id="summary" class="mt-2"></p>
       </div>
-
-      <div class="card overflow-x-auto">
-        <div class="flex items-center justify-between">
-          <h4 class="section-subtitle">All Metrics</h4>
-          <button class="btn-secondary" onclick="exportMetricsCSV()">Export CSV</button>
-        </div>
-        <table class="table mt-3">
-          <thead>
-            <tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr>
-          </thead>
-          <tbody id="metricsTable"></tbody>
-        </table>
-      </div>
-
       <div class="card">
-        <div class="flex items-center justify-between">
-          <h4 class="section-subtitle">My Audit History</h4>
-          <button class="btn-secondary" onclick="loadHistory()">Refresh</button>
-        </div>
-        <div class="overflow-x-auto mt-3">
-          <table class="table">
-            <thead>
-              <tr><th>ID</th><th>URL</th><th>Score</th><th>Grade</th><th>Date</th><th>PDF</th></tr>
-            </thead>
-            <tbody id="historyTable"></tbody>
-          </table>
-        </div>
+        <h4 class="section-subtitle">Score & Grade</h4>
+        <div id="scoreGrade" class="mt-2"></div>
+        <div class="progress mt-3"><div id="scoreBar" class="progress-fill" style="width:0%"></div></div>
+        <canvas id="catChart" height="160" class="mt-4"></canvas>
       </div>
     </section>
   </main>
-
-  <footer class="container mx-auto px-4 py-8 text-center text-slate-400">
-    FF Tech • /healthHealth</a> • /docsDocs</a>
-  </footer>
 
   /static/app.js</script>
 </body>
