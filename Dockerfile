@@ -8,19 +8,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install dependencies
+# Install Python dependencies (requirements.txt lives inside fftech_audit/)
 COPY fftech_audit/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source + start script
+# Copy source code
 COPY . .
+
+# Copy and enable start script (handles PORT correctly)
 COPY start.sh .
 RUN chmod +x start.sh
 
-# Optional: ensure Python can resolve packages from /app
-# ENV PYTHONPATH=/app
-
 EXPOSE 8080
 
-# Run via script (guarantees $PORT expansion)
+# Entrypoint: use our script so $PORT expands properly everywhere
 CMD ["./start.sh"]
+``
