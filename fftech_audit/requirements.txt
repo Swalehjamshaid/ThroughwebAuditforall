@@ -1,21 +1,12 @@
 
-# Core Framework
-fastapi
-uvicorn
+fastapi==0.115.2
+uvicorn[standard]==0.32.0
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
+requests==2.32.3
+reportlab==4.2.5
 
-# Database ORM
-sqlalchemy
-
-# Postgres Driver (required for Railway Postgres)
-psycopg2-binary
-
-# HTTP Requests (for audit engine)
-requests
-
-# PDF Generation
-reportlab
-
-# Optional Extras (recommended for production)
-python-dotenv       # For environment variable management
-alembic             # For database migrations
-jinja2              # If you plan to use templates later
+# Optional extras
+python-dotenv==1.0.1
+alembic==1.13.2
+jinja2==3.1.4
