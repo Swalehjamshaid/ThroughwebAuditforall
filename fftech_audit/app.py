@@ -8,6 +8,9 @@ import threading
 import time
 from typing import Dict, Any, List
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Depends, Query, Request, Form, Body
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,13 +32,14 @@ from .auth_email import (
     hash_password,
     verify_password,
     send_email_with_pdf,
+    generate_token,  # ensure imported
 )
 from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, now_utc, is_valid_url
 from .ui_and_pdf import build_pdf_report
 
 APP_NAME = "FF Tech AI Website Audit"
 PORT = int(os.getenv("PORT", "8080"))
-FREE_AUDIT_LIMIT = 10
+FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDITS_LIMIT", "10"))
 SCHEDULER_SLEEP = int(os.getenv("SCHEDULER_INTERVAL", "60"))
 
 app = FastAPI(title=APP_NAME, version="4.0", description="SSR + API")
@@ -91,22 +95,19 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
     category = metrics[8]["value"]
     severity = metrics[7]["value"]
 
-    # build rows for SSR table
     rows: List[Dict[str, Any]] = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": "(Unknown)", "category": "-"})
         cell = metrics.get(pid, {"value": "N/A", "detail": ""})
-        val = cell["value"]
         rows.append({
             "id": pid,
             "name": desc["name"],
             "category": desc["category"],
-            "value": val,
+            "value": cell["value"],
             "detail": cell.get("detail", "")
         })
 
-    allow_pdf = False  # open users cannot download
-
+    allow_pdf = False  # Open users cannot download
     return templates.TemplateResponse(
         "results.html",
         {
@@ -129,12 +130,12 @@ def api_audit_open(payload: Dict[str, str] = Body(...)):
     url = payload.get("url")
     if not url or not is_valid_url(url):
         raise HTTPException(status_code=400, detail="Invalid URL")
+
     eng = AuditEngine(url)
     metrics = eng.compute_metrics()
     score = metrics[1]["value"]
     grade = metrics[2]["value"]
 
-    # store anonymous audit (optional)
     db = next(get_db())
     audit = Audit(user_id=None, url=url, metrics_json=json.dumps(metrics), score=score, grade=grade)
     db.add(audit); db.commit()
@@ -146,15 +147,16 @@ def api_audit_open(payload: Dict[str, str] = Body(...)):
 def api_metric_descriptors():
     return METRIC_DESCRIPTORS
 
-# ---------------- PDF (Open snapshot via POST) ----------------
-# Keep for development; disable in production
+# ---------------- PDF (Open snapshot via POST; dev only) ----------------
 @app.post("/api/report/open.pdf")
 def report_open_pdf_api(req: Dict[str, str]):
     url = req.get("url")
     if not url or not is_valid_url(url):
         raise HTTPException(status_code=400, detail="Invalid URL")
+
     eng = AuditEngine(url)
     metrics = eng.compute_metrics()
+
     class _Transient:
         id = 0
         user_id = None
@@ -162,6 +164,7 @@ def report_open_pdf_api(req: Dict[str, str]):
         metrics_json = json.dumps(metrics)
         score = metrics[1]["value"]
         grade = metrics[2]["value"]
+
     pdf = build_pdf_report(_Transient, metrics)
     return StreamingResponse(
         io.BytesIO(pdf),
@@ -181,13 +184,12 @@ def require_user(credentials: HTTPAuthorizationCredentials = Depends(security),
         raise HTTPException(status_code=403, detail="Email not verified")
     return user
 
-# ---------------- Registration (SSR + API) ----------------
+# ---------------- Registration (SSR) ----------------
 @app.get("/auth/register", response_class=HTMLResponse)
 def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
 
-class RegisterBody(Dict[str, str]): ...
-@app.post("/auth/register")
+@app.post("/auth/register", response_class=HTMLResponse)
 def auth_register(request: Request,
                   name: str = Form(...),
                   email: str = Form(...),
@@ -218,7 +220,6 @@ def auth_register(request: Request,
 @app.get("/auth/verify-link")
 def auth_verify_link(token: str = Query(...), db: Session = Depends(get_db)):
     session_token = verify_magic_or_verify_link(token, db)
-    # For simplicity, show success and instruct user to copy token (frontend can call this via fetch)
     return {"token": session_token, "message": "Verification successful"}
 
 # ---------------- Login (SSR) ----------------
@@ -235,17 +236,16 @@ def auth_login(request: Request, email: str = Form(...), password: str = Form(..
     if not user.verified:
         return templates.TemplateResponse("verify_required.html", {"request": request}, status_code=403)
 
-    session_token = verify_session_token(generate_token({"email": email, "purpose": "session"}))  # validate creation
-    # In SSR, we can show a simple message; in SPA, you'd return JSON. Here we'll show success:
-    return templates.TemplateResponse("verify_success.html", {"request": request, "message": "Login successful. Use magic link flow or API to store token."})
+    session_token = generate_token({"email": email, "purpose": "session"})
+    # Show success and token (frontend can store it in localStorage via fetch on /auth/verify-link)
+    return templates.TemplateResponse("verify_success.html", {"request": request, "message": f"Login successful. Token: {session_token}"})
 
-# ---------------- Magic link (optional) ----------------
+# ---------------- Magic/Verify link (API) ----------------
 @app.post("/auth/request-link")
 def auth_request_link(payload: Dict[str, str] = Body(...), request: Request = None, db: Session = Depends(get_db)):
     email = (payload.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=400, detail="Email required")
-    # reuse verification link as login link for simplicity (or build dedicated magic link)
     send_verification_link(email, request, db)
     return {"message": "Magic/Verification link sent. If SMTP is not configured, check server logs for the DEV link."}
 
@@ -310,12 +310,13 @@ def scheduler_loop():
                               score=metrics[1]["value"], grade=metrics[2]["value"])
                 db.add(audit); db.commit()
                 pdf = build_pdf_report(audit, metrics)
-                send_email_with_pdf(user.email,
-                                    subject="Your FF Tech Audit Report",
-                                    body=f"Attached: 5-page audit report for {sch.url}.",
-                                    pdf_bytes=pdf,
-                                    filename="FFTech_Audit.pdf")
-                # schedule next
+                send_email_with_pdf(
+                    user.email,
+                    subject="Your FF Tech Audit Report",
+                    body=f"Attached: 5-page audit report for {sch.url}.",
+                    pdf_bytes=pdf,
+                    filename="FFTech_Audit.pdf"
+                )
                 if sch.frequency == "daily":
                     sch.next_run_at = now + datetime.timedelta(days=1)
                 else:
@@ -330,3 +331,4 @@ def scheduler_loop():
 def start_scheduler():
     t = threading.Thread(target=scheduler_loop, daemon=True)
     t.start()
+``
