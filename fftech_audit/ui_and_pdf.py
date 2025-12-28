@@ -1,5 +1,5 @@
 
-# ui_and_pdf.py
+# fftech_audit/ui_and_pdf.py
 """
 5-page PDF generator (ReportLab)
 - Charts: vector bars & progress (no matplotlib)
