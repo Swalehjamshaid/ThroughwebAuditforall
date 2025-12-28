@@ -19,5 +19,5 @@ RUN chmod +x start.sh
 
 EXPOSE 8080
 
-# Run via the script so $PORT is resolved
+# Run via the script (guarantees $PORT is expanded)
 CMD ["./start.sh"]
