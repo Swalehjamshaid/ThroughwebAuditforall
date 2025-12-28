@@ -5,21 +5,26 @@
   <meta charset="utf-8">
   <title>FF Tech AI • Website Audit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Google Fonts (Inter) -->
+  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap
+  <!-- Your app styles -->
   /static/app.css
+  <!-- Chart.js -->
   https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
+  <!-- Your app scripts -->
   /static/app.js</script>
 </head>
 <body class="font-inter bg-surface text-text">
   <header class="header" style="padding: 18px 24px; color: #fff;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <strong>FF Tech AI • Website Audit</strong>
+    <div style="display:flex;justify-content:space-between;align-items:center;max-width:1080px;margin:0 auto;">
+      <strong style="font-weight:800">FF Tech AI • Website Audit</strong>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn-secondary" onclick="toggleTheme()">Toggle Theme</button>
         <button class="btn-secondary" onclick="logout()">Logout</button>
       </div>
     </div>
   </header>
-  <main style="padding: 24px;">
+  <main style="padding: 24px; max-width: 1080px; margin: 0 auto;">
     {% block content %}{% endblock %}
   </main>
 
