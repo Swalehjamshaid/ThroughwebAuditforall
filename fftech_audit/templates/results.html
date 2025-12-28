@@ -1,0 +1,102 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h2 class="section-title" style="display:flex;align-items:center;gap:12px">
+    Audit Result
+    <span class="badge">Grade: {{ grade }}</span>
+  </h2>
+  <p class="text-muted">URL: <strong>{{ url }}</strong></p>
+  <div class="progress" style="margin-top:12px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
+  <p class="text-muted" style="margin-top:6px">Score: {{ score }}%</p>
+
+  <!-- Severity -->
+  <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+    <span class="badge">Errors: {{ severity.errors }}</span>
+    <span class="badge">Warnings: {{ severity.warnings }}</span>
+    <span class="badge">Notices: {{ severity.notices }}</span>
+  </div>
+
+  <!-- Category donuts -->
+  <div style="display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:16px;margin-top:16px">
+    <canvas id="donutCrawl"></canvas>
+    <canvas id="donutSEO"></canvas>
+    <canvas id="donutPerf"></canvas>
+    <canvas id="donutSec"></canvas>
+    <canvas id="donutMobile"></canvas>
+  </div>
+
+  <!-- Metrics table -->
+  <div style="margin-top:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <input id="filterText" class="input" placeholder="Filter metrics by name/category/value..." oninput="filterMetrics()" style="max-width:420px" />
+      <div style="display:flex;gap:8px">
+        <button class="btn-secondary" onclick="exportMetricsCSV()">Export CSV</button>
+        {% if allow_pdf %}
+          <button class="btn-primary" onclick="downloadPDF()">Download PDF</button>
+        {% else %}
+          <button class="btn-secondary" onclick="alert('Login & verify email to download PDF')">Download PDF</button>
+        {% endif %}
+      </div>
+    </div>
+    <div class="text-muted" id="metricsCount" style="margin-bottom:6px">Showing {{ rows|length }} metrics</div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="id">ID <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="name">Name <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="category">Category <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="value">Value <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="detail">Detail <span class="sort-indicator"></span></th>
+        </tr>
+      </thead>
+      <tbody id="metricsTable">
+        {% for r in rows %}
+          <tr data-name="{{ r.name|lower }}" data-cat="{{ r.category|lower }}" data-val="{{ r.value|string|lower }}">
+            <td>{{ r.id }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.category }}</td>
+            <td>
+              {% if r.value is mapping or r.value is sequence %}
+                {{ r.value|tojson }}
+              {% else %}
+                {{ r.value }}
+              {% endif %}
+            </td>
+            <td>{{ r.detail }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  // Donuts
+  (function(){
+    const cat = {{ category|tojson }};
+    const donut = (el, val)=> new Chart(el, { type:'doughnut', data:{ labels:['Score','Remaining'],
+      datasets:[{ data:[val,100-val], backgroundColor: ['#16a34a','#334155'], borderWidth:0 }] }, options:{cutout:'70%'} });
+    donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
+    donut(document.getElementById('donutSEO'),    cat['On-Page SEO']);
+    donut(document.getElementById('donutPerf'),   cat['Performance']);
+    donut(document.getElementById('donutSec'),    cat['Security']);
+    donut(document.getElementById('donutMobile'), cat['Mobile']);
+  })();
+
+  // Sort/init
+  window.currentAudit = {
+    metrics: (function(){
+      const M = {};
+      {% for r in rows %}
+        M[{{ r.id }}] = { value: {{ r.value|tojson }}, detail: "{{ r.detail|e }}" };
+      {% endfor %}
+      return M;
+    })()
+  };
+  fetch('/api/metrics/descriptors').then(r=>r.json()).then(desc=>{
+    window.currentDescriptors = desc;
+    initSortableHeaders();
+  });
+</script>
+{% endblock %}
