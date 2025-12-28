@@ -1,0 +1,27 @@
+
+# ---------------- Core App Settings ----------------
+DATABASE_URL=${{Postgres.DATABASE_URL}}   # Provided by Railway/Postgres
+APP_BASE_URL="https://throughwebauditforall-production.up.railway.app"
+SECRET_KEY="7fb8e12a9c3d4f5b6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9"
+USER_AGENT="FFTech-Audit/3.0 (+https://fftech.io)"
+FREE_AUDITS_LIMIT="10"
+SCHEDULER_INTERVAL="60"   # Background scheduler loop interval in seconds
+
+# ---------------- SMTP Email Settings ----------------
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+EMAIL_SENDER="no-reply@fftech.io"
+
+# ---------------- Stripe Payment Settings ----------------
+SUBSCRIPTION_PRICE_USD="5"
+STRIPE_SUCCESS_URL="https://throughwebauditforall-production.up.railway.app/success"
+STRIPE_CANCEL_URL="https://throughwebauditforall-production.up.railway.app/cancel"
+STRIPE_SECRET_KEY="sk_test_placeholder"
+STRIPE_PRICE_ID="price_placeholder"
+STRIPE_WEBHOOK_SECRET="whsec_placeholder"
+
+# ---------------- Feature Flags ----------------
+AUTO_CREATE_STATIC="true"
+AUTO_CREATE_PAGES="true"
