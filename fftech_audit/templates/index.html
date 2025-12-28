@@ -4,9 +4,9 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>FF Tech AI Website Audit SaaS</title>
+  <title>FF Tech AI • Website Audit</title>
 
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS -->
   https://cdn.tailwindcss.com</script>
   <!-- Chart.js -->
   https://cdn.jsdelivr.net/npm/chart.js</script>
@@ -17,132 +17,125 @@
   /static/app.css
 </head>
 <body class="bg-slate-900 text-slate-100 font-inter">
+  <!-- Full-screen audit overlay -->
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="loader-xl"></div>
+      <p class="mt-3 text-slate-300">Running audit… please wait</p>
+    </div>
+  </div>
+
   <!-- Header -->
-  <header class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 shadow-lg">
-    <div class="container mx-auto px-4 py-4 flex items-center justify-between gap-3">
+  <header class="header">
+    <div class="container mx-auto px-4 py-5 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="brand-logo"></div>
-        <h1 class="text-white text-xl sm:text-2xl font-extrabold tracking-wide">FF TECH AI • Website Audit</h1>
+        <span class="brand-dot"></span>
+        <h1 class="text-white text-2xl font-extrabold tracking-wide">FF TECH AI</h1>
+        <span class="text-blue-100 font-semibold">Website Audit</span>
       </div>
       <div class="flex items-center gap-2">
-        <button class="btn-secondary" onclick="toggleTheme()" title="Toggle theme">Theme</button>
         <button class="btn-secondary" onclick="showLogin()">Login</button>
         <button class="btn-primary" onclick="logout()">Logout</button>
       </div>
     </div>
   </header>
 
-  <main class="container mx-auto px-4 py-6 space-y-6">
-    <!-- Toast -->
-    <div id="toast" class="toast hidden"></div>
+  <!-- Hero -->
+  <section class="container mx-auto px-4 mt-8 text-center">
+    <h2 class="text-3xl md:text-4xl font-extrabold leading-tight">Audit any website in seconds</h2>
+    <p class="text-slate-400 mt-3">
+      Choose <strong>Open URL</strong> for instant checks, or <strong>Login</strong> for history, PDF exports & scheduling.
+    </p>
+  </section>
 
-    <!-- Login Card -->
-    <section id="loginCard" class="card hidden">
-      <h2 class="section-title">Passwordless Login</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <form onsubmit="requestLink(event)" class="space-y-3">
-          <label class="label">Magic link to your email</label>
-          <input id="emailInput" type="email" class="input" placeholder="you@example.com" required />
-          <button class="btn-primary w-full">Send Magic Link</button>
-        </form>
-
-        <form onsubmit="requestCode(event)" class="space-y-3">
-          <label class="label">Send OTP code</label>
-          <input id="emailCode" type="email" class="input" placeholder="you@example.com" required />
-          <button class="btn-primary w-full">Send Code (OTP)</button>
-        </form>
-
-        <form onsubmit="verifyCode(event)" class="space-y-3">
-          <label class="label">Verify and Login</label>
-          <input id="codeInput" class="input" placeholder="Enter code" minlength="4" maxlength="8" required />
-          <button class="btn-success w-full">Verify Code &amp; Login</button>
-        </form>
-      </div>
-      <p class="muted mt-3">Use either magic link or OTP.</p>
-    </section>
-
-    <!-- Audit Forms -->
-    <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="card">
+  <!-- Two Options -->
+  <main class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Open URL -->
+      <div class="card glass">
         <div class="flex items-center justify-between">
-          <h2 class="section-title">Open Access Audit</h2>
-          <span id="loadingOpen" class="loader hidden"></span>
+          <h3 class="section-title">Open URL</h3>
         </div>
-        <form onsubmit="runOpenAudit(event)" class="space-y-3">
+        <form onsubmit="runOpenAudit(event)" class="mt-4 space-y-3">
           <input id="urlOpen" class="input" type="url" placeholder="https://example.com" required />
-          <button class="btn-primary">Run Audit</button>
+          <button id="btnOpen" class="btn-primary w-full">Run Audit</button>
+          <p class="muted text-center">No login required.</p>
         </form>
+      </div>
+
+      <!-- Login -->
+      <div class="card glass">
+        <h3 class="section-title">Login (Magic Link / OTP)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <form onsubmit="requestLink(event)" class="space-y-3">
+            <label class="label">Send magic link</label>
+            <input id="emailInput" type="email" class="input" placeholder="you@example.com" required />
+            <button class="btn-secondary w-full">Send Magic Link</button>
+          </form>
+          <form onsubmit="requestCode(event)" class="space-y-3">
+            <label class="label">Send OTP code</label>
+            <input id="emailCode" type="email" class="input" placeholder="you@example.com" required />
+            <button class="btn-secondary w-full">Send Code</button>
+          </form>
+          <form onsubmit="verifyCode(event)" class="space-y-3 md:col-span-2">
+            <label class="label">Verify & Login</label>
+            <input id="codeInput" class="input" minlength="4" maxlength="8" placeholder="Enter code" required />
+            <button class="btn-success w-full">Verify Code & Login</button>
+          </form>
+        </div>
+        <p class="muted mt-3">Logged-in users get saved history, PDF exports & scheduling.</p>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <section id="results" class="space-y-6 mt-10 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card">
+          <h4 class="section-subtitle">Executive Summary</h4>
+          <p id="summary" class="prose-sm prose-invert leading-relaxed mt-2"></p>
+        </div>
+        <div class="card">
+          <h4 class="section-subtitle">Score & Grade</h4>
+          <div id="scoreGrade" class="mt-2 flex flex-wrap items-center gap-2"></div>
+          <div class="progress mt-3"><div id="scoreBar" class="progress-fill" style="width:0%"></div></div>
+          <canvas id="catChart" height="160" class="mt-4"></canvas>
+        </div>
+        <div class="card">
+          <h4 class="section-subtitle">Severity</h4>
+          <div id="severity" class="mt-2 flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4 class="section-subtitle">Category Charts</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-3">
+          <canvas id="chartCrawl"></canvas>
+          <canvas id="chartSEO"></canvas>
+          <canvas id="chartPerf"></canvas>
+          <canvas id="chartSec"></canvas>
+          <canvas id="chartMobile"></canvas>
+        </div>
+      </div>
+
+      <div class="card overflow-x-auto">
+        <div class="flex items-center justify-between">
+          <h4 class="section-subtitle">All Metrics</h4>
+          <button class="btn-secondary" onclick="exportMetricsCSV()">Export CSV</button>
+        </div>
+        <table class="table mt-3">
+          <thead>
+            <tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr>
+          </thead>
+          <tbody id="metricsTable"></tbody>
+        </table>
       </div>
 
       <div class="card">
         <div class="flex items-center justify-between">
-          <h2 class="section-title">Registered Audit</h2>
-          <span id="loadingUser" class="loader hidden"></span>
-        </div>
-        <form onsubmit="runUserAudit(event)" class="space-y-3">
-          <input id="urlUser" class="input" type="url" placeholder="https://example.com" required />
-          <button class="btn-primary">Run &amp; Save Audit</button>
-        </form>
-        <p class="muted mt-2">Free plan: 10 audits; Pro: scheduling &amp; long-term history.</p>
-      </div>
-    </section>
-
-    <!-- Summary, Score, Severity -->
-    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="card">
-        <h3 class="section-subtitle">Executive Summary</h3>
-        <p id="summary" class="prose-sm prose-invert leading-relaxed"></p>
-      </div>
-
-      <div class="card">
-        <h3 class="section-subtitle">Score &amp; Grade</h3>
-        <div id="scoreGrade" class="mb-3 flex flex-wrap items-center gap-2"></div>
-        <div class="progress">
-          <div id="scoreBar" class="progress-fill" style="width:0%"></div>
-        </div>
-        <canvas id="catChart" height="160" class="mt-4"></canvas>
-      </div>
-
-      <div class="card">
-        <h3 class="section-subtitle">Severity</h3>
-        <div id="severity" class="flex flex-wrap gap-2"></div>
-      </div>
-    </section>
-
-    <!-- Category Charts -->
-    <section class="card">
-      <h3 class="section-subtitle mb-4">Category Charts</h3>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <canvas id="chartCrawl"></canvas>
-        <canvas id="chartSEO"></canvas>
-        <canvas id="chartPerf"></canvas>
-        <canvas id="chartSec"></canvas>
-        <canvas id="chartMobile"></canvas>
-      </div>
-    </section>
-
-    <!-- Metrics Table -->
-    <section class="card overflow-x-auto">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="section-subtitle">All Metrics (1–200)</h3>
-        <button class="btn-secondary" onclick="exportMetricsCSV()">Export CSV</button>
-      </div>
-      <table class="table">
-        <thead>
-          <tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr>
-        </thead>
-        <tbody id="metricsTable"></tbody>
-      </table>
-    </section>
-
-    <!-- History & Scheduling -->
-    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="card">
-        <div class="flex items-center justify-between">
-          <h3 class="section-subtitle">My Audit History</h3>
+          <h4 class="section-subtitle">My Audit History</h4>
           <button class="btn-secondary" onclick="loadHistory()">Refresh</button>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto mt-3">
           <table class="table">
             <thead>
               <tr><th>ID</th><th>URL</th><th>Score</th><th>Grade</th><th>Date</th><th>PDF</th></tr>
@@ -151,36 +144,10 @@
           </table>
         </div>
       </div>
-
-      <div class="card">
-        <h3 class="section-subtitle">Scheduling (Pro)</h3>
-        <form onsubmit="createSchedule(event)" class="space-y-3">
-          <input id="scheduleUrl" class="input" type="url" placeholder="https://example.com" required />
-          <select id="scheduleFreq" class="input">
-            <option value="daily">daily</option>
-            <option value="weekly" selected>weekly</option>
-            <option value="monthly">monthly</option>
-          </select>
-          <button class="btn-primary">Create Schedule</button>
-        </form>
-        <div class="flex items-center justify-between mt-3">
-          <button class="btn-secondary" onclick="listSchedules()">List Schedules</button>
-          <span id="schedulesCount" class="muted"></span>
-        </div>
-        <ul id="schedules" class="mt-3 space-y-2"></ul>
-        <p class="muted mt-2">Scheduled audits email PDFs if SMTP is configured.</p>
-      </div>
     </section>
   </main>
 
   <!-- Footer -->
-  <footer class="container mx-auto px-4 py-6 text-center text-slate-400">
-    FF Tech • API-driven • Charts by Chart.js •
-    /healthHealth</a> •
-    /docsDocs</a>
-  </footer>
-
-  <!-- App script -->
-  /static/app.js</script>
-</body>
+  <footer class="container mx-auto px-4 py-8 text-center text-slate-400">
+    FF Tech • /healthHealth</a> • <a class="underline hover:text-slate-200" href="/docs</body>
 </html>
