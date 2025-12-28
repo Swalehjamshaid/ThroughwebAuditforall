@@ -39,12 +39,12 @@ SCHEDULER_SLEEP = int(os.getenv("SCHEDULER_INTERVAL", "60"))  # seconds
 app = FastAPI(
     title=APP_NAME,
     version="3.3.2",
-    description="Main entrypoint integrating DB, Auth (magic link + OTP), Metrics, PDF & Scheduler"
+    description="Main entrypoint integrating DB, Auth, Metrics, PDF & Scheduler"
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 security = HTTPBearer()
 
-# Optional static mount (if you have a /static folder one level up)
+# ✅ Mount static from repo root: /static
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -61,42 +61,17 @@ except Exception as e:
 def health():
     return {"status": "ok", "service": APP_NAME, "time": now_utc().isoformat()}
 
-# ---------------- Root (fixes 404 on GET /) ----------------
+# ---------------- Root: serve the template ----------------
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """Serve templates/index.html if present; otherwise a minimal HTML page."""
+    """
+    Serve templates/index.html (world-class landing).
+    """
     template_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
     if os.path.exists(template_path):
+        # NOTE: FileResponse sets correct headers and streams file
         return FileResponse(template_path)
-
-    # Fallback HTML
-    return HTMLResponse(
-        """
-        <!doctype html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8"/>
-          <meta name="viewport" content="width=device-width,initial-scale=1"/>
-          <title>FF Tech AI Website Audit SaaS</title>
-          <style>
-            body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;padding:24px}
-            a{color:#2563eb;text-decoration:none}
-            a:hover{text-decoration:underline}
-            ul{line-height:1.8}
-          </style>
-        </head>
-        <body>
-          <h2>FF Tech AI Website Audit SaaS</h2>
-          <p>Service is running.</p>
-          <ul>
-            <li>/health/health</a> — Healthcheck</li>
-            <li>/docs/docs</a> — API Docs (Swagger)</li>
-          </ul>
-        </body>
-        </html>
-        """,
-        status_code=200,
-    )
+    return HTMLResponse("<h3>Template not found.</h3>", status_code=500)
 
 # ---------------- Schemas ----------------
 class AuditRequest(BaseModel):
@@ -127,7 +102,7 @@ def auth_user(credentials: HTTPAuthorizationCredentials = Depends(security), db=
         raise HTTPException(status_code=401, detail="User not verified")
     return user
 
-# ---------------- Auth Routes (Magic link + OTP) ----------------
+# ---------------- Auth Routes ----------------
 @app.post("/auth/request-link")
 def request_magic_link(payload: EmailRequest, request: Request, db=Depends(get_db)):
     send_magic_link(payload.email, request, db)
@@ -223,33 +198,7 @@ def report_open_pdf(req: AuditRequest):
         headers={"Content-Disposition": 'attachment; filename="FFTech_Audit_Open.pdf"'}
     )
 
-# ---------------- Scheduling (Pro-only) ----------------
-@app.post("/schedule")
-def create_schedule(payload: ScheduleRequest, user: User = Depends(auth_user), db=Depends(get_db)):
-    if user.plan == "free":
-        raise HTTPException(status_code=402, detail="Scheduling requires subscription (Pro+).")
-    freq = payload.frequency
-    delta = datetime.timedelta(days=1 if freq == "daily" else 7 if freq == "weekly" else 30)
-    sch = Schedule(user_id=user.id, url=payload.url, frequency=freq, enabled=True, next_run_at=now_utc() + delta)
-    db.add(sch)
-    db.commit()
-    return {"message": "Scheduled", "schedule_id": sch.id}
-
-@app.get("/schedule")
-def list_schedules(user: User = Depends(auth_user), db=Depends(get_db)):
-    rows = db.query(Schedule).filter(Schedule.user_id == user.id).order_by(Schedule.next_run_at).all()
-    return [{"id": s.id, "url": s.url, "frequency": s.frequency, "enabled": s.enabled, "next_run_at": s.next_run_at.isoformat()} for s in rows]
-
-@app.delete("/schedule/{schedule_id}")
-def delete_schedule(schedule_id: int, user: User = Depends(auth_user), db=Depends(get_db)):
-    s = db.query(Schedule).filter(Schedule.id == schedule_id, Schedule.user_id == user.id).first()
-    if not s:
-        raise HTTPException(status_code=404, detail="Schedule not found")
-    db.delete(s)
-    db.commit()
-    return {"message": "Deleted"}
-
-# ---------------- Robust Scheduler Loop ----------------
+# ---------------- Scheduler ----------------
 async def scheduler_loop():
     while True:
         try:
@@ -298,7 +247,6 @@ async def scheduler_loop():
 
                     except Exception as e:
                         db.rollback()
-                        # Auto-remediate columns if schedules.url missing
                         if "UndefinedColumn" in str(e) and "schedules.url" in str(e):
                             try:
                                 ensure_schedule_columns()
