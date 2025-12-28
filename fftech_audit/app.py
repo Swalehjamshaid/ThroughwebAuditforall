@@ -32,7 +32,7 @@ from .auth_email import (
     hash_password,
     verify_password,
     send_email_with_pdf,
-    generate_token,  # ensure imported
+    generate_token,
 )
 from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, now_utc, is_valid_url
 from .ui_and_pdf import build_pdf_report
@@ -46,16 +46,16 @@ app = FastAPI(title=APP_NAME, version="4.0", description="SSR + API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 security = HTTPBearer()
 
-# mount static
+# ---------------- Static ----------------
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# jinja2 templates
+# ---------------- Templates ----------------
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-# DB init
+# ---------------- DB init ----------------
 Base.metadata.create_all(bind=engine)
 try:
     ensure_schedule_columns()
@@ -237,7 +237,6 @@ def auth_login(request: Request, email: str = Form(...), password: str = Form(..
         return templates.TemplateResponse("verify_required.html", {"request": request}, status_code=403)
 
     session_token = generate_token({"email": email, "purpose": "session"})
-    # Show success and token (frontend can store it in localStorage via fetch on /auth/verify-link)
     return templates.TemplateResponse("verify_success.html", {"request": request, "message": f"Login successful. Token: {session_token}"})
 
 # ---------------- Magic/Verify link (API) ----------------
@@ -303,7 +302,8 @@ def scheduler_loop():
             due = db.query(Schedule).filter(Schedule.enabled == True, Schedule.next_run_at <= now).all()
             for sch in due:
                 user = db.query(User).filter(User.id == sch.user_id).first()
-                if not user or not user.verified: continue
+                if not user or not user.verified:
+                    continue
                 eng = AuditEngine(sch.url)
                 metrics = eng.compute_metrics()
                 audit = Audit(user_id=user.id, url=sch.url, metrics_json=json.dumps(metrics),
@@ -331,4 +331,3 @@ def scheduler_loop():
 def start_scheduler():
     t = threading.Thread(target=scheduler_loop, daemon=True)
     t.start()
-``
