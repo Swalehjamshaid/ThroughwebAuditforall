@@ -1,4 +1,5 @@
 
+# fftech_audit/app.py
 import os
 import io
 import json
@@ -12,7 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, EmailStr
 
-# ✅ Package-relative imports (fixes ModuleNotFoundError)
+# ✅ Package-relative imports
 from .db import (
     SessionLocal, get_db, Base, engine,
     User, Audit, Schedule, ensure_schedule_columns
@@ -63,15 +64,12 @@ def health():
 # ---------------- Root (fixes 404 on GET /) ----------------
 @app.get("/", response_class=HTMLResponse)
 def home():
-    """
-    Serve templates/index.html if present; otherwise a minimal HTML page.
-    Prevents 404 on GET /
-    """
+    """Serve templates/index.html if present; otherwise a minimal HTML page."""
     template_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
     if os.path.exists(template_path):
         return FileResponse(template_path)
 
-    # ✅ Clean fallback HTML
+    # Fallback HTML
     return HTMLResponse(
         """
         <!doctype html>
@@ -116,7 +114,7 @@ class VerifyCodeRequest(BaseModel):
 
 class ScheduleRequest(BaseModel):
     url: str
-    frequency: str = Field(default="weekly", pattern="^(daily|weekly|monthly)$")  # Pydantic v2 compliant
+    frequency: str = Field(default="weekly", pattern="^(daily|weekly|monthly)$")
 
 # ---------------- Auth Helper ----------------
 def auth_user(credentials: HTTPAuthorizationCredentials = Depends(security), db=Depends(get_db)) -> User:
@@ -253,13 +251,6 @@ def delete_schedule(schedule_id: int, user: User = Depends(auth_user), db=Depend
 
 # ---------------- Robust Scheduler Loop ----------------
 async def scheduler_loop():
-    """
-    Robust scheduler:
-      - safe session context (with SessionLocal() as db)
-      - commit/rollback per item
-      - automatic column fix via ensure_schedule_columns() if UndefinedColumn occurs
-      - batch limit & sleep to prevent pool exhaustion
-    """
     while True:
         try:
             with SessionLocal() as db:
