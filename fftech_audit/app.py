@@ -12,7 +12,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, EmailStr
 
-# Local modules (make sure these files exist)
+# Local modules (ensure these files exist and are correct)
 from db import (
     SessionLocal, get_db, Base, engine,
     User, Audit, Schedule, ensure_schedule_columns
@@ -37,7 +37,7 @@ SCHEDULER_SLEEP = int(os.getenv("SCHEDULER_INTERVAL", "60"))  # seconds
 # ---------------- FastAPI App ----------------
 app = FastAPI(
     title=APP_NAME,
-    version="3.3.1",
+    version="3.3.2",
     description="Main entrypoint integrating DB, Auth (magic link + OTP), Metrics, PDF & Scheduler"
 )
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -71,6 +71,7 @@ def home():
     if os.path.exists(template_path):
         return FileResponse(template_path)
 
+    # Fallback HTML if no template file exists
     return HTMLResponse(
         """
         <!doctype html>
@@ -81,15 +82,17 @@ def home():
           <title>FF Tech AI Website Audit SaaS</title>
           <style>
             body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;padding:24px}
-            a{color:#2563eb}
+            a{color:#2563eb;text-decoration:none}
+            a:hover{text-decoration:underline}
+            ul{line-height:1.8}
           </style>
         </head>
         <body>
           <h2>FF Tech AI Website Audit SaaS</h2>
           <p>Service is running.</p>
           <ul>
-            <li><a href="/health" target="_check</li>
-            <li>/docs/docs</a> — API Docs (Swagger)</li>
+            <li>/health/health</a> — Healthcheck</li>
+            <li><a href="/</a> — API Docs (Swagger)</li>
           </ul>
         </body>
         </html>
