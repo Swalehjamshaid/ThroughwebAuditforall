@@ -1,28 +1,44 @@
 
 {% extends "base.html" %}
 {% block content %}
-  <section class="center" style="margin-top:24px">
-    <h2 style="font-weight:800;margin:0">Audit any website in seconds</h2>
-    <p class="muted">Choose <strong>Open Audit URL</strong> or <strong>Registration</strong> for premium features.</p>
-    {% if error %}<p style="color:#ef4444">{{ error }}</p>{% endif %}
-  </section>
+<section style="margin-top:24px">
+  <h2 class="section-title">Audit any website in seconds</h2>
+  <p class="text-muted">Choose <strong>Open Audit URL</strong> or <strong>Sign In / Register</strong> for premium features.</p>
+  {% if error %}<p style="color:#ef4444">{{ error }}</p>{% endif %}
+</section>
 
-  <div class="grid two" style="margin-top:20px">
-    <div class="card">
-      <h3 style="margin-top:0">Open Audit URL</h3>
-      /audit/open
-        <input class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required>
-        <div style="margin-top:10px"><button class="btn">Run Audit</button></div>
-      </form>
-      <p class="muted" style="margin-top:8px">No login required. View results instantly.</p>
-    </div>
-
-    <div class="card">
-      <h3 style="margin-top:0">Registration / Login</h3>
-      <p class="muted">Magic link &amp; OTP flows can be added here (coming soon).</p>
-      <button class="btn secondary" onclick="alert('Registration coming soon')">Send Magic Link</button>
-    </div>
+<div class="grid two" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px">
+  <!-- Open Audit -->
+  <div class="card glass">
+    <h3 class="section-subtitle">Open Audit URL</h3>
+    /audit/open
+      <input id="urlOpen" class="input" type="url" name="url"
+             placeholder="https://example.com"
+             value="{{ prefill_url or '' }}" required />
+      <div style="margin-top:10px">
+        <button id="btnOpen" class="btn-primary">Run Audit</button>
+      </div>
+    </form>
+    <p class="text-muted" style="margin-top:8px">No login required. View results instantly.</p>
   </div>
 
-  <p class="muted" style="margin-top:24px">Build: {{ build_marker }}</p>
+  <!-- Sign In / Registration -->
+  <div class="card glass">
+    <h3 class="section-subtitle">Sign In / Register</h3>
+    <p class="text-muted">Register with name, email & password, then verify via email link. Or use magic link.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn-secondary" href="/auth/loginrRegister</a>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+    <form onsubmit="requestLink(event)" style="margin-top:8px">
+      <input id="emailInput" class="input" type="email" placeholder="you@example.com" required />
+      <div style="margin-top:10px">
+        <button class="btn-secondary" type="submit">Send Magic/Verify Link</button>
+      </div>
+    </form>
+    <p class="text-muted" style="margin-top:8px">Registered users can download PDFs & schedule email reports.</p>
+  </div>
+</div>
+
+<p class="text-muted" style="margin-top:24px">Build: {{ build_marker }}</p>
 {% endblock %}
