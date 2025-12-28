@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install Python dependencies (your requirements.txt lives inside fftech_audit/)
+# Install Python dependencies (requirements.txt is inside fftech_audit/)
 COPY fftech_audit/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -21,5 +21,5 @@ RUN chmod +x start.sh
 
 EXPOSE 8080
 
-# Use the script so $PORT becomes a real integer
+# Use the script so $PORT expands properly
 CMD ["./start.sh"]
