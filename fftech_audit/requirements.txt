@@ -1,7 +1,21 @@
 
+# Core Framework
 fastapi
 uvicorn
+
+# Database ORM
 sqlalchemy
+
+# Postgres Driver (required for Railway Postgres)
+psycopg2-binary
+
+# HTTP Requests (for audit engine)
 requests
+
+# PDF Generation
 reportlab
-psycopg2-binary   # Add this for Postgres support
+
+# Optional Extras (recommended for production)
+python-dotenv       # For environment variable management
+alembic             # For database migrations
+jinja2              # If you plan to use templates later
