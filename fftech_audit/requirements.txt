@@ -4,3 +4,4 @@ uvicorn
 sqlalchemy
 requests
 reportlab
+psycopg2-binary   # Add this for Postgres support
