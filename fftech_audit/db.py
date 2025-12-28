@@ -1,48 +1,57 @@
 
 # fftech_audit/db.py
 """
-Database integration (SQLAlchemy)
-- Engine & SessionLocal tuned with pool_pre_ping and bounded pool size to avoid overflow
-- Models: User, Audit, Schedule, MagicLink, EmailCode
-- Auto-remediation: ensure 'schedules' table has required columns (url, frequency, enabled, next_run_at)
+Database integration (SQLAlchemy) + Auto-remediation for schedules table
+
+Fixes:
+- (psycopg2.errors.UndefinedColumn) column schedules.url does not exist
+- Connection pool overflow by enabling pool_pre_ping and bounding pool size
+
+What this file does:
+- Defines models: User, Audit, Schedule, MagicLink, EmailCode
+- Creates tables if missing (create_all)
+- Adds missing columns to 'schedules' table at startup: url, frequency, enabled, next_run_at
+- Tunes SQLAlchemy engine pool for Postgres deployments
+
+Usage:
+- Drop-in replacement for your current fftech_audit/db.py
+- No external migrations required (one-time DDL executed at startup)
 """
 
 import os
 import datetime
 from sqlalchemy import (
-    create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey, inspect, text
+    create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey,
+    inspect, text
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
+# ---------------- Config ----------------
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_audit.db")
 
-# Tune the engine to reduce pool exhaustion and keep connections healthy
+# Engine tuning to reduce pool errors (ignored by SQLite, used by Postgres/MySQL)
 _engine_kwargs = {
-    "pool_pre_ping": True,
+    "pool_pre_ping": True,                               # refresh dead connections
+    "pool_size": int(os.getenv("DB_POOL_SIZE", "5")),    # base pool size
+    "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "10")),  # overflow connections
 }
-# Pool sizing (ignored by SQLite, respected by Postgres/MySQL)
-_pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
-_max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
-_engine_kwargs.update({"pool_size": _pool_size, "max_overflow": _max_overflow})
-
-# SQLite-specific connect args
+# SQLite needs check_same_thread=False; Postgres/MySQL don't
 _connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
+# ---------------- SQLAlchemy Setup ----------------
 Base = declarative_base()
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=_connect_args,
-    **_engine_kwargs,
-)
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
 
 def get_db():
+    """FastAPI dependency for a scoped DB session."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
+# ---------------- Models ----------------
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
@@ -68,10 +77,12 @@ class Schedule(Base):
     __tablename__ = "schedules"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    url = Column(String(2048), nullable=False)         # REQUIRED
-    frequency = Column(String(32), default="weekly")   # REQUIRED: daily|weekly|monthly
-    enabled = Column(Boolean, default=True)            # REQUIRED
-    next_run_at = Column(DateTime, default=datetime.datetime.utcnow)  # REQUIRED
+
+    # These columns MUST exist in the DB to avoid your errors:
+    url = Column(String(2048), nullable=False)
+    frequency = Column(String(32), default="weekly")     # daily|weekly|monthly
+    enabled = Column(Boolean, default=True)
+    next_run_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 class MagicLink(Base):
     __tablename__ = "magic_links"
@@ -91,22 +102,26 @@ class EmailCode(Base):
     used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-# Create tables if missing (does NOT add columns to existing tables)
+# Create tables if missing (NOTE: create_all does NOT add columns to existing tables)
 Base.metadata.create_all(bind=engine)
 
+# ---------------- Auto-remediation for schedules table ----------------
 def ensure_schedule_columns():
     """
-    Auto-remediate the 'schedules' table to ensure required columns exist.
-    Works for PostgreSQL and SQLite. Safe to run on startup.
+    Add missing columns to 'schedules' (url, frequency, enabled, next_run_at) at startup.
+    Works for PostgreSQL and SQLite. Safe to run repeatedly.
     """
-    dialect = engine.dialect.name  # 'postgresql', 'sqlite', 'mysql', etc.
+    dialect = engine.dialect.name  # 'postgresql', 'sqlite', 'mysql', ...
     insp = inspect(engine)
-    tables = insp.get_table_names()
-    if "schedules" not in tables:
-        # Table missing; create via metadata (already done above)
+    table_names = insp.get_table_names()
+
+    if "schedules" not in table_names:
+        # Table absent: already created above via create_all, but return here just in case.
         return
 
     existing_cols = {col["name"] for col in insp.get_columns("schedules")}
+
+    # Column types per dialect
     required = {
         "url": ("VARCHAR(2048)" if dialect == "postgresql" else "TEXT"),
         "frequency": ("VARCHAR(32)" if dialect == "postgresql" else "TEXT"),
@@ -114,12 +129,11 @@ def ensure_schedule_columns():
         "next_run_at": ("TIMESTAMP WITH TIME ZONE" if dialect == "postgresql" else "DATETIME"),
     }
 
-    # Build DDL per missing column
     ddls = []
     for col_name, col_type in required.items():
         if col_name not in existing_cols:
             if dialect == "postgresql":
-                # Postgres supports IF NOT EXISTS for ADD COLUMN
+                # Postgres: IF NOT EXISTS is supported; include sensible DEFAULTs
                 default_clause = ""
                 if col_name == "frequency":
                     default_clause = " DEFAULT 'weekly'"
@@ -128,32 +142,31 @@ def ensure_schedule_columns():
                 elif col_name == "next_run_at":
                     default_clause = " DEFAULT NOW()"
                 ddl = f"ALTER TABLE schedules ADD COLUMN IF NOT EXISTS {col_name} {col_type}{default_clause};"
-                ddls.append(ddl)
             elif dialect == "sqlite":
-                # SQLite (older versions) may not support IF NOT EXISTS; we guard by checking columns above.
-                # Use reasonable defaults.
+                # SQLite: older versions may not support IF NOT EXISTS on ADD COLUMN;
+                # we guarded above by checking existing_cols.
                 default_clause = ""
                 if col_name == "frequency":
                     default_clause = " DEFAULT 'weekly'"
                 elif col_name == "enabled":
                     default_clause = " DEFAULT 1"
                 ddl = f"ALTER TABLE schedules ADD COLUMN {col_name} {col_type}{default_clause};"
-                ddls.append(ddl)
             else:
-                # Fallback generic SQL
+                # Generic fallback
                 ddl = f"ALTER TABLE schedules ADD COLUMN {col_name} {col_type};"
-                ddls.append(ddl)
+            ddls.append(ddl)
 
     if not ddls:
-        return
+        return  # nothing to do
 
-    # Execute DDLs
+    # Execute DDL safely in a transaction
     with engine.begin() as conn:
         for ddl in ddls:
             try:
                 conn.execute(text(ddl))
+                print(f"[DB] Added missing column via DDL: {ddl}")
             except Exception as e:
-                # If column already exists or dialect limitation, ignore/log and continue
+                # Don't crash the app; log and continue
                 print(f"[DB] ensure_schedule_columns: DDL failed '{ddl}': {e}")
 
 # Run auto-remediation at import/startup
