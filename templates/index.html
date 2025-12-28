@@ -1,152 +1,220 @@
+
+<!-- templates/index.html -->
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tech AI | Professional Website Audit</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0B1221; }
-        .glass { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .gradient-text { background: linear-gradient(90deg, #3B82F6, #2DD4BF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    </style>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FF Tech AI Website Audit SaaS</title>
+https://cdn.jsdelivr.net/npm/chart.js</script>
+<style>
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0}
+header{background:#0a2540;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+.brand{font-weight:800;letter-spacing:0.5px}
+main{padding:24px}
+.card{background:#111827;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.btn{background:#2563eb;color:white;border:none;border-radius:8px;padding:10px 14px;cursor:pointer}
+.input{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#0b1220;color:#e2e8f0}
+.badge{display:inline-block;background:#1f2937;padding:6px 10px;border-radius:999px;margin-right:8px}
+.progress{background:#334155;border-radius:8px;height:12px;width:100%;overflow:hidden}
+.progress>div{height:100%;background:#16a34a}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px;border-bottom:1px solid #334155}
+footer{padding:24px;text-align:center;color:#93c5fd}
+small{color:#93c5fd}
+a{color:#93c5fd}
+</style>
 </head>
-<body class="text-gray-100 min-h-screen">
+<body>
+<header>
+  <div class="brand">FF TECH AI • Website Audit</div>
+  <div>
+    <button class="btn" onclick="showLogin()">Login (Magic Link / OTP)</button>
+    <button class="btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+<main>
+  <div class="card" id="loginCard" style="display:none">
+    <h3>Passwordless Login</h3>
+    <form onsubmit="requestLink(event)">
+      <input id="emailInput" type="email" class="input" placeholder="you@example.com" required />
+      <button class="btn">Send Magic Link</button>
+    </form>
+    <form onsubmit="requestCode(event)" style="margin-top:10px">
+      <input id="emailCode" type="email" class="input" placeholder="you@example.com" required />
+      <button class="btn">Send Code (OTP)</button>
+    </form>
+    <form onsubmit="verifyCode(event)" style="margin-top:10px">
+      <input id="codeInput" class="input" placeholder="Enter code" required />
+      <button class="btn">Verify Code & Login</button>
+    </form>
+    <small>Magic link or OTP — both supported.</small>
+  </div>
 
-    <nav class="border-b border-white/10 py-4 px-6 flex justify-between items-center glass sticky top-0 z-50">
-        <div class="text-xl font-extrabold tracking-tight gradient-text">FF TECH AI</div>
-        <div class="flex gap-4">
-            <button onclick="toggleLogin()" class="text-sm font-semibold hover:text-blue-400 transition">Login</button>
-            <button id="logoutBtn" onclick="logout()" class="hidden text-sm font-semibold text-red-400">Logout</button>
-        </div>
-    </nav>
+  <div class="card">
+    <form onsubmit="runOpenAudit(event)">
+      <label>Open Access Audit (no login)</label>
+      <input id="urlOpen" class="input" type="url" placeholder="https://example.com" required />
+      <button class="btn">Run Audit</button>
+      <span id="loadingOpen" style="margin-left:10px;display:none">Running...</span>
+    </form>
+  </div>
 
-    <main class="max-w-6xl mx-auto p-6">
-        <section class="text-center py-12">
-            <h1 class="text-5xl font-extrabold mb-4">Analyze Your <span class="gradient-text">Web Performance</span></h1>
-            <p class="text-gray-400 mb-8">Professional AI-powered audits with 200+ data points.</p>
-            
-            <div class="max-w-2xl mx-auto flex gap-2">
-                <input id="auditUrl" type="url" placeholder="https://example.com" class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="runAudit()" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-bold transition">Run Audit</button>
-            </div>
-            <div id="loader" class="hidden mt-4 text-blue-400 animate-pulse">FF Tech AI Engine Analyzing...</div>
-        </section>
+  <div class="card">
+    <form onsubmit="runUserAudit(event)">
+      <label>Registered Audit (logged-in users)</label>
+      <input id="urlUser" class="input" type="url" placeholder="https://example.com" required />
+      <button class="btn">Run & Save Audit</button>
+      <span id="loadingUser" style="margin-left:10px;display:none">Running...</span>
+    </form>
+    <small>Free plan: 10 audits; Pro: scheduling & long-term history.</small>
+  </div>
 
-        <div id="results" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass p-6 rounded-3xl col-span-1 flex flex-col items-center justify-center">
-                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">Overall Score</h3>
-                <div class="relative">
-                    <canvas id="scoreChart" width="200" height="200"></canvas>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span id="scoreText" class="text-4xl font-black">0%</span>
-                        <span id="gradeText" class="text-blue-400 font-bold">Grade: F</span>
-                    </div>
-                </div>
-            </div>
+  <div class="grid">
+    <div class="card"><h3>Executive Summary</h3><p id="summary"></p></div>
+    <div class="card"><h3>Score & Grade</h3>
+      <div id="scoreGrade"></div>
+      <div class="progress"><div id="scoreBar" style="width:0%"></div></div>
+      <canvas id="catChart" height="160"></canvas>
+    </div>
+    <div class="card"><h3>Severity</h3><div id="severity"></div></div>
+  </div>
 
-            <div class="glass p-6 rounded-3xl col-span-2">
-                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">Executive Summary</h3>
-                <p id="summaryText" class="text-gray-300 leading-relaxed italic"></p>
-                <div class="mt-6 flex gap-3">
-                    <button id="pdfBtn" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-                        <span>📄 Download PDF Report</span>
-                    </button>
-                </div>
-            </div>
+  <div class="card"><h3>Category Charts</h3>
+    <div class="grid">
+      <div><canvas id="chartCrawl"></canvas></div>
+      <div><canvas id="chartSEO"></canvas></div>
+      <div><canvas id="chartPerf"></canvas></div>
+      <div><canvas id="chartSec"></canvas></div>
+      <div><canvas id="chartMobile"></canvas></div>
+    </div>
+  </div>
 
-            <div class="glass p-6 rounded-3xl col-span-full overflow-hidden">
-                <h3 class="text-gray-400 font-bold mb-4 uppercase text-xs tracking-widest">All Metrics (1-200)</h3>
-                <div class="overflow-x-auto h-96">
-                    <table class="w-full text-left">
-                        <thead class="sticky top-0 bg-[#0B1221]">
-                            <tr class="text-gray-500 text-sm border-b border-white/5">
-                                <th class="py-3 px-2">ID</th>
-                                <th class="py-3">Name</th>
-                                <th class="py-3">Category</th>
-                                <th class="py-3">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="metricsBody" class="text-sm divide-y divide-white/5"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </main>
+  <div class="card">
+    <h3>All Metrics (1–200)</h3>
+    <table id="metricsTable"><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr></thead><tbody></tbody></table>
+  </div>
 
-    <script>
-        const API_BASE = window.location.origin;
-        let mainChart;
+  <div class="card">
+    <h3>My Audit History</h3>
+    <button class="btn" onclick="loadHistory()">Refresh</button>
+    <table id="historyTable"><thead><tr><th>ID</th><th>URL</th><th>Score</th><th>Grade</th><th>Date</th><th>PDF</th></tr></thead><tbody></tbody></table>
+  </div>
 
-        async function runAudit() {
-            const url = document.getElementById('auditUrl').value;
-            if(!url) return alert("Enter a URL");
+  <div class="card">
+    <h3>Scheduling (Pro)</h3>
+    <form onsubmit="createSchedule(event)">
+      <input id="scheduleUrl" class="input" type="url" placeholder="https://example.com" required />
+      <select id="scheduleFreq" class="input"><option value="daily">daily</option><option value="weekly" selected>weekly</option><option value="monthly">monthly</option></select>
+      <button class="btn">Create Schedule</button>
+    </form>
+    <button class="btn" onclick="listSchedules()">List Schedules</button>
+    <ul id="schedules"></ul>
+    <small>Scheduled audits email PDFs if SMTP is configured.</small>
+  </div>
+</main>
+<footer>FF Tech • API-driven • Charts by Chart.js (CDN) • Health: /health/health</a></footer>
 
-            document.getElementById('loader').classList.remove('hidden');
-            const token = localStorage.getItem('fftech_token');
-            const endpoint = token ? '/api/audit/user' : '/api/audit/open';
-            
-            try {
-                const res = await fetch(API_BASE + endpoint, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        ...(token && { 'Authorization': `Bearer ${token}` })
-                    },
-                    body: JSON.stringify({ url })
-                });
-                const data = await res.json();
-                renderAudit(data);
-            } catch (e) {
-                alert("Audit failed. Check backend connection.");
-            } finally {
-                document.getElementById('loader').classList.add('hidden');
-            }
-        }
+<script>
+function token(){ return localStorage.getItem('fftech_token') || ''; }
+function showLogin(){ document.getElementById('loginCard').style.display='block'; }
+function logout(){ localStorage.removeItem('fftech_token'); alert('Logged out'); }
 
-        function renderAudit(data) {
-            document.getElementById('results').classList.remove('hidden');
-            document.getElementById('scoreText').innerText = data.score + "%";
-            document.getElementById('gradeText').innerText = "Grade: " + data.grade;
-            document.getElementById('summaryText').innerText = data.metrics[3].value;
+async function requestLink(e){ e.preventDefault();
+  const email = document.getElementById('emailInput').value;
+  const res = await fetch('/auth/request-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+  const d = await res.json(); alert(d.message || 'Magic link sent / logged. Check email or server logs.');
+}
 
-            // Update PDF button logic
-            const pdfUrl = data.audit_id ? `/api/report/${data.audit_id}.pdf` : `/api/report/open.pdf`;
-            document.getElementById('pdfBtn').onclick = () => window.open(API_BASE + pdfUrl);
+async function requestCode(e){ e.preventDefault();
+  const email = document.getElementById('emailCode').value;
+  const res = await fetch('/auth/request-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+  const d = await res.json(); alert(d.message || 'Code sent / logged.');
+}
 
-            // Populate Table
-            const tbody = document.getElementById('metricsBody');
-            tbody.innerHTML = '';
-            Object.entries(data.metrics).forEach(([id, m]) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="py-3 text-gray-500">${id}</td>
-                    <td class="py-3 font-semibold">${m.name || 'Analysis Signal'}</td>
-                    <td class="py-3"><span class="px-2 py-1 rounded bg-white/5 text-xs">Technical</span></td>
-                    <td class="py-3 ${m.value == 0 ? 'text-red-400' : 'text-green-400'}">${m.detail || 'Optimized'}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+async function verifyCode(e){ e.preventDefault();
+  const email = document.getElementById('emailCode').value; const code = document.getElementById('codeInput').value;
+  const res = await fetch('/auth/verify-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,code})});
+  const d = await res.json(); if(res.ok){ localStorage.setItem('fftech_token', d.token); alert('Logged in via code!'); } else { alert(d.detail || 'Failed'); }
+}
 
-            // Score Chart
-            const ctx = document.getElementById('scoreChart').getContext('2d');
-            if(mainChart) mainChart.destroy();
-            mainChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [data.score, 100 - data.score],
-                        backgroundColor: ['#3B82F6', '#1F2937'],
-                        borderWidth: 0,
-                        circumference: 180,
-                        rotation: 270
-                    }]
-                },
-                options: { cutout: '80%', plugins: { legend: { display: false } } }
-            });
-        }
-    </script>
-</body>
-</html>
+function chartDonut(id,val){ new Chart(document.getElementById(id),{type:'doughnut',
+  data:{labels:['Score','Remaining'],datasets:[{data:[val,100-val],backgroundColor:['#16a34a','#334155']}]},
+  options:{plugins:{legend:{display:false}}}}); }
+
+function render(d){
+  document.getElementById('summary').textContent = d.metrics[3].value;
+  document.getElementById('scoreGrade').innerHTML = `<span class="badge">Score: ${d.score}%</span><span class="badge">Grade: ${d.grade}</span>`;
+  document.getElementById('scoreBar').style.width = d.score + '%';
+  const sev = d.metrics[7].value;
+  document.getElementById('severity').innerHTML = `<span class="badge">Errors: ${sev.errors}</span><span class="badge">Warnings: ${sev.warnings}</span><span class="badge">Notices: ${sev.notices}</span>`;
+  const cat=d.metrics[8].value;
+  new Chart(document.getElementById('catChart'),{type:'bar',data:{labels:Object.keys(cat),datasets:[{data:Object.values(cat),backgroundColor:'#2E86C1'}]},options:{scales:{y:{min:0,max:100}}}});
+  chartDonut('chartCrawl',cat['Crawlability']); chartDonut('chartSEO',cat['On-Page SEO']); chartDonut('chartPerf',cat['Performance']); chartDonut('chartSec',cat['Security']); chartDonut('chartMobile',cat['Mobile']);
+
+  const tbody=document.getElementById('metricsTable').querySelector('tbody'); tbody.innerHTML='';
+  const entries=Object.entries(d.metrics).sort((a,b)=>parseInt(a[0])-parseInt(b[0]));
+  fetch('/api/metrics/descriptors').then(r=>r.json()).then(DESCRIPTORS=>{
+    for(const [id,obj] of entries){
+      const desc=DESCRIPTORS[id]||{name:'(Unknown)',category:'-'};
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${id}</td><td>${desc.name}</td><td>${desc.category}</td><td>${(typeof obj.value==='object')? JSON.stringify(obj.value): obj.value}</td><td>${obj.detail||''}</td>`;
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+async function runOpenAudit(e){ e.preventDefault();
+  const url=document.getElementById('urlOpen').value; document.getElementById('loadingOpen').style.display='inline';
+  try{ const r=await fetch('/api/audit/open',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})}); const d=await r.json();
+    if(r.ok){ render(d); } else { alert(d.detail||'Audit failed'); }
+  }catch(err){ alert('Error: '+err); } finally{ document.getElementById('loadingOpen').style.display='none'; }
+}
+
+async function runUserAudit(e){ e.preventDefault();
+  const t=token(); if(!t){ alert('Please login first.'); return; }
+  const url=document.getElementById('urlUser').value; document.getElementById('loadingUser').style.display='inline';
+  try{ const r=await fetch('/api/audit/user',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},body:JSON.stringify({url})}); const d=await r.json();
+    if(r.ok){ render(d); alert('Audit saved. ID: '+d.audit_id); } else { alert(d.detail||'Audit failed'); }
+  }catch(err){ alert('Error: '+err); } finally{ document.getElementById('loadingUser').style.display='none'; }
+}
+
+async function loadHistory(){
+  const t=token(); if(!t){ alert('Login required'); return; }
+  const r=await fetch('/api/audits',{headers:{'Authorization':'Bearer '+t}}); const d=await r.json();
+  const tbody=document.getElementById('historyTable').querySelector('tbody'); tbody.innerHTML='';
+  for(const a of d){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${a.id}</td><td>${a.url}</td><td>${a.score}</td><td>${a.grade}</td><td>${a.created_at}</td><td>/api/report/${a.id}.pdfPDF</a></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function createSchedule(e){
+  e.preventDefault(); const t=token(); if(!t){ alert('Login required'); return; }
+  const url=document.getElementById('scheduleUrl').value; const frequency=document.getElementById('scheduleFreq').value;
+  const r=await fetch('/schedule',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},body:JSON.stringify({url,frequency})}); const d=await r.json();
+  if(r.ok){ alert('Scheduled: '+d.schedule_id); } else { alert(d.detail||'Failed'); }
+}
+
+async function listSchedules(){
+  const t=token(); if(!t){ alert('Login required'); return; }
+  const r=await fetch('/schedule',{headers:{'Authorization':'Bearer '+t}}); const d=await r.json();
+  const ul=document.getElementById('schedules'); ul.innerHTML='';
+  for(const s of d){
+    const li=document.createElement('li'); li.textContent=`#${s.id} ${s.url} (${s.frequency}) next: ${s.next_run_at}`;
+    ul.appendChild(li);
+  }
+}
+
+// If redirected with ?token=..., auto verify & store session token
+(function(){
+  const params=new URLSearchParams(location.search);
+  const tok=params.get('token'); if(tok){
+    fetch('/auth/verify-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token: tok})})
+      .then(r=>r.json()).then(d=>{
+        if(d.token){ localStorage.setItem('fftech_token', d.token); alert('Logged in via magic link!'); history.replaceState({},'',location.pathname); }
+      });
+  }
+})();
+</script>
+</body></html>
