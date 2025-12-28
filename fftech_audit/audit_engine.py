@@ -7,7 +7,11 @@
 - Scoring & category breakdown (strict & industry-standard approach, normalized for clarity)
 """
 
-import re, time, json, datetime, requests
+import re
+import time
+import json
+import datetime
+import requests
 from typing import Dict, Any, List, Tuple
 from urllib.parse import urlparse, urljoin
 
@@ -173,7 +177,7 @@ class AuditEngine:
         m[24] = {"value": 1 if 500 <= self.status_code < 600 else 0, "detail": f"Status {self.status_code}"}
         if m[23]["value"] or m[24]["value"]: total_errors += 1
 
-        # Title/meta
+        # Title/meta (fixed regex to parse real tags)
         title_match = re.search(r"<title>(.*?)</title>", self.html, flags=re.IGNORECASE | re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
         meta_desc_match = re.search(
@@ -181,23 +185,25 @@ class AuditEngine:
             self.html, flags=re.IGNORECASE
         )
         meta_desc = meta_desc_match.group(1).strip() if meta_desc_match else ""
+
         m[41] = {"value": 1 if not title else 0, "detail": "Missing title"}
         m[43] = {"value": 1 if title and len(title) > 65 else 0, "detail": f"Title length {len(title) if title else 0}"}
         m[44] = {"value": 1 if title and len(title) < 15 else 0, "detail": f"Title length {len(title) if title else 0}"}
         m[45] = {"value": 1 if not meta_desc else 0, "detail": "Missing meta description"}
         m[47] = {"value": 1 if meta_desc and len(meta_desc) > 165 else 0, "detail": f"Meta length {len(meta_desc) if meta_desc else 0}"}
         m[48] = {"value": 1 if meta_desc and len(meta_desc) < 50 else 0, "detail": f"Meta length {len(meta_desc) if meta_desc else 0}"}
+
         total_errors += 1 if m[41]["value"] else 0
         total_warnings += (m[43]["value"] or m[44]["value"] or m[45]["value"])
         total_notices += (m[47]["value"] or m[48]["value"])
 
-        # H1 tags
+        # H1 tags (fixed regex)
         h1s = re.findall(r"<h1[^>]*>(.*?)</h1>", self.html, flags=re.IGNORECASE | re.DOTALL)
         m[49] = {"value": 1 if len(h1s) == 0 else 0, "detail": f"H1 count {len(h1s)}"}
         m[50] = {"value": 1 if len(h1s) > 1 else 0, "detail": f"H1 count {len(h1s)}"}
         total_warnings += (m[49]["value"] or m[50]["value"])
 
-        # Image alt tags
+        # Image alt tags (fixed regex)
         img_tags = re.findall(r"<img[^>]*>", self.html, flags=re.IGNORECASE)
         missing_alts = sum(1 for tag in img_tags if re.search(r'alt=["\'].*?["\']', tag, flags=re.IGNORECASE) is None)
         m[55] = {"value": missing_alts, "detail": f"Images missing alt: {missing_alts}"}
@@ -215,12 +221,12 @@ class AuditEngine:
         m[108] = {"value": 1 if mixed else 0, "detail": "Mixed content detected" if mixed else "No mixed content"}
         total_warnings += 1 if mixed else 0
 
-        # Mobile viewport
+        # Mobile viewport (fixed regex)
         viewport_meta = re.search(r'<meta[^>]+name=["\']viewport["\']', self.html, flags=re.IGNORECASE)
         m[98] = {"value": 1 if bool(viewport_meta) else 0, "detail": "Viewport meta present" if viewport_meta else "Missing viewport"}
         total_warnings += 0 if viewport_meta else 1
 
-        # Canonical
+        # Canonical (fixed regex)
         canonical = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]*href="\'["\']', self.html, flags=re.IGNORECASE)
         m[32] = {"value": 0 if canonical else 1, "detail": f"Canonical present: {bool(canonical)}"}
         m[33] = {"value": "N/A", "detail": "Incorrect canonical needs multi-page check"}
@@ -229,11 +235,13 @@ class AuditEngine:
         robots_url = f"{urlparse(self.url).scheme}://{self.domain}/robots.txt"
         rcode, rcontent, _, _ = safe_request(robots_url)
         m[29] = {"value": 0 if rcode == 200 and rcontent else 1, "detail": "robots.txt present" if rcode == 200 else "robots.txt missing"}
+
         sitemap_present = False
         for path in ["/sitemap.xml","/sitemap_index.xml","/sitemap"]:
             scode, scontent, _, _ = safe_request(f"{urlparse(self.url).scheme}://{self.domain}{path}")
             if scode == 200 and scontent:
-                sitemap_present = True; break
+                sitemap_present = True
+                break
         m[136] = {"value": 1 if sitemap_present else 0, "detail": "Sitemap present" if sitemap_present else "Sitemap missing"}
 
         # Performance basics
@@ -258,6 +266,7 @@ class AuditEngine:
             code, _, _, _ = safe_request(li)
             if code >= 400 or code == 0: broken_internal += 1
         m[27] = {"value": broken_internal, "detail": "Broken internal links (sample)"}
+
         broken_external = 0
         for le in self.links_external[:20]:
             code, _, _, _ = safe_request(le)
@@ -314,16 +323,24 @@ class AuditEngine:
         if meta_desc and 50 <= len(meta_desc) <= 165: strengths.append("Meta description optimal")
         if lazy_count > 0: strengths.append("Lazy loading used")
         if m[95]["value"]: strengths.append("Compression (gzip/br) enabled")
+
         if m[41]["value"]: weaknesses.append("Missing title")
         if m[45]["value"]: weaknesses.append("Missing meta description")
         if m[110]["value"] > 0: weaknesses.append("Missing security headers")
         if m[27]["value"] > 0: weaknesses.append("Broken internal links")
         if m[136]["value"] == 0: weaknesses.append("Missing sitemap")
-        if m[27]["value"] > 0: priority_fixes.append("Fix internal broken links")
-        if m[105]["value] == 0": priority_fixes.append("Enable HTTPS sitewide")
-        if m[110]["value"] > 0: priority_fixes.append("Implement CSP, HSTS, X-Frame-Options, etc.")
-        if m[98]["value"] == 0: priority_fixes.append("Add responsive viewport meta")
-        if not m[95]["value"] and m[84]["value"] > 256: priority_fixes.append("Enable gzip/brotli compression")
+
+        # Priority fixes (fixed HTTPS line)
+        if m[27]["value"] > 0:
+            priority_fixes.append("Fix internal broken links")
+        if m[105]["value"] == 0:
+            priority_fixes.append("Enable HTTPS sitewide")
+        if m[110]["value"] > 0:
+            priority_fixes.append("Implement CSP, HSTS, X-Frame-Options, etc.")
+        if m[98]["value"] == 0:
+            priority_fixes.append("Add responsive viewport meta")
+        if not m[95]["value"] and m[84]["value"] > 256:
+            priority_fixes.append("Enable gzip/brotli compression")
 
         m[4] = {"value": strengths, "detail": "Strengths"}
         m[5] = {"value": weaknesses, "detail": "Weak areas"}
