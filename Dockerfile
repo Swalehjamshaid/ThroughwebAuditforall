@@ -8,16 +8,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install deps
+# Install dependencies (your requirements are inside the folder)
 COPY fftech_audit/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source + script
+# Copy source + the start script
 COPY . .
 COPY start.sh .
 RUN chmod +x start.sh
 
 EXPOSE 8080
 
-# Run via the script (guarantees $PORT is expanded)
+# Use the script so $PORT is properly read & passed as an integer
 CMD ["./start.sh"]
