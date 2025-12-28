@@ -1,5 +1,5 @@
 
-# audit_engine.py
+# fftech_audit/audit_engine.py
 """
 200 Metrics Registry + AuditEngine (homepage quick audit)
 - Transparent, extensible metrics (IDs 1..200)
@@ -176,7 +176,10 @@ class AuditEngine:
         # Title/meta
         title_match = re.search(r"<title>(.*?)</title>", self.html, flags=re.IGNORECASE | re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
-        meta_desc_match = re.search(r'<meta[^>]+name=[\'"]description[\'"][^>]+content=\'"[\'"]', self.html, flags=re.IGNORECASE | re.DOTALL)
+        meta_desc_match = re.search(
+            r'<meta[^>]+name=["\']description["\'][^>]*content="\'["\']',
+            self.html, flags=re.IGNORECASE
+        )
         meta_desc = meta_desc_match.group(1).strip() if meta_desc_match else ""
         m[41] = {"value": 1 if not title else 0, "detail": "Missing title"}
         m[43] = {"value": 1 if title and len(title) > 65 else 0, "detail": f"Title length {len(title) if title else 0}"}
@@ -188,7 +191,7 @@ class AuditEngine:
         total_warnings += (m[43]["value"] or m[44]["value"] or m[45]["value"])
         total_notices += (m[47]["value"] or m[48]["value"])
 
-        # H1
+        # H1 tags
         h1s = re.findall(r"<h1[^>]*>(.*?)</h1>", self.html, flags=re.IGNORECASE | re.DOTALL)
         m[49] = {"value": 1 if len(h1s) == 0 else 0, "detail": f"H1 count {len(h1s)}"}
         m[50] = {"value": 1 if len(h1s) > 1 else 0, "detail": f"H1 count {len(h1s)}"}
@@ -196,7 +199,7 @@ class AuditEngine:
 
         # Image alt tags
         img_tags = re.findall(r"<img[^>]*>", self.html, flags=re.IGNORECASE)
-        missing_alts = sum(1 for tag in img_tags if re.search(r'alt=[\'"].*?[\'"]', tag, flags=re.IGNORECASE) is None)
+        missing_alts = sum(1 for tag in img_tags if re.search(r'alt=["\'].*?["\']', tag, flags=re.IGNORECASE) is None)
         m[55] = {"value": missing_alts, "detail": f"Images missing alt: {missing_alts}"}
         total_notices += 1 if missing_alts > 0 else 0
 
@@ -213,12 +216,12 @@ class AuditEngine:
         total_warnings += 1 if mixed else 0
 
         # Mobile viewport
-        viewport_meta = re.search(r'<meta[^>]+name=[\'"]viewport[\'"]', self.html, flags=re.IGNORECASE)
+        viewport_meta = re.search(r'<meta[^>]+name=["\']viewport["\']', self.html, flags=re.IGNORECASE)
         m[98] = {"value": 1 if bool(viewport_meta) else 0, "detail": "Viewport meta present" if viewport_meta else "Missing viewport"}
         total_warnings += 0 if viewport_meta else 1
 
         # Canonical
-        canonical = re.search(r'<link[^>]+rel=[\'"]canonical[\'"][^>]+href=\'"[\'"]', self.html, flags=re.IGNORECASE)
+        canonical = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]*href="\'["\']', self.html, flags=re.IGNORECASE)
         m[32] = {"value": 0 if canonical else 1, "detail": f"Canonical present: {bool(canonical)}"}
         m[33] = {"value": "N/A", "detail": "Incorrect canonical needs multi-page check"}
 
@@ -271,16 +274,16 @@ class AuditEngine:
         m[90] = {"value": third_js, "detail": f"3rd-party scripts {third_js}"}
         large_imgs = sum(1 for img in self.resources_img if re.search(r"(large|hero|banner|@2x|\d{4}x\d{4})", img, flags=re.IGNORECASE))
         m[92] = {"value": large_imgs, "detail": "Potentially unoptimized images (heuristic)"}
-        lazy_count = len(re.findall(r'loading=[\'"]lazy[\'"]', self.html, flags=re.IGNORECASE))
+        lazy_count = len(re.findall(r'loading=["\']lazy["\']', self.html, flags=re.IGNORECASE))
         m[93] = {"value": 0 if lazy_count>0 else 1, "detail": f"Lazy loading tags count {lazy_count}"}
         m[96] = {"value": "N/A", "detail": "Runtime resource errors need lab tools"}
 
         # Social meta presence
-        og_or_twitter = bool(re.search(r'property=[\'"]og:', self.html) or re.search(r'name=[\'"]twitter:', self.html))
+        og_or_twitter = bool(re.search(r'property=["\']og:', self.html) or re.search(r'name=["\']twitter:', self.html))
         m[141] = {"value": 0 if og_or_twitter else 1, "detail": "Social metadata present" if og_or_twitter else "Missing social metadata"}
         m[62] = {"value": 0 if og_or_twitter else 1, "detail": "Open Graph/Twitter present" if og_or_twitter else "Missing"}
 
-        # Broken links intel & opportunities (non-N/A)
+        # Broken links intel & opportunities
         m[168] = {"value": broken_internal + broken_external, "detail": "Total broken links (sample)"}
         m[169] = {"value": broken_internal, "detail": "Internal broken links"}
         m[170] = {"value": broken_external, "detail": "External broken links"}
@@ -317,7 +320,7 @@ class AuditEngine:
         if m[27]["value"] > 0: weaknesses.append("Broken internal links")
         if m[136]["value"] == 0: weaknesses.append("Missing sitemap")
         if m[27]["value"] > 0: priority_fixes.append("Fix internal broken links")
-        if m[105]["value"] == 0: priority_fixes.append("Enable HTTPS sitewide")
+        if m[105]["value] == 0": priority_fixes.append("Enable HTTPS sitewide")
         if m[110]["value"] > 0: priority_fixes.append("Implement CSP, HSTS, X-Frame-Options, etc.")
         if m[98]["value"] == 0: priority_fixes.append("Add responsive viewport meta")
         if not m[95]["value"] and m[84]["value"] > 256: priority_fixes.append("Enable gzip/brotli compression")
@@ -341,7 +344,7 @@ class AuditEngine:
         m[15] = {"value": 1, "detail": "Total Crawled Pages (homepage quick audit)"}
         m[20] = {"value": 1, "detail": "Audit completion status"}
 
-        # Ensure ALL metrics 1..200 exist (placeholders for deep crawl/APIs/lab tools)
+        # Fill placeholders for 1..200
         for pid in range(1, 201):
             if pid not in m:
                 m[pid] = {"value": "N/A", "detail": "Not computed in quick audit; requires deeper crawl/APIs/lab tooling"}
@@ -365,4 +368,3 @@ class AuditEngine:
         if len(text.split()) < 200:
             text += " The platform uses transparent, normalized scoring that is API-first and frontend-agnostic, enabling seamless integration with any HTML or JavaScript framework. Historical trending, competitor benchmarking, and scheduled monitoring can be enabled via subscription for continuous improvement."
         return text
-
