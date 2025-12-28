@@ -1,0 +1,34 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FF Tech AI • Website Audit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  /static/app.css
+  https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
+  /static/app.js</script>
+</head>
+<body class="font-inter bg-surface text-text">
+  <header class="header" style="padding: 18px 24px; color: #fff;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong>FF Tech AI • Website Audit</strong>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-secondary" onclick="toggleTheme()">Toggle Theme</button>
+        <button class="btn-secondary" onclick="logout()">Logout</button>
+      </div>
+    </div>
+  </header>
+  <main style="padding: 24px;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Overlay loader -->
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <div class="loader-xl" style="margin:0 auto 12px;"></div>
+      <div>Running audit…</div>
+    </div>
+  </div>
+</body>
+</html>
