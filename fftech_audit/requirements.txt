@@ -5,8 +5,7 @@ sqlalchemy
 psycopg2-binary
 requests
 reportlab
+email-validator
 python-dotenv
 alembic
 jinja2
-# ✅ Add this line to fix the error:
-email-validator
