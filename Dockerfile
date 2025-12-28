@@ -8,18 +8,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install Python dependencies (requirements.txt is inside fftech_audit/)
+# Install Python dependencies (requirements.txt lives inside fftech_audit/)
 COPY fftech_audit/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application source
+# ✅ Copy entire project: templates, static, app code
 COPY . .
 
-# Copy and enable the start script
+# Start script
 COPY start.sh .
 RUN chmod +x start.sh
 
 EXPOSE 8080
 
-# Use the script so $PORT expands properly
 CMD ["./start.sh"]
