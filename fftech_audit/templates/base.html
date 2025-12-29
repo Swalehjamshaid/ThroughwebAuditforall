@@ -5,43 +5,22 @@
   <meta charset="utf-8">
   <title>FF Tech AI • Website Audit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Inter font -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap CSS -->
-  /static/app.css
-
-  <!-- Chart.js -->
-  https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
-
-  <!-- App JS -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"p.css
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4rt.umd.min.js</script>
   /static/app.js</script>
 </head>
 <body class="font-inter bg-surface text-text">
-  <!-- Hero header -->
-  <header class="header" style="padding: 22px 24px; color: #fff;">
+  <header class="header" style="padding: 22px; color: #fff;">
     <div style="display:flex;justify-content:space-between;align-items:center;max-width:1180px;margin:0 auto;">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:36px;height:36px;border-radius:8px;background:#ffffff22;border:1px solid #ffffff33"></div>
-        <strong style="font-weight:800;letter-spacing:.3px">FF Tech AI • Website Audit</strong>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <strong style="font-weight:800">FF Tech AI • Website Audit</strong>
+      <div style="display:flex;gap:8px">
         <button class="btn-secondary" onclick="toggleTheme()">Toggle Theme</button>
         <button class="btn-secondary" onclick="logout()">Logout</button>
       </div>
     </div>
   </header>
-
-  <!-- Content container -->
   <main style="padding: 28px; max-width: 1180px; margin: 0 auto;">
     {% block content %}{% endblock %}
   </main>
-
-  <!-- Overlay loader -->
-  <div id="overlay" class="overlay hidden">
-    <div class="overlay-card">
-      <div class="loader-xl" style="margin:0 auto 12px;"></div>
-      <div>Running audit…</div>
-    </div>
-  </div>
 </body>
 </html>
