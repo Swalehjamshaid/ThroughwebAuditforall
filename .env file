@@ -1,63 +1,17 @@
 
-# =========================
-# Core App Settings
-# =========================
-# Railway-provided Postgres URL. For local dev, replace with e.g.:
-# DATABASE_URL="sqlite:///./fftech_audit.db"
+# Core
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+APP_BASE_URL=https://throughwebauditforall-production.up.railway.app
+SECRET_KEY=7fb8e12a9c3d4f5b6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9
+USER_AGENT=FFTech-Audit/3.0 (+https://fftech.io)
+FREE_AUDITS_LIMIT=10
+SCHEDULER_INTERVAL=60
+PORT=8080
 
-# Public base URL of your app (used in verification links)
-APP_BASE_URL="https://throughwebauditforall-production.up.railway.app"
-
-# JWT signing key (keep secret; 32+ random chars)
-SECRET_KEY="7fb8e12a9c3d4f5b6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9"
-
-# Outbound HTTP UA for audits
-USER_AGENT="FFTech-Audit/3.0 (+https://fftech.io)"
-
-# Free audits (per anonymous user/IP) limit
-FREE_AUDITS_LIMIT="10"
-
-# Background scheduler interval (seconds)
-SCHEDULER_INTERVAL="60"
-
-# Optionally expose a custom port (Railway sets PORT automatically)
-PORT="8080"
-
-# Optional DB pool tuning (mostly useful outside SQLite)
-DB_POOL_SIZE="5"
-DB_MAX_OVERFLOW="10"
-
-
-# =========================
-# SMTP Email Settings
-# =========================
-# Use Gmail SMTP (with an App Password), or your own SMTP provider
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="587"
-SMTP_USER="your-email@gmail.com"
-SMTP_PASS="your-app-password"
-
-# The "From" address used in outgoing emails (verification links, scheduled reports)
-SMTP_FROM="no-reply@fftech.io"
-
-# (Optional) Legacy alias — some templates or external tools may reference this
-EMAIL_SENDER="no-reply@fftech.io"
-
-
-# =========================
-# Stripe Payment Settings (optional / future)
-# =========================
-SUBSCRIPTION_PRICE_USD="5"
-STRIPE_SUCCESS_URL="https://throughwebauditforall-production.up.railway.app/success"
-STRIPE_CANCEL_URL="https://throughwebauditforall-production.up.railway.app/cancel"
-STRIPE_SECRET_KEY="sk_test_placeholder"
-STRIPE_PRICE_ID="price_placeholder"
-STRIPE_WEBHOOK_SECRET="whsec_placeholder"
-
-
-# =========================
-# Feature Flags (optional)
-# =========================
-AUTO_CREATE_STATIC="true"
-AUTO_CREATE_PAGES="true"
+# SMTP (Gmail App Password required)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM=no-reply@fftech.io
+EMAIL_SENDER=no-reply@fftech.io
