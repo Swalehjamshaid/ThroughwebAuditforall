@@ -1,54 +1,34 @@
-{% extends "base.html" %}
-{% block content %}
-<section class="hero">
-  <h1 class="title">Audit any website in seconds</h1>
-  <p class="muted">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
-  {% if error %}<p class="error">{{ error }}</p>{% endif %}
-</section>
 
-<div class="grid two">
-  <div class="card glass">
-    <h3 class="subtitle">Open Audit</h3>
-    <form id="auditForm" action="/audit/open" method="POST" class="form">
-      <input id="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required autocomplete="off" />
-      <div class="row"><button id="btnRunAudit" class="btn primary" type="submit">Run Audit</button><span id="auditStatus" class="muted hidden">Running…</span></div>
-    </form>
-    <p class="muted tiny">No sign‑in required. Instant results.</p>
-  </div>
-
-  <div class="card glass">
-    <h3 class="subtitle">Sign In / Register</h3>
-    <p class="muted">Register with name, email & password, then verify via email link.</p>
-    <div class="row wrap">
-      <a class="btn ghost" href="/auth/login">Sign In</a>
-      <a class="btn primary" href="/auth/register">Register</a>
-    </div>
-    <p class="muted tiny">Registered users can download PDFs & schedule audit emails.</p>
-  </div>
-</div>
-
-<p class="muted center tiny">Build: {{ build_marker }}</p>
-
-<script>
-(function(){
-  const form=document.getElementById('auditForm'), input=document.getElementById('urlOpen'), btn=document.getElementById('btnRunAudit'), status=document.getElementById('auditStatus');
-  if(!form||!input||!btn)return;
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const url=(input.value||'').trim();
-    if(!url){ alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
-    if(!/^https?:\/\/.+/i.test(url)){ alert('Please include http:// or https:// in the URL.'); input.focus(); return; }
-    btn.disabled=true; status.classList.remove('hidden');
-    try{
-      const body=new URLSearchParams(); body.append('url',url);
-      const resp=await fetch('/audit/open',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
-      const ct=(resp.headers.get('Content-Type')||'').toLowerCase();
-      if(resp.ok&&ct.includes('text/html')){ const html=await resp.text(); document.open(); document.write(html); document.close(); return; }
-      let msg='Audit failed. Please try another URL.'; try{ const data=await resp.json(); msg=data.detail||msg; }catch{ const text=await resp.text(); if(text) msg=text; }
-      alert(msg);
-    }catch(err){ alert('Network error while running audit: '+err); }
-    finally{ btn.disabled=false; status.classList.add('hidden'); }
-  });
-})();
-</script>
-{% endblock %}
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF Tech AI • Website Audit</title>
+  /static/app.css
+</head><body>
+  <header class="topbar">
+    /static/logo.png
+    <h1>FF Tech AI • Website Audit SaaS</h1>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h2>Run an Audit</h2>
+      /audit/open
+        <input type="url" name="url" placeholder="https://example.com" required />
+        <button type="submit">Analyze</button>
+      </form>
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    </section>
+    <section class="card">
+      <h3>Registered Access (Email Verification)</h3>
+      /auth/register<button type="submit">Register</button></form>
+    </section>
+    <section class="card">
+      <h3>How it works</h3>
+      <ul>
+        <li>Open access: quick audits, no history saved.</li>
+        <li>Registered: email verification, audit history, 5‑page PDF, scheduling (premium).</li>
+        <li>Transparent scoring: security, performance, SEO, mobile, content.</li>
+      </ul>
+    </section>
+  </main>
+</body></html>
