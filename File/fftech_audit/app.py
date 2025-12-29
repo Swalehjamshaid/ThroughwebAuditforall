@@ -15,7 +15,13 @@ from fastapi.templating import Jinja2Templates
 
 from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, canonical_origin, aggregate_score, grade_from_score
 from .db import SessionLocal, Base, engine, User, Audit, Schedule
-from .auth_email import send_verification_link, verify_magic_or_verify_link, verify_session_token, generate_token, send_email_with_pdf
+from .auth_email import (
+    send_verification_link,
+    verify_magic_or_verify_link,
+    verify_session_token,
+    generate_token,
+    send_email_with_pdf,
+)
 from .ui_and_pdf import build_pdf_report
 
 # ------------------------------------------------------------
@@ -335,8 +341,11 @@ def report_pdf_api(req: Dict[str, str] = Body(...)):
         priority_fixes = metrics.get(6, {}).get("value", [])
         pdf_bytes = build_pdf_report(audit, category_scores, strengths, weaknesses, priority_fixes)
 
-        return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
-                                 headers={"Content-Disposition": 'attachment; filename="FFTech_Audit.pdf"'})
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="FFTech_Audit.pdf"'},
+        )
     finally:
         db.close()
 
@@ -540,4 +549,3 @@ def on_startup():
     init_db()
     threading.Thread(target=scheduler_loop, daemon=True).start()
     logger.info("Scheduler started ✅")
-``
