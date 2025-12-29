@@ -1,3 +1,4 @@
+
 {% extends "base.html" %}
 
 {% block content %}
@@ -11,7 +12,7 @@
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; margin-bottom:24px;">
     <!-- Score & Grade -->
     <div style="background:#1e293b; border-radius:16px; padding:20px;">
-      <h3 style="margin:0 0 12px; color:#94a3b8; font-weight:600;">Overall Score & Grade</h3>
+      <h3 style="margin:0 0 12px; color:#94a3b8; font-weight:600;">Overall Score &amp; Grade</h3>
       <div style="font-size:3rem; font-weight:800; color:#16a34a;">{{ score }}%</div>
       <div style="font-size:2rem; font-weight:700; color:#22c55e; margin-top:8px;">{{ grade }}</div>
       <div style="background:#334155; border-radius:8px; height:12px; margin-top:16px; overflow:hidden;">
@@ -49,7 +50,9 @@
       <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; text-align:center; box-shadow:0 8px 20px rgba(0,0,0,.2);">
         <canvas id="donut{{ loop.index }}" height="180"></canvas>
         <p style="margin:12px 0 0; font-weight:600; color:#e2e8f0;">{{ cat_name }}</p>
-        <p style="font-size:2rem; font-weight:800; color:{{ color }};">{{ category_scores[cat_name] }}%</p>
+        <p style="font-size:2rem; font-weight:800; color:{{ color }};">
+          {{ category_scores[cat_name] }}%
+        </p>
       </div>
     {% endfor %}
   </div>
@@ -109,7 +112,7 @@
 <!-- Detailed Metrics Table -->
 <section style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:24px; box-shadow:0 12px 28px rgba(0,0,0,.35);">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-    <h2 style="font-size:1.8rem; font-weight:700; margin:0;">Detailed Metrics ({{ rows|length }})</h2>
+    <h2 id="metricsTitle" style="font-size:1.8rem; font-weight:700; margin:0;">Detailed Metrics ({{ rows|length }})</h2>
     <input id="filterText" placeholder="Search metrics…" style="padding:12px 16px; border-radius:12px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; width:320px;" oninput="filterMetrics()" />
   </div>
 
@@ -117,10 +120,10 @@
     <table style="width:100%; border-collapse:collapse;">
       <thead>
         <tr style="background:#1e293b;">
-          <th class="sortable" data-col="id" style="padding:14px; text-align:left; cursor:pointer;">ID ↑</th>
-          <th class="sortable" data-col="name" style="padding:14px; text-align:left; cursor:pointer;">Metric Name</th>
-          <th class="sortable" data-col="category" style="padding:14px; text-align:left; cursor:pointer;">Category</th>
-          <th class="sortable" data-col="value" style="padding:14px; text-align:left; cursor:pointer;">Value</th>
+          <th class="sortable" data-col="id" style="padding:14px; text-align:left; cursor:pointer;">ID <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="name" style="padding:14px; text-align:left; cursor:pointer;">Metric Name <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="category" style="padding:14px; text-align:left; cursor:pointer;">Category <span class="sort-indicator"></span></th>
+          <th class="sortable" data-col="value" style="padding:14px; text-align:left; cursor:pointer;">Value <span class="sort-indicator"></span></th>
           <th style="padding:14px; text-align:left;">Detail</th>
         </tr>
       </thead>
@@ -142,7 +145,7 @@
 </section>
 
 <script>
-  // Updated donut charts with better colors and animation
+  // Donut charts
   const cat = JSON.parse('{{ category_json|e }}');
   const colors = {
     'Crawlability': '#3b82f6',
@@ -174,43 +177,42 @@
   new Chart(document.getElementById('donut4'), donutConfig(cat['Security'], colors['Security']));
   new Chart(document.getElementById('donut5'), donutConfig(cat['Mobile'], colors['Mobile']));
 
-  // Table sorting & filtering (same logic, improved UX)
+  // Table sorting & filtering
   let sortState = { col: 'id', dir: 'asc' };
+
+  function compareRows(a, b, col, dir) {
+    let va = a[col], vb = b[col];
+    if (col === 'id') return dir === 'asc' ? va - vb : vb - va;
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return dir === 'asc' ? na - nb : nb - na;
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  }
+
   function rebuildTable() {
     const tbody = document.getElementById('metricsTable');
     const rows = Array.from(tbody.querySelectorAll('tr')).map(tr => {
-      const cells = tr.querySelectorAll('td');
+      const tds = tr.querySelectorAll('td');
       return {
         tr,
-        id: Number(cells[0].textContent),
-        name: cells[1].textContent,
-        category: cells[2].textContent,
-        value: cells[3].textContent.trim(),
-        detail: cells[4].textContent
+        id: Number(tds[0].textContent),
+        name: tds[1].textContent,
+        category: tds[2].textContent,
+        value: tds[3].textContent.trim(),
+        detail: tds[4].textContent
       };
     });
 
-    rows.sort((a, b) => {
-      let va = a[sortState.col], vb = b[sortState.col];
-      if (sortState.col === 'id') return sortState.dir === 'asc' ? va - vb : vb - va;
-      const na = parseFloat(va), nb = parseFloat(vb);
-      if (!isNaN(na) && !isNaN(nb)) return sortState.dir === 'asc' ? na - nb : nb - na;
-      va = va.toLowerCase(); vb = vb.toLowerCase();
-      return sortState.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-    });
-
+    rows.sort((a, b) => compareRows(a, b, sortState.col, sortState.dir));
     tbody.innerHTML = '';
     rows.forEach(r => tbody.appendChild(r.tr));
     updateSortIndicators();
   }
 
   function updateSortIndicators() {
-    document.querySelectorAll('th.sortable').forEach(th => {
-      th.innerHTML = th.innerHTML.replace(/ [▲▼]$/, '');
-      if (th.dataset.col === sortState.col) {
-        th.innerHTML += sortState.dir === 'asc' ? ' ▲' : ' ▼';
-      }
-    });
+    document.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
+    const th = document.querySelector('.table thead th[data-col="'+sortState.col+'"] .sort-indicator');
+    if (th) th.textContent = sortState.dir === 'asc' ? '▲' : '▼';
   }
 
   document.querySelectorAll('th.sortable').forEach(th => {
@@ -223,7 +225,7 @@
   });
 
   function filterMetrics() {
-    const q = document.getElementById('filterText').value.trim().toLowerCase();
+    const q = (document.getElementById('filterText').value || '').trim().toLowerCase();
     const trs = document.querySelectorAll('#metricsTable tr');
     let shown = 0;
     trs.forEach(tr => {
@@ -231,7 +233,8 @@
       tr.style.display = visible ? '' : 'none';
       if (visible) shown++;
     });
-    document.querySelector('h2 ~ div').textContent = `Detailed Metrics (${shown})`;
+    const title = document.getElementById('metricsTitle');
+    if (title) title.textContent = `Detailed Metrics (${shown})`;
   }
 
   // Initial sort
