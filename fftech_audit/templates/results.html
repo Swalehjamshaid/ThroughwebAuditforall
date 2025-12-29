@@ -11,14 +11,12 @@
   <div class="progress" style="margin-top:12px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
   <p class="text-muted" style="margin-top:6px">Score: {{ score }}%</p>
 
-  <!-- Severity badges -->
   <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
     <span class="badge">Errors: {{ severity.errors }}</span>
     <span class="badge">Warnings: {{ severity.warnings }}</span>
     <span class="badge">Notices: {{ severity.notices }}</span>
   </div>
 
-  <!-- Category donuts -->
   <div style="display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:16px;margin-top:16px">
     <canvas id="donutCrawl"></canvas>
     <canvas id="donutSEO"></canvas>
@@ -27,7 +25,6 @@
     <canvas id="donutMobile"></canvas>
   </div>
 
-  <!-- Metrics table -->
   <div style="margin-top:24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <input id="filterText" class="input" placeholder="Filter metrics by name/category/value..." oninput="filterMetrics()" style="max-width:420px" />
@@ -57,7 +54,7 @@
             <td>{{ r.id }}</td>
             <td>{{ r.name }}</td>
             <td>{{ r.category }}</td>
-            <td>{{ r.value }}</td>  <!-- ✅ Now reliable text (JSON-stringified in app.py) -->
+            <td>{{ r.value }}</td>
             <td>{{ r.detail }}</td>
           </tr>
         {% endfor %}
@@ -83,7 +80,7 @@
     donut(document.getElementById('donutMobile'), cat['Mobile']);
   })();
 
-  // Build table (helpers live in static/app.js)
+  // Sort init (helpers in static/app.js)
   window.currentAudit = {
     metrics: (function(){
       const M = {};
@@ -99,4 +96,3 @@
   });
 </script>
 {% endblock %}
-``
