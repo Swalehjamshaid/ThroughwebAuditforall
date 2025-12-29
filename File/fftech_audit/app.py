@@ -38,7 +38,7 @@ app = FastAPI(title="FF Tech AI Website Audit SaaS", version="7.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ------------------------------------------------------------
-# Static: prefer root /static if present, otherwise package static
+# Static
 # ------------------------------------------------------------
 ROOT_STATIC = os.path.join(os.path.dirname(__file__), "..", "static")
 PKG_STATIC = os.path.join(os.path.dirname(__file__), "static")
@@ -57,7 +57,6 @@ def init_db():
     log the error and continue—service must start so Railway healthcheck passes.
     """
     try:
-        # Quick connect test
         with engine.connect() as _:
             pass
         Base.metadata.create_all(bind=engine)
@@ -137,7 +136,6 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
     weaknesses = metrics.get(5, {}).get("value", [])
     priority_fixes = metrics.get(6, {}).get("value", [])
 
-    # Build rows 1..200
     rows = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": f"Metric {pid}", "category": "-"})
