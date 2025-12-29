@@ -1,0 +1,30 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FF Tech AI • Website Audit SaaS{% endblock %}</title>
+  <meta name="description" content="AI-powered website audits: security, performance, SEO, mobile, content. Instant results.">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <img src="/static/logo.png" alt="FF Tech AI" onerror="this.style.display='none'">
+    <h1>FF Tech AI • Audit</h1>
+    <div style="margin-left:auto; display:flex; gap:12px;">
+      {% if ENABLE_AUTH %}
+        <a href="/auth/register" class="btn ghost">Register</a>
+      {% endif %}
+      <a href="/" class="btn ghost">New Audit</a>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <script src="/static/app.js"></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,22 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>{{ message }}</h2>
+  <p class="muted">You are verified. We saved your session token to your browser.</p>
+  <pre id="tokenBox" class="token">{{ token }}</pre>
+  <div class="form-row">
+    <a href="/" class="btn ghost">Go to Homepage</a>
+    <a href="/schedule" class="btn ghost">Schedule Reports</a>
+  </div>
+</section>
+<script>
+  (function(){
+    const t = (document.getElementById('tokenBox').innerText||'').trim();
+    if (t) {
+      localStorage.setItem('fftech_token', t);
+      document.cookie = 'token='+encodeURIComponent(t)+'; Max-Age='+(60*60*24*180)+'; Path=/; SameSite=Lax';
+    }
+  })();
+</script>
+{% endblock %}

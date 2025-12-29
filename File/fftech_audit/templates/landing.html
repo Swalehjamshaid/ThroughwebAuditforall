@@ -1,0 +1,27 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h2 class="title">FF Tech AI • Website Audit</h2>
+  <p class="subtitle">Instant, professional audits with world-class grading and 200 metrics.</p>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h3>Run Free Audit</h3>
+    <p class="muted">Enter a full URL (including https://) and get an instant 200‑metric report.</p>
+    <form method="post" action="/audit/open" class="form-row">
+      <input name="url" type="url" required placeholder="https://example.com">
+      <button type="submit" class="btn primary">Analyze Now</button>
+    </form>
+    {% if error %}
+    <div class="alert">{{ error }}</div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h3>Registration</h3>
+    <p class="muted">Verify by email, download 5‑page PDF, and schedule daily/weekly/monthly reports.</p>
+    <a href="/auth/register" class="btn ghost">Register</a>
+  </div>
+</section>
+{% endblock %}

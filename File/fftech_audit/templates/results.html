@@ -1,0 +1,74 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Results</h2>
+  <p><strong>URL:</strong> {{ url_display }}</p>
+</section>
+
+<section class="grid">
+  <div class="card score">
+    <div class="big">{{ score }}%</div>
+    <div class="badge">Grade: {{ grade }}</div>
+  </div>
+  <div class="card">
+    <h3>Category Breakdown</h3>
+    <div class="progress"><label>Security</label><div style="width:{{ progress_security }}%"></div></div>
+    <div class="progress"><label>Performance</label><div style="width:{{ progress_performance }}%"></div></div>
+    <div class="progress"><label>SEO</label><div style="width:{{ progress_seo }}%"></div></div>
+    <div class="progress"><label>Mobile</label><div style="width:{{ progress_mobile }}%"></div></div>
+    <div class="progress"><label>Content</label><div style="width:{{ progress_content }}%"></div></div>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Executive Summary</h3>
+  <p>{{ rows[2].value }}</p>
+</section>
+
+<section class="grid">
+  <div class="card">
+    <h3>Strengths</h3>
+    <ul>
+      {% for s in rows[3].value if rows[3].value is iterable %}
+      <li>{{ s }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Weak Areas</h3>
+    <ul>
+      {% for w in rows[4].value if rows[4].value is iterable %}
+      <li>{{ w }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Priority Fixes</h3>
+    <ul>
+      {% for f in rows[5].value if rows[5].value is iterable %}
+      <li>{{ f }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="card">
+  <h3>200 Metrics</h3>
+  <table class="metrics">
+    <thead>
+      <tr><th>ID</th><th>Metric</th><th>Category</th><th>Value</th></tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.id }}</td>
+        <td>{{ row.name }}</td>
+        <td>{{ row.category }}</td>
+        <td>{{ row.value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

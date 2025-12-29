@@ -1,0 +1,47 @@
+
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Schedule Reports</h2>
+  <p class="muted">Choose frequency and local time to receive PDF by email.</p>
+  <form id="sched" class="grid">
+    <div class="card">
+      <label>Website URL</label>
+      <input id="url" type="url" required placeholder="https://example.com">
+    </div>
+    <div class="card">
+      <label>Frequency</label>
+      <select id="frequency">
+        <option value="daily">Daily</option>
+        <option value="weekly" selected>Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </div>
+    <div class="card">
+      <label>Time of day</label>
+      <input id="time" type="time" value="09:00">
+    </div>
+    <div class="card">
+      <label>Timezone</label>
+      <input id="tz" type="text" value="Asia/Karachi">
+    </div>
+  </form>
+  <div class="form-row">
+    <button class="btn primary" onclick="saveSchedule()">Save Schedule</button>
+    <span id="msg" class="muted"></span>
+  </div>
+</section>
+<script>
+async function saveSchedule(){
+  const token = localStorage.getItem('fftech_token')||'';
+  if (!token) { document.getElementById('msg').innerText = 'Missing session token. Verify via email link.'; return; }
+  const url = document.getElementById('url').value.trim();
+  const frequency = document.getElementById('frequency').value;
+  const time_of_day = document.getElementById('time').value || '09:00';
+  const timezone = document.getElementById('tz').value || 'UTC';
+  const res = await fetch('/schedule/set', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token, url, frequency, time_of_day, timezone }) });
+  const data = await res.json();
+  document.getElementById('msg').innerText = data.next_run_at_utc ? ('Saved • next run (UTC): '+data.next_run_at_utc) : (data.detail||'Failed');
+}
+</script>
+{% endblock %}
