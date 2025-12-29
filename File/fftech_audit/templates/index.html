@@ -1,34 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>FF Tech AI • Website Audit SaaS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <!-- Preconnect for faster font loading -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  
+  <!-- App assets -->
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+  
+  <!-- Beautiful modern styling improvements -->
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #1e293b;
+      --primary: #6366f1;
+      --accent: #ec4899;
+      --glow-primary: 0 0 20px rgba(99, 102, 241, 0.4);
+      --glow-accent: 0 0 20px rgba(236, 72, 153, 0.5);
+    }
 
-<!DOCTYPE html>
-<html lang="en"><head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FF Tech AI • Website Audit</title>
-  /static/app.css
-</head><body>
-  <header class="topbar">
-    /static/logo.png
-    <h1>FF Tech AI • Website Audit SaaS</h1>
-  </header>
-  <main class="container">
-    <section class="card">
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 80px 0 100px;
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      margin: 0 0 16px;
+      background: linear-gradient(90deg, #c7d2fe, #fbbf24, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Audit Card */
+    .audit-card {
+      background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin: 40px 0;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .audit-card h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 24px;
+      color: var(--text);
+    }
+
+    .audit-form {
+      display: flex;
+      gap: 12px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .audit-form input {
+      flex: 1;
+      padding: 16px 20px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.6);
+      color: var(--text);
+      font-size: 1.1rem;
+    }
+
+    .audit-form input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .audit-form button {
+      padding: 0 32px;
+      border-radius: 12px;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: var(--glow-primary);
+    }
+
+    .audit-form button:hover {
+      background: #4f46e5;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+    }
+
+    /* Register Card */
+    .register-card {
+      background: rgba(17, 24, 39, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      margin: 40px 0;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+
+    .register-card h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0 0 16px;
+    }
+
+    .register-card a {
+      display: inline-block;
+      padding: 14px 36px;
+      background: var(--accent);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-top: 16px;
+      transition: all 0.3s ease;
+      box-shadow: var(--glow-accent);
+    }
+
+    .register-card a:hover {
+      background: #db2777;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(236, 72, 153, 0.5);
+    }
+
+    /* Features */
+    .features {
+      padding: 60px 0;
+    }
+
+    .features h2 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .features ul {
+      max-width: 800px;
+      margin: 0 auto;
+      font-size: 1.2rem;
+      line-height: 2;
+      color: var(--text-muted);
+    }
+
+    .features li {
+      margin: 12px 0;
+    }
+
+    .features strong {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body class="font-inter theme-dark">
+  <div class="container">
+    <div class="hero">
+      <h1>FF Tech AI • Website Audit SaaS</h1>
+    </div>
+
+    <div class="audit-card">
       <h2>Run an Audit</h2>
-      /audit/open
+      <form action="/audit/open" method="post" class="audit-form">
         <input type="url" name="url" placeholder="https://example.com" required />
         <button type="submit">Analyze</button>
       </form>
-      {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    </section>
-    <section class="card">
-      <h3>Registered Access (Email Verification)</h3>
-      /auth/register<button type="submit">Register</button></form>
-    </section>
-    <section class="card">
-      <h3>How it works</h3>
+    </div>
+
+    <div class="register-card">
+      <h2>Registered Access (Email Verification)</h2>
+      <a href="/auth/register">Register</a>
+    </div>
+
+    <div class="features">
+      <h2>How it works</h2>
       <ul>
-        <li>Open access: quick audits, no history saved.</li>
-        <li>Registered: email verification, audit history, 5‑page PDF, scheduling (premium).</li>
-        <li>Transparent scoring: security, performance, SEO, mobile, content.</li>
+        <li><strong>Open access:</strong> quick audits, no history saved.</li>
+        <li><strong>Registered:</strong> email verification, audit history, 5-page PDF, scheduling (premium).</li>
+        <li><strong>Transparent scoring:</strong> security, performance, SEO, mobile, content.</li>
       </ul>
-    </section>
-  </main>
-</body></html>
+    </div>
+  </div>
+</body>
+</html>
