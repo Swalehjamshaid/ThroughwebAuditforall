@@ -1,42 +1,41 @@
-
 {% extends "base.html" %}
+{% block title %}FF Tech AI • Free Website Audit{% endblock %}
+
 {% block content %}
-<section class="card" style="margin-bottom:24px;">
-  <h2 style="margin-top:0;">Run a Quick Audit</h2>
-  <p style="color:var(--text-muted);margin-top:4px;">
-    Enter a full URL (including <strong>https://</strong>) to run a one‑page audit.
-  </p>
+<div style="text-align:center; padding:80px 0;">
+  <h1 style="font-size:3.5rem; font-weight:800; margin:0 0 40px; 
+    background:linear-gradient(90deg,#6366f1,#ec4899); 
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;">
+    FF Tech AI • Website Audit
+  </h1>
 
-  /audit/open
-    <label for="url" style="display:block;margin-bottom:8px;">Website URL</label>
-    <input id="url" name="url" type="url" required placeholder="https://example.com"
-           style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);" />
-    <div style="margin-top:12px;display:flex;gap:12px;">
-      <button type="submit" class="btn ghost">Run Audit</button>
-      /auth/register
-        Register to get 5‑page PDF
-      </a>
-    </div>
-  </form>
-
-  {% if error %}
-  <div style="margin-top:12px;padding:12px;border-radius:8px;background:#1e293b;color:#fca5a5;">
-    {{ error }}
+  <div class="card" style="max-width:900px; margin:60px auto; padding:60px; 
+    backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:28px;">
+    <h2 style="font-size:2.4rem; margin:0 0 40px;">Run Free Audit</h2>
+    <form action="/audit/open" method="post" style="display:flex; gap:20px; max-width:800px; margin:0 auto;">
+      <input type="url" name="url" placeholder="https://example.com" required 
+        style="flex:1; padding:20px 28px; border-radius:16px; border:1px solid var(--border); 
+        background:#151515; color:var(--text); font-size:1.4rem;" />
+      <button type="submit" style="padding:20px 60px; border-radius:16px; background:var(--accent); 
+        color:#000; font-weight:700; font-size:1.4rem; border:none; cursor:pointer; 
+        box-shadow:var(--glow); transition:0.3s;">
+        Analyze Now
+      </button>
+    </form>
+    {% if error %}
+      <div style="color:#ff6666; font-weight:700; font-size:1.3rem; margin-top:30px;">
+        {{ error }}
+      </div>
+    {% endif %}
   </div>
-  {% endif %}
-</section>
 
-<section class="card">
-  <h2 style="margin-top:0;">What You’ll Get</h2>
-  <ul style="margin-top:8px;">
-    <li>Overall score &amp; grade</li>
-    <li>Category breakdown (Security, Performance, SEO, Mobile, Content)</li>
-    <li>Strengths, weak areas, priority fixes</li>
-    <li>Detailed metrics table</li>
-  </ul>
-  <p style="color:var(--text-muted);margin-top:8px;">
-    Registered users receive a <strong>5‑page executive PDF</strong> by email and can set a
-    <strong>daily/weekly schedule</strong> with local time and timezone.
-  </p>
-</section>
+  <div class="card" style="max-width:1000px; margin:60px auto; padding:60px; text-align:left;">
+    <h2 style="font-size:2.4rem; margin:0 0 40px; text-align:center;">How It Works</h2>
+    <ul style="font-size:1.4rem; line-height:2.2; color:var(--muted); max-width:900px; margin:0 auto;">
+      <li><strong>🔍 Instant:</strong> Enter URL → Get 200+ metrics across 5 categories in seconds.</li>
+      <li><strong>📊 Transparent:</strong> Overall score + category breakdowns + priority fixes.</li>
+      <li><strong>💎 Free:</strong> Unlimited open audits. Register for PDF reports & history.</li>
+    </ul>
+  </div>
+</div>
 {% endblock %}
