@@ -58,7 +58,6 @@ def register_metrics():
         for name in names:
             METRIC_DESCRIPTORS[idx] = {"name": name, "category": cat}
             idx += 1
-    # fill to 200
     while idx <= 200:
         METRIC_DESCRIPTORS[idx] = {"name": f"Placeholder {idx}", "category": "Z"}
         idx += 1
@@ -77,7 +76,7 @@ class AuditEngine:
 
     def _extract(self):
         hrefs = re.findall(r'href=[\'"]?([^\'" >]+)', self.html, flags=re.IGNORECASE)
-        srcs = re.findall(r'src=[\'"]?([^\'" >]+)', self.html, flags=re.IGNORECASE)
+        srcs  = re.findall(r'src=[\'"]?([^\'" >]+)',  self.html, flags=re.IGNORECASE)
         for u in hrefs:
             full = urljoin(self.url, u)
             if urlparse(full).netloc == self.domain:
@@ -96,8 +95,6 @@ class AuditEngine:
         total_errors = total_warnings = total_notices = 0
 
         # Status
-        m[2] = {"value": "Pending", "detail": "Website Grade"}
-        m[7] = {"value": {"errors": 0,"warnings":0,"notices":0}, "detail": "Severity"}
         m[21] = {"value": 1 if 200 <= self.status_code < 300 else 0, "detail": f"Status {self.status_code}"}
         m[23] = {"value": 1 if 400 <= self.status_code < 500 else 0, "detail": f"Status {self.status_code}"}
         m[24] = {"value": 1 if 500 <= self.status_code < 600 else 0, "detail": f"Status {self.status_code}"}
@@ -117,7 +114,7 @@ class AuditEngine:
         m[48] = {"value": 1 if meta_desc and len(meta_desc) < 50 else 0, "detail": f"Meta length {len(meta_desc) if meta_desc else 0}"}
         total_errors += 1 if m[41]["value"] else 0
         total_warnings += (m[43]["value"] or m[44]["value"] or m[45]["value"])
-        total_notices += (m[47]["value"] or m[48]["value"])
+        total_notices  += (m[47]["value"] or m[48]["value"])
 
         # H1 / images
         h1s = re.findall(r"<h1[^>]*>(.*?)</h1>", self.html, flags=re.IGNORECASE | re.DOTALL)
@@ -144,7 +141,7 @@ class AuditEngine:
         viewport_meta = re.search(r'<meta[^>]+name=["\']viewport["\']', self.html, flags=re.IGNORECASE)
         m[98] = {"value": 1 if bool(viewport_meta) else 0, "detail": "Viewport meta present" if viewport_meta else "Missing viewport"}
         total_warnings += 0 if viewport_meta else 1
-        canonical = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]*href="\'["\']', self.html, flags=re.IGNORECASE)
+        canonical = re.search(r'<link[^>]+rel=["\']canonical["\'][^>]*href=["\']([^', self.html, flags=re.IGNORECASE)
         m[32] = {"value": 0 if canonical else 1, "detail": f"Canonical present: {bool(canonical)}"}
         og_or_twitter = bool(re.search(r'property=["\']og:', self.html) or re.search(r'name=["\']twitter:', self.html))
         m[62] = {"value": 0 if og_or_twitter else 1, "detail": "Open Graph/Twitter present" if og_or_twitter else "Missing"}
@@ -211,16 +208,16 @@ class AuditEngine:
 
         # Overall score and grade
         base = 100
-        base -= (10 if m[41]["value"] else 0)       # missing title
-        base -= (5 if m[45]["value"] else 0)        # missing meta
-        base -= (15 if m[105]["value"]==0 else 0)   # no https
-        base -= min(10, m[88]["value"])             # render-blocking approx
+        base -= (10 if m[41]["value"] else 0)
+        base -= (5  if m[45]["value"] else 0)
+        base -= (15 if m[105]["value"]==0 else 0)
+        base -= min(10, m[88]["value"])
         base -= min(8, int((len(self.content)/1024)/512)*2 if self.content else 0)
         score = max(0, min(100, base))
         m[1] = {"value": score, "detail": "Overall Site Health (%)"}
         m[2] = {"value": grade_from_score(score), "detail": "Website Grade"}
 
-        # Executive summary + strengths/weaknesses
+        # Exec summary + strengths/weaknesses
         strengths, weaknesses, priority_fixes = [], [], []
         if m[105]["value"]: strengths.append("HTTPS enabled")
         if title and 15 <= len(title) <= 65: strengths.append("Title length optimal")
@@ -252,7 +249,6 @@ class AuditEngine:
         m[191] = {"value": min(100, m[110]["value"]*10), "detail": "Security improvement potential"}
         m[200] = {"value": max(0, 100 - m[180]["value"]), "detail": "Growth readiness"}
 
-        # Summary text
         m[3] = {"value": self.executive_summary(m), "detail": "Executive Summary (~200 words)"}
 
         # Fill missing IDs
@@ -265,12 +261,11 @@ class AuditEngine:
     def executive_summary(self, metrics: Dict[int, Dict[str, Any]]) -> str:
         score = metrics[1]["value"]; grade = metrics[2]["value"]
         sev = metrics[7]["value"]; perf = metrics[84]["value"]; resp = metrics[91]["value"]
-        strengths = ", ".join(metrics[4]["value"]) if metrics[4]["value"] else "None"
+        strengths  = ", ".join(metrics[4]["value"]) if metrics[4]["value"] else "None"
         weaknesses = ", ".join(metrics[5]["value"]) if metrics[5]["value"] else "None"
-        text = (
+        return (
             f"{APP_BRAND} audited {self.url} across crawlability, on-page SEO, performance, mobile, and security. "
             f"Overall health score is {score}% ({grade}). We found {sev['errors']} errors, {sev['warnings']} warnings, {sev['notices']} notices. "
             f"Approx payload {perf} KB; server response {resp} ms. Strengths: {strengths}. Weaknesses: {weaknesses}. "
             f"Priority: link integrity, HTTPS/security headers, responsive meta, compression."
         )
-        return text
