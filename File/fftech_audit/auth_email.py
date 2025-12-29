@@ -1,5 +1,4 @@
 
-# fftech_audit/auth_email.py
 import os
 import time
 import hmac
@@ -69,7 +68,8 @@ def send_verification_link(email: str):
     token = generate_token({"email": email, "purpose": "verify"}, ttl_seconds=3600)
     verify_url = f"{BASE_URL}/auth/verify-link?token={token}"
     subject = "Your FF Tech AI secure login link"
-    body = f"Click to complete registration: {verify_url}\n\nThis link expires in 60 minutes."
+    # Use concatenation to avoid f-string pitfalls with hidden characters
+    body = "Click to complete registration: " + verify_url + "\n" + "\n" + "This link expires in 60 minutes."
     _send_email(email, subject, body)
 
 
@@ -109,4 +109,3 @@ def _deliver(msg: EmailMessage):
             server.login(SMTP_USER, SMTP_PASS)
         server.send_message(msg)
         print("[EMAIL] Sent to", msg["To"])
-``
