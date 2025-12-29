@@ -1,5 +1,5 @@
-
 {% extends "base.html" %}
+
 {% block content %}
 <section style="text-align:center; margin-bottom:18px;">
   <h1 style="font-size:2rem; font-weight:800; margin:0;">Audit any website in seconds</h1>
@@ -11,11 +11,12 @@
   <!-- Open Audit -->
   <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.25);">
     <h3 style="margin:0 0 8px; font-weight:700;">Open Audit</h3>
-
-    /audit/open
+    
+    <form id="auditForm" action="/audit/open" method="post">
       <input id="urlOpen" name="url" type="url" required placeholder="https://example.com"
              value="{{ prefill_url or '' }}"
              style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid #334155; background:#0b1220; color:#e2e8f0;" />
+      
       <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
         <button id="btnRunAudit" type="submit" style="padding:12px 16px; border-radius:12px; border:none; background:#2563eb; color:#fff; font-weight:700; cursor:pointer;">
           Run Audit
@@ -23,18 +24,20 @@
         <span id="auditStatus" style="color:#94a3b8; display:none;">Running…</span>
       </div>
     </form>
-
+    
     <p style="color:#94a3b8; font-size:.9rem; margin-top:8px;">No sign‑in required. Instant results.</p>
   </div>
-
+  
   <!-- Sign In / Registration -->
   <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.25);">
     <h3 style="margin:0 0 8px; font-weight:700;">Sign In / Register</h3>
     <p style="color:#94a3b8;">Register with name, email & password, then verify via email link.</p>
+    
     <div style="display:flex; gap:8px;">
-      /auth/loginSign In</a>
-      /auth/registerRegister</a>
+      <a href="/auth/login" style="color:#2563eb; text-decoration:none;">Sign In</a>
+      <a href="/auth/register" style="color:#2563eb; text-decoration:none;">Register</a>
     </div>
+    
     <p style="color:#94a3b8; font-size:.9rem; margin-top:8px;">Registered users can download PDFs & schedule audit emails.</p>
   </div>
 </div>
@@ -43,46 +46,49 @@
 
 <script>
 (function(){
-  const form   = document.getElementById('auditForm');
-  const input  = document.getElementById('urlOpen');
-  const btn    = document.getElementById('btnRunAudit');
+  const form = document.getElementById('auditForm');
+  const input = document.getElementById('urlOpen');
+  const btn = document.getElementById('btnRunAudit');
   const status = document.getElementById('auditStatus');
-
+  
   if (!form || !input || !btn) return;
-
+  
   form.addEventListener('submit', async (e) => {
-    e.preventDefault(); // keep SSR as fallback if fetch fails
+    e.preventDefault();
+    
     const url = (input.value || '').trim();
     if (!url) { alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
     if (!/^https?:\/\/.+/i.test(url)) { alert('Include http:// or https://'); input.focus(); return; }
-
+    
     status.style.display = 'inline';
     btn.disabled = true;
     overlayShow();
-
+    
     try {
-      const body = new URLSearchParams(); body.append('url', url);
+      const body = new URLSearchParams();
+      body.append('url', url);
+      
       const resp = await fetch('/audit/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString()
       });
-
+      
       const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
       if (resp.ok && ct.includes('text/html')) {
         const html = await resp.text();
-        document.open(); document.write(html); document.close();
+        document.open();
+        document.write(html);
+        document.close();
         return;
       }
-
-      // Friendly error
+      
       let msg = 'Audit failed. Please check the logs.';
       try { const data = await resp.json(); msg = data.detail || msg; }
       catch { const text = await resp.text(); if (text) msg = text; }
-      console.error('[Audit] Server error:', msg);
+      
       alert(msg);
     } catch (err) {
-      console.error('[Audit] Network error:', err);
       alert('Network error while running audit: ' + err);
     } finally {
       status.style.display = 'none';
