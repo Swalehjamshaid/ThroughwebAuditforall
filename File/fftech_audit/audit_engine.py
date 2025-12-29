@@ -1,7 +1,7 @@
 
 # fftech_audit/audit_engine.py
 from urllib.parse import urlparse, urljoin
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 import re, time
 try:
     import requests
@@ -10,6 +10,7 @@ except Exception:
 import urllib.request
 import ssl
 
+# === Metric Descriptors ===
 METRIC_DESCRIPTORS: Dict[int, Dict[str, str]] = {}
 idx = 1
 for category, items in [
@@ -46,6 +47,11 @@ for category, items in [
                                           "Lazy Load Conflicts","Sitemap Presence","Noindex Issues","Structured Data Consistency","Redirect Correctness",
                                           "Broken Rich Media","Social Metadata Presence","Error Trend","Health Trend","Crawl Trend","Index Trend",
                                           "Core Web Vitals Trend","Backlink Trend","Keyword Trend","Historical Comparison","Overall Stability Index"]),
+    ("Competitor Analysis", ["Competitor Health Score","Competitor Performance Comparison","Competitor Core Web Vitals Comparison",
+                             "Competitor SEO Issues Comparison","Competitor Broken Links Comparison","Competitor Authority Score",
+                             "Competitor Backlink Growth","Competitor Keyword Visibility","Competitor Rank Distribution","Competitor Content Volume",
+                             "Competitor Speed Comparison","Competitor Mobile Score","Competitor Security Score","Competitive Gap Score",
+                             "Competitive Opportunity Heatmap","Competitive Risk Heatmap","Overall Competitive Rank"]),
     ("Broken Links Intelligence", ["Total Broken Links","Internal Broken Links","External Broken Links","Broken Links Trend","Broken Pages by Impact",
                                    "Status Code Distribution","Page Type Distribution","Fix Priority Score","SEO Loss Impact","Affected Pages Count",
                                    "Broken Media Links","Resolution Progress","Risk Severity Index"]),
@@ -59,9 +65,9 @@ for category, items in [
         METRIC_DESCRIPTORS[idx] = {"name": name, "category": category}
         idx += 1
 
+# === Scoring ===
 WEIGHTS = {"security": 0.35, "performance": 0.25, "seo": 0.20, "mobile": 0.10, "content": 0.10}
 SECURITY_PENALTIES = {"csp": 20, "hsts": 15, "x_frame": 10, "referrer_policy": 5}
-
 
 def canonical_origin(url: str) -> str:
     parsed = urlparse(url)
@@ -69,10 +75,8 @@ def canonical_origin(url: str) -> str:
     host = parsed.netloc or parsed.path.split('/')[0]
     return f"{scheme}://{host}".lower()
 
-
 def clamp(val: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, val))
-
 
 def grade_from_score(score: float) -> str:
     s = round(score)
@@ -82,6 +86,7 @@ def grade_from_score(score: float) -> str:
     if s >= 60: return 'D'
     return 'F'
 
+# === Fetching ===
 USER_AGENT = 'FFTech-AuditBot/1.0 (+https://fftech.ai)'
 
 class FetchResult:
@@ -91,7 +96,6 @@ class FetchResult:
         self.content = content
         self.elapsed_ms = elapsed_ms
         self.url = url
-
 
 def fetch(url: str, timeout: float = 10.0) -> FetchResult:
     start = time.time()
@@ -122,7 +126,6 @@ def fetch(url: str, timeout: float = 10.0) -> FetchResult:
     elapsed_ms = int((time.time() - start) * 1000)
     return FetchResult(status, headers, content, elapsed_ms, final_url)
 
-
 def head_exists(base: str, path: str, timeout: float = 5.0) -> bool:
     url = urljoin(base, path)
     if requests:
@@ -139,7 +142,7 @@ def head_exists(base: str, path: str, timeout: float = 5.0) -> bool:
     except Exception:
         return False
 
-
+# === Category Scoring ===
 def compute_category_security(sec: Dict[str, Any]) -> float:
     base = 100 if sec.get('https_enabled') else 60
     for k, penalty in SECURITY_PENALTIES.items():
@@ -193,6 +196,7 @@ def aggregate_score(metrics: Dict[str, Dict[str, Any]]) -> Tuple[float, Dict[str
     total = sum(WEIGHTS[k] * cats[k] for k in WEIGHTS)
     return round(clamp(total), 1), cats
 
+# === Audit Engine ===
 class AuditEngine:
     def __init__(self, url: str):
         self.url = url
@@ -204,6 +208,7 @@ class AuditEngine:
         content = r.content
         html_text = content.decode('utf-8', errors='ignore') if content else ''
 
+        # Security
         sec = {
             'https_enabled': origin.startswith('https://'),
             'csp': bool(headers.get('content-security-policy')),
@@ -212,6 +217,7 @@ class AuditEngine:
             'referrer_policy': bool(headers.get('referrer-policy')),
         }
 
+        # Performance
         cache_max_age = 0
         cc = headers.get('cache-control', '')
         m = re.search(r'max-age\s*=\s*(\d+)', cc, re.I)
@@ -223,11 +229,12 @@ class AuditEngine:
             'cache_max_age_s': cache_max_age,
         }
 
-        has_title = bool(re.search(r'<title[^>]*>.*?</title>', html_text, re.I|re.S))
-        has_desc = bool(re.search(r'<meta[^>]*name=["']description["'][^>]*content=["']', html_text, re.I))
+        # SEO (✅ corrected regexes: use real < and >, proper quoting)
+        has_title = bool(re.search(r'<title\b[^>]*>.*?</title>', html_text, re.I | re.S))
+        has_desc  = bool(re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\']', html_text, re.I))
         has_sitemap = head_exists(origin, '/sitemap.xml')
-        has_robots = head_exists(origin, '/robots.txt')
-        structured = 'application/ld+json' in html_text.lower()
+        has_robots  = head_exists(origin, '/robots.txt')
+        structured  = 'application/ld+json' in html_text.lower()
         seo = {
             'has_title': has_title,
             'has_meta_desc': has_desc,
@@ -236,14 +243,17 @@ class AuditEngine:
             'structured_data_ok': structured,
         }
 
-        viewport = bool(re.search(r'<meta[^>]*name=["']viewport["'][^>]*>', html_text, re.I))
+        # Mobile (✅ corrected regex)
+        viewport   = bool(re.search(r'<meta[^>]*name=["\']viewport["\'][^>]*>', html_text, re.I))
         responsive = 'device-width' in html_text.lower()
         mobile = {'viewport_ok': viewport, 'responsive_meta': responsive}
 
-        has_h1 = bool(re.search(r'<h1', html_text, re.I))
-        alt_ok = bool(re.search(r'<img[^>]*\salt=["']', html_text, re.I))
+        # Content (✅ corrected regex)
+        has_h1 = bool(re.search(r'<h1\b', html_text, re.I))
+        alt_ok = bool(re.search(r'<img\b[^>]*\salt=["\']', html_text, re.I))
         content_cat = {'has_h1': has_h1, 'alt_ok': alt_ok}
 
+        # Populate metrics
         metrics: Dict[int, Dict[str, Any]] = {}
         metrics[10] = {'value': sec['https_enabled']}
         metrics[11] = {'value': sec['csp']}
@@ -263,8 +273,10 @@ class AuditEngine:
         metrics[50] = {'value': content_cat['has_h1']}
         metrics[51] = {'value': content_cat['alt_ok']}
 
+        # Severity (simple example)
         warnings = sum(1 for k in ['csp','hsts','x_frame','referrer_policy'] if not sec[k])
-        metrics[100] = {'value': 0}
+        metrics[100] = {'value': 0}  # errors
         metrics[101] = {'value': warnings}
-        metrics[102] = {'value': 0}
+        metrics[102] = {'value': 0}  # notices
+
         return metrics
