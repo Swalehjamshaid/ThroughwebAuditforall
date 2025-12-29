@@ -1,259 +1,73 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="landing-hero">
-  <div class="container">
-    <h1 class="main-title">
-      FF Tech AI • Website Audit SaaS
-    </h1>
-
-    <!-- Run an Audit Card -->
-    <section class="glass-card audit-section">
-      <h2 class="section-title">Run an Audit</h2>
-      <form action="/audit/open" method="post" class="audit-form">
-        <input
-          type="url"
-          name="url"
-          placeholder="https://example.com"
-          required
-          class="url-input"
-          aria-label="Website URL to audit"
-        />
-        <button type="submit" class="analyze-button">
-          Analyze
-        </button>
-      </form>
-
-      {% if error %}
-        <p class="error-message" role="alert">{{ error }}</p>
-      {% endif %}
-    </section>
-
-    <!-- Registered Access Card -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FF Tech AI • Website Audit SaaS{% endblock %}</title>
+  <meta name="description" content="AI-powered website audits: security, performance, SEO, mobile, content. Instant 0-100 scores + PDF reports.">
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  {% block extra_css %}{% endblock %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <img src="/static/logo.png" alt="FF Tech AI Logo" style="height:32px; width:auto; display:block; object-fit:contain;" onerror="this.style.display='none'">
+    <div class="logo-dot" style="width:8px;height:8px;background:#00ADB5;border-radius:50%;margin:0 8px;"></div>
+    <strong>FF Tech AI • Website Audit</strong>
     {% if ENABLE_AUTH %}
-    <section class="glass-card register-section">
-      <h2 class="section-title">Registered Access (Email Verification)</h2>
-      <p class="register-description">
-        Unlock audit history, downloadable 5-page PDF reports, and premium scheduling features.
-      </p>
-      <a href="/auth/register" class="register-button">Register</a>
-    </section>
+    <div class="hdr__actions" style="margin-left:auto; display:flex; gap:12px;">
+      {% if user %}
+        <button class="btn ghost" onclick="window.location='/dashboard'">Dashboard</button>
+        <button class="btn ghost" onclick="logout()">Logout</button>
+      {% else %}
+        <a href="/auth/login" class="btn ghost">Login</a>
+      {% endif %}
+    </div>
     {% endif %}
+  </header>
+  
+  <main class="container page">
+    {% block content %}{% endblock %}
+  </main>
 
-    <!-- How It Works Card -->
-    <section class="glass-card how-it-works-section">
-      <h2 class="section-title">How it works</h2>
-      <ul class="features-list">
-        <li><strong>Open access:</strong> Instant audits for any website — no account needed, no history saved.</li>
-        <li><strong>Registered:</strong> Email verification unlocks full history, beautiful 5-page PDF reports, and upcoming premium scheduling.</li>
-        <li><strong>Transparent scoring:</strong> Clear 0–100 scores across security, performance, SEO, mobile, and content quality.</li>
-      </ul>
-    </section>
-
-    <!-- Optional subtle footer note -->
-    <footer class="landing-footer">
-      <p>Powered by AI-driven analysis • Instant, accurate, actionable insights</p>
-    </footer>
-  </div>
-</div>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-  :root {
-    --bg: #0f0f0f;
-    --card-bg: rgba(20, 25, 40, 0.65);
-    --border: rgba(255, 255, 255, 0.08);
-    --primary: #00ADB5;
-    --accent: #818cf8;
-    --glow-primary: 0 10px 30px rgba(0, 173, 181, 0.25);
-    --glow-accent: 0 10px 30px rgba(129, 140, 248, 0.3);
-    --text: #eaeaea;
-    --text-muted: #a0a0a0;
-  }
-
-  .landing-hero {
-    min-height: 100vh;
-    text-align: center;
-    padding: 80px 0 120px;
-    background: var(--bg);
-  }
-
-  .container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 20px;
-  }
-
-  .main-title {
-    font-size: 3.8rem;
-    font-weight: 800;
-    margin: 0 0 40px;
-    background: linear-gradient(90deg, #6366f1, #ec4899);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    line-height: 1.1;
-  }
-
-  .glass-card {
-    background: var(--card-bg);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: 28px;
-    padding: 60px;
-    margin: 60px auto;
-    max-width: 900px;
-    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
-    transition: transform 0.3s ease;
-  }
-
-  .glass-card:hover {
-    transform: translateY(-4px);
-  }
-
-  .how-it-works-section {
-    max-width: 1000px;
-  }
-
-  .section-title {
-    font-size: 2.6rem;
-    font-weight: 700;
-    margin: 0 0 40px;
-    color: var(--text);
-  }
-
-  .audit-form {
-    display: flex;
-    gap: 20px;
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  .url-input {
-    flex: 1;
-    padding: 20px 28px;
-    font-size: 1.4rem;
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: rgba(30, 41, 59, 0.8);
-    color: var(--text);
-    outline: none;
-    transition: all 0.3s ease;
-  }
-
-  .url-input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(0, 173, 181, 0.2);
-  }
-
-  .url-input::placeholder {
-    color: #777;
-  }
-
-  .analyze-button {
-    padding: 0 60px;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: white;
-    background: var(--primary);
-    border: none;
-    border-radius: 16px;
-    cursor: pointer;
-    box-shadow: var(--glow-primary);
-    transition: all 0.3s ease;
-  }
-
-  .analyze-button:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 15px 40px rgba(0, 173, 181, 0.4);
-  }
-
-  .register-button {
-    display: inline-block;
-    padding: 20px 80px;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: white;
-    background: var(--accent);
-    text-decoration: none;
-    border-radius: 16px;
-    box-shadow: var(--glow-accent);
-    transition: all 0.3s ease;
-  }
-
-  .register-button:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 15px 40px rgba(129, 140, 248, 0.4);
-  }
-
-  .register-description {
-    font-size: 1.3rem;
-    color: var(--text-muted);
-    max-width: 600px;
-    margin: 0 auto 40px;
-  }
-
-  .error-message {
-    color: #ef4444;
-    font-weight: 700;
-    font-size: 1.3rem;
-    margin-top: 30px;
-  }
-
-  .features-list {
-    font-size: 1.5rem;
-    line-height: 2.4;
-    max-width: 900px;
-    margin: 0 auto;
-    text-align: left;
-    color: var(--text-muted);
-    padding-left: 24px;
-  }
-
-  .features-list li {
-    margin-bottom: 20px;
-  }
-
-  .features-list strong {
-    color: var(--text);
-  }
-
-  .landing-footer {
-    margin-top: 80px;
-    color: #666;
-    font-size: 1.1rem;
-  }
-
-  /* Responsive adjustments */
-  @media (max-width: 860px) {
-    .main-title {
-      font-size: 3rem;
+  <script src="/static/app.js"></script>
+  {% block extra_js %}{% endblock %}
+  
+  <style>
+    :root { 
+      --bg:#121212; 
+      --card-bg:rgba(30,41,59,0.8); 
+      --card:#1e1e1e; 
+      --accent:#00ADB5; 
+      --text:#eaeaea; 
+      --text-muted:#a0a0a0; 
+      --border:rgba(255,255,255,0.08); 
+      --primary:#00ADB5; 
+      --glow-primary:0 10px 30px rgba(0,173,181,0.3);
+      --glow-accent:0 10px 30px rgba(129,140,248,0.3);
     }
-    .section-title {
-      font-size: 2.2rem;
+    * { box-sizing:border-box; }
+    body { 
+      margin:0; 
+      background:var(--bg); 
+      color:var(--text); 
+      font-family:'Inter',system-ui,Arial,sans-serif; 
+      line-height:1.6;
     }
-    .audit-form {
-      flex-direction: column;
+    .btn.ghost { 
+      background:transparent; 
+      border:1px solid var(--accent); 
+      color:var(--accent); 
+      padding:6px 16px; 
+      border-radius:8px; 
+      cursor:pointer; 
+      font-size:14px; 
+      transition:all 0.2s;
     }
-    .analyze-button {
-      padding: 20px;
-    }
-    .glass-card {
-      padding: 40px;
-      margin: 40px auto;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .main-title {
-      font-size: 2.5rem;
-    }
-    .url-input,
-    .analyze-button,
-    .register-button {
-      font-size: 1.2rem;
-    }
-  }
-</style>
-{% endblock %}
+    .btn.ghost:hover { background:var(--accent); color:#000; }
+    .page { padding:24px 0; min-height:calc(100vh - 80px); }
+  </style>
+</body>
+</html>
