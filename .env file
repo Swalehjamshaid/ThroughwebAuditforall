@@ -8,16 +8,15 @@ FREE_AUDITS_LIMIT=10
 SCHEDULER_INTERVAL=60
 PORT=8080
 
-# Assets control (toggle without changing templates)
-USE_CDN_ASSETS=false        # set true if /static not present or you prefer CDN
-CHARTJS_CDN=https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
+# Asset strategy (toggle without changing templates)
+USE_CDN_ASSETS=false
 GOOGLE_FONT_CSS=https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap
+CHARTJS_CDN=https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
 
-# SMTP (Gmail: use App Password, not normal password)
+# SMTP (Gmail App Password recommended)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_PASS=your-app-password      # Gmail App Password**
 SMTP_FROM=no-reply@fftech.io
 EMAIL_SENDER=no-reply@fftech.io
-``
