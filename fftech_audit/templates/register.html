@@ -22,7 +22,9 @@
 </div>
 
 <table class="table" style="margin-top:22px">
-  <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr></thead>
+  <thead>
+    <tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr>
+  </thead>
   <tbody>
     {% for r in rows %}
       <tr>
@@ -33,8 +35,8 @@
 </table>
 
 <script>
-  // Build donuts using the numeric values provided
-  const cat = {{ category|safe }};
+  // Category donuts (safe JSON)
+  const cat = JSON.parse('{{ category_json|e }}');
   const donut = (el, val)=> new Chart(el, {
     type:'doughnut',
     data:{ labels:['Score','Remaining'],
