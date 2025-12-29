@@ -1,17 +1,7 @@
 
-# Core
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-APP_BASE_URL=https://throughwebauditforall-production.up.railway.app
-SECRET_KEY=7fb8e12a9c3d4f5b6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9
-USER_AGENT=FFTech-Audit/3.0 (+https://fftech.io)
-FREE_AUDITS_LIMIT=10
-SCHEDULER_INTERVAL=60
-PORT=8080
-
-# SMTP (Gmail App Password required)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+SMTP_PASS=your-app-password      # Gmail App Password (not your normal password)
 SMTP_FROM=no-reply@fftech.io
-EMAIL_SENDER=no-reply@fftech.io
+SECRET_KEY=7fb8e12a9c3d4f5b6e7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9
