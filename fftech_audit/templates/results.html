@@ -51,7 +51,7 @@
         <canvas id="donut{{ loop.index }}" height="180"></canvas>
         <p style="margin:12px 0 0; font-weight:600; color:#e2e8f0;">{{ cat_name }}</p>
         <p style="font-size:2rem; font-weight:800; color:{{ color }};">
-          {{ category_scores[cat_name] }}%
+          {{ category_scores.get(cat_name, 0) }}%
         </p>
       </div>
     {% endfor %}
