@@ -1,16 +1,26 @@
-function toggleTheme(){
-  const body=document.body; const dark=body.classList.contains('theme-dark');
-  body.classList.toggle('theme-dark', !dark); body.classList.toggle('theme-light', dark);
-  localStorage.setItem('fftech_theme', dark?'light':'dark');
-}
-(function initTheme(){
-  const saved=localStorage.getItem('fftech_theme')||'dark';
-  document.body.classList.add(saved==='dark'?'theme-dark':'theme-light');
+
+(function(){
+  const d = window.FFTECH_DATA || { score: 0, categories: {security:0,performance:0,seo:0,mobile:0,content:0} };
+  // Overall donut
+  const ov = document.getElementById('overallChart');
+  if (ov && window.Chart) {
+    new Chart(ov, {
+      type: 'doughnut',
+      data: { labels: ['Score','Remaining'],
+        datasets: [{ data: [d.score, 100-d.score], backgroundColor:['#00ADB5','#2a2a2a'], borderWidth:0 }] },
+      options: { circumference: 180, rotation: -90, cutout: '70%', plugins: { legend: { display:false } } }
+    });
+  }
+  // Bar chart
+  const bc = document.getElementById('barChart');
+  if (bc && window.Chart) {
+    new Chart(bc, {
+      type: 'bar',
+      data: { labels: ['Security','Performance','SEO','Mobile','Content'],
+        datasets: [{ label:'Category Scores',
+          data:[d.categories.security,d.categories.performance,d.categories.seo,d.categories.mobile,d.categories.content],
+          backgroundColor:'#00ADB5' }] },
+      options: { scales: { y: { min:0, max:100 } }, plugins:{ legend:{ display:false } } }
+    });
+  }
 })();
-function logout(){ localStorage.removeItem('fftech_token'); alert('Logged out'); }
-if (window.Chart) {
-  const color=getComputedStyle(document.body).getPropertyValue('--text').trim()||'#e2e8f0';
-  Chart.defaults.color=color;
-  Chart.defaults.font.family="'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
-  Chart.defaults.plugins.legend.display=false;
-}
