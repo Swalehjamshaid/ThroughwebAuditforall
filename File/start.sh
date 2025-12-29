@@ -1,9 +1,15 @@
 
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Install dependencies
-pip install --no-cache-dir -r requirements.txt
+# Example: change this block to your stack
+# Node:
+# npm run start
 
-# Start the app
-exec uvicorn fftech_audit.app:app --host 0.0.0.0 --port "${PORT:-8080}"
+# Python FastAPI:
+# uvicorn main:app --host 0.0.0.0 --port "${PORT:-8080}"
+
+# Java Spring Boot:
+# java -jar target/myapp.jar
+
+# Keep the process in foreground (do NOT nohup/background it)
