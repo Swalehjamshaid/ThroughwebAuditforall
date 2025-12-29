@@ -1,6 +1,14 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Verify your email</h2>
-<p class="text-muted">We sent a verification link to <strong>{{ email }}</strong>. Click it to activate your account.</p>
+<h2 class="section-title">Create your account</h2>
+/auth/register
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <input class="input" type="text" name="name" placeholder="Full Name" required>
+    <input class="input" type="email" name="email" placeholder="name@example.com" required>
+  </div>
+  <input class="input" style="margin-top:8px" type="password" name="password" placeholder="Password" required>
+  <button class="btn-primary" style="margin-top:10px">Register</button>
+</form>
+{% if error %}<p style="color:#ef4444;margin-top:8px">{{ error }}</p>{% endif %}
 {% endblock %}
