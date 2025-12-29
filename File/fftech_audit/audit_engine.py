@@ -1,5 +1,4 @@
 
-# fftech_audit/audit_engine.py
 from urllib.parse import urlparse, urljoin
 from typing import Dict, Any, Tuple, List
 import re, ssl, time
@@ -224,7 +223,7 @@ class AuditEngine:
         }
         # Performance
         cache_max_age = 0
-        cc = headers.get('cache-control',''); m = re.search(r'max-age\\s*=\\s*(\\d+)', cc)
+        cc = headers.get('cache-control',''); m = re.search(r'max-age\s*=\s*(\d+)', cc)
         if m: cache_max_age = int(m.group(1))
         perf = {
             'ttfb_ms': r.elapsed_ms,
@@ -233,11 +232,18 @@ class AuditEngine:
         }
         # SEO
         html_text  = content.decode('utf-8', errors='ignore') if content else ''
-        has_title  = bool(re.search(r'<\\s*title\\b[^>]*>.*?<\\s*/\\s*title>', html_text, flags=re.IGNORECASE|re.DOTALL))
-        has_desc   = bool(re.search(r'<\\s*meta\\b[^>]*name\\s*=\\s*[\"\\']description[\"\\'][^>]*>', html_text, flags=re.IGNORECASE))
-        has_sitemap= head_exists(origin, '/sitemap.xml')
-        has_robots = head_exists(origin, '/robots.txt')
-        structured = 'application/ld+json' in html_text
+
+        has_title = bool(re.search(
+            r'<\s*title\b[^>]*>.*?<\s*/\s*title>',
+            html_text, flags=re.IGNORECASE | re.DOTALL))
+
+        has_desc  = bool(re.search(
+            r'<\s*meta\b[^>]*name\s*=\s*["\']description["\'][^>]*>',
+            html_text, flags=re.IGNORECASE))
+
+        has_sitemap = head_exists(origin, '/sitemap.xml')
+        has_robots  = head_exists(origin, '/robots.txt')
+        structured  = 'application/ld+json' in html_text
         seo = {
             'has_title': has_title,
             'has_meta_desc': has_desc,
@@ -246,13 +252,17 @@ class AuditEngine:
             'structured_data_ok': structured,
         }
         # Mobile
-        viewport   = bool(re.search(r'<\\s*meta\\b[^>]*name\\s*=\\s*[\"\\']viewport[\"\\'][^>]*>', html_text, flags=re.IGNORECASE))
-        responsive = bool(re.search(r'width\\s*=\\s*device-width', html_text, flags=re.IGNORECASE))
+        viewport = bool(re.search(
+            r'<\s*meta\b[^>]*name\s*=\s*["\']viewport["\'][^>]*>',
+            html_text, flags=re.IGNORECASE))
+
+        responsive = bool(re.search(r'width\s*=\s*device-width', html_text, flags=re.IGNORECASE))
         mobile     = { 'viewport_ok': viewport, 'responsive_meta': responsive }
+
         # Content
-        has_h1     = bool(re.search(r'<\\s*h1\\b[^>]*>', html_text, flags=re.IGNORECASE))
-        alt_ok     = bool(re.search(r'<\\s*img\\b[^>]*alt\\s*=\\s*', html_text, flags=re.IGNORECASE))
-        content_cat= { 'has_h1': has_h1, 'alt_ok': alt_ok }
+        has_h1 = bool(re.search(r'<\s*h1\b[^>]*>', html_text, flags=re.IGNORECASE))
+        alt_ok = bool(re.search(r'<\s*img\b[^>]*alt\s*=\s*', html_text, flags=re.IGNORECASE))
+        content_cat = { 'has_h1': has_h1, 'alt_ok': alt_ok }
 
         metrics: Dict[int, Dict[str, Any]] = {}
         # Populate IDs used by scoring/UI
@@ -282,3 +292,4 @@ class AuditEngine:
         metrics[101] = {'value': warnings}
         metrics[102] = {'value': notices}
 
+        return metrics
