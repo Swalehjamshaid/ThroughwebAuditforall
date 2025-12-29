@@ -1,6 +1,6 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Email verification required</h2>
-<p class="text-muted">Please check your email for the verification link before signing in.</p>
+<h2 class="section-title">Success</h2>
+<p class="text-muted">{{ message or "Your account is verified. You can now access premium features." }}</p>
 {% endblock %}
