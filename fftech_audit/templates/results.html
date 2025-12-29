@@ -1,49 +1,135 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Audit Result</h2>
-<p class="text-muted">URL: <strong>{{ url }}</strong></p>
 
-<div class="progress" style="margin-top:10px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
-<p class="text-muted" style="margin-top:6px">Score: {{ score }}% • Grade: {{ grade }}</p>
+<!-- Hero summary -->
+<section class="card glass" style="margin-bottom:18px;">
+  <h2 class="title" style="margin:0 0 6px;">Audit Result</h2>
+  <p class="muted" style="margin:0 0 12px;">URL: <strong>{{ url }}</strong></p>
+  <div class="grid two" style="gap:14px;">
+    <div>
+      <div class="subtitle">Score & Grade</div>
+      <div class="progress" style="margin-top:8px;"><div class="progress-fill" style="width: {{ score }}%"></div></div>
+      <p class="muted tiny" style="margin-top:6px;">Score: <strong>{{ score }}%</strong> • Grade: <strong>{{ grade }}</strong></p>
+    </div>
+    <div>
+      <div class="subtitle">Severity</div>
+      <div class="row wrap" style="margin-top:8px;">
+        <span class="badge">Errors: {{ severity.errors }}</span>
+        <span class="badge">Warnings: {{ severity.warnings }}</span>
+        <span class="badge">Notices: {{ severity.notices }}</span>
+      </div>
+    </div>
+  </div>
+</section>
 
-<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-  <span class="badge">Errors: {{ severity.errors }}</span>
-  <span class="badge">Warnings: {{ severity.warnings }}</span>
-  <span class="badge">Notices: {{ severity.notices }}</span>
-</div>
+<!-- Category donuts (Chart.js) -->
+<section class="grid five" style="gap:16px; margin-bottom:18px;">
+  <div class="card"><canvas id="donutCrawl"></canvas><p class="center tiny muted">Crawlability</p></div>
+  <div class="card"><canvas id="donutSEO"></canvas><p class="center tiny muted">On‑Page SEO</p></div>
+  <div class="card"><canvas id="donutPerf"></canvas><p class="center tiny muted">Performance</p></div>
+  <div class="card"><canvas id="donutSec"></canvas><p class="center tiny muted">Security</p></div>
+  <div class="card"><canvas id="donutMobile"></canvas><p class="center tiny muted">Mobile</p></div>
+</section>
 
-<div style="display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:14px;margin-top:16px">
-  <canvas id="donutCrawl"></canvas>
-  <canvas id="donutSEO"></canvas>
-  <canvas id="donutPerf"></canvas>
-  <canvas id="donutSec"></canvas>
-  <canvas id="donutMobile"></canvas>
-</div>
+<!-- Executive summary -->
+<section class="card glass" style="margin-bottom:18px;">
+  <div class="subtitle">Executive Summary</div>
+  <p class="muted" style="margin-top:8px;">{{ summary }}</p>
+</section>
 
-<table class="table" style="margin-top:22px">
-  <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr></thead>
-  <tbody>
-    {% for r in rows %}
+<!-- Metrics table -->
+<section class="card glass">
+  <div class="row" style="justify-content:space-between;align-items:center; margin-bottom:8px;">
+    <div class="subtitle" style="margin:0;">All Metrics</div>
+    <input id="filterText" class="input" placeholder="Filter by name/category/value…" style="max-width:420px;" oninput="filterMetrics()" />
+  </div>
+  <div id="metricsCount" class="muted tiny" style="margin-bottom:6px;">Showing {{ rows|length }} metrics</div>
+  <table class="table">
+    <thead>
       <tr>
-        <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.category }}</td><td>{{ r.value }}</td><td>{{ r.detail }}</td>
+        <th class="sortable" data-col="id">ID <span class="sort-indicator"></span></th>
+        <th class="sortable" data-col="name">Name <span class="sort-indicator"></span></th>
+        <th class="sortable" data-col="category">Category <span class="sort-indicator"></span></th>
+        <th class="sortable" data-col="value">Value <span class="sort-indicator"></span></th>
+        <th class="sortable" data-col="detail">Detail <span class="sort-indicator"></span></th>
       </tr>
-    {% endfor %}
-  </tbody>
-</table>
+    </thead>
+    <tbody id="metricsTable">
+      {% for r in rows %}
+        <tr data-name="{{ r.name|lower }}" data-cat="{{ r.category|lower }}" data-val="{{ r.value|string|lower }}">
+          <td>{{ r.id }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.category }}</td>
+          <td>{{ r.value }}</td>
+          <td>{{ r.detail }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
 
 <script>
-  const cat = {{ category|tojson }};
-  const donut = (el, val)=> new Chart(el, {
-    type:'doughnut',
-    data:{ labels:['Score','Remaining'],
-      datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }] },
-    options:{ cutout:'70%' }
+  // Donuts
+  const cat = JSON.parse('{{ category_json|e }}');
+  const donut = (canvas, val) => new Chart(canvas, {
+    type: 'doughnut',
+    data: { labels: ['Score','Remaining'], datasets: [{ data: [val, 100-val], backgroundColor: ['#16a34a','#334155'], borderWidth: 0 }] },
+    options: { cutout: '70%' }
   });
   donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
   donut(document.getElementById('donutSEO'),    cat['On-Page SEO']);
   donut(document.getElementById('donutPerf'),   cat['Performance']);
   donut(document.getElementById('donutSec'),    cat['Security']);
   donut(document.getElementById('donutMobile'), cat['Mobile']);
+
+  // Sort & filter
+  let sortState = { col: 'id', dir: 'asc' };
+  function compareRows(a, b, col, dir) {
+    let va = a[col], vb = b[col];
+    if (col === 'id') return dir === 'asc' ? va - vb : vb - va;
+    const na = parseFloat(va), nb = parseFloat(vb);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return dir === 'asc' ? na - nb : nb - na;
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+  }
+  function rebuildTable() {
+    const tbody = document.getElementById('metricsTable');
+    const rows = Array.from(tbody.querySelectorAll('tr')).map(tr => {
+      const tds = tr.querySelectorAll('td');
+      return { tr, id: Number(tds[0].textContent), name: tds[1].textContent, category: tds[2].textContent, value: tds[3].textContent, detail: tds[4].textContent };
+    });
+    rows.sort((a,b)=>compareRows(a,b,sortState.col,sortState.dir));
+    tbody.innerHTML = '';
+    rows.forEach(r => tbody.appendChild(r.tr));
+    updateSortIndicators();
+  }
+  function updateSortIndicators(){
+    document.querySelectorAll('.sort-indicator').forEach(el => el.textContent = '');
+    const th = document.querySelector('.table thead th[data-col="'+sortState.col+'"] .sort-indicator');
+    if (th) th.textContent = sortState.dir === 'asc' ? '▲' : '▼';
+  }
+  document.querySelectorAll('.table thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.getAttribute('data-col');
+      if (sortState.col === col) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      else { sortState.col = col; sortState.dir = 'asc'; }
+      rebuildTable();
+    });
+  });
+  function filterMetrics(){
+    const q = (document.getElementById('filterText').value || '').trim().toLowerCase();
+    const trs = document.querySelectorAll('#metricsTable tr');
+    let shown = 0;
+    trs.forEach(tr => {
+      const match = !q || tr.dataset.name.includes(q) || tr.dataset.cat.includes(q) || tr.dataset.val.includes(q);
+      tr.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    const mc = document.getElementById('metricsCount');
+    if (mc) mc.textContent = `Showing ${shown} metrics`;
+  }
 </script>
+
 {% endblock %}
+``
