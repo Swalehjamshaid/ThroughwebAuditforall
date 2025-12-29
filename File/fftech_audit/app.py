@@ -23,7 +23,7 @@ from .auth_email import (
     send_email_with_pdf,
 )
 from .ui_and_pdf import build_pdf_report
-from .db_migration import migrate_schedules_table  # ✅ migration helper
+from .db_migration import migrate_schedules_table  # migration helper
 
 # ------------------------------------------------------------
 # Flags & Logging
@@ -63,7 +63,7 @@ def init_db():
             pass
         # Create tables (idempotent)
         Base.metadata.create_all(bind=engine)
-        # 🔧 Migrate schedules table to add missing columns, safely
+        # Migrate schedules table to add missing columns, safely
         migrate_schedules_table(engine)
         logger.info("DB initialization complete ✅")
     except Exception as e:
@@ -82,13 +82,15 @@ def health():
 # ------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    return templates.TemplateResponse("base.html", {"request": request})
+    # ✅ render the home template (extends base.html and fills the content block)
+    return templates.TemplateResponse("home.html", {"request": request})
 
 @app.post("/audit/open", response_class=HTMLResponse)
 def audit_open_ssr(request: Request, url: str = Form(...)):
     url = (url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
-        return templates.TemplateResponse("base.html", {"request": request, "error": "Invalid URL"}, status_code=400)
+        # ✅ show the form page again with the error message
+        return templates.TemplateResponse("home.html", {"request": request, "error": "Invalid URL"}, status_code=400)
 
     origin = canonical_origin(url)
     try:
@@ -97,7 +99,8 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
     except Exception as e:
         logger.error("[AUDIT OPEN] Failed: %s", e)
         traceback.print_exc()
-        return templates.TemplateResponse("base.html", {"request": request, "error": f"Audit failed: {e}"}, status_code=500)
+        # ✅ show error on the home page so user can try again
+        return templates.TemplateResponse("home.html", {"request": request, "error": f"Audit failed: {e}"}, status_code=500)
 
     security_checks = {
         "https_enabled": metrics.get(10, {}).get("value", True),
@@ -142,7 +145,7 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
     priority_fixes = metrics.get(6, {}).get("value", [])
 
     # Build rows 1..200
-    rows = []
+    rows: List[Dict[str, Any]] = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": f"Metric {pid}", "category": "-"})
         cell = metrics.get(pid, {"value": "N/A"})
