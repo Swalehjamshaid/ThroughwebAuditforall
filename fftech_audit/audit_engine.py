@@ -7,6 +7,7 @@ from urllib.parse import urlparse, urljoin
 APP_BRAND = "FF Tech"
 
 def now_utc(): return datetime.datetime.utcnow()
+
 def is_valid_url(url: str) -> bool:
     try:
         p = urlparse(url)
@@ -33,6 +34,7 @@ def safe_search(pattern: str, text: str, flags=0):
         print(f"[Regex] pattern failed: {pattern} -> {e}")
         return None
 
+# ---- 1..200 metric registry ----
 METRIC_DESCRIPTORS: Dict[int, Dict[str, Any]] = {}
 def register_metrics():
     sections = {
@@ -77,8 +79,8 @@ class AuditEngine:
             (self.links_internal if urlparse(full).netloc == self.domain else self.links_external).append(full)
         for s in srcs:
             full = urljoin(self.url, s); low = full.lower()
-            if   low.endswith(".css"):   self.resources_css.append(full)
-            elif low.endswith(".js"):    self.resources_js.append(full)
+            if low.endswith(".css"): self.resources_css.append(full)
+            elif low.endswith(".js"): self.resources_js.append(full)
             elif any(low.endswith(ext) for ext in(".png",".jpg",".jpeg",".webp",".gif",".svg")):
                 self.resources_img.append(full)
 
@@ -86,15 +88,18 @@ class AuditEngine:
         m: Dict[int, Dict[str, Any]] = {}
         total_errors = total_warnings = total_notices = 0
 
+        # Status family
         m[21] = {"value": 1 if 200 <= self.status_code < 300 else 0, "detail": f"Status {self.status_code}"}
         m[23] = {"value": 1 if 400 <= self.status_code < 500 else 0, "detail": f"Status {self.status_code}"}
         m[24] = {"value": 1 if 500 <= self.status_code < 600 else 0, "detail": f"Status {self.status_code}"}
         if m[23]["value"] or m[24]["value"]: total_errors += 1
 
+        # Title/meta
         title_match = safe_search(r"<title>(.*?)</title>", self.html, flags=re.IGNORECASE | re.DOTALL)
         title = title_match.group(1).strip() if title_match else ""
         meta_desc_match = safe_search(
-            r'<meta[^>]+name=["\']description["\'][^>]*content="\'["\']', self.html, flags=re.IGNORECASE
+            r'<meta[^>]+name=["\']description["\'][^>]*content=["\']([^"\
+            self.html, flags=re.IGNORECASE
         )
         meta_desc = meta_desc_match.group(1).strip() if meta_desc_match else ""
 
@@ -108,6 +113,7 @@ class AuditEngine:
         total_warnings += (m[43]["value"] or m[44]["value"] or m[45]["value"])
         total_notices  += (m[47]["value"] or m[48]["value"])
 
+        # H1 / images
         h1s = re.findall(r"<h1[^>]*>(.*?)</h1>", self.html, flags=re.IGNORECASE | re.DOTALL)
         m[49] = {"value": 1 if len(h1s) == 0 else 0, "detail": f"H1 count {len(h1s)}"}
         m[50] = {"value": 1 if len(h1s) > 1 else 0, "detail": f"H1 count {len(h1s)}"}
@@ -118,6 +124,7 @@ class AuditEngine:
         m[55] = {"value": missing_alts, "detail": f"Images missing alt: {missing_alts}"}
         total_notices += 1 if missing_alts > 0 else 0
 
+        # URL / HTTPS / security
         m[63] = {"value": 1 if len(self.url) > 115 else 0, "detail": f"URL length {len(self.url)}"}
         m[64] = {"value": 1 if re.search(r"[A-Z]", self.url) else 0, "detail": "Uppercase in URL" if re.search(r"[A-Z]", self.url) else "Lowercase"}
         is_https = self.url.startswith("https://")
@@ -127,14 +134,14 @@ class AuditEngine:
         m[108] = {"value": 1 if mixed else 0, "detail": "Mixed content detected" if mixed else "No mixed content"}
         total_warnings += 1 if mixed else 0
 
+        # Viewport / canonical / social
         viewport_meta = safe_search(r'<meta[^>]+name=["\']viewport["\']', self.html, flags=re.IGNORECASE)
         m[98] = {"value": 1 if bool(viewport_meta) else 0, "detail": "Viewport meta present" if viewport_meta else "Missing viewport"}
         total_warnings += 0 if viewport_meta else 1
 
         canonical_match = safe_search(
-            r'<link[^>]+rel=["\']canonical["\'][^>]*href="\'["\']',
-            self.html,
-            flags=re.IGNORECASE
+            r'<link[^>]+rel=["\']canonical["\'][^>]*href="\'["\']',  # FIXED
+            self.html, flags=re.IGNORECASE
         )
         canonical_href = canonical_match.group(1) if canonical_match else None
         m[32] = {"value": 0 if canonical_href else 1, "detail": f"Canonical present: {bool(canonical_href)}"}
@@ -145,16 +152,17 @@ class AuditEngine:
         )
         m[62] = {"value": 0 if og_or_twitter else 1, "detail": "Open Graph/Twitter present" if og_or_twitter else "Missing"}
 
+        # robots/sitemap
         robots_url = f"{urlparse(self.url).scheme}://{self.domain}/robots.txt"
         rcode, rcontent, _, _ = safe_request(robots_url)
         m[29] = {"value": 0 if rcode == 200 and rcontent else 1, "detail": "robots.txt present" if rcode == 200 else "robots.txt missing"}
-
         sitemap_present = False
         for path in ["/sitemap.xml","/sitemap_index.xml","/sitemap"]:
             scode, scontent, _, _ = safe_request(f"{urlparse(self.url).scheme}://{self.domain}{path}")
             if scode == 200 and scontent: sitemap_present = True; break
         m[136] = {"value": 1 if sitemap_present else 0, "detail": "Sitemap present" if sitemap_present else "Sitemap missing"}
 
+        # Performance basics
         page_size_kb = len(self.content)/1024 if self.content else 0
         m[84] = {"value": round(page_size_kb,2), "detail": f"Total page size KB {round(page_size_kb,2)}"}
         m[85] = {"value": len(self.resources_css)+len(self.resources_js)+len(self.resources_img), "detail": "Requests per page (approx)"}
@@ -166,19 +174,19 @@ class AuditEngine:
         m[95] = {"value": 1 if compressed else 0, "detail": f"Content-Encoding: {content_encoding or 'none'}"}
         rb_css = len(self.resources_css); rb_js_sync = len(self.resources_js)
         m[88] = {"value": rb_css + rb_js_sync, "detail": f"Potential render-blocking (approx): {rb_css+rb_js_sync}"}
-        dom_nodes = len(re.findall(r"<[a-zA-Z]+", self.html))
-        m[89] = {"value": dom_nodes, "detail": f"Approx DOM nodes {dom_nodes}"}
-        third_js = sum(1 for js in self.resources_js if urlparse(js).netloc != self.domain)
-        m[90] = {"value": third_js, "detail": f"3rd-party scripts {third_js}"}
+        dom_nodes = len(re.findall(r"<[a-zA-Z]+", self.html)); m[89] = {"value": dom_nodes, "detail": f"Approx DOM nodes {dom_nodes}"}
+        third_js = sum(1 for js in self.resources_js if urlparse(js).netloc != self.domain); m[90] = {"value": third_js, "detail": f"3rd-party scripts {third_js}"}
         large_imgs = sum(1 for img in self.resources_img if re.search(r"(large|hero|banner|@2x|\d{4}x\d{4})", img, flags=re.IGNORECASE))
         m[92] = {"value": large_imgs, "detail": "Potentially unoptimized images (heuristic)"}
         lazy_count = len(re.findall(r'loading=["\']lazy["\']', self.html, flags=re.IGNORECASE))
         m[93] = {"value": 0 if lazy_count>0 else 1, "detail": f"Lazy loading tags count {lazy_count}"}
 
+        # Security headers
         sec_required = ["Content-Security-Policy","Strict-Transport-Security","X-Frame-Options","X-Content-Type-Options","Referrer-Policy"]
         missing_sec = [h for h in sec_required if h not in self.headers]
         m[110] = {"value": len(missing_sec), "detail": f"Missing security headers: {missing_sec}"}
 
+        # Broken links (sample)
         broken_internal = 0
         for li in self.links_internal[:20]:
             code, _, _, _ = safe_request(li)
@@ -190,6 +198,7 @@ class AuditEngine:
         m[27] = {"value": broken_internal, "detail": "Broken internal links (sample)"}
         m[28] = {"value": broken_external, "detail": "Broken external links (sample)"}
 
+        # Category scoring
         cat_scores = {
             "Crawlability": max(0, 100 - (m[27]["value"] + m[28]["value"])*5),
             "On-Page SEO": max(0, 100 - (m[41]["value"] + m[45]["value"] + m[43]["value"] + m[44]["value"])*10),
@@ -200,6 +209,7 @@ class AuditEngine:
         m[8] = {"value": cat_scores, "detail": "Category score breakdown"}
         m[7] = {"value": {"errors": total_errors, "warnings": total_warnings, "notices": total_notices}, "detail": "Severity"}
 
+        # Overall score/grade
         base = 100
         base -= (10 if m[41]["value"] else 0)
         base -= (5  if m[45]["value"] else 0)
@@ -210,6 +220,7 @@ class AuditEngine:
         m[1] = {"value": score, "detail": "Overall Site Health (%)"}
         m[2] = {"value": grade_from_score(score), "detail": "Website Grade"}
 
+        # Exec summary + lists
         strengths, weaknesses, priority_fixes = [], [], []
         if m[105]["value"]: strengths.append("HTTPS enabled")
         title_ok = title and 15 <= len(title) <= 65
