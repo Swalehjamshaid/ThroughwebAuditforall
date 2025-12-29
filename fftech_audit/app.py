@@ -35,27 +35,47 @@ from .auth_email import (
 from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, now_utc, is_valid_url
 from .ui_and_pdf import build_pdf_report
 
-# ✅ Create FastAPI app FIRST
+# --- App init ---
 app = FastAPI(title="FF Tech AI Website Audit", version="4.0", description="SSR + API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 security = HTTPBearer()
 
-# ✅ Static files
+# --- Static ---
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+STATIC_OK = os.path.isdir(STATIC_DIR) and \
+            os.path.isfile(os.path.join(STATIC_DIR, "app.css")) and \
+            os.path.isfile(os.path.join(STATIC_DIR, "app.js"))
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# ✅ Templates
+# --- Templates ---
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-# ✅ DB init
+# --- DB ---
 Base.metadata.create_all(bind=engine)
 try:
     ensure_schedule_columns()
     ensure_user_columns()
 except Exception as e:
     print(f"[Startup] ensure_* failed: {e}")
+
+# --- Asset config from env (only vars change; files constant) ---
+def asset_cfg() -> Dict[str, str]:
+    use_cdn = (os.getenv("USE_CDN_ASSETS", "false").lower() == "true") or not STATIC_OK
+    google_font_css = os.getenv("GOOGLE_FONT_CSS",
+                                "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap")
+    chartjs_cdn = os.getenv("CHARTJS_CDN",
+                            "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js")
+    return {
+        "font_href": google_font_css,
+        "css_href": ("/static/app.css" if not use_cdn else "https://unpkg.com/modern-css-reset/dist/reset.min.css"),
+        "chartjs_src": chartjs_cdn,
+        "js_src": ("/static/app.js" if not use_cdn else "https://unpkg.com/placeholder-js@1.0.0/index.js"),
+    }
+
+def ctx_base(request: Request) -> Dict[str, Any]:
+    return {"request": request, "ASSETS": asset_cfg(), "build_marker": "v2025-12-28-SSR-6"}
 
 # ---------------- Health ----------------
 @app.get("/health")
@@ -65,22 +85,23 @@ def health():
 # ---------------- Landing (SSR) ----------------
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "build_marker": "v2025-12-28-SSR-5"})
+    return templates.TemplateResponse("index.html", ctx_base(request))
 
 # ---------------- Open Audit (SSR) ----------------
 @app.post("/audit/open", response_class=HTMLResponse)
 async def audit_open_ssr(request: Request, url: str = Form(...)):
     if not is_valid_url(url):
-        return templates.TemplateResponse(
-            "index.html", {"request": request, "error": "Invalid URL", "prefill_url": url}, status_code=400
-        )
+        ctx = ctx_base(request)
+        ctx.update({"error": "Invalid URL", "prefill_url": url})
+        return templates.TemplateResponse("index.html", ctx, status_code=400)
+
     try:
         eng = AuditEngine(url)
         metrics: Dict[int, Dict[str, Any]] = eng.compute_metrics()
     except Exception as e:
-        return templates.TemplateResponse(
-            "index.html", {"request": request, "error": f"Audit failed: {e}", "prefill_url": url}, status_code=500
-        )
+        ctx = ctx_base(request)
+        ctx.update({"error": f"Audit failed: {e}", "prefill_url": url})
+        return templates.TemplateResponse("index.html", ctx, status_code=500)
 
     score = metrics[1]["value"]
     grade = metrics[2]["value"]
@@ -88,7 +109,7 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
     category = metrics[8]["value"]
     severity = metrics[7]["value"]
 
-    # ✅ JSON-stringify dict/list values so Jinja prints them cleanly and completely
+    # JSON-stringify dict/list values for clean rendering
     rows: List[Dict[str, Any]] = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": "(Unknown)", "category": "-"})
@@ -107,23 +128,15 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
             "detail": cell.get("detail", "")
         })
 
-    return templates.TemplateResponse(
-        "results.html",
-        {
-            "request": request,
-            "url": url,
-            "score": score,
-            "grade": grade,
-            "summary": summary,
-            "severity": severity,
-            "category": category,
-            "rows": rows,
-            "allow_pdf": False,  # open users cannot download
-            "build_marker": "v2025-12-28-SSR-5",
-        },
-    )
+    ctx = ctx_base(request)
+    ctx.update({
+        "url": url, "score": score, "grade": grade, "summary": summary,
+        "severity": severity, "category": category, "rows": rows,
+        "allow_pdf": False,
+    })
+    return templates.TemplateResponse("results.html", ctx)
 
-# ---------------- API: open audit JSON ----------------
+# ---------------- API: open audit (JSON) ----------------
 @app.post("/api/audit/open")
 def api_audit_open(payload: Dict[str, str] = Body(...)):
     url = payload.get("url")
@@ -137,7 +150,6 @@ def api_audit_open(payload: Dict[str, str] = Body(...)):
     db = next(get_db())
     audit = Audit(user_id=None, url=url, metrics_json=json.dumps(metrics), score=score, grade=grade)
     db.add(audit); db.commit()
-
     return {"url": url, "score": score, "grade": grade, "metrics": metrics}
 
 @app.get("/api/metrics/descriptors")
@@ -159,7 +171,7 @@ def require_user(credentials: HTTPAuthorizationCredentials = Depends(security),
 # ---------------- Registration (SSR) ----------------
 @app.get("/auth/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse("register.html", ctx_base(request))
 
 @app.post("/auth/register", response_class=HTMLResponse)
 def auth_register(request: Request,
@@ -170,24 +182,21 @@ def auth_register(request: Request,
     email = email.strip().lower()
     name = name.strip()
     if not (name and email and password):
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Please fill in all fields."}, status_code=400)
+        ctx = ctx_base(request); ctx["error"] = "Please fill in all fields."
+        return templates.TemplateResponse("register.html", ctx, status_code=400)
     user = db.query(User).filter(User.email == email).first()
     if user and user.password_hash:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Email already registered."}, status_code=400)
+        ctx = ctx_base(request); ctx["error"] = "Email already registered."
+        return templates.TemplateResponse("register.html", ctx, status_code=400)
     if not user:
         user = User(name=name, email=email, password_hash=hash_password(password), verified=False, plan="free")
         db.add(user); db.commit()
     else:
-        user.name = name
-        user.password_hash = hash_password(password)
-        user.verified = False
-        db.commit()
-
-    # send verification link (uses SMTP_* envs; logs dev link if SMTP missing)
+        user.name = name; user.password_hash = hash_password(password); user.verified = False; db.commit()
     send_verification_link(email, request, db)
-    return templates.TemplateResponse("register_done.html", {"request": request, "email": email})
+    return templates.TemplateResponse("register_done.html", ctx_base(request) | {"email": email})
 
-# ---------------- Verify via link (magic or verify) ----------------
+# ---------------- Verify via link ----------------
 @app.get("/auth/verify-link")
 def auth_verify_link(token: str = Query(...), db: Session = Depends(get_db)):
     session_token = verify_magic_or_verify_link(token, db)
@@ -196,20 +205,21 @@ def auth_verify_link(token: str = Query(...), db: Session = Depends(get_db)):
 # ---------------- Login (SSR) ----------------
 @app.get("/auth/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", ctx_base(request))
 
 @app.post("/auth/login", response_class=HTMLResponse)
 def auth_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     email = email.strip().lower()
     user = db.query(User).filter(User.email == email).first()
     if not user or not user.password_hash or not verify_password(password, user.password_hash):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials."}, status_code=401)
+        ctx = ctx_base(request); ctx["error"] = "Invalid credentials."
+        return templates.TemplateResponse("login.html", ctx, status_code=401)
     if not user.verified:
-        return templates.TemplateResponse("verify_required.html", {"request": request}, status_code=403)
+        return templates.TemplateResponse("verify_required.html", ctx_base(request), status_code=403)
     session_token = generate_token({"email": email, "purpose": "session"})
-    return templates.TemplateResponse("verify_success.html", {"request": request, "message": f"Login successful. Token: {session_token}"})
+    return templates.TemplateResponse("verify_success.html", ctx_base(request) | {"message": f"Login successful. Token: {session_token}"})
 
-# ---------------- Schedule + PDF (Registered-only) ----------------
+# ---------------- PDF & Schedule (Registered-only) ----------------
 @app.post("/api/report/pdf")
 def report_pdf_api(req: Dict[str, str], user: User = Depends(require_user), db: Session = Depends(get_db)):
     url = req.get("url")
@@ -217,10 +227,8 @@ def report_pdf_api(req: Dict[str, str], user: User = Depends(require_user), db: 
         raise HTTPException(status_code=400, detail="Invalid URL")
     eng = AuditEngine(url)
     metrics = eng.compute_metrics()
-    audit = Audit(user_id=user.id, url=url, metrics_json=json.dumps(metrics),
-                  score=metrics[1]["value"], grade=metrics[2]["value"])
+    audit = Audit(user_id=user.id, url=url, metrics_json=json.dumps(metrics), score=metrics[1]["value"], grade=metrics[2]["value"])
     db.add(audit); db.commit()
-
     pdf = build_pdf_report(audit, metrics)
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="FFTech_Audit.pdf"'}
@@ -246,7 +254,7 @@ def schedule_set(payload: Dict[str, str] = Body(...), user: User = Depends(requi
     db.commit()
     return {"message": "Schedule saved", "next_run_at": sch.next_run_at.isoformat()}
 
-# ---------------- Background scheduler ----------------
+# --- Background scheduler ---
 def scheduler_loop():
     while True:
         try:
@@ -263,13 +271,8 @@ def scheduler_loop():
                               score=metrics[1]["value"], grade=metrics[2]["value"])
                 db.add(audit); db.commit()
                 pdf = build_pdf_report(audit, metrics)
-                send_email_with_pdf(
-                    user.email,
-                    subject="Your FF Tech Audit Report",
-                    body=f"Attached: 5-page audit report for {sch.url}.",
-                    pdf_bytes=pdf,
-                    filename="FFTech_Audit.pdf"
-                )
+                send_email_with_pdf(user.email, "Your FF Tech Audit Report",
+                                    f"Attached: 5-page audit report for {sch.url}.", pdf, "FFTech_Audit.pdf")
                 sch.next_run_at = now + (datetime.timedelta(days=1) if sch.frequency == "daily" else datetime.timedelta(days=7))
                 db.commit()
             db.close()
