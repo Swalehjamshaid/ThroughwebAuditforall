@@ -1,19 +1,10 @@
 
 :root {
-  --surface: #0b1220;
-  --card:    #0f172a;
-  --border:  #334155;
-  --text:    #e2e8f0;
-  --muted:   #94a3b8;
-  --link:    #93c5fd;
-  --brand-blue:   #2563eb;
-  --brand-indigo: #4f46e5;
-  --brand-green:  #16a34a;
-  --accent-graph: #2E86C1;
+  --surface: #0b1220; --card: #0f172a; --border: #334155; --text: #e2e8f0; --muted: #94a3b8; --link: #93c5fd;
+  --brand-blue:#2563eb; --brand-indigo:#4f46e5; --brand-green:#16a34a; --accent-graph:#2E86C1;
 }
 body[data-theme="light"] {
-  --surface: #f7fafc; --card: #ffffff; --border: #e2e8f0;
-  --text: #0f172a; --muted: #475569; --link: #2563eb; --accent-graph: #2563eb;
+  --surface:#f7fafc; --card:#ffffff; --border:#e2e8f0; --text:#0f172a; --muted:#475569; --link:#2563eb; --accent-graph:#2563eb;
 }
 .font-inter{ font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
 .bg-surface{ background: var(--surface); } .text-text{ color: var(--text); } .text-muted{ color: var(--muted); } a{ color: var(--link); }
