@@ -2,10 +2,13 @@
 // Theme toggle
 function toggleTheme() {
   const body = document.body;
-  const isDark = body.classList.contains('theme-dark');
-  body.classList.toggle('theme-dark', !isDark);
-  body.classList.toggle('theme-light', isDark);
-  localStorage.setItem('fftech_theme', isDark ? 'light' : 'dark');
+  if (body.classList.contains('theme-dark')) {
+    body.classList.remove('theme-dark'); body.classList.add('theme-light');
+    localStorage.setItem('fftech_theme', 'light');
+  } else {
+    body.classList.remove('theme-light'); body.classList.add('theme-dark');
+    localStorage.setItem('fftech_theme', 'dark');
+  }
 }
 (function initTheme(){
   const saved = localStorage.getItem('fftech_theme');
@@ -25,8 +28,4 @@ function overlayHide(){ document.getElementById('overlay')?.classList.add('hidde
 
 // Chart defaults tuned for theme
 if (window.Chart) {
-  const color = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#e2e8f0';
-  Chart.defaults.color = color;
-  Chart.defaults.font.family = "'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
-  Chart.defaults.plugins.legend.display = false;
-}
+  const color = getComputedStyle
