@@ -1,19 +1,19 @@
 
 # railway.toml
-
 [build]
-builder = "RAILPACK"        # Use Railpack builder
-# root = "/your-app-folder" # Uncomment if your app is in a subfolder
+builder = "RAILPACK"
+# If your app is in a subfolder, set root here or in Railway UI:
+# root = "/File"
 
 # Commands for install/build/start
 install = ""                # e.g., "npm ci" or "pip install -r requirements.txt"
 build   = ""                # e.g., "npm run build" or "./mvnw package"
-start   = ""                # REQUIRED: e.g., "npm start" or "uvicorn main:app --host 0.0.0.0 --port $PORT"
+start   = "./start.sh"      # or "npm start" / "uvicorn main:app --host 0.0.0.0 --port $PORT"
 
 [variables]
-PORT = "8080"               # Railway injects PORT automatically, but keep for clarity
+PORT = "8080"
 
 [watch]
 paths = [
-  "/**/*"                   # Optional: triggers rebuild when files change
+  "/**/*"
 ]
