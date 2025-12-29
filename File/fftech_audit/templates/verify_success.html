@@ -4,7 +4,23 @@
   <div class="card">
     <h2>{{ message }}</h2>
     <p style="color:var(--text-muted)">Your session token:</p>
-    <pre style="white-space:wrap;word-break:break-word;background:#0f172a;padding:12px;border-radius:8px;">{{ token }}</pre>
-    <p style="color:var(--text-muted)">Use this token with APIs like <code>/audit/user</code> or <code>/api/report/pdf</code>.</p>
+    <pre id="tokenBox" style="white-space:wrap;word-break:break-word;background:#0f172a;padding:12px;border-radius:8px;">
+{{ token }}
+    </pre>
+    <p style="color:var(--text-muted)">
+      We saved your token for you. You can now set a schedule on the homepage.
+    </p>
+    <div style="margin-top:12px;">
+      /Go to Homepage</a>
+    </div>
   </div>
+  <script>
+    (function() {
+      const t = (document.getElementById('tokenBox').innerText || '').trim();
+      if (t) {
+        localStorage.setItem('fftech_token', t);
+        document.cookie = "token=" + encodeURIComponent(t) + "; Max-Age=" + (60*60*24*180) + "; Path=/; SameSite=Lax";
+      }
+    })();
+  </script>
 {% endblock %}
