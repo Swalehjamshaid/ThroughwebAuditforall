@@ -1,10 +1,13 @@
-{% extends "base.html" %}
-{% block content %}
-<h2 class="title">Create your account</h2>
-<form method="POST" action="/auth/register" style="margin-top:12px;max-width:720px">
-  <div class="grid two"><input class="input" type="text" name="name" placeholder="Full Name" required><input class="input" type="email" name="email" placeholder="name@example.com" required></div>
-  <input class="input" style="margin-top:8px" type="password" name="password" placeholder="Password" required>
-  <button class="btn primary" style="margin-top:10px">Register</button>
-</form>
-{% if error %}<p class="error" style="margin-top:8px">{{ error }}</p>{% endif %}
-{% endblock %}
+
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Register • FF Tech</title>/static/app.css</head>
+<body><main class="container">
+  <section class="card">
+    <h2>Email Registration (Passwordless)</h2>
+    /auth/register
+      <input type="email" name="email" placeholder="you@example.com" required />
+      <input type="text"  name="name"  placeholder="Your Name" />
+      <button type="submit">Send Verification Link</button>
+    </form>
+  </section>
+</main></body></html>
