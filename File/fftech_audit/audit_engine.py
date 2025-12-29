@@ -9,7 +9,7 @@ except Exception:
 import urllib.request
 import ssl
 
-# === Metric Descriptors (1 to 200) ===
+# === Metric Descriptors ===
 METRIC_DESCRIPTORS: Dict[int, Dict[str, str]] = {}
 idx = 1
 for category, items in [
@@ -64,7 +64,7 @@ for category, items in [
         METRIC_DESCRIPTORS[idx] = {"name": name, "category": category}
         idx += 1
 
-# === Scoring Logic ===
+# === Scoring ===
 WEIGHTS = {"security": 0.35, "performance": 0.25, "seo": 0.20, "mobile": 0.10, "content": 0.10}
 SECURITY_PENALTIES = {"csp": 20, "hsts": 15, "x_frame": 10, "referrer_policy": 5}
 
@@ -141,7 +141,7 @@ def head_exists(base: str, path: str, timeout: float = 5.0) -> bool:
     except Exception:
         return False
 
-# === Category Scoring Functions ===
+# === Category Scoring ===
 def compute_category_security(sec: Dict[str, Any]) -> float:
     base = 100 if sec.get('https_enabled') else 60
     for k, penalty in SECURITY_PENALTIES.items():
@@ -252,7 +252,7 @@ class AuditEngine:
         alt_ok = bool(re.search(r'<img\b[^>]*\salt=["\']', html_text, re.I))
         content_cat = {'has_h1': has_h1, 'alt_ok': alt_ok}
 
-        # Populate metrics used by scoring and HTML
+        # Populate metrics
         metrics: Dict[int, Dict[str, Any]] = {}
         metrics[10] = {'value': sec['https_enabled']}
         metrics[11] = {'value': sec['csp']}
@@ -272,7 +272,7 @@ class AuditEngine:
         metrics[50] = {'value': content_cat['has_h1']}
         metrics[51] = {'value': content_cat['alt_ok']}
 
-        # Severity counts (warnings from missing security headers)
+        # Severity
         warnings = sum(1 for k in ['csp','hsts','x_frame','referrer_policy'] if not sec[k])
         metrics[100] = {'value': 0}  # errors
         metrics[101] = {'value': warnings}
