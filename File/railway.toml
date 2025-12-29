@@ -1,17 +1,19 @@
 
-# railway.toml
+# railway.toml  — place this in the build root (repo root)
+# If your app lives in /File, either move files to root OR set the service Root Directory to /File.
+
 [build]
 builder = "RAILPACK"
-# If your app is in a subfolder, set root here or in Railway UI:
+# Uncomment the next line ONLY if you cannot change Railway's Root Directory and you want Railpack to build from /File.
 # root = "/File"
 
-# Commands for install/build/start
-install = ""                # e.g., "npm ci" or "pip install -r requirements.txt"
-build   = ""                # e.g., "npm run build" or "./mvnw package"
-start   = "./start.sh"      # or "npm start" / "uvicorn main:app --host 0.0.0.0 --port $PORT"
+# Commands — adjust to your stack.
+install = ""                 # e.g., "npm ci" or "pip install -r requirements.txt"
+build   = ""                 # e.g., "npm run build" or "./mvnw package"
+start   = "./start.sh"       # or: "npm start" / "uvicorn main:app --host 0.0.0.0 --port $PORT"
 
 [variables]
-PORT = "8080"
+PORT = "8080"                # Document default; Railway injects PORT automatically.
 
 [watch]
 paths = [
