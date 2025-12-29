@@ -13,21 +13,8 @@
     <h3 class="subtitle">Open Audit</h3>
 
     <!-- Plain HTML form (SSR) + JS progressive enhancement -->
-    <!-- IMPORTANT:
-         - method="POST" to hit @app.post("/audit/open")
-         - name="url" MUST match route signature: url: str = Form(...)
-    -->
     /audit/open
-      <input
-        id="urlOpen"
-        class="input"
-        type="url"
-        name="url"
-        placeholder="https://example.com"
-        value="{{ prefill_url or '' }}"
-        required
-        autocomplete="off"
-      />
+      <input id="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required autocomplete="off" />
       <div class="row">
         <button id="btnRunAudit" class="btn primary" type="submit">Run Audit</button>
         <span id="auditStatus" class="muted hidden">Running…</span>
@@ -52,12 +39,6 @@
 <p class="muted center tiny">Build: {{ build_marker }}</p>
 
 <script>
-/**
- * Run Audit: progressive enhancement
- * - Without JS: browser submits form normally (SSR) to /audit/open.
- * - With JS: intercept submit, show overlay, POST via fetch,
- *            and replace page with returned HTML (results).
- */
 (function() {
   const form   = document.getElementById('auditForm');
   const input  = document.getElementById('urlOpen');
@@ -74,21 +55,14 @@
     if (!url) { alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
     if (!/^https?:\/\/.+/i.test(url)) { alert('Please include http:// or https:// in the URL.'); input.focus(); return; }
 
-    // UI: show running
     btn.disabled = true;
     status.classList.remove('hidden');
     overlayShow();
 
     try {
       // Send as standard urlencoded form (FastAPI Form(...) friendly)
-      const body = new URLSearchParams();
-      body.append('url', url);
-
-      const resp = await fetch('/audit/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-      });
+      const body = new URLSearchParams(); body.append('url', url);
+      const resp = await fetch('/audit/open', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
 
       const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
       if (resp.ok && ct.includes('text/html')) {
@@ -96,22 +70,12 @@
         document.open(); document.write(html); document.close();
         return;
       }
-
-      // Friendly error messaging
       let msg = 'Audit failed. Please try another URL.';
-      try {
-        const data = await resp.json();
-        msg = data.detail || msg;
-      } catch {
-        const text = await resp.text();
-        if (text) msg = text;
-      }
-      console.error('[Audit] Server error:', msg);
-      alert(msg);
+      try { const data = await resp.json(); msg = data.detail || msg; } catch { const text = await resp.text(); if (text) msg = text; }
+      console.error('[Audit] Server error:', msg); alert(msg);
 
     } catch (err) {
-      console.error('[Audit] Network error:', err);
-      alert('Network error while running audit: ' + err);
+      console.error('[Audit] Network error:', err); alert('Network error while running audit: ' + err);
     } finally {
       btn.disabled = false;
       status.classList.add('hidden');
