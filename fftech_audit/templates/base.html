@@ -6,57 +6,39 @@
   <title>FF Tech AI • Website Audit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Proper tags: stop printing URLs as text -->
+  <!-- Premium font + assets -->
   https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap
   /static/app.css
   https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
   /static/app.js</script>
-
-  <!-- Fallback style (in case /static/app.css fails) -->
-  <style>
-    :root {
-      --surface:#0b1220; --card:#0f172a; --border:#334155; --text:#e2e8f0; --muted:#94a3b8;
-      --brand-blue:#2563eb; --brand-indigo:#4f46e5; --brand-green:#16a34a;
-    }
-    body{margin:0;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--surface);color:var(--text);}
-    .header{
-      padding:22px;
-      background: radial-gradient(1200px 450px at 10% 0%, #1e3a8a 0%, #4338ca 50%, #6d28d9 100%);
-      color:#fff; box-shadow:0 10px 28px rgba(0,0,0,.35);
-    }
-    .container{max-width:1180px;margin:0 auto;padding:0 24px;}
-    .btn-primary,.btn-secondary{padding:12px 16px;border:none;border-radius:12px;font-weight:700;cursor:pointer;}
-    .btn-primary{background:var(--brand-blue);color:#fff;}
-    .btn-secondary{background:var(--border);color:#e2e8f0;}
-    .card{background: #0f172a; border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:0 10px 28px rgba(0,0,0,.2);}
-    .section-title{font-weight:800;letter-spacing:.3px}
-    .section-subtitle{font-weight:700}
-    .text-muted{color:#94a3b8}
-    .grid{display:grid;gap:20px}
-    .grid.two{grid-template-columns:1fr 1fr}
-    .input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:#0b1220;color:#e2e8f0}
-    .progress{height:14px;background:var(--border);border-radius:12px;overflow:hidden}
-    .progress-fill{height:100%;background:linear-gradient(90deg, var(--brand-green), #22c55e)}
-    .table{width:100%;border-collapse:collapse}
-    .table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
-    .badge{display:inline-block;background:var(--border);color:#e2e8f0;padding:6px 12px;border-radius:999px}
-  </style>
 </head>
-<body>
+<body class="font-inter theme-dark">
   <!-- Header -->
-  <header class="header">
-    <div class="container" style="display:flex;justify-content:space-between;align-items:center;">
-      <strong style="font-weight:800">FF Tech AI • Website Audit</strong>
-      <div style="display:flex;gap:8px">
-        <button class="btn-secondary" onclick="toggleTheme && toggleTheme()">Toggle Theme</button>
-        <button class="btn-secondary" onclick="logout && logout()">Logout</button>
+  <header class="hdr">
+    <div class="hdr__inner container">
+      <div class="hdr__brand">
+        <div class="logo-dot"></div>
+        <strong>FF Tech AI • Website Audit</strong>
+      </div>
+      <div class="hdr__actions">
+        <button class="btn ghost" onclick="toggleTheme()">Toggle Theme</button>
+        <button class="btn ghost" onclick="logout()">Logout</button>
       </div>
     </div>
+    <div class="hdr__gradient"></div>
   </header>
 
-  <!-- Content -->
-  <main class="container" style="padding: 28px 24px;">
+  <!-- Main -->
+  <main class="container page">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Global overlay (used by Run Audit JS) -->
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay__card">
+      <div class="spinner"></div>
+      <div class="overlay__text">Running audit…</div>
+    </div>
+  </div>
 </body>
 </html>
