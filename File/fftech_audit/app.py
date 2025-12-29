@@ -23,6 +23,7 @@ from .auth_email import (
     send_email_with_pdf,
 )
 from .ui_and_pdf import build_pdf_report
+from .db_migration import migrate_schedules_table  # ✅ migration helper
 
 # ------------------------------------------------------------
 # Flags & Logging
@@ -55,11 +56,15 @@ def init_db():
     """
     Try to connect and create tables. If DB is misconfigured or down,
     log the error and continue—service must start so Railway healthcheck passes.
+    Also run a small migration to add new scheduling columns if missing.
     """
     try:
         with engine.connect() as _:
             pass
+        # Create tables (idempotent)
         Base.metadata.create_all(bind=engine)
+        # 🔧 Migrate schedules table to add missing columns, safely
+        migrate_schedules_table(engine)
         logger.info("DB initialization complete ✅")
     except Exception as e:
         logger.error("DB initialization failed: %s", e)
@@ -136,6 +141,7 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
     weaknesses = metrics.get(5, {}).get("value", [])
     priority_fixes = metrics.get(6, {}).get("value", [])
 
+    # Build rows 1..200
     rows = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": f"Metric {pid}", "category": "-"})
