@@ -1,23 +1,11 @@
 
-# File/railway.toml
-
 [build]
 builder = "RAILPACK"
 root    = "/File"
 
-# Python (FastAPI)
 install = "pip install -r requirements.txt"
 build   = ""
-start   = "uvicorn ffteck_audit.app:app --host 0.0.0.0 --port $PORT"
+start   = "uvicorn fftech_audit.app:app --host 0.0.0.0 --port $PORT"
 
 [variables]
 PORT = "8000"
-
-# Watch paths must be a TOML array of strings; no backticks or trailing commas.
-[watch]
-paths = [
-  "/File/requirements.txt",
-  "/File/ffteck_audit/**/*.py",
-  "/File/ffteck_audit/templates/**/*.html",
-  "/File/static/**/*"
-]
