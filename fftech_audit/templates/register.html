@@ -1,14 +1,50 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Create your account</h2>
-/auth/register
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <input class="input" type="text" name="name" placeholder="Full Name" required>
-    <input class="input" type="email" name="email" placeholder="name@example.com" required>
-  </div>
-  <input class="input" style="margin-top:8px" type="password" name="password" placeholder="Password" required>
-  <button class="btn-primary" style="margin-top:10px">Register</button>
-</form>
-{% if error %}<p style="color:#ef4444;margin-top:8px">{{ error }}</p>{% endif %}
+<h2 class="section-title">Audit Result</h2>
+<p class="text-muted">URL: <strong>{{ url }}</strong></p>
+
+<div class="progress" style="margin-top:10px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
+<p class="text-muted" style="margin-top:6px">Score: {{ score }}% • Grade: {{ grade }}</p>
+
+<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+  <span class="badge">Errors: {{ severity.errors }}</span>
+  <span class="badge">Warnings: {{ severity.warnings }}</span>
+  <span class="badge">Notices: {{ severity.notices }}</span>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:14px;margin-top:16px">
+  <canvas id="donutCrawl"></canvas>
+  <canvas id="donutSEO"></canvas>
+  <canvas id="donutPerf"></canvas>
+  <canvas id="donutSec"></canvas>
+  <canvas id="donutMobile"></canvas>
+</div>
+
+<table class="table" style="margin-top:22px">
+  <thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr></thead>
+  <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.category }}</td><td>{{ r.value }}</td><td>{{ r.detail }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  // Build donuts using the numeric values provided
+  const cat = {{ category|safe }};
+  const donut = (el, val)=> new Chart(el, {
+    type:'doughnut',
+    data:{ labels:['Score','Remaining'],
+      datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }] },
+    options:{ cutout:'70%' }
+  });
+  donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
+  donut(document.getElementById('donutSEO'),    cat['On-Page SEO']);
+  donut(document.getElementById('donutPerf'),   cat['Performance']);
+  donut(document.getElementById('donutSec'),    cat['Security']);
+  donut(document.getElementById('donutMobile'), cat['Mobile']);
+</script>
 {% endblock %}
