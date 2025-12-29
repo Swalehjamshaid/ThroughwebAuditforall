@@ -1,21 +1,21 @@
 
 {% extends "base.html" %}
 {% block content %}
-<section style="text-align:center">
-  <h1 class="section-title" style="font-size:2rem;margin:0">Audit any website in seconds</h1>
-  <p class="text-muted" style="margin-top:8px">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
-  {% if error %}<p style="color:#ef4444;margin-top:8px">{{ error }}</p>{% endif %}
+<section class="hero">
+  <h1 class="title">Audit any website in seconds</h1>
+  <p class="muted">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
 </section>
 
-<div class="grid two" style="margin-top:22px">
+<div class="grid two">
   <!-- Open Audit -->
-  <div class="card">
-    <h3 class="section-subtitle">Open Audit</h3>
+  <div class="card glass">
+    <h3 class="subtitle">Open Audit</h3>
 
+    <!-- Plain HTML form (SSR) + JS progressive enhancement -->
     <!-- IMPORTANT:
          - method="POST" to hit @app.post("/audit/open")
-         - enctype="multipart/form-data" for FastAPI Form(...)
-         - name="url" must match the route signature url: str = Form(...)
+         - name="url" MUST match route signature: url: str = Form(...)
     -->
     /audit/open
       <input
@@ -28,46 +28,46 @@
         required
         autocomplete="off"
       />
-      <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
-        <button id="btnRunAudit" class="btn-primary" type="submit">Run Audit</button>
-        <span id="auditStatus" class="text-muted" style="display:none">Running…</span>
+      <div class="row">
+        <button id="btnRunAudit" class="btn primary" type="submit">Run Audit</button>
+        <span id="auditStatus" class="muted hidden">Running…</span>
       </div>
     </form>
 
-    <p class="text-muted" style="margin-top:8px">No sign-in required. Instant results.</p>
+    <p class="muted tiny">No sign‑in required. Instant results.</p>
   </div>
 
-  <!-- Sign In / Registration (placeholders until Phase 2 enabled) -->
-  <div class="card">
-    <h3 class="section-subtitle">Sign In / Register</h3>
-    <p class="text-muted">Register with name, email & password, then verify via email link.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+  <!-- Sign In / Registration -->
+  <div class="card glass">
+    <h3 class="subtitle">Sign In / Register</h3>
+    <p class="muted">Register with name, email & password, then verify via email link.</p>
+    <div class="row wrap">
       /auth/loginSign In</a>
       /auth/registerRegister</a>
     </div>
-    <p class="text-muted">Registered users can download PDFs & schedule audit emails.</p>
+    <p class="muted tiny">Registered users can download PDFs & schedule audit emails.</p>
   </div>
 </div>
 
-<p class="text-muted" style="margin-top:24px;text-align:center">Build: {{ build_marker }}</p>
+<p class="muted center tiny">Build: {{ build_marker }}</p>
 
 <script>
 /**
- * Progressive enhancement:
- * - First, normal form post works (SSR).
- * - If JS is enabled, we intercept to show "Running…" + fetch, then replace page with returned HTML.
+ * Run Audit: progressive enhancement
+ * - Without JS: browser submits form normally (SSR) to /audit/open.
+ * - With JS: intercept submit, show overlay, POST via fetch,
+ *            and replace page with returned HTML (results).
  */
 (function() {
-  const form = document.getElementById('auditForm');
-  const input = document.getElementById('urlOpen');
+  const form   = document.getElementById('auditForm');
+  const input  = document.getElementById('urlOpen');
+  const btn    = document.getElementById('btnRunAudit');
   const status = document.getElementById('auditStatus');
-  const btn = document.getElementById('btnRunAudit');
 
-  // Hard guard: ensure button exists and is inside the form
-  if (!form || !btn || !input) return;
+  if (!form || !input || !btn) return;
 
   form.addEventListener('submit', async (e) => {
-    // Keep SSR working if fetch fails
+    // Keep SSR as fallback if fetch fails
     e.preventDefault();
 
     const url = (input.value || '').trim();
@@ -75,15 +75,20 @@
     if (!/^https?:\/\/.+/i.test(url)) { alert('Please include http:// or https:// in the URL.'); input.focus(); return; }
 
     // UI: show running
-    status.style.display = 'inline';
     btn.disabled = true;
+    status.classList.remove('hidden');
+    overlayShow();
 
     try {
-      // Build multipart body (FastAPI Form(...) friendly)
-      const body = new FormData();
+      // Send as standard urlencoded form (FastAPI Form(...) friendly)
+      const body = new URLSearchParams();
       body.append('url', url);
 
-      const resp = await fetch('/audit/open', { method: 'POST', body });
+      const resp = await fetch('/audit/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      });
 
       const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
       if (resp.ok && ct.includes('text/html')) {
@@ -92,7 +97,7 @@
         return;
       }
 
-      // Friendly error
+      // Friendly error messaging
       let msg = 'Audit failed. Please try another URL.';
       try {
         const data = await resp.json();
@@ -103,12 +108,14 @@
       }
       console.error('[Audit] Server error:', msg);
       alert(msg);
+
     } catch (err) {
       console.error('[Audit] Network error:', err);
       alert('Network error while running audit: ' + err);
     } finally {
-      status.style.display = 'none';
       btn.disabled = false;
+      status.classList.add('hidden');
+      overlayHide();
     }
   });
 })();
