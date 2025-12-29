@@ -1,52 +1,100 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Audit Result</h2>
-<p class="text-muted">URL: <strong>{{ url }}</strong></p>
+<section style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:24px; box-shadow:0 12px 28px rgba(0,0,0,.35); margin-bottom:32px; text-align:center;">
+  <h1 style="font-size:2.5rem; font-weight:800; margin:0 0 12px; color:#fff;">Audit Results</h1>
+  <p style="color:#94a3b8; font-size:1.1rem; margin:0 0 24px;">Audited URL: <strong style="color:#e2e8f0;">{{ url }}</strong></p>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:24px; margin-bottom:24px;">
+    <div style="background:#1e293b; border-radius:16px; padding:20px;">
+      <h3 style="margin:0 0 12px; color:#94a3b8; font-weight:600;">Overall Score &amp; Grade</h3>
+      <div style="font-size:3rem; font-weight:800; color:#16a34a;">{{ score }}%</div>
+      <div style="font-size:2rem; font-weight:700; color:#22c55e; margin-top:8px;">{{ grade }}</div>
+      <div style="background:#334155; border-radius:8px; height:12px; margin-top:16px; overflow:hidden;"><div style="background:linear-gradient(to right, #ef4444, #f97316, #22c55e); width:{{ score }}%; height:100%; transition:width 1.2s ease;"></div></div>
+    </div>
+    <div style="background:#1e293b; border-radius:16px; padding:20px;">
+      <h3 style="margin:0 0 16px; color:#94a3b8; font-weight:600;">Issue Severity</h3>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between;"><span style="color:#ef4444; font-weight:700;">Errors</span><span style="font-size:1.5rem; font-weight:800;">{{ severity.errors }}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:#f97316; font-weight:700;">Warnings</span><span style="font-size:1.5rem; font-weight:800;">{{ severity.warnings }}</span></div>
+        <div style="display:flex; justify-content:space-between;"><span style="color:#eab308; font-weight:700;">Notices</span><span style="font-size:1.5rem; font-weight:800;">{{ severity.notices }}</span></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-<div class="progress" style="margin-top:10px"><div class="progress-fill" style="width: {{ score }}%"></div></div>
-<p class="text-muted" style="margin-top:6px">Score: {{ score }}% • Grade: {{ grade }}</p>
-
-<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-  <span class="badge">Errors: {{ severity.errors }}</span>
-  <span class="badge">Warnings: {{ severity.warnings }}</span>
-  <span class="badge">Notices: {{ severity.notices }}</span>
-</div>
-
-<div style="display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:14px;margin-top:16px">
-  <canvas id="donutCrawl"></canvas>
-  <canvas id="donutSEO"></canvas>
-  <canvas id="donutPerf"></canvas>
-  <canvas id="donutSec"></canvas>
-  <canvas id="donutMobile"></canvas>
-</div>
-
-<table class="table" style="margin-top:22px">
-  <thead>
-    <tr><th>ID</th><th>Name</th><th>Category</th><th>Value</th><th>Detail</th></tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.id }}</td><td>{{ r.name }}</td><td>{{ r.category }}</td><td>{{ r.value }}</td><td>{{ r.detail }}</td>
-      </tr>
+<section style="margin-bottom:32px;">
+  <h2 style="font-size:1.8rem; font-weight:700; margin-bottom:20px; text-align:center;">Category Breakdown</h2>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
+    {% set categories = [('Crawlability', '#3b82f6'), ('On-Page SEO', '#8b5cf6'), ('Performance', '#f59e0b'), ('Security', '#ef4444'), ('Mobile', '#10b981')] %}
+    {% for cat_name, color in categories %}
+      <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; text-align:center; box-shadow:0 8px 20px rgba(0,0,0,.2);">
+        <canvas id="donut{{ loop.index }}" height="180"></canvas>
+        <p style="margin:12px 0 0; font-weight:600; color:#e2e8f0;">{{ cat_name }}</p>
+        <p style="font-size:2rem; font-weight:800; color:{{ color }};">{{ category_scores.get(cat_name, 0) }}%</p>
+      </div>
     {% endfor %}
-  </tbody>
-</table>
+  </div>
+</section>
+
+<section style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:24px; margin-bottom:32px; box-shadow:0 12px 28px rgba(0,0,0,.35);">
+  <h2 style="font-size:1.8rem; font-weight:700; margin-bottom:16px;">Executive Summary</h2>
+  <p style="color:#e2e8f0; line-height:1.7; font-size:1.05rem;">{{ summary }}</p>
+</section>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:24px; margin-bottom:32px;">
+  <section style="background:#0f172a; border:1px solid #22c55e; border-radius:18px; padding:20px; box-shadow:0 8px 20px rgba(34,197,94,.15);">
+    <h3 style="color:#22c55e; font-weight:700; margin-bottom:16px;">Strengths</h3>
+    {% if strengths %}<ul style="color:#e2e8f0; line-height:1.8;">{% for item in strengths %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p style="color:#94a3b8; font-style:italic;">No major strengths detected in this quick audit.</p>{% endif %}
+  </section>
+  <section style="background:#0f172a; border:1px solid #f97316; border-radius:18px; padding:20px; box-shadow:0 8px 20px rgba(249,115,22,.15);">
+    <h3 style="color:#f97316; font-weight:700; margin-bottom:16px;">Areas for Improvement</h3>
+    {% if weaknesses %}<ul style="color:#e2e8f0; line-height:1.8;">{% for item in weaknesses %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p style="color:#94a3b8; font-style:italic;">No critical issues found — great job!</p>{% endif %}
+  </section>
+  <section style="background:#0f172a; border:1px solid #ef4444; border-radius:18px; padding:20px; box-shadow:0 8px 20px rgba(239,68,68,.15);">
+    <h3 style="color:#ef4444; font-weight:700; margin-bottom:16px;">Priority Fixes</h3>
+    {% if priority_fixes %}<ol style="color:#e2e8f0; line-height:1.8;">{% for item in priority_fixes %}<li>{{ item }}</li>{% endfor %}</ol>{% else %}<p style="color:#94a3b8; font-style:italic;">No high-priority fixes needed.</p>{% endif %}
+  </section>
+</div>
+
+<section style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:24px; box-shadow:0 12px 28px rgba(0,0,0,.35);">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <h2 id="metricsTitle" style="font-size:1.8rem; font-weight:700; margin:0;">Detailed Metrics ({{ rows|length }})</h2>
+    <input id="filterText" placeholder="Search metrics…" style="padding:12px 16px; border-radius:12px; border:1px solid #334155; background:#1e293b; color:#e2e8f0; width:320px;" oninput="filterMetrics()" />
+  </div>
+  <div class="table-container" style="overflow-x:auto;">
+    <table class="table">
+      <thead>
+        <tr><th class="sortable" data-col="id">ID <span class="sort-indicator"></span></th><th class="sortable" data-col="name">Metric Name <span class="sort-indicator"></span></th><th class="sortable" data-col="category">Category <span class="sort-indicator"></span></th><th class="sortable" data-col="value">Value <span class="sort-indicator"></span></th><th>Detail</th></tr>
+      </thead>
+      <tbody id="metricsTable">
+        {% for r in rows %}
+          <tr data-name="{{ r.name|lower }}" data-cat="{{ r.category|lower }}" data-val="{{ (r.value|string)|lower }}">
+            <td>{{ r.id }}</td><td style="font-weight:600;">{{ r.name }}</td><td>{{ r.category }}</td>
+            <td>{% if r.value is number %}<strong>{{ r.value }}</strong>{% else %}{{ r.value }}{% endif %}</td>
+            <td style="color:#94a3b8;">{{ r.detail }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <script>
-  // Category donuts (safe JSON)
   const cat = JSON.parse('{{ category_json|e }}');
-  const donut = (el, val)=> new Chart(el, {
-    type:'doughnut',
-    data:{ labels:['Score','Remaining'],
-      datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }] },
-    options:{ cutout:'70%' }
-  });
-  donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
-  donut(document.getElementById('donutSEO'),    cat['On-Page SEO']);
-  donut(document.getElementById('donutPerf'),   cat['Performance']);
-  donut(document.getElementById('donutSec'),    cat['Security']);
-  donut(document.getElementById('donutMobile'), cat['Mobile']);
+  const colors = {'Crawlability':'#3b82f6','On-Page SEO':'#8b5cf6','Performance':'#f59e0b','Security':'#ef4444','Mobile':'#10b981'};
+  const donutConfig = (val, color)=>({type:'doughnut',data:{datasets:[{data:[val,100-val],backgroundColor:[color,'#1e293b'],borderWidth:0,borderRadius:8}]} ,options:{cutout:'75%',plugins:{legend:{display:false}},animation:{duration:1500}}});
+  new Chart(document.getElementById('donut1'), donutConfig(cat['Crawlability'], colors['Crawlability']));
+  new Chart(document.getElementById('donut2'), donutConfig(cat['On-Page SEO'], colors['On-Page SEO']));
+  new Chart(document.getElementById('donut3'), donutConfig(cat['Performance'], colors['Performance']));
+  new Chart(document.getElementById('donut4'), donutConfig(cat['Security'], colors['Security']));
+  new Chart(document.getElementById('donut5'), donutConfig(cat['Mobile'], colors['Mobile']));
+
+  let sortState = { col: 'id', dir: 'asc' };
+  function compareRows(a,b,col,dir){let va=a[col],vb=b[col]; if(col==='id') return dir==='asc'?va-vb:vb-va; const na=parseFloat(va),nb=parseFloat(vb); if(!Number.isNaN(na)&&!Number.isNaN(nb)) return dir==='asc'?na-nb:nb-na; va=String(va).toLowerCase(); vb=String(vb).toLowerCase(); return dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
+  function rebuildTable(){const tbody=document.getElementById('metricsTable'); const rows=Array.from(tbody.querySelectorAll('tr')).map(tr=>{const tds=tr.querySelectorAll('td');return{tr,id:Number(tds[0].textContent),name:tds[1].textContent,category:tds[2].textContent,value:tds[3].textContent.trim(),detail:tds[4].textContent};}); rows.sort((a,b)=>compareRows(a,b,sortState.col,sortState.dir)); tbody.innerHTML=''; rows.forEach(r=>tbody.appendChild(r.tr)); updateSortIndicators();}
+  function updateSortIndicators(){document.querySelectorAll('.sort-indicator').forEach(el=>el.textContent=''); const th=document.querySelector('.table thead th[data-col="'+sortState.col+'"] .sort-indicator'); if(th) th.textContent=sortState.dir==='asc'?'▲':'▼';}
+  document.querySelectorAll('th.sortable').forEach(th=>{th.addEventListener('click',()=>{const col=th.dataset.col; if(sortState.col===col) sortState.dir=sortState.dir==='asc'?'desc':'asc'; else {sortState.col=col; sortState.dir='asc';} rebuildTable();});});
+  function filterMetrics(){const q=(document.getElementById('filterText').value||'').trim().toLowerCase(); const trs=document.querySelectorAll('#metricsTable tr'); let shown=0; trs.forEach(tr=>{const visible=!q||tr.dataset.name.includes(q)||tr.dataset.cat.includes(q)||tr.dataset.val.includes(q); tr.style.display=visible?'':'none'; if(visible) shown++;}); const title=document.getElementById('metricsTitle'); if(title) title.textContent=`Detailed Metrics (${shown})`; }
+  rebuildTable();
 </script>
 {% endblock %}
