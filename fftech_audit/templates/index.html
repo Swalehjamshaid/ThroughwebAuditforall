@@ -1,7 +1,6 @@
 
 {% extends "base.html" %}
 {% block content %}
-
 <section style="text-align:center">
   <h1 class="section-title" style="font-size:2rem;margin:0">Audit any website in seconds</h1>
   <p class="text-muted" style="margin-top:8px">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
@@ -12,10 +11,28 @@
   <!-- Open Audit -->
   <div class="card">
     <h3 class="section-subtitle">Open Audit</h3>
+
+    <!-- IMPORTANT:
+         - method="POST" so it hits your FastAPI route: @app.post("/audit/open")
+         - enctype="multipart/form-data" so FastAPI Form(...) can parse (requires python-multipart)
+         - name="url" matches the route signature: url: str = Form(...)
+    -->
     /audit/open
-      <input id="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required />
-      <button class="btn-primary" style="margin-top:10px">Run Audit</button>
+      <input
+        id="urlOpen"
+        class="input"
+        type="url"
+        name="url"
+        placeholder="https://example.com"
+        value="{{ prefill_url or '' }}"
+        required
+        autocomplete="off"
+      />
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
+        <button id="btnRunAudit" class="btn-primary" type="submit">Run Audit</button>
+      </div>
     </form>
+
     <p class="text-muted" style="margin-top:8px">No sign-in required. Instant results.</p>
   </div>
 
@@ -24,8 +41,7 @@
     <h3 class="section-subtitle">Sign In / Register</h3>
     <p class="text-muted">Register with name, email & password, then verify via email link.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      /auth/loginSign In</a>
-      /auth/registerRegister</a>
+      <a class="btn-secondary" href/auth/registerRegister</a>
     </div>
     <p class="text-muted">Registered users can download PDFs & schedule audit emails.</p>
   </div>
