@@ -2,8 +2,7 @@
 {% extends "base.html" %}
 {% block content %}
 <h2 class="section-title">Sign In</h2>
-/auth/login
-  <input class="input" type="email" name="email" placeholder="name@example.com" required>
+<form method="POST" action="/auth/login" style="margin-top:12px;max-width:name@example.com" required>
   <input class="input" style="margin-top:8px" type="password" name="password" placeholder="Password" required>
   <button class="btn-primary" style="margin-top:10px">Sign In</button>
 </form>
