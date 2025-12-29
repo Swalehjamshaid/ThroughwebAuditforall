@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+requests
+reportlab
+email-validator
+jinja2
+python-dotenv
+alembic
+passlib[bcrypt]
+python-multipart
