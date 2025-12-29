@@ -1,47 +1,42 @@
 
 {% extends "base.html" %}
 {% block content %}
-  <!-- Quick Audit -->
-  <section class="card" style="margin-bottom:24px;">
-    <h2 style="margin-top:0;">Run a Quick Audit</h2>
-    <p style="color:var(--text-muted);margin-top:4px;">
-      Enter a full URL (including <strong>https://</strong>) to run a one‑page audit.
-    </p>
+<section class="card" style="margin-bottom:24px;">
+  <h2 style="margin-top:0;">Run a Quick Audit</h2>
+  <p style="color:var(--text-muted);margin-top:4px;">
+    Enter a full URL (including <strong>https://</strong>) to run a one‑page audit.
+  </p>
 
-    /audit/open
-      <label for="url" style="display:block;margin-bottom:8px;">Website URL</label>
-      <input
-        id="url" name="url" type="url" required
-        placeholder="https://example.com"
-        style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);"
-      />
-      <div style="margin-top:12px;display:flex;gap:12px;">
-        <button type="submit" class="btn ghost">Run Audit</button>
-        /auth/register
-          Register to get 5‑page PDF
-        </a>
-      </div>
-    </form>
-
-    {% if error %}
-    <div style="margin-top:12px;padding:12px;border-radius:8px;background:#1e293b;color:#fca5a5;">
-      {{ error }}
+  /audit/open
+    <label for="url" style="display:block;margin-bottom:8px;">Website URL</label>
+    <input id="url" name="url" type="url" required placeholder="https://example.com"
+           style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text);" />
+    <div style="margin-top:12px;display:flex;gap:12px;">
+      <button type="submit" class="btn ghost">Run Audit</button>
+      /auth/register
+        Register to get 5‑page PDF
+      </a>
     </div>
-    {% endif %}
-  </section>
+  </form>
 
-  <!-- How it works -->
-  <section class="card">
-    <h2 style="margin-top:0;">What You’ll Get</h2>
-    <ul style="margin-top:8px;">
-      <li>Overall score &amp; grade</li>
-      <li>Category breakdown (Security, Performance, SEO, Mobile, Content)</li>
-      <li>Strengths, weak areas, priority fixes</li>
-      <li>Detailed metrics table</li>
-    </ul>
-    <p style="color:var(--text-muted);margin-top:8px;">
-      Registered users receive a <strong>5‑page executive PDF</strong> by email and can set a
-      <strong>daily/weekly schedule</strong> with local time and timezone.
-    </p>
-  </section>
+  {% if error %}
+  <div style="margin-top:12px;padding:12px;border-radius:8px;background:#1e293b;color:#fca5a5;">
+    {{ error }}
+  </div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2 style="margin-top:0;">What You’ll Get</h2>
+  <ul style="margin-top:8px;">
+    <li>Overall score &amp; grade</li>
+    <li>Category breakdown (Security, Performance, SEO, Mobile, Content)</li>
+    <li>Strengths, weak areas, priority fixes</li>
+    <li>Detailed metrics table</li>
+  </ul>
+  <p style="color:var(--text-muted);margin-top:8px;">
+    Registered users receive a <strong>5‑page executive PDF</strong> by email and can set a
+    <strong>daily/weekly schedule</strong> with local time and timezone.
+  </p>
+</section>
 {% endblock %}
