@@ -1,0 +1,10 @@
+
+{% extends "base.html" %}
+{% block content %}
+  <div class="card">
+    <h2>{{ message }}</h2>
+    <p style="color:var(--text-muted)">Your session token:</p>
+    <pre style="white-space:wrap;word-break:break-word;background:#0f172a;padding:12px;border-radius:8px;">{{ token }}</pre>
+    <p style="color:var(--text-muted)">Use this token with APIs like <code>/audit/user</code> or <code>/api/report/pdf</code>.</p>
+  </div>
+{% endblock %}

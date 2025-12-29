@@ -1,0 +1,125 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Audit Results • FF Tech</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar" style="display:flex;align-items:center;gap:16px;padding:16px;border-bottom:1px solid var(--border);">
+    <img src="/static/logo.png" alt="FF Tech Logo" style="height:40px;border-radius:8px;" />
+    <h1 style="margin:0;">Audit Results</h1>
+  </header>
+  <main class="container" style="max-width:1280px;margin:0 auto;padding:24px;">
+    <section class="card" style="background:var(--card-bg);padding:24px;border-radius:12px;margin-bottom:24px;">
+      <p>Audited URL: <strong>{{ url_display }}</strong></p>
+      <div class="overall" style="display:flex;align-items:center;gap:24px;">
+        <div class="gauge"><canvas id="overallChart" width="140" height="140"></canvas></div>
+        <div class="grade">Overall: <strong>{{ score }}%</strong> — <span class="badge" style="padding:4px 8px;background:var(--primary);border-radius:6px;">{{ grade }}</span></div>
+        <div class="sev" style="color:var(--text-muted);">Errors {{ errors_count }} • Warnings {{ warnings_count }} • Notices {{ notices_count }}</div>
+      </div>
+    </section>
+
+    <section class="card" style="background:var(--card-bg);padding:24px;border-radius:12px;margin-bottom:24px;">
+      <h3>Category Breakdown</h3>
+      <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+        {% for cat, val in category_scores.items() %}
+        <div class="category">
+          <h4 style="margin-bottom:8px;">{{ cat|capitalize }}</h4>
+          <div class="progress" style="background:#1e293b;border-radius:8px;overflow:hidden;height:10px;">
+            <div style="width: {{ val }}%;background:var(--primary);height:10px;"></div>
+          </div>
+          <small>{{ val|round(1) }} / 100</small>
+        </div>
+        {% endfor %}
+      </div>
+      <canvas id="barChart" height="120" style="margin-top:16px;"></canvas>
+    </section>
+
+    <section class="grid three" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;">
+      <div class="card" style="background:var(--card-bg);padding:16px;border-radius:12px;">
+        <h3>Strengths</h3>
+        <ul>{% for s in strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+      </div>
+      <div class="card" style="background:var(--card-bg);padding:16px;border-radius:12px;">
+        <h3>Weak Areas</h3>
+        <ul>{% for w in weaknesses %}<li>{{ w }}</li>{% endfor %}</ul>
+      </div>
+      <div class="card" style="background:var(--card-bg);padding:16px;border-radius:12px;">
+        <h3>Priority Fixes</h3>
+        <ul>{% for p in priority_fixes %}<li>{{ p }}</li>{% endfor %}</ul>
+      </div>
+    </section>
+
+    <section class="card" style="background:var(--card-bg);padding:24px;border-radius:12px;">
+      <h3>Detailed Metrics</h3>
+      <div class="table-wrap" style="overflow-x:auto;">
+        <table class="metrics" style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:8px;">#</th>
+              <th style="padding:8px;">Name</th>
+              <th style="padding:8px;">Category</th>
+              <th style="padding:8px;">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:8px;">{{ r.id }}</td>
+              <td style="padding:8px;">{{ r.name }}</td>
+              <td style="padding:8px;">{{ r.category }}</td>
+              <td style="padding:8px;">{{ r.value }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    window.FFTECH_DATA = {
+      score: {{ score|round(1) }},
+      categories: {
+        security: {{ category_scores.security|round(1) }},
+        performance: {{ category_scores.performance|round(1) }},
+        seo: {{ category_scores.seo|round(1) }},
+        mobile: {{ category_scores.mobile|round(1) }},
+        content: {{ category_scores.content|round(1) }}
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const styles = getComputedStyle(document.documentElement);
+      const cats = window.FFTECH_DATA.categories;
+
+      const overallCtx = document.getElementById('overallChart');
+      if (overallCtx && Chart) {
+        new Chart(overallCtx, {
+          type: 'doughnut',
+          data: { labels: ['Score', 'Remaining'], datasets: [{ data: [window.FFTECH_DATA.score, 100 - window.FFTECH_DATA.score], backgroundColor: ['#6366f1', '#1e293b'] }] },
+          options: { cutout: '70%', plugins: { legend: { display: false } } }
+        });
+      }
+
+      const barCtx = document.getElementById('barChart');
+      if (barCtx && Chart) {
+        new Chart(barCtx, {
+          type: 'bar',
+          data: { labels: Object.keys(cats), datasets: [{ label: 'Category Scores', data: Object.values(cats), backgroundColor: ['#6366f1','#22d3ee','#f59e0b','#ec4899','#10b981'] }] },
+          options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, max: 100, ticks: { color: styles.getPropertyValue('--text-muted') } }, x: { ticks: { color: styles.getPropertyValue('--text-muted') } } },
+            plugins: { legend: { labels: { color: styles.getPropertyValue('--text') } } }
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
