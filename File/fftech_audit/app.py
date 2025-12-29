@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, canonical_origin, aggregate_score, grade_from_score
+from .audit_engine import AuditEngine, METRIC_DESCRIPTORS, canonical_origin
 from .db import SessionLocal, Base, engine, User, Audit, Schedule
 from .auth_email import (
     send_verification_link,
@@ -53,11 +53,6 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 # SAFE DB INIT → defer to startup
 # ------------------------------------------------------------
 def init_db():
-    """
-    Connect and create tables. If DB is misconfigured or down,
-    log the error and continue—service must start so Railway healthcheck passes.
-    Also run a small migration to add new scheduling columns if missing.
-    """
     try:
         with engine.connect() as _:
             pass
@@ -80,41 +75,41 @@ def health():
 # ------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    # ✅ render the home template (extends base.html and fills the content block)
     return templates.TemplateResponse("home.html", {"request": request})
 
 @app.post("/audit/open", response_class=HTMLResponse)
 def audit_open_ssr(request: Request, url: str = Form(...)):
     url = (url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
-        # show the form page again with the error message
         return templates.TemplateResponse("home.html", {"request": request, "error": "Invalid URL (must start with http:// or https://)"}, status_code=400)
 
-    origin = canonical_origin(url)
+    # ✅ Audit the full path the user typed (not just origin)
+    target = url.strip()
     try:
-        eng = AuditEngine(origin)
+        eng = AuditEngine(target)
         metrics = eng.compute_metrics()
     except Exception as e:
         logger.error("[AUDIT OPEN] Failed: %s", e)
         traceback.print_exc()
-        # show error on the home page so user can try again
         return templates.TemplateResponse("home.html", {"request": request, "error": f"Audit failed: {e}"}, status_code=500)
 
-    # Compose categories (basic demo aggregation). You can customize this if needed.
-    security_checks = {"https_enabled": metrics.get(10, {}).get("value", True)}
-    perf = {"ttfb_ms": metrics.get(20, {}).get("value", 0), "payload_kb": metrics.get(21, {}).get("value", 0)}
-    seo = {"has_title": metrics.get(30, {}).get("value", False), "has_meta_desc": metrics.get(31, {}).get("value", False)}
-    mobile = {"viewport_ok": metrics.get(40, {}).get("value", False)}
-    content = {"has_h1": metrics.get(50, {}).get("value", False), "alt_ok": metrics.get(51, {}).get("value", False)}
+    # Simple scoring demo based on key signals
+    https_ok = metrics.get(10, {}).get("value", True)
+    ttfb_ms  = metrics.get(20, {}).get("value", 0)
+    size_kb  = metrics.get(21, {}).get("value", 0)
+    has_title = metrics.get(30, {}).get("value", False)
+    has_desc  = metrics.get(31, {}).get("value", False)
+    viewport  = metrics.get(40, {}).get("value", False)
+    has_h1    = metrics.get(50, {}).get("value", False)
+    alt_ok    = metrics.get(51, {}).get("value", False)
 
-    # Simple scoring demo (you can replace with your aggregate_score if desired)
     overall = 0
-    overall += 20 if security_checks["https_enabled"] else 0
-    overall += 20 if perf["ttfb_ms"] <= 500 else 10 if perf["ttfb_ms"] <= 1000 else 0
-    overall += 20 if perf["payload_kb"] <= 1024 else 10 if perf["payload_kb"] <= 2048 else 0
-    overall += 20 if seo["has_title"] and seo["has_meta_desc"] else 10 if (seo["has_title"] or seo["has_meta_desc"]) else 0
-    overall += 20 if mobile["viewport_ok"] else 0
-    overall += 20 if content["has_h1"] and content["alt_ok"] else 10 if (content["has_h1"] or content["alt_ok"]) else 0
+    overall += 20 if https_ok else 0
+    overall += 20 if ttfb_ms <= 500 else 10 if ttfb_ms <= 1000 else 0
+    overall += 20 if size_kb <= 1024 else 10 if size_kb <= 2048 else 0
+    overall += 20 if has_title and has_desc else 10 if (has_title or has_desc) else 0
+    overall += 20 if viewport else 0
+    overall += 20 if has_h1 and alt_ok else 10 if (has_h1 or alt_ok) else 0
     overall = min(100, overall)
 
     def grade_from_score(s: float) -> str:
@@ -130,8 +125,7 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
     rows: List[Dict[str, Any]] = []
     for pid in sorted(metrics.keys()):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": f"Metric {pid}", "category": "-"})
-        cell = metrics.get(pid, {"value": "N/A"})
-        val = cell["value"]
+        val = metrics.get(pid, {}).get("value", "N/A")
         if isinstance(val, (dict, list)):
             try:
                 val = json.dumps(val, ensure_ascii=False)
@@ -141,10 +135,9 @@ def audit_open_ssr(request: Request, url: str = Form(...)):
 
     ctx = {
         "request": request,
-        "url_display": origin,
+        "url_display": target,
         "score": overall,
         "grade": grade,
-        "category_scores": {"security": security_checks, "performance": perf, "seo": seo, "mobile": mobile, "content": content},
         "rows": rows,
     }
     return templates.TemplateResponse("results.html", ctx)
@@ -221,35 +214,39 @@ def audit_user(req: Dict[str, str] = Body(...)):
         user = db.query(User).filter(User.email == email).first()
         if not user or not user.is_verified:
             raise HTTPException(status_code=403, detail="Email not verified")
-        origin = canonical_origin(url)
-        eng = AuditEngine(origin)
+        target = url.strip()
+        eng = AuditEngine(target)
         metrics = eng.compute_metrics()
 
-        # Simple category summary (same as open)
-        security_checks = {"https_enabled": metrics.get(10, {}).get("value", True)}
-        perf = {"ttfb_ms": metrics.get(20, {}).get("value", 0), "payload_kb": metrics.get(21, {}).get("value", 0)}
-        seo = {"has_title": metrics.get(30, {}).get("value", False), "has_meta_desc": metrics.get(31, {}).get("value", False)}
-        mobile = {"viewport_ok": metrics.get(40, {}).get("value", False)}
-        content = {"has_h1": metrics.get(50, {}).get("value", False), "alt_ok": metrics.get(51, {}).get("value", False)}
-        overall = 0
-        overall += 20 if security_checks["https_enabled"] else 0
-        overall += 20 if perf["ttfb_ms"] <= 500 else 10 if perf["ttfb_ms"] <= 1000 else 0
-        overall += 20 if perf["payload_kb"] <= 1024 else 10 if perf["payload_kb"] <= 2048 else 0
-        overall += 20 if seo["has_title"] and seo["has_meta_desc"] else 10 if (seo["has_title"] or seo["has_meta_desc"]) else 0
-        overall += 20 if mobile["viewport_ok"] else 0
-        overall += 20 if content["has_h1"] and content["alt_ok"] else 10 if (content["has_h1"] or content["alt_ok"]) else 0
-        overall = min(100, overall)
-        grade = grade_from_score(overall)
+        # Simple category summary (same signals as open)
+        https_ok = metrics.get(10, {}).get("value", True)
+        ttfb_ms  = metrics.get(20, {}).get("value", 0)
+        size_kb  = metrics.get(21, {}).get("value", 0)
+        has_title = metrics.get(30, {}).get("value", False)
+        has_desc  = metrics.get(31, {}).get("value", False)
+        viewport  = metrics.get(40, {}).get("value", False)
+        has_h1    = metrics.get(50, {}).get("value", False)
+        alt_ok    = metrics.get(51, {}).get("value", False)
 
-        audit = Audit(user_id=user.id, url=origin, metrics_json=json.dumps(metrics), score=int(round(overall)), grade=grade)
+        overall = 0
+        overall += 20 if https_ok else 0
+        overall += 20 if ttfb_ms <= 500 else 10 if ttfb_ms <= 1000 else 0
+        overall += 20 if size_kb <= 1024 else 10 if size_kb <= 2048 else 0
+        overall += 20 if has_title and has_desc else 10 if (has_title or has_desc) else 0
+        overall += 20 if viewport else 0
+        overall += 20 if has_h1 and alt_ok else 10 if (has_h1 or alt_ok) else 0
+        overall = min(100, overall)
+
+        grade_val = grade_from_score(overall)
+
+        audit = Audit(user_id=user.id, url=target, metrics_json=json.dumps(metrics), score=int(round(overall)), grade=grade_val)
         db.add(audit); db.commit()
 
-        # Email PDF
-        pdf_bytes = build_pdf_report(audit, {"security": security_checks, "performance": perf, "seo": seo, "mobile": mobile, "content": content},
-                                     [], [], [])
+        # Email PDF (basic exec summary)
+        pdf_bytes = build_pdf_report(audit, {}, [], [], [])
         send_email_with_pdf(user.email, "Your FF Tech Audit Report", "Attached is your 5-page audit report.", pdf_bytes)
 
-        return {"message": "Audit stored", "score": overall, "grade": grade, "audit_id": audit.id}
+        return {"message": "Audit stored", "score": overall, "grade": grade_val, "audit_id": audit.id}
     finally:
         db.close()
 
@@ -264,27 +261,32 @@ def report_pdf_api(req: Dict[str, str] = Body(...)):
         user = db.query(User).filter(User.email == email).first()
         if not user or not user.is_verified:
             raise HTTPException(status_code=403, detail="Email not verified")
-        origin = canonical_origin(url); eng = AuditEngine(origin); metrics = eng.compute_metrics()
+        target = url.strip(); eng = AuditEngine(target); metrics = eng.compute_metrics()
 
-        security_checks = {"https_enabled": metrics.get(10, {}).get("value", True)}
-        perf = {"ttfb_ms": metrics.get(20, {}).get("value", 0), "payload_kb": metrics.get(21, {}).get("value", 0)}
-        seo = {"has_title": metrics.get(30, {}).get("value", False), "has_meta_desc": metrics.get(31, {}).get("value", False)}
-        mobile = {"viewport_ok": metrics.get(40, {}).get("value", False)}
-        content = {"has_h1": metrics.get(50, {}).get("value", False), "alt_ok": metrics.get(51, {}).get("value", False)}
+        https_ok = metrics.get(10, {}).get("value", True)
+        ttfb_ms  = metrics.get(20, {}).get("value", 0)
+        size_kb  = metrics.get(21, {}).get("value", 0)
+        has_title = metrics.get(30, {}).get("value", False)
+        has_desc  = metrics.get(31, {}).get("value", False)
+        viewport  = metrics.get(40, {}).get("value", False)
+        has_h1    = metrics.get(50, {}).get("value", False)
+        alt_ok    = metrics.get(51, {}).get("value", False)
+
         overall = 0
-        overall += 20 if security_checks["https_enabled"] else 0
-        overall += 20 if perf["ttfb_ms"] <= 500 else 10 if perf["ttfb_ms"] <= 1000 else 0
-        overall += 20 if perf["payload_kb"] <= 1024 else 10 if perf["payload_kb"] <= 2048 else 0
-        overall += 20 if seo["has_title"] and seo["has_meta_desc"] else 10 if (seo["has_title"] or seo["has_meta_desc"]) else 0
-        overall += 20 if mobile["viewport_ok"] else 0
-        overall += 20 if content["has_h1"] and content["alt_ok"] else 10 if (content["has_h1"] or content["alt_ok"]) else 0
+        overall += 20 if https_ok else 0
+        overall += 20 if ttfb_ms <= 500 else 10 if ttfb_ms <= 1000 else 0
+        overall += 20 if size_kb <= 1024 else 10 if size_kb <= 2048 else 0
+        overall += 20 if has_title and has_desc else 10 if (has_title or has_desc) else 0
+        overall += 20 if viewport else 0
+        overall += 20 if has_h1 and alt_ok else 10 if (has_h1 or alt_ok) else 0
         overall = min(100, overall)
-        grade = grade_from_score(overall)
 
-        audit = Audit(user_id=user.id, url=origin, metrics_json=json.dumps(metrics), score=int(round(overall)), grade=grade)
+        grade_val = grade_from_score(overall)
+
+        audit = Audit(user_id=user.id, url=target, metrics_json=json.dumps(metrics), score=int(round(overall)), grade=grade_val)
         db.add(audit); db.commit()
 
-        pdf_bytes = build_pdf_report(audit, {"security": security_checks, "performance": perf, "seo": seo, "mobile": mobile, "content": content}, [], [], [])
+        pdf_bytes = build_pdf_report(audit, {}, [], [], [])
         return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                                  headers={"Content-Disposition": 'attachment; filename="FFTech_Audit.pdf"'})
     finally:
@@ -431,24 +433,28 @@ def scheduler_loop():
                 eng = AuditEngine(origin)
                 metrics = eng.compute_metrics()
 
-                security_checks = {"https_enabled": metrics.get(10, {}).get("value", True)}
-                perf = {"ttfb_ms": metrics.get(20, {}).get("value", 0), "payload_kb": metrics.get(21, {}).get("value", 0)}
-                seo = {"has_title": metrics.get(30, {}).get("value", False), "has_meta_desc": metrics.get(31, {}).get("value", False)}
-                mobile = {"viewport_ok": metrics.get(40, {}).get("value", False)}
-                content = {"has_h1": metrics.get(50, {}).get("value", False), "alt_ok": metrics.get(51, {}).get("value", False)}
+                https_ok = metrics.get(10, {}).get("value", True)
+                ttfb_ms  = metrics.get(20, {}).get("value", 0)
+                size_kb  = metrics.get(21, {}).get("value", 0)
+                has_title = metrics.get(30, {}).get("value", False)
+                has_desc  = metrics.get(31, {}).get("value", False)
+                viewport  = metrics.get(40, {}).get("value", False)
+                has_h1    = metrics.get(50, {}).get("value", False)
+                alt_ok    = metrics.get(51, {}).get("value", False)
+
                 overall = 0
-                overall += 20 if security_checks["https_enabled"] else 0
-                overall += 20 if perf["ttfb_ms"] <= 500 else 10 if perf["ttfb_ms"] <= 1000 else 0
-                overall += 20 if perf["payload_kb"] <= 1024 else 10 if perf["payload_kb"] <= 2048 else 0
-                overall += 20 if seo["has_title"] and seo["has_meta_desc"] else 10 if (seo["has_title"] or seo["has_meta_desc"]) else 0
-                overall += 20 if mobile["viewport_ok"] else 0
-                overall += 20 if content["has_h1"] and content["alt_ok"] else 10 if (content["has_h1"] or content["alt_ok"]) else 0
+                overall += 20 if https_ok else 0
+                overall += 20 if ttfb_ms <= 500 else 10 if ttfb_ms <= 1000 else 0
+                overall += 20 if size_kb <= 1024 else 10 if size_kb <= 2048 else 0
+                overall += 20 if has_title and has_desc else 10 if (has_title or has_desc) else 0
+                overall += 20 if viewport else 0
+                overall += 20 if has_h1 and alt_ok else 10 if (has_h1 or alt_ok) else 0
                 overall = min(100, overall)
 
                 audit = Audit(user_id=user.id, url=origin, metrics_json=json.dumps(metrics), score=int(round(overall)), grade=grade_from_score(overall))
                 db.add(audit); db.commit()
 
-                pdf_bytes = build_pdf_report(audit, {"security": security_checks, "performance": perf, "seo": seo, "mobile": mobile, "content": content}, [], [], [])
+                pdf_bytes = build_pdf_report(audit, {}, [], [], [])
                 send_email_with_pdf(user.email, "Scheduled FF Tech Audit Report", "Your scheduled audit report is attached.", pdf_bytes)
 
                 sch.next_run_at = compute_next_run(
