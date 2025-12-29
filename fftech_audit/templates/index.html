@@ -1,13 +1,14 @@
 
 {% extends "base.html" %}
 {% block content %}
+
 <section style="text-align:center">
-  <h1 class="section-title" style="font-size:2rem">Audit any website in seconds</h1>
-  <p class="text-muted">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
-  {% if error %}<p style="color:#ef4444">{{ error }}</p>{% endif %}
+  <h1 class="section-title" style="font-size:2rem;margin:0">Audit any website in seconds</h1>
+  <p class="text-muted" style="margin-top:8px">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
+  {% if error %}<p style="color:#ef4444;margin-top:8px">{{ error }}</p>{% endif %}
 </section>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+<div class="grid two" style="margin-top:22px">
   <!-- Open Audit -->
   <div class="card">
     <h3 class="section-subtitle">Open Audit</h3>
@@ -18,7 +19,7 @@
     <p class="text-muted" style="margin-top:8px">No sign-in required. Instant results.</p>
   </div>
 
-  <!-- Sign In / Registration (Phase 2 will enable) -->
+  <!-- Sign In / Registration (placeholders until Phase 2 enabled) -->
   <div class="card">
     <h3 class="section-subtitle">Sign In / Register</h3>
     <p class="text-muted">Register with name, email & password, then verify via email link.</p>
