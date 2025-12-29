@@ -1,1 +1,6 @@
-web: uvicorn fftech_audit.app:app --host 0.0.0.0 --port $PORT
+
+# Use this if you're running Flask/Wsgi:
+web: gunicorn ffteck_audit.app:app --workers 2 --threads 4 --bind 0.0.0.0:$PORT
+
+# If FastAPI instead, change it to:
+# web: uvicorn ffteck_audit.app:app --host 0.0.0.0 --port $PORT
