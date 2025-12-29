@@ -73,7 +73,7 @@ def health():
 def landing(request: Request):
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "build_marker": "v2025-12-28-SSR-2"},
+        {"request": request, "build_marker": "v2025-12-28-SSR-3"},
     )
 
 # ---------------- Open Audit (SSR) ----------------
@@ -86,8 +86,15 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
             status_code=400,
         )
 
-    eng = AuditEngine(url)
-    metrics: Dict[int, Dict[str, Any]] = eng.compute_metrics()
+    try:
+        eng = AuditEngine(url)
+        metrics: Dict[int, Dict[str, Any]] = eng.compute_metrics()
+    except Exception as e:
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "error": f"Audit failed: {e}", "prefill_url": url},
+            status_code=500,
+        )
 
     score = metrics[1]["value"]
     grade = metrics[2]["value"]
@@ -95,19 +102,27 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
     category = metrics[8]["value"]
     severity = metrics[7]["value"]
 
+    # ✅ JSON-stringify dict/list values so Jinja prints them cleanly
     rows: List[Dict[str, Any]] = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": "(Unknown)", "category": "-"})
         cell = metrics.get(pid, {"value": "N/A", "detail": ""})
+        val = cell["value"]
+        if isinstance(val, (dict, list)):
+            try:
+                val = json.dumps(val, ensure_ascii=False)
+            except Exception:
+                val = str(val)
         rows.append({
             "id": pid,
             "name": desc["name"],
             "category": desc["category"],
-            "value": cell["value"],
+            "value": val,
             "detail": cell.get("detail", "")
         })
 
     allow_pdf = False  # Open users cannot download
+
     return templates.TemplateResponse(
         "results.html",
         {
@@ -120,7 +135,7 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
             "category": category,
             "rows": rows,
             "allow_pdf": allow_pdf,
-            "build_marker": "v2025-12-28-SSR-2",
+            "build_marker": "v2025-12-28-SSR-3",
         },
     )
 
