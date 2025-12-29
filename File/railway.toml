@@ -1,11 +1,29 @@
 
 # railway.toml
+
 [build]
 builder = "RAILPACK"
-root = "/File"                          # Only if using Option A
+root = "/File"  # matches the Root Directory you set in Railway
+
+# Python install/build/start
 install = "pip install -r requirements.txt"
 build   = ""
+
+# ---- CHOOSE ONE START COMMAND ----
+# Flask/Wsgi:
 start   = "gunicorn ffteck_audit.app:app --workers 2 --threads 4 --bind 0.0.0.0:$PORT"
+
+# FastAPI/ASGI (if your app is FastAPI, comment the Flask line above and use this):
+# start   = "uvicorn ffteck_audit.app:app --host 0.0.0.0 --port $PORT"
 
 [variables]
 PORT = "8000"
+
+[watch]
+paths = [
+  "/File/requirements.txt",
+  "/File/ffteck_audit/**/*.py",
+  "/File/ffteck_audit/templates/**/*.html",
+  "/File/static/**/*"
+]
+``
