@@ -3,15 +3,14 @@
 {% block content %}
 <section style="text-align:center">
   <h1 class="section-title" style="font-size:2rem">Audit any website in seconds</h1>
-  <p class="text-muted">Choose <strong>Open Audit URL</strong> or <strong>Sign In / Register</strong>.</p>
+  <p class="text-muted">Choose <strong>Open Audit URL</strong> or <strong>Sign In / Register</strong> for premium features.</p>
   {% if error %}<p style="color:#ef4444">{{ error }}</p>{% endif %}
 </section>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
   <div class="card">
     <h3>Open Audit URL</h3>
-    /audit/open
-      <input id="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required />
+    <form action="/audit/open"d="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required />
       <button class="btn-primary" style="margin-top:10px">Run Audit</button>
     </form>
     <p class="text-muted" style="margin-top:8px">No login required. View results instantly.</p>
@@ -20,7 +19,7 @@
     <h3>Sign In / Register</h3>
     <p class="text-muted">Register with name, email & password, then verify via email link.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      /auth/loginSign In</a>
+      <auth/loginSign In</a>
       /auth/registerRegister</a>
     </div>
   </div>
