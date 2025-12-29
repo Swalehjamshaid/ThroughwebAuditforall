@@ -57,13 +57,7 @@
             <td>{{ r.id }}</td>
             <td>{{ r.name }}</td>
             <td>{{ r.category }}</td>
-            <td>
-              {% if r.value is mapping or r.value is sequence %}
-                {{ r.value|tojson }}
-              {% else %}
-                {{ r.value }}
-              {% endif %}
-            </td>
+            <td>{{ r.value }}</td>  <!-- ✅ Now reliable text (JSON-stringified in app.py) -->
             <td>{{ r.detail }}</td>
           </tr>
         {% endfor %}
@@ -78,10 +72,8 @@
     const cat = {{ category|tojson }};
     const donut = (el, val)=> new Chart(el, {
       type:'doughnut',
-      data:{
-        labels:['Score','Remaining'],
-        datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }]
-      },
+      data:{ labels:['Score','Remaining'],
+        datasets:[{ data:[val,100-val], backgroundColor:['#16a34a','#334155'], borderWidth:0 }] },
       options:{ cutout:'70%' }
     });
     donut(document.getElementById('donutCrawl'),  cat['Crawlability']);
@@ -91,12 +83,12 @@
     donut(document.getElementById('donutMobile'), cat['Mobile']);
   })();
 
-  // Build table (using helpers in static/app.js)
+  // Build table (helpers live in static/app.js)
   window.currentAudit = {
     metrics: (function(){
       const M = {};
       {% for r in rows %}
-        M[{{ r.id }}] = { value: {{ r.value|tojson }}, detail: "{{ r.detail|e }}" };
+        M[{{ r.id }}] = { value: "{{ r.value|e }}", detail: "{{ r.detail|e }}" };
       {% endfor %}
       return M;
     })()
@@ -107,3 +99,4 @@
   });
 </script>
 {% endblock %}
+``
