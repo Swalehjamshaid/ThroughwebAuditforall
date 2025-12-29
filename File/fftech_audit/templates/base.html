@@ -1,32 +1,55 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>FF Tech AI • Website Audit SaaS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  /static/app.css
-  /static/app.js</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FF Tech AI • Website Audit SaaS{% endblock %}</title>
+  <meta name="description" content="AI-powered website audits: security, performance, SEO, mobile, content. Instant results.">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
-    :root { --bg:#0b0f1a; --card-bg:#111827; --text:#f1f5f9; --text-muted:#94a3b8; --border:#1e293b; --primary:#6366f1; }
-    body { margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-    .topbar { display:flex; align-items:center; gap:16px; padding:16px; border-bottom:1px solid var(--border); }
-    .container { max-width:1280px; margin:0 auto; padding:24px; }
-    .card { background:var(--card-bg); padding:24px; border-radius:12px; }
-    .btn.ghost { padding:12px 16px; border-radius:12px; background:transparent; border:1px solid var(--border); color:var(--text); cursor:pointer; }
+    :root { 
+      --bg:#121212; --card:#1e1e1e; --accent:#00ADB5; --text:#eaeaea; --muted:#999; 
+      --border:#2a2a2a; --primary:#00ADB5; --glow:0 10px 30px rgba(0,173,181,0.3);
+    }
+    * { box-sizing:border-box; }
+    body { 
+      margin:0; background:var(--bg); color:var(--text); 
+      font-family:system-ui,Arial,sans-serif; line-height:1.6;
+    }
+    .topbar { 
+      display:flex; align-items:center; gap:12px; padding:12px 16px; 
+      background:#202020; border-bottom:1px solid var(--border);
+    }
+    .topbar img { height:32px; }
+    .topbar h1 { margin:0; font-size:1.3rem; }
+    .container { max-width:1100px; margin:24px auto; padding:0 16px; }
+    .btn.ghost { 
+      padding:8px 16px; border:1px solid var(--accent); color:var(--accent); 
+      background:transparent; border-radius:8px; cursor:pointer; font-size:14px;
+      transition:all 0.2s;
+    }
+    .btn.ghost:hover { background:var(--accent); color:#000; }
   </style>
+  {% block extra_css %}{% endblock %}
 </head>
 <body>
   <header class="topbar">
-    /static/logo.png
-    <h1 style="margin:0;">FF Tech AI • Website Audit SaaS</h1>
-    <div style="margin-left:auto;display:flex;gap:8px;">
-      <button class="btn ghost" onclick="toggleTheme()">Toggle Theme</button>
-      <button class="btn ghost" onclick="logout()">Logout</button>
+    <img src="/static/logo.png" alt="FF Tech AI" style="height:32px;" onerror="this.style.display='none'">
+    <h1>FF Tech AI • Audit</h1>
+    <div style="margin-left:auto; display:flex; gap:12px;">
+      {% if ENABLE_AUTH %}
+        <a href="/auth/register" class="btn ghost">Register</a>
+      {% endif %}
+      <button class="btn ghost" onclick="window.location='/';">New Audit</button>
     </div>
   </header>
+  
   <main class="container">
     {% block content %}{% endblock %}
   </main>
+
+  <script src="/static/app.js"></script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>
