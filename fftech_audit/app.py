@@ -40,7 +40,7 @@ app = FastAPI(title="FF Tech AI Website Audit", version="4.0", description="SSR 
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 security = HTTPBearer()
 
-# ✅ Mount static files
+# ✅ Static files
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -57,26 +57,30 @@ try:
 except Exception as e:
     print(f"[Startup] ensure_* failed: {e}")
 
-# ✅ Health check
+# ---------------- Health ----------------
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "FF Tech AI Website Audit", "time": now_utc().isoformat()}
 
-# ✅ Landing page
+# ---------------- Landing (SSR) ----------------
 @app.get("/", response_class=HTMLResponse)
 def landing(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "build_marker": "v2025-12-28-SSR-4"})
+    return templates.TemplateResponse("index.html", {"request": request, "build_marker": "v2025-12-28-SSR-5"})
 
-# ✅ Open Audit (SSR)
+# ---------------- Open Audit (SSR) ----------------
 @app.post("/audit/open", response_class=HTMLResponse)
 async def audit_open_ssr(request: Request, url: str = Form(...)):
     if not is_valid_url(url):
-        return templates.TemplateResponse("index.html", {"request": request, "error": "Invalid URL", "prefill_url": url}, status_code=400)
+        return templates.TemplateResponse(
+            "index.html", {"request": request, "error": "Invalid URL", "prefill_url": url}, status_code=400
+        )
     try:
         eng = AuditEngine(url)
-        metrics = eng.compute_metrics()
+        metrics: Dict[int, Dict[str, Any]] = eng.compute_metrics()
     except Exception as e:
-        return templates.TemplateResponse("index.html", {"request": request, "error": f"Audit failed: {e}", "prefill_url": url}, status_code=500)
+        return templates.TemplateResponse(
+            "index.html", {"request": request, "error": f"Audit failed: {e}", "prefill_url": url}, status_code=500
+        )
 
     score = metrics[1]["value"]
     grade = metrics[2]["value"]
@@ -84,25 +88,196 @@ async def audit_open_ssr(request: Request, url: str = Form(...)):
     category = metrics[8]["value"]
     severity = metrics[7]["value"]
 
-    # ✅ Convert dict/list values to JSON strings for clean rendering
-    rows = []
+    # ✅ JSON-stringify dict/list values so Jinja prints them cleanly and completely
+    rows: List[Dict[str, Any]] = []
     for pid in range(1, 201):
         desc = METRIC_DESCRIPTORS.get(pid, {"name": "(Unknown)", "category": "-"})
         cell = metrics.get(pid, {"value": "N/A", "detail": ""})
         val = cell["value"]
         if isinstance(val, (dict, list)):
-            val = json.dumps(val, ensure_ascii=False)
-        rows.append({"id": pid, "name": desc["name"], "category": desc["category"], "value": val, "detail": cell.get("detail", "")})
+            try:
+                val = json.dumps(val, ensure_ascii=False)
+            except Exception:
+                val = str(val)
+        rows.append({
+            "id": pid,
+            "name": desc["name"],
+            "category": desc["category"],
+            "value": val,
+            "detail": cell.get("detail", "")
+        })
 
-    return templates.TemplateResponse("results.html", {
-        "request": request,
-        "url": url,
-        "score": score,
-        "grade": grade,
-        "summary": summary,
-        "severity": severity,
-        "category": category,
-        "rows": rows,
-        "allow_pdf": False,
-        "build_marker": "v2025-12-28-SSR-4",
-    })
+    return templates.TemplateResponse(
+        "results.html",
+        {
+            "request": request,
+            "url": url,
+            "score": score,
+            "grade": grade,
+            "summary": summary,
+            "severity": severity,
+            "category": category,
+            "rows": rows,
+            "allow_pdf": False,  # open users cannot download
+            "build_marker": "v2025-12-28-SSR-5",
+        },
+    )
+
+# ---------------- API: open audit JSON ----------------
+@app.post("/api/audit/open")
+def api_audit_open(payload: Dict[str, str] = Body(...)):
+    url = payload.get("url")
+    if not url or not is_valid_url(url):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    eng = AuditEngine(url)
+    metrics = eng.compute_metrics()
+    score = metrics[1]["value"]
+    grade = metrics[2]["value"]
+
+    db = next(get_db())
+    audit = Audit(user_id=None, url=url, metrics_json=json.dumps(metrics), score=score, grade=grade)
+    db.add(audit); db.commit()
+
+    return {"url": url, "score": score, "grade": grade, "metrics": metrics}
+
+@app.get("/api/metrics/descriptors")
+def api_metric_descriptors():
+    return METRIC_DESCRIPTORS
+
+# ---------------- Protected helpers ----------------
+def require_user(credentials: HTTPAuthorizationCredentials = Depends(security),
+                 db: Session = Depends(get_db)) -> User:
+    payload = verify_session_token(credentials.credentials)
+    email = payload.get("email")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if not user.verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+    return user
+
+# ---------------- Registration (SSR) ----------------
+@app.get("/auth/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+@app.post("/auth/register", response_class=HTMLResponse)
+def auth_register(request: Request,
+                  name: str = Form(...),
+                  email: str = Form(...),
+                  password: str = Form(...),
+                  db: Session = Depends(get_db)):
+    email = email.strip().lower()
+    name = name.strip()
+    if not (name and email and password):
+        return templates.TemplateResponse("register.html", {"request": request, "error": "Please fill in all fields."}, status_code=400)
+    user = db.query(User).filter(User.email == email).first()
+    if user and user.password_hash:
+        return templates.TemplateResponse("register.html", {"request": request, "error": "Email already registered."}, status_code=400)
+    if not user:
+        user = User(name=name, email=email, password_hash=hash_password(password), verified=False, plan="free")
+        db.add(user); db.commit()
+    else:
+        user.name = name
+        user.password_hash = hash_password(password)
+        user.verified = False
+        db.commit()
+
+    # send verification link (uses SMTP_* envs; logs dev link if SMTP missing)
+    send_verification_link(email, request, db)
+    return templates.TemplateResponse("register_done.html", {"request": request, "email": email})
+
+# ---------------- Verify via link (magic or verify) ----------------
+@app.get("/auth/verify-link")
+def auth_verify_link(token: str = Query(...), db: Session = Depends(get_db)):
+    session_token = verify_magic_or_verify_link(token, db)
+    return {"token": session_token, "message": "Verification successful"}
+
+# ---------------- Login (SSR) ----------------
+@app.get("/auth/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/auth/login", response_class=HTMLResponse)
+def auth_login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    email = email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.password_hash or not verify_password(password, user.password_hash):
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid credentials."}, status_code=401)
+    if not user.verified:
+        return templates.TemplateResponse("verify_required.html", {"request": request}, status_code=403)
+    session_token = generate_token({"email": email, "purpose": "session"})
+    return templates.TemplateResponse("verify_success.html", {"request": request, "message": f"Login successful. Token: {session_token}"})
+
+# ---------------- Schedule + PDF (Registered-only) ----------------
+@app.post("/api/report/pdf")
+def report_pdf_api(req: Dict[str, str], user: User = Depends(require_user), db: Session = Depends(get_db)):
+    url = req.get("url")
+    if not url or not is_valid_url(url):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    eng = AuditEngine(url)
+    metrics = eng.compute_metrics()
+    audit = Audit(user_id=user.id, url=url, metrics_json=json.dumps(metrics),
+                  score=metrics[1]["value"], grade=metrics[2]["value"])
+    db.add(audit); db.commit()
+
+    pdf = build_pdf_report(audit, metrics)
+    return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="FFTech_Audit.pdf"'}
+    )
+
+@app.post("/api/schedule/set")
+def schedule_set(payload: Dict[str, str] = Body(...), user: User = Depends(require_user), db: Session = Depends(get_db)):
+    url = (payload.get("url") or "").strip()
+    frequency = (payload.get("frequency") or "weekly").strip().lower()
+    run_at_iso = payload.get("run_at")
+    if not is_valid_url(url):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    try:
+        run_at = datetime.datetime.fromisoformat(run_at_iso.replace("Z", "+00:00")) if run_at_iso else (now_utc() + datetime.timedelta(days=7))
+    except Exception:
+        run_at = now_utc() + datetime.timedelta(days=7)
+    sch = db.query(Schedule).filter(Schedule.user_id == user.id, Schedule.url == url).first()
+    if not sch:
+        sch = Schedule(user_id=user.id, url=url, frequency=frequency, enabled=True, next_run_at=run_at)
+        db.add(sch)
+    else:
+        sch.frequency = frequency; sch.enabled = True; sch.next_run_at = run_at
+    db.commit()
+    return {"message": "Schedule saved", "next_run_at": sch.next_run_at.isoformat()}
+
+# ---------------- Background scheduler ----------------
+def scheduler_loop():
+    while True:
+        try:
+            db = SessionLocal()
+            now = now_utc()
+            due = db.query(Schedule).filter(Schedule.enabled == True, Schedule.next_run_at <= now).all()
+            for sch in due:
+                user = db.query(User).filter(User.id == sch.user_id).first()
+                if not user or not user.verified:
+                    continue
+                eng = AuditEngine(sch.url)
+                metrics = eng.compute_metrics()
+                audit = Audit(user_id=user.id, url=sch.url, metrics_json=json.dumps(metrics),
+                              score=metrics[1]["value"], grade=metrics[2]["value"])
+                db.add(audit); db.commit()
+                pdf = build_pdf_report(audit, metrics)
+                send_email_with_pdf(
+                    user.email,
+                    subject="Your FF Tech Audit Report",
+                    body=f"Attached: 5-page audit report for {sch.url}.",
+                    pdf_bytes=pdf,
+                    filename="FFTech_Audit.pdf"
+                )
+                sch.next_run_at = now + (datetime.timedelta(days=1) if sch.frequency == "daily" else datetime.timedelta(days=7))
+                db.commit()
+            db.close()
+        except Exception as e:
+            print(f"[Scheduler] Error: {e}")
+        time.sleep(int(os.getenv("SCHEDULER_INTERVAL", "60")))
+
+@app.on_event("startup")
+def start_scheduler():
+    t = threading.Thread(target=scheduler_loop, daemon=True)
+    t.start()
