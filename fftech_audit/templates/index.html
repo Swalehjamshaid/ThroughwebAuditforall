@@ -1,100 +1,54 @@
-{% extends "base.html" %}
 
+{% extends "base.html" %}
 {% block content %}
-<section style="text-align:center; margin-bottom:18px;">
-  <h1 style="font-size:2rem; font-weight:800; margin:0;">Audit any website in seconds</h1>
-  <p style="color:#94a3b8;">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
-  {% if error %}<p style="color:#ef4444; font-weight:700;">{{ error }}</p>{% endif %}
+<section class="hero">
+  <h1 class="title">Audit any website in seconds</h1>
+  <p class="muted">Choose <strong>Open Audit</strong> or <strong>Sign In / Register</strong> for premium features.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
 </section>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
-  <!-- Open Audit -->
-  <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.25);">
-    <h3 style="margin:0 0 8px; font-weight:700;">Open Audit</h3>
-    
-    <form id="auditForm" action="/audit/open" method="post">
-      <input id="urlOpen" name="url" type="url" required placeholder="https://example.com"
-             value="{{ prefill_url or '' }}"
-             style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid #334155; background:#0b1220; color:#e2e8f0;" />
-      
-      <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
-        <button id="btnRunAudit" type="submit" style="padding:12px 16px; border-radius:12px; border:none; background:#2563eb; color:#fff; font-weight:700; cursor:pointer;">
-          Run Audit
-        </button>
-        <span id="auditStatus" style="color:#94a3b8; display:none;">Running…</span>
-      </div>
+<div class="grid two">
+  <div class="card glass">
+    <h3 class="subtitle">Open Audit</h3>
+    /audit/open
+      <input id="urlOpen" class="input" type="url" name="url" placeholder="https://example.com" value="{{ prefill_url or '' }}" required autocomplete="off" />
+      <div class="row"><button id="btnRunAudit" class="btn primary" type="submit">Run Audit</button><span id="auditStatus" class="muted hidden">Running…</span></div>
     </form>
-    
-    <p style="color:#94a3b8; font-size:.9rem; margin-top:8px;">No sign‑in required. Instant results.</p>
+    <p class="muted tiny">No sign‑in required. Instant results.</p>
   </div>
-  
-  <!-- Sign In / Registration -->
-  <div style="background:#0f172a; border:1px solid #334155; border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.25);">
-    <h3 style="margin:0 0 8px; font-weight:700;">Sign In / Register</h3>
-    <p style="color:#94a3b8;">Register with name, email & password, then verify via email link.</p>
-    
-    <div style="display:flex; gap:8px;">
-      <a href="/auth/login" style="color:#2563eb; text-decoration:none;">Sign In</a>
-      <a href="/auth/register" style="color:#2563eb; text-decoration:none;">Register</a>
+
+  <div class="card glass">
+    <h3 class="subtitle">Sign In / Register</h3>
+    <p class="muted">Register with name, email & password, then verify via email link.</p>
+    <div class="row wrap">
+      <a class="btngn In</a>
+      /auth/registerRegister</a>
     </div>
-    
-    <p style="color:#94a3b8; font-size:.9rem; margin-top:8px;">Registered users can download PDFs & schedule audit emails.</p>
+    <p class="muted tiny">Registered users can download PDFs & schedule audit emails.</p>
   </div>
 </div>
 
-<p style="color:#94a3b8; text-align:center; font-size:.9rem; margin-top:24px;">Build: {{ build_marker }}</p>
+<p class="muted center tiny">Build: {{ build_marker }}</p>
 
 <script>
 (function(){
-  const form = document.getElementById('auditForm');
-  const input = document.getElementById('urlOpen');
-  const btn = document.getElementById('btnRunAudit');
-  const status = document.getElementById('auditStatus');
-  
-  if (!form || !input || !btn) return;
-  
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const url = (input.value || '').trim();
-    if (!url) { alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
-    if (!/^https?:\/\/.+/i.test(url)) { alert('Include http:// or https://'); input.focus(); return; }
-    
-    status.style.display = 'inline';
-    btn.disabled = true;
-    overlayShow();
-    
-    try {
-      const body = new URLSearchParams();
-      body.append('url', url);
-      
-      const resp = await fetch('/audit/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-      });
-      
-      const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
-      if (resp.ok && ct.includes('text/html')) {
-        const html = await resp.text();
-        document.open();
-        document.write(html);
-        document.close();
-        return;
-      }
-      
-      let msg = 'Audit failed. Please check the logs.';
-      try { const data = await resp.json(); msg = data.detail || msg; }
-      catch { const text = await resp.text(); if (text) msg = text; }
-      
+  const form=document.getElementById('auditForm'), input=document.getElementById('urlOpen'), btn=document.getElementById('btnRunAudit'), status=document.getElementById('auditStatus');
+  if(!form||!input||!btn)return;
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault(); // keep SSR fallback
+    const url=(input.value||'').trim();
+    if(!url){ alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
+    if(!/^https?:\/\/.+/i.test(url)){ alert('Please include http:// or https:// in the URL.'); input.focus(); return; }
+    btn.disabled=true; status.classList.remove('hidden');
+    try{
+      const body=new URLSearchParams(); body.append('url',url);
+      const resp=await fetch('/audit/open',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()});
+      const ct=(resp.headers.get('Content-Type')||'').toLowerCase();
+      if(resp.ok&&ct.includes('text/html')){ const html=await resp.text(); document.open(); document.write(html); document.close(); return; }
+      let msg='Audit failed. Please try another URL.'; try{ const data=await resp.json(); msg=data.detail||msg; }catch{ const text=await resp.text(); if(text) msg=text; }
       alert(msg);
-    } catch (err) {
-      alert('Network error while running audit: ' + err);
-    } finally {
-      status.style.display = 'none';
-      btn.disabled = false;
-      overlayHide();
-    }
+    }catch(err){ alert('Network error while running audit: '+err); }
+    finally{ btn.disabled=false; status.classList.add('hidden'); }
   });
 })();
 </script>
