@@ -1,121 +1,77 @@
+ThroughwebAuditforall
+/
+286f0286
+Active
 
-# fftech_audit/db.py
-import os
-import datetime
-from sqlalchemy import (
-    create_engine, Column, Integer, String, DateTime, Boolean, Text, ForeignKey, inspect, text
-)
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+Dec 29, 2025, 1:24 PM
+throughwebauditforall-production.up.railway.app
+Details
+Build Logs
+Deploy Logs
+HTTP Logs
+Filter and search logs
 
-# ---- Engine & Session ----
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./fftech_audit.db")
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+You reached the start of the range
+Dec 29, 2025, 1:24 PM
+Starting Container
+Traceback (most recent call last):
+  File "/usr/local/bin/uvicorn", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 424, in main
+    run(
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/main.py", line 594, in run
+    server.run()
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 71, in serve
+    await self._serve(sockets)
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 78, in _serve
+    config.load()
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 439, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/app/fftech_audit/app.py", line 19, in <module>
+    from .auth_email import ( send_verification_link, verify_magic_or_verify_link, verify_session_token, hash_password, verify_password, send_email_with_pdf, generate_token )
+  File "/app/fftech_audit/auth_email.py", line 9, in <module>
+    from .db import User, MagicLink, EmailCode
+ImportError: cannot import name 'EmailCode' from 'fftech_audit.db' (/app/fftech_audit/db.py)
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=_connect_args,
-    pool_pre_ping=True
-)
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False
-)
-
-Base = declarative_base()
-
-def get_db():
-    """FastAPI dependency: yields a DB session and closes it afterwards."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# ---- Models ----
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), default="")
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), default="")
-    verified = Column(Boolean, default=False)
-    plan = Column(String(32), default="free")
-    audits_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    audits = relationship("Audit", back_populates="user")
-
-class Audit(Base):
-    __tablename__ = "audits"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    url = Column(String(2048), nullable=False)
-    metrics_json = Column(Text)
-    score = Column(Integer)
-    grade = Column(String(8))
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    user = relationship("User", back_populates="audits")
-
-class Schedule(Base):
-    __tablename__ = "schedules"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    url = Column(String(2048), nullable=False)
-    frequency = Column(String(32), default="weekly")  # daily | weekly (etc.)
-    enabled = Column(Boolean, default=True)
-    next_run_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-class MagicLink(Base):
-    __tablename__ = "magic_links"
-    id = Column(Integer, primary_key=True)
-    email = Column(String(255), index=True, nullable=False)
-    token = Column(String(512), nullable=False)
-    purpose = Column(String(32), default="verify")  # verify | magic
-    expires_at = Column(DateTime, nullable=False)
-    used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-
-# ---- Create tables ----
-Base.metadata.create_all(bind=engine)
-
-# ---- DDL helpers (safe add columns if missing) ----
-def ensure_schedule_columns():
-    insp = inspect(engine)
-    if "schedules" not in insp.get_table_names():
-        return
-    existing = {c["name"] for c in insp.get_columns("schedules")}
-    with engine.begin() as conn:
-        # column name -> SQL DDL
-        add_stmts = [
-            ("url", "ALTER TABLE schedules ADD COLUMN url TEXT"),
-            ("frequency", "ALTER TABLE schedules ADD COLUMN frequency TEXT DEFAULT 'weekly'"),
-            ("enabled", "ALTER TABLE schedules ADD COLUMN enabled INTEGER DEFAULT 1"),
-            ("next_run_at", "ALTER TABLE schedules ADD COLUMN next_run_at DATETIME"),
-        ]
-        for name, ddl in add_stmts:
-            if name not in existing:
-                try:
-                    conn.execute(text(ddl))
-                except Exception as e:
-                    print("[DB] DDL failed:", ddl, e)
-
-def ensure_user_columns():
-    insp = inspect(engine)
-    if "users" not in insp.get_table_names():
-        return
-    existing = {c["name"] for c in insp.get_columns("users")}
-    with engine.begin() as conn:
-        add_stmts = [
-            ("name", "ALTER TABLE users ADD COLUMN name TEXT"),
-            ("password_hash", "ALTER TABLE users ADD COLUMN password_hash TEXT"),
-            ("plan", "ALTER TABLE users ADD COLUMN plan TEXT"),
-            ("audits_count", "ALTER TABLE users ADD COLUMN audits_count INTEGER DEFAULT 0"),
-        ]
-        for name, ddl in add_stmts:
-            if name not in existing:
-                try:
-                    conn.execute(text(ddl))
-                except Exception as e:
-                    print("[DB] DDL failed:", ddl, e)
