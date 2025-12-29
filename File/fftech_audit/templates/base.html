@@ -1,89 +1,259 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>FF Tech AI • Website Audit SaaS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
-  
-  <link rel="stylesheet" href="/static/app.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-  <script src="/static/app.js" defer></script>
-  
-  <style>
-    :root {
-      --bg: #0b0f1a;
-      --card-bg: #111827;
-      --text: #f1f5f9;
-      --text-muted: #94a3b8;
-      --border: #1e293b;
-      --primary: #6366f1;
-      --accent: #ec4899;
-      --glow: 0 0 20px rgba(99,102,241,0.4);
+{% extends "base.html" %}
+{% block content %}
+<div class="landing-hero">
+  <div class="container">
+    <h1 class="main-title">
+      FF Tech AI • Website Audit SaaS
+    </h1>
+
+    <!-- Run an Audit Card -->
+    <section class="glass-card audit-section">
+      <h2 class="section-title">Run an Audit</h2>
+      <form action="/audit/open" method="post" class="audit-form">
+        <input
+          type="url"
+          name="url"
+          placeholder="https://example.com"
+          required
+          class="url-input"
+          aria-label="Website URL to audit"
+        />
+        <button type="submit" class="analyze-button">
+          Analyze
+        </button>
+      </form>
+
+      {% if error %}
+        <p class="error-message" role="alert">{{ error }}</p>
+      {% endif %}
+    </section>
+
+    <!-- Registered Access Card -->
+    {% if ENABLE_AUTH %}
+    <section class="glass-card register-section">
+      <h2 class="section-title">Registered Access (Email Verification)</h2>
+      <p class="register-description">
+        Unlock audit history, downloadable 5-page PDF reports, and premium scheduling features.
+      </p>
+      <a href="/auth/register" class="register-button">Register</a>
+    </section>
+    {% endif %}
+
+    <!-- How It Works Card -->
+    <section class="glass-card how-it-works-section">
+      <h2 class="section-title">How it works</h2>
+      <ul class="features-list">
+        <li><strong>Open access:</strong> Instant audits for any website — no account needed, no history saved.</li>
+        <li><strong>Registered:</strong> Email verification unlocks full history, beautiful 5-page PDF reports, and upcoming premium scheduling.</li>
+        <li><strong>Transparent scoring:</strong> Clear 0–100 scores across security, performance, SEO, mobile, and content quality.</li>
+      </ul>
+    </section>
+
+    <!-- Optional subtle footer note -->
+    <footer class="landing-footer">
+      <p>Powered by AI-driven analysis • Instant, accurate, actionable insights</p>
+    </footer>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card-bg: rgba(20, 25, 40, 0.65);
+    --border: rgba(255, 255, 255, 0.08);
+    --primary: #00ADB5;
+    --accent: #818cf8;
+    --glow-primary: 0 10px 30px rgba(0, 173, 181, 0.25);
+    --glow-accent: 0 10px 30px rgba(129, 140, 248, 0.3);
+    --text: #eaeaea;
+    --text-muted: #a0a0a0;
+  }
+
+  .landing-hero {
+    min-height: 100vh;
+    text-align: center;
+    padding: 80px 0 120px;
+    background: var(--bg);
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .main-title {
+    font-size: 3.8rem;
+    font-weight: 800;
+    margin: 0 0 40px;
+    background: linear-gradient(90deg, #6366f1, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 60px;
+    margin: 60px auto;
+    max-width: 900px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+  }
+
+  .glass-card:hover {
+    transform: translateY(-4px);
+  }
+
+  .how-it-works-section {
+    max-width: 1000px;
+  }
+
+  .section-title {
+    font-size: 2.6rem;
+    font-weight: 700;
+    margin: 0 0 40px;
+    color: var(--text);
+  }
+
+  .audit-form {
+    display: flex;
+    gap: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .url-input {
+    flex: 1;
+    padding: 20px 28px;
+    font-size: 1.4rem;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: rgba(30, 41, 59, 0.8);
+    color: var(--text);
+    outline: none;
+    transition: all 0.3s ease;
+  }
+
+  .url-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(0, 173, 181, 0.2);
+  }
+
+  .url-input::placeholder {
+    color: #777;
+  }
+
+  .analyze-button {
+    padding: 0 60px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+    background: var(--primary);
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    box-shadow: var(--glow-primary);
+    transition: all 0.3s ease;
+  }
+
+  .analyze-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 40px rgba(0, 173, 181, 0.4);
+  }
+
+  .register-button {
+    display: inline-block;
+    padding: 20px 80px;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+    background: var(--accent);
+    text-decoration: none;
+    border-radius: 16px;
+    box-shadow: var(--glow-accent);
+    transition: all 0.3s ease;
+  }
+
+  .register-button:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 15px 40px rgba(129, 140, 248, 0.4);
+  }
+
+  .register-description {
+    font-size: 1.3rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 40px;
+  }
+
+  .error-message {
+    color: #ef4444;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin-top: 30px;
+  }
+
+  .features-list {
+    font-size: 1.5rem;
+    line-height: 2.4;
+    max-width: 900px;
+    margin: 0 auto;
+    text-align: left;
+    color: var(--text-muted);
+    padding-left: 24px;
+  }
+
+  .features-list li {
+    margin-bottom: 20px;
+  }
+
+  .features-list strong {
+    color: var(--text);
+  }
+
+  .landing-footer {
+    margin-top: 80px;
+    color: #666;
+    font-size: 1.1rem;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 860px) {
+    .main-title {
+      font-size: 3rem;
     }
-    body { margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-    .hdr {
-      position:relative; overflow:hidden; border-bottom:1px solid var(--border);
+    .section-title {
+      font-size: 2.2rem;
     }
-    .hdr__gradient {
-      position:absolute; inset:0;
-      background:radial-gradient(1200px 450px at 10% 0%, #1e3a8a 0%, #4338ca 50%, #6d28d9 100%);
-      opacity:0.95; z-index:-1;
+    .audit-form {
+      flex-direction: column;
     }
-    .hdr__bar {
-      position:relative; display:flex; justify-content:space-between; align-items:center;
-      padding:24px 0; backdrop-filter:blur(12px); background:rgba(11,15,26,0.45);
-      border-bottom:1px solid rgba(255,255,255,0.08);
+    .analyze-button {
+      padding: 20px;
     }
-    .hdr__brand {
-      display:flex; align-items:center; gap:16px; font-size:1.8rem; font-weight:800;
+    .glass-card {
+      padding: 40px;
+      margin: 40px auto;
     }
-    .hdr__brand strong {
-      background:linear-gradient(90deg, #c7d2fe, #fbbf24, #ec4899);
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  }
+
+  @media (max-width: 480px) {
+    .main-title {
+      font-size: 2.5rem;
     }
-    .logo-dot {
-      width:12px; height:12px; background:#ec4899; border-radius:50%;
-      box-shadow:0 0 16px rgba(236,72,153,0.8); animation:pulse 2s infinite;
+    .url-input,
+    .analyze-button,
+    .register-button {
+      font-size: 1.2rem;
     }
-    @keyframes pulse { 0%,100% { opacity:0.7; transform:scale(1); } 50% { opacity:1; transform:scale(1.4); } }
-    .btn.ghost {
-      padding:12px 24px; border-radius:12px; background:transparent; border:1px solid var(--border);
-      color:var(--text); font-weight:600; cursor:pointer; transition:all 0.3s ease;
-    }
-    .btn.ghost:hover {
-      background:rgba(99,102,241,0.15); border-color:var(--primary); box-shadow:var(--glow);
-    }
-    .container { max-width:1280px; margin:0 auto; padding:0 32px; }
-    main { padding:60px 0; }
-    .hdr::after {
-      content:''; position:absolute; bottom:0; left:0; width:100%; height:120px;
-      background:url('data:image/svg+xml;utf8,<svg viewBox="0 0 1440 120" xmlns="http://www.w3.org/2000/svg"><path fill="%230b0f1a" d="M0,0 C320,80 1120,80 1440,0 L1440,120 L0,120 Z"/></svg>') bottom/cover no-repeat;
-      z-index:-1;
-    }
-  </style>
-</head>
-<body>
-  <header class="hdr">
-    <div class="container hdr__bar">
-      <div class="hdr__brand">
-        <img src="/static/logo.png" alt="FF Tech Logo" style="height:40px;border-radius:8px;" onerror="this.style.display='none'" />
-        <div class="logo-dot"></div>
-        <strong>FF Tech AI • Website Audit SaaS</strong>
-      </div>
-      <div style="display:flex;gap:16px;">
-        <button class="btn ghost" onclick="toggleTheme()">Toggle Theme</button>
-        <button class="btn ghost" onclick="logout()">Logout</button>
-      </div>
-    </div>
-    <div class="hdr__gradient"></div>
-  </header>
-  
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
-</body>
-</html>
+  }
+</style>
+{% endblock %}
