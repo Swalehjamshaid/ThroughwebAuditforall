@@ -1,32 +1,126 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>FF Tech AI • Website Audit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Proper asset tags (no raw URLs in head) -->
-  https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap
-  /static/app.css
-  https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
-  /static/app.js</script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+  
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --card-bg: #111827;
+      --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #1e293b;
+      --primary: #6366f1;
+      --glow: 0 0 20px rgba(99, 102, 241, 0.3);
+    }
+    
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    
+    .hdr {
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .hdr::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(1200px 450px at 10% 0%, #1e3a8a 0%, #4338ca 50%, #6d28d9 100%);
+      opacity: 0.9;
+      z-index: -1;
+    }
+    
+    .hdr__bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0;
+      backdrop-filter: blur(10px);
+      background: rgba(11, 15, 26, 0.4);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .hdr__title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #c7d2fe, #fbbf24, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .btn {
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid var(--border);
+    }
+    
+    .btn.ghost {
+      background: transparent;
+      color: var(--text);
+    }
+    
+    .btn.ghost:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--primary);
+      box-shadow: var(--glow);
+    }
+    
+    .hero-wave {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 120px;
+      background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1440 120" xmlns="http://www.w3.org/2000/svg"><path fill="%230b0f1a" fill-opacity="1" d="M0,0 C320,80 1120,80 1440,0 L1440,120 L0,120 Z"></path></svg>') bottom/cover no-repeat;
+    }
+    
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    main {
+      padding: 60px 0;
+      min-height: calc(100vh - 300px);
+    }
+  </style>
 </head>
-<body class="font-inter theme-dark">
-  <!-- Header -->
+<body>
   <header class="hdr">
-    <div class="container" style="display:flex;justify-content:space-between;align-items:center;padding:18px;">
-      <strong style="font-weight:800;color:#fff">FF Tech AI • Website Audit</strong>
-      <div style="display:flex;gap:8px;">
+    <div class="container hdr__bar">
+      <strong class="hdr__title">FF Tech AI • Website Audit</strong>
+      <div style="display:flex;gap:12px;">
         <button class="btn ghost" onclick="toggleTheme()">Toggle Theme</button>
         <button class="btn ghost" onclick="logout()">Logout</button>
       </div>
     </div>
-    <div style="height:160px;background: radial-gradient(1200px 450px at 10% 0%, #1e3a8a 0%, #4338ca 50%, #6d28d9 100%);box-shadow:0 18px 40px rgba(0,0,0,.35)"></div>
+    <div class="hero-wave"></div>
   </header>
-
-  <!-- Main -->
-  <main class="container" style="padding:28px 0;">
+  
+  <main class="container">
     {% block content %}{% endblock %}
   </main>
 </body>
