@@ -13,9 +13,9 @@
     <h3 class="section-subtitle">Open Audit</h3>
 
     <!-- IMPORTANT:
-         - method="POST" so it hits your FastAPI route: @app.post("/audit/open")
-         - enctype="multipart/form-data" so FastAPI Form(...) can parse (requires python-multipart)
-         - name="url" matches the route signature: url: str = Form(...)
+         - method="POST" to hit @app.post("/audit/open")
+         - enctype="multipart/form-data" for FastAPI Form(...)
+         - name="url" must match the route signature url: str = Form(...)
     -->
     /audit/open
       <input
@@ -30,6 +30,7 @@
       />
       <div style="margin-top:10px; display:flex; gap:8px; align-items:center">
         <button id="btnRunAudit" class="btn-primary" type="submit">Run Audit</button>
+        <span id="auditStatus" class="text-muted" style="display:none">Running…</span>
       </div>
     </form>
 
@@ -41,11 +42,75 @@
     <h3 class="section-subtitle">Sign In / Register</h3>
     <p class="text-muted">Register with name, email & password, then verify via email link.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <a class="btn-secondary" href/auth/registerRegister</a>
+      /auth/loginSign In</a>
+      /auth/registerRegister</a>
     </div>
     <p class="text-muted">Registered users can download PDFs & schedule audit emails.</p>
   </div>
 </div>
 
 <p class="text-muted" style="margin-top:24px;text-align:center">Build: {{ build_marker }}</p>
+
+<script>
+/**
+ * Progressive enhancement:
+ * - First, normal form post works (SSR).
+ * - If JS is enabled, we intercept to show "Running…" + fetch, then replace page with returned HTML.
+ */
+(function() {
+  const form = document.getElementById('auditForm');
+  const input = document.getElementById('urlOpen');
+  const status = document.getElementById('auditStatus');
+  const btn = document.getElementById('btnRunAudit');
+
+  // Hard guard: ensure button exists and is inside the form
+  if (!form || !btn || !input) return;
+
+  form.addEventListener('submit', async (e) => {
+    // Keep SSR working if fetch fails
+    e.preventDefault();
+
+    const url = (input.value || '').trim();
+    if (!url) { alert('Please enter a URL (e.g., https://example.com)'); input.focus(); return; }
+    if (!/^https?:\/\/.+/i.test(url)) { alert('Please include http:// or https:// in the URL.'); input.focus(); return; }
+
+    // UI: show running
+    status.style.display = 'inline';
+    btn.disabled = true;
+
+    try {
+      // Build multipart body (FastAPI Form(...) friendly)
+      const body = new FormData();
+      body.append('url', url);
+
+      const resp = await fetch('/audit/open', { method: 'POST', body });
+
+      const ct = (resp.headers.get('Content-Type') || '').toLowerCase();
+      if (resp.ok && ct.includes('text/html')) {
+        const html = await resp.text();
+        document.open(); document.write(html); document.close();
+        return;
+      }
+
+      // Friendly error
+      let msg = 'Audit failed. Please try another URL.';
+      try {
+        const data = await resp.json();
+        msg = data.detail || msg;
+      } catch {
+        const text = await resp.text();
+        if (text) msg = text;
+      }
+      console.error('[Audit] Server error:', msg);
+      alert(msg);
+    } catch (err) {
+      console.error('[Audit] Network error:', err);
+      alert('Network error while running audit: ' + err);
+    } finally {
+      status.style.display = 'none';
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}
