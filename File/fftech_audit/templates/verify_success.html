@@ -1,5 +1,11 @@
-{% extends "base.html" %}
-{% block content %}
-<h2 class="title">Success</h2>
-<p class="muted">{{ message or "Your account is verified. You can now access premium features." }}</p>
-{% endblock %}
+
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Verified</title>/static/app.css</head>
+<body><main class="container">
+  <section class="card">
+    <h3>Email Verified</h3>
+    <p>{{ message }}</p>
+    <p>Your session token:</p>
+    <pre>{{ token }}</pre>
+  </section>
+</main></body></html>
