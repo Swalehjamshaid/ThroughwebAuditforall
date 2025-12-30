@@ -1,13 +1,13 @@
 
 # fftech_audit/auth_email.py
+import os
 import time
 import hmac
 import base64
 import hashlib
 from typing import Tuple, Optional
 
-# In production, put this in env secrets
-_SECRET = b"change-me-to-a-long-random-secret"
+_SECRET = (os.getenv("TOKEN_SECRET") or "change-me-to-a-long-random-secret").encode("utf-8")
 
 def _sign(payload: str) -> str:
     sig = hmac.new(_SECRET, payload.encode("utf-8"), hashlib.sha256).digest()
@@ -42,8 +42,9 @@ class verify_token:
 
 def send_magic_link_email(email: str, token: str):
     """
-    Stub: replace with real SMTP or provider call.
-    For local dev, just print the link.
+    Stub email sender. Replace with SMTP or provider integration (e.g., SendGrid).
     """
-    link = f"http://localhost:8000/verify?token={token}"
+    # In production, build the Railway base URL dynamically from env
+    base_url = os.getenv("APP_BASE_URL", "http://localhost:8000")
+    link = f"{base_url}/verify?token={token}"
     print(f"[Magic Link] Send to {email}: {link}")
