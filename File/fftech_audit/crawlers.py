@@ -1,5 +1,6 @@
 
-# fftech_audit/crawlers.py (improved)
+# fftech_audit/crawlers.py (v2.0 — robust, consistent types)
+
 import os
 import re
 import time
@@ -13,9 +14,9 @@ import xml.etree.ElementTree as ET
 import urllib.robotparser as robotparser
 
 MAX_PAGES = int(os.getenv("MAX_PAGES", "120"))
-TIMEOUT = 12.0
-MAX_LINK_CHECKS = 150
-USER_AGENT = "FFTechAI-AuditBot/2.0 (+https://fftech.ai)"
+TIMEOUT = float(os.getenv("CRAWL_TIMEOUT", "12.0"))
+MAX_LINK_CHECKS = int(os.getenv("MAX_LINK_CHECKS", "150"))
+USER_AGENT = os.getenv("CRAWL_UA", "FFTechAI-AuditBot/2.0 (+https://fftech.ai)")
 
 @dataclass
 class PageInfo:
@@ -33,7 +34,7 @@ class PageInfo:
     meta_robots: Optional[str] = None
     links_internal: List[str] = field(default_factory=list)
     links_external: List[str] = field(default_factory=list)
-    images: List[Dict] = field(default_factory=list)
+    images: List[Dict] = field(default_factory=list)  # [{"src":..., "attrs":{...}}]
     images_missing_alt: int = 0
     og_tags_present: bool = False
     schema_present: bool = False
@@ -64,7 +65,7 @@ class CrawlResult:
 
 def _normalize_seed(url: str) -> str:
     url = url.strip()
-    if not url.startswith("http"):
+    if not url.startswith(("http://", "https://")):
         url = "https://" + url
     return url
 
@@ -73,7 +74,7 @@ def _same_host(u1: str, u2: str) -> bool:
 
 def _normalize_url(base: str, href: str) -> Optional[str]:
     try:
-        href = href.strip()
+        href = (href or "").strip()
         if not href or href.startswith("#") or href.startswith("javascript:"):
             return None
         absolute = up.urljoin(base, href)
@@ -91,9 +92,9 @@ def _fetch_robots(seed: str) -> robotparser.RobotFileParser:
         robots_url = up.urljoin(origin, "/robots.txt")
         rp.set_url(robots_url)
         rp.read()
-        return rp
     except Exception:
-        return rp
+        pass
+    return rp
 
 def _discover_sitemaps(seed: str) -> List[str]:
     urls = []
@@ -105,8 +106,7 @@ def _discover_sitemaps(seed: str) -> List[str]:
             if r.status_code == 200:
                 for line in r.text.splitlines():
                     if line.lower().startswith("sitemap:"):
-                        url = line.split(":", 1)[1].strip()
-                        urls.append(url)
+                        urls.append(line.split(":", 1)[1].strip())
         candidate = up.urljoin(origin, "/sitemap.xml")
         with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
             r = client.get(candidate)
@@ -151,14 +151,13 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     sitemap_urls = _discover_sitemaps(seed)
     for sm in list(sitemap_urls):
         for u in _parse_sitemap(sm):
-            if _same_host(seed, u) and len(seen) < max_pages:
-                if u not in seen:
-                    seen.add(u)
-                    q.append((u, 0))
+            if _same_host(seed, u) and len(seen) < max_pages and u not in seen:
+                seen.add(u)
+                q.append((u, 0))
 
     soup_parser = "lxml"
     try:
-        import lxml
+        import lxml  # noqa: F401
     except Exception:
         soup_parser = "html.parser"
 
@@ -169,38 +168,35 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                 if rp.default_entry is not None and not rp.can_fetch(USER_AGENT, url):
                     continue
 
-                start_time = time.time()
+                start = time.time()
                 r = client.get(url)
-                elapsed_ms = int((time.time() - start_time) * 1000)
+                elapsed_ms = int((time.time() - start) * 1000)
 
                 status = r.status_code
                 status_counts[status // 100 * 100] += 1
                 ctype = r.headers.get("Content-Type", "")
                 clen = int(r.headers.get("Content-Length") or len(r.content))
+
                 pi = PageInfo(
-                    url=url,
-                    status=status,
-                    content_type=ctype,
-                    content_len=clen,
-                    response_ms=elapsed_ms,
-                    headers=dict(r.headers),
-                    raw_html=r.text,
-                    depth=depth
+                    url=url, status=status, content_type=ctype, content_len=clen,
+                    response_ms=elapsed_ms, headers=dict(r.headers), raw_html=r.text, depth=depth
                 )
 
                 if "text/html" in ctype and r.text:
                     soup = BeautifulSoup(r.text, soup_parser)
+
+                    # Content
                     pi.html_title = soup.title.string.strip() if soup.title else None
                     desc_el = soup.find("meta", attrs={"name": "description"})
-                    pi.meta_desc = desc_el.get("content", "").strip() if desc_el else None
+                    pi.meta_desc = (desc_el.get("content", "").strip() if desc_el else None)
                     pi.h1_count = len(soup.find_all("h1"))
                     can_el = soup.find("link", rel=lambda v: v and "canonical" in v.lower())
-                    pi.canonical = can_el.get("href") if can_el else None
+                    pi.canonical = (can_el.get("href") if can_el else None)
                     mr = soup.find("meta", attrs={"name": "robots"})
-                    pi.meta_robots = mr.get("content") if mr else None
+                    pi.meta_robots = (mr.get("content") if mr else None)
 
-                    anchors = soup.find_all("a", href=True)
-                    for a in anchors:
+                    # Links + enqueue internal
+                    for a in soup.find_all("a", href=True):
                         tgt = _normalize_url(url, a.get("href"))
                         if not tgt:
                             continue
@@ -214,10 +210,10 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                             pi.links_external.append(tgt)
                             external_links.add(tgt)
 
-                    imgs = soup.find_all("img")
+                    # Images list with attrs
                     missing = 0
                     img_list = []
-                    for img in imgs:
+                    for img in soup.find_all("img"):
                         alt = img.get("alt")
                         if not (alt and str(alt).strip()):
                             missing += 1
@@ -225,28 +221,32 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     pi.images = img_list
                     pi.images_missing_alt = missing
 
-                    og = soup.find_all("meta", property=re.compile(r"^og:"))
-                    pi.og_tags_present = len(og) > 0
-                    script_ld = soup.find_all("script", type="application/ld+json")
-                    pi.schema_present = len(script_ld) > 0
+                    # Open Graph & JSON-LD
+                    pi.og_tags_present = len(soup.find_all("meta", property=re.compile(r"^og:"))) > 0
+                    pi.schema_present = len(soup.find_all("script", type="application/ld+json")) > 0
 
+                    # Hreflang
                     for ln in soup.find_all("link", attrs={"rel": "alternate"}):
                         if ln.get("hreflang") and ln.get("href"):
                             pi.hreflang.append((ln.get("hreflang"), ln.get("href")))
 
+                    # Pagination
                     prev = soup.find("link", rel="prev")
                     next_ = soup.find("link", rel="next")
                     pi.rel_prev = prev.get("href") if prev else None
                     pi.rel_next = next_.get("href") if next_ else None
 
+                    # Resources
                     pi.scripts = len(soup.find_all("script"))
                     pi.stylesheets = len(soup.find_all("link", rel=lambda v: v and "stylesheet" in v.lower()))
                     pi.scripts_src = [s.get("src") for s in soup.find_all("script", src=True)]
                     pi.stylesheets_href = [l.get("href") for l in soup.find_all("link", rel=lambda v: v and "stylesheet" in v.lower(), href=True)]
                     pi.dom_nodes_est = sum(1 for _ in soup.descendants if getattr(_, "name", None))
 
+                    # Viewport meta
                     pi.viewport_meta = bool(soup.find("meta", attrs={"name": "viewport"}))
 
+                    # Mixed content (HTTP resources on HTTPS pages)
                     pi.mixed_content_http = 0
                     if url.startswith("https://"):
                         for tag in soup.find_all(["img", "script", "link"], src=True):
@@ -263,6 +263,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
             except Exception as e:
                 errors.append(f"{url} -> {e}")
 
+    # Broken-link sample checks (HEAD)
     def _head_ok(u: str) -> bool:
         try:
             with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
