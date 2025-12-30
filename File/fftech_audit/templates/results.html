@@ -1,74 +1,54 @@
 
 {% extends "base.html" %}
+
 {% block content %}
-<section class="card">
-  <h2>Results</h2>
-  <p><strong>URL:</strong> {{ url_display }}</p>
-</section>
 
-<section class="grid">
-  <div class="card score">
-    <div class="big">{{ score }}%</div>
-    <div class="badge">Grade: {{ grade }}</div>
+{# Optional: show an error banner if the backend passed an error string #}
+{% if error %}
+  <div class="alert alert-warning">
+    Audit could not complete: {{ error }}
   </div>
-  <div class="card">
-    <h3>Category Breakdown</h3>
-    <div class="progress"><label>Security</label><div style="width:{{ progress_security }}%"></div></div>
-    <div class="progress"><label>Performance</label><div style="width:{{ progress_performance }}%"></div></div>
-    <div class="progress"><label>SEO</label><div style="width:{{ progress_seo }}%"></div></div>
-    <div class="progress"><label>Mobile</label><div style="width:{{ progress_mobile }}%"></div></div>
-    <div class="progress"><label>Content</label><div style="width:{{ progress_content }}%"></div></div>
-  </div>
-</section>
+{% endif %}
 
-<section class="card">
-  <h3>Executive Summary</h3>
-  <p>{{ rows[2].value }}</p>
-</section>
+{# Compute a safe score for the 11th metric (index 10) #}
+{% set score_10 = 0 %}
+{% if rows is iterable and rows|length > 10 and rows[10] is defined %}
+  {% if rows[10].value is defined %}
+    {% set score_10 = rows[10].value %}
+  {% endif %}
+{% endif %}
 
-<section class="grid">
-  <div class="card">
-    <h3>Strengths</h3>
-    <ul>
-      {% for s in rows[3].value if rows[3].value is iterable %}
-      <li>{{ s }}</li>
-      {% endfor %}
-    </ul>
-  </div>
-  <div class="card">
-    <h3>Weak Areas</h3>
-    <ul>
-      {% for w in rows[4].value if rows[4].value is iterable %}
-      <li>{{ w }}</li>
-      {% endfor %}
-    </ul>
-  </div>
-  <div class="card">
-    <h3>Priority Fixes</h3>
-    <ul>
-      {% for f in rows[5].value if rows[5].value is iterable %}
-      <li>{{ f }}</li>
-      {% endfor %}
-    </ul>
-  </div>
-</section>
+{# Clamp score_10 between 0 and 100 just in case #}
+{% if score_10 < 0 %}
+  {% set score_10 = 0 %}
+{% elif score_10 > 100 %}
+  {% set score_10 = 100 %}
+{% endif %}
 
-<section class="card">
-  <h3>200 Metrics</h3>
-  <table class="metrics">
+<div class="progress">
+  <div style="width:{{ score_10 }}%;"></div>
+</div>
+
+{# Render rows table safely #}
+{% if rows|length > 0 %}
+  <table class="metrics-table">
     <thead>
-      <tr><th>ID</th><th>Metric</th><th>Category</th><th>Value</th></tr>
+      <tr>
+        <th>Metric</th>
+        <th>Value</th>
+      </tr>
     </thead>
     <tbody>
-      {% for row in rows %}
-      <tr>
-        <td>{{ row.id }}</td>
-        <td>{{ row.name }}</td>
-        <td>{{ row.category }}</td>
-        <td>{{ row.value }}</td>
-      </tr>
+      {% for r in rows %}
+        <tr>
+          <td>{{ r.name if r.name is defined else 'Unnamed' }}</td>
+          <td>{{ r.value if r.value is defined else '-' }}</td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
-</section>
+{% else %}
+  <p>No metrics available yet.</p>
+{% endif %}
+
 {% endblock %}
