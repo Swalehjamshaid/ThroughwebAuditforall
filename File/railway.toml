@@ -1,7 +1,6 @@
 
-# railway.toml
 [service]
-name = "my-app"
-startCommand = "gunicorn -k uvicorn.workers.UvicornWorker app:app --workers ${WEB_CONCURRENCY:-2} --bind 0.0.0.0:$PORT --timeout ${WEB_TIMEOUT:-300} --keep-alive 5 --log-level info --access-logfile -"
+name = "fftech-audit"
+startCommand = "gunicorn -k uvicorn.workers.UvicornWorker fftech_audit.app:app --workers ${WEB_CONCURRENCY:-2} --bind 0.0.0.0:$PORT --timeout ${WEB_TIMEOUT:-300} --keep-alive 5 --log-level info --access-logfile -"
 healthcheckPath = "/health"
 healthcheckTimeout = 180
