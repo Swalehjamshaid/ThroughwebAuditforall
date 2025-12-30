@@ -1,9 +1,7 @@
 
-[build]
-builder = "RAILPACK"
-
-[deploy]
-startCommand = "python -m uvicorn fftech_ai_audit_saas.fftech_audit.app:app --host 0.0.0.0 --port ${PORT} --log-level info"
+# railway.toml
+[service]
+name = "my-app"
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT"  # For Flask/Django; adjust for your framework
 healthcheckPath = "/health"
-healthcheckTimeout = 100
-restartPolicyType = "ON_FAILURE"
+healthcheckTimeout = 180  # Increase timeout for slow startups
