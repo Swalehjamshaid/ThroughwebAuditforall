@@ -1,252 +1,218 @@
+
 # fftech_audit/app.py
-from __future__ import annotations
-import logging
-from typing import Any, Dict, Optional
-from datetime import datetime
+import os
+import uuid
+import datetime as dt
+from typing import Optional, Dict, Any, List
 
-from fastapi import FastAPI, Request, Form, BackgroundTasks, HTTPException, Query
-from fastapi.responses import StreamingResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.templating import Jinja2Templates
-from starlette.staticfiles import StaticFiles
+from fastapi import FastAPI, Request, Form
+from fastapi import BackgroundTasks
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
-# ---- Import from audit_engine.py ----
-from .audit_engine import AuditEngine, generate_pdf_report
+from audit_engine import run_audit
+from ui_and_pdf import build_rows_for_ui, make_pdf_bytes
+from auth_email import send_magic_link_email, verify_token
+from db import SessionLocal, get_user_by_email, upsert_user, save_schedule, compute_next_run_utc
+from db import AuditHistory, create_audit_history
+from sqlalchemy.orm import Session
 
-# ---- Optional modules (safe fallbacks) ----
-send_verification_email = None
-verify_token = None
-try:
-    from .auth_email import send_verification_email as _send_verif, verify_token as _verify_tok
-    send_verification_email = _send_verif
-    verify_token = _verify_tok
-except Exception:
-    pass
+# --- App & templates ---
+app = FastAPI(title="FF Tech AI • Website Audit")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-db_create_user = None
-db_get_user_by_email = None
-db_save_audit = None
-try:
-    from .db import create_user as _create_user, get_user_by_email as _get_user, save_audit as _save_audit
-    db_create_user = _create_user
-    db_get_user_by_email = _get_user
-    db_save_audit = _save_audit
-except Exception:
-    pass
+# Static files (CSS/JS/images that you add later)
+static_dir = os.path.join(BASE_DIR, "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-# ---- Logging ----
-logger = logging.getLogger("fftech")
-logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
-# ---- FastAPI App ----
-app = FastAPI(
-    title="FF Tech AI Website Audit",
-    description="Professional AI-powered SEO audit with instant reports and PDF exports.",
-    version="1.0.0"
-)
+def _now_utc():
+    return dt.datetime.utcnow()
 
-# ---- CORS (restrict in production) ----
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Change to your domain(s) in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# ---- Static Files (CSS, JS, images) ----
-app.mount("/static", StaticFiles(directory="fftech_audit/static"), name="static")
+# ----- Landing / Home -----
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    # Render clean landing page
+    return templates.TemplateResponse(
+        "landing.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+        },
+    )
 
-# ---- Templates ----
-templates = Jinja2Templates(directory="fftech_audit/templates")
-templates.env.globals.update({
-    "len": len,
-    "now": datetime.utcnow()
-})
 
-# ---- Audit Engine Instance ----
-engine = AuditEngine()
+# ----- Open Audit -----
+@app.post("/audit/open", response_class=HTMLResponse)
+async def audit_open(request: Request, url: str = Form(...)):
+    """
+    Accepts a URL, runs the audit engine, and renders results.
+    """
+    # Run audit (deterministic stub + extensible)
+    metrics = run_audit(url)
 
-# ---- Utility Functions ----
-def base_ctx(request: Request, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    ctx = {
-        "request": request,
-        "now": datetime.utcnow()
-    }
-    if extra:
-        ctx.update(extra)
-    return ctx
+    # Produce UI rows for "Key Signals"
+    rows = build_rows_for_ui(metrics)
 
-def _normalize_url(raw: str) -> str:
-    url = (raw or "").strip().lower()
-    if not url:
-        return ""
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-    return url
-
-def _render_results(request: Request, raw_url: Optional[str]) -> Any:
-    url = _normalize_url(raw_url or "")
-
-    # Empty state – show welcome screen
-    if not url:
-        metrics = engine.run("")  # Returns welcome metrics with None scores
-        rows = metrics.get("rows", [])
-        return templates.TemplateResponse(
-            "results.html",
-            base_ctx(request, {"url": None, "metrics": metrics, "rows": rows})
-        )
-
-    # Real audit
-    try:
-        logger.info("Auditing %s", url)
-        metrics = engine.run(url)
-    except Exception as e:
-        logger.exception("Audit failed for %s", url)
-        raise HTTPException(status_code=500, detail="Unable to analyze this website. Please try again later.")
-
-    rows = metrics.get("rows", [])
-
-    # Optional: save to DB
-    if db_save_audit:
-        try:
-            db_save_audit(url=url, metrics=metrics)
-        except Exception as db_e:
-            logger.warning("Failed to save audit: %s", db_e)
+    # Save a lightweight history (optional)
+    with SessionLocal() as db:
+        create_audit_history(db, url=url, health_score=float(metrics.get("overall.health_score") or 0.0))
 
     return templates.TemplateResponse(
         "results.html",
-        base_ctx(request, {"url": url, "metrics": metrics, "rows": rows})
+        {
+            "request": request,
+            "now": _now_utc(),
+            "url": url,
+            "metrics": metrics,
+            "rows": rows,
+        },
     )
 
-# ---------------------------
-# ROUTES
-# ---------------------------
 
-@app.get("/", include_in_schema=False)
-async def landing(request: Request):
-    """Landing / Home page"""
-    return templates.TemplateResponse("landing.html", base_ctx(request))
-
-@app.get("/audit/open")
-async def audit_open_get(request: Request, url: Optional[str] = Query(None)):
-    """Direct access with ?url= or show form"""
-    return _render_results(request, url)
-
-@app.post("/audit/open")
-async def audit_open_post(request: Request, url: str = Form(...)):
-    """Form submission – run audit"""
-    return _render_results(request, url)
-
-@app.get("/register")
-async def register_get(request: Request):
-    return templates.TemplateResponse("register.html", base_ctx(request))
-
-@app.post("/register")
-async def register_post(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    email: str = Form(...)
-):
-    email = email.strip().lower()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
-
-    if db_create_user and db_get_user_by_email:
-        try:
-            if not db_get_user_by_email(email):
-                db_create_user(email=email)
-        except Exception as e:
-            logger.warning("DB user creation failed: %s", e)
-
-    if send_verification_email:
-        try:
-            background_tasks.add_task(send_verification_email, email)
-        except Exception as e:
-            logger.warning("Failed to send email: %s", e)
-
-    return templates.TemplateResponse("register_done.html", base_ctx(request, {"email": email}))
-
-# Alias routes
-@app.get("/auth/register")
-async def auth_register_get(request: Request):
-    return await register_get(request)
-
-@app.post("/auth/register")
-async def auth_register_post(request: Request, background_tasks: BackgroundTasks, email: str = Form(...)):
-    return await register_post(request, background_tasks, email)
-
-@app.get("/verify-success")
-@app.get("/auth/verify-success")
-async def verify_success(
-    request: Request,
-    token: Optional[str] = Query(None),
-    email: Optional[str] = Query(None)
-):
-    verified = False
-    if verify_token and token and email:
-        try:
-            verified = bool(verify_token(email=email, token=token))
-        except Exception as e:
-            logger.warning("Token verification failed: %s", e)
-    return templates.TemplateResponse(
-        "verify_success.html",
-        base_ctx(request, {"verified": verified, "email": email})
-    )
-
-@app.get("/schedule")
-async def schedule_get(request: Request):
-    return templates.TemplateResponse("schedule.html", base_ctx(request))
-
-# ---------------------------
-# JSON API
-# ---------------------------
-@app.post("/api/audit")
-async def api_audit(url: str = Form(...)):
-    norm = _normalize_url(url)
-    if not norm:
-        raise HTTPException(status_code=400, detail="URL is required")
-    try:
-        metrics = engine.run(norm)
-        return JSONResponse(content=metrics)
-    except Exception as e:
-        logger.exception("API audit failed: %s", e)
-        raise HTTPException(status_code=500, detail="Audit failed")
-
-# ---------------------------
-# PDF Export
-# ---------------------------
+# ----- Export PDF -----
 @app.post("/audit/pdf")
 async def audit_pdf(url: str = Form(...)):
-    norm = _normalize_url(url)
-    if not norm:
-        raise HTTPException(status_code=400, detail="URL required for PDF")
+    """
+    Regenerate audit (or you can accept submitted metrics) and return a 5-page PDF.
+    """
+    metrics = run_audit(url)
+    rows = build_rows_for_ui(metrics)
 
-    metrics = engine.run(norm)
+    pdf_bytes = make_pdf_bytes(url=url, metrics=metrics, rows=rows)
 
-    if not generate_pdf_report:
-        raise HTTPException(status_code=501, detail="PDF generation not available")
+    filename = f"fftech_audit_{uuid.uuid4().hex[:8]}.pdf"
+    pdf_path = os.path.join(BASE_DIR, filename)
+    with open(pdf_path, "wb") as f:
+        f.write(pdf_bytes)
 
-    pdf_bytes = generate_pdf_report(url=norm, metrics=metrics)
-
-    domain = norm.replace("https://", "").replace("http://", "").split("/")[0]
-    filename = f"FFTech_AI_Audit_{domain}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
-
-    return StreamingResponse(
-        iter([pdf_bytes]),
+    # Return as file; you may switch to StreamingResponse
+    return FileResponse(
+        pdf_path,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        filename=f"FFTechAI_{url.replace('https://', '').replace('http://', '').replace('/', '_')}.pdf",
     )
 
-# ---------------------------
-# Health Check
-# ---------------------------
-@app.get("/health")
-async def health():
-    return {
-        "status": "healthy",
-        "service": "FF Tech AI Website Audit",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
-    }
+
+# ----- Register -----
+@app.get("/register", response_class=HTMLResponse)
+async def register_get(request: Request):
+    return templates.TemplateResponse(
+        "register.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+        },
+    )
+
+
+@app.post("/register", response_class=HTMLResponse)
+async def register_post(
+    request: Request,
+    background: BackgroundTasks,
+    email: str = Form(...),
+):
+    """
+    Send passwordless magic link to the email (stubbed sender).
+    """
+    with SessionLocal() as db:
+        user = get_user_by_email(db, email)
+        if not user:
+            user = upsert_user(db, email=email)
+
+    # Create a signed token (stub) and send email
+    token = verify_token.issue(email)  # token string
+    background.add_task(send_magic_link_email, email=email, token=token)
+
+    return templates.TemplateResponse(
+        "register_done.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+            "email": email,
+        },
+    )
+
+
+# ----- Verify -----
+@app.get("/verify", response_class=HTMLResponse)
+async def verify(request: Request, token: str):
+    """
+    Verify token; if ok → set session cookie (omitted) or mark verified in UI.
+    """
+    ok, email = verify_token.check(token)
+    # If you implement sessions, set a secure cookie here.
+
+    return templates.TemplateResponse(
+        "verify_success.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+            "verified": ok,
+            "email": email if ok else None,
+        },
+    )
+
+
+# ----- Schedule -----
+@app.get("/schedule", response_class=HTMLResponse)
+async def schedule(request: Request):
+    return templates.TemplateResponse(
+        "schedule.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+        },
+    )
+
+
+@app.post("/schedule/set")
+async def schedule_set(payload: Dict[str, Any]):
+    """
+    Save schedule definition and return next run time (UTC).
+    payload: {url, frequency, time_of_day, timezone}
+    """
+    url = (payload.get("url") or "").strip()
+    frequency = (payload.get("frequency") or "weekly").strip().lower()
+    time_of_day = (payload.get("time_of_day") or "09:00").strip()
+    timezone = (payload.get("timezone") or "UTC").strip()
+
+    if not url:
+        return JSONResponse(status_code=400, content={"detail": "URL is required"})
+
+    # Save to DB
+    with SessionLocal() as db:
+        save_schedule(db, url=url, frequency=frequency, time_of_day=time_of_day, timezone=timezone)
+
+    next_run_at_utc = compute_next_run_utc(frequency=frequency, time_of_day=time_of_day)
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "ok": True,
+            "next_run_at_utc": next_run_at_utc.isoformat(timespec="minutes") + "Z",
+        },
+    )
+
+
+# ----- Optional: Index of results when no metrics -----
+@app.get("/audit/results", response_class=HTMLResponse)
+async def results_empty(request: Request):
+    """
+    Render results page with empty state (no metrics yet).
+    """
+    return templates.TemplateResponse(
+        "results.html",
+        {
+            "request": request,
+            "now": _now_utc(),
+            "url": None,
+            "metrics": {"overall.health_score": None},  # trigger empty state block
+            "rows": [],
+        },
+    )
