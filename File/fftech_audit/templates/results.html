@@ -1,63 +1,42 @@
 <!-- fftech_audit/templates/results.html -->
 {% extends "base.html" %}
 
-{% block title %}FF Tech AI – Audit Results{% endblock %}
+{% block title %}Audit Results • {{ url or 'FF Tech AI' }}{% endblock %}
 
 {% block content %}
-<style>
-  .kpi-card .display-4 { font-weight: 800; }
-  .badge-grade { font-size: 2.5rem; padding: 0.8em 1.2em; border-radius: 1rem; }
-  .progress { height: 12px; background-color: #e9ecef; border-radius: 6px; }
-  .progress-bar.good { background: linear-gradient(90deg, #198754, #20c997); }
-  .progress-bar.warn { background: linear-gradient(90deg, #ffc107, #fd7e14); }
-  .progress-bar.bad { background: linear-gradient(90deg, #dc3545, #e4606d); }
-  .card.shadow-soft { 
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08); 
-    border: none; 
-    border-radius: 1rem;
-    transition: transform 0.2s;
-  }
-  .card.shadow-soft:hover { transform: translateY(-5px); }
-  .muted { color: #6c757d; }
-  .filter-input { max-width: 320px; }
-  .welcome-icon { font-size: 5rem; opacity: 0.15; }
-</style>
-
 <div class="container py-5">
 
-  <!-- Welcome State: No audit yet -->
+  <!-- Welcome / Empty State -->
   {% if metrics['overall.health_score'] is none %}
   <div class="text-center py-5 my-5">
-    <i class="bi bi-graph-up-arrow display-1 text-primary welcome-icon mb-4"></i>
-    <h1 class="display-3 fw-bold mb-4">FF Tech AI Website Audit</h1>
+    <i class="bi bi-graph-up-arrow display-1 text-primary opacity-25 mb-4"></i>
+    <h1 class="display-3 fw-bold mb-4">Ready to Audit Your Website?</h1>
     <p class="lead col-lg-8 mx-auto text-muted mb-5">
-      Get an instant, professional SEO health check for any website.<br>
-      Receive scores, strengths, priority fixes, and a beautiful PDF report — all in seconds.
+      Enter any website URL to get an instant professional SEO report with scores, fixes, and PDF export.
     </p>
     <div class="col-md-8 col-lg-6 mx-auto">
       <form method="post" action="/audit/open" class="d-flex gap-3">
-        <input type="url" name="url" class="form-control form-control-lg flex-grow-1" 
-               placeholder="Enter website URL, e.g. https://example.com" required autofocus>
+        <input type="url" name="url" class="form-control form-control-lg" 
+               placeholder="https://example.com" required autofocus>
         <button type="submit" class="btn btn-primary btn-lg px-5">
-          <i class="bi bi-search"></i> Audit Now
+          <i class="bi bi-search"></i> Start Audit
         </button>
       </form>
-      <small class="text-muted d-block mt-4">
-        No signup required • Privacy-first • Powered by AI
-      </small>
     </div>
   </div>
 
-  <!-- Real Audit Results -->
+  <!-- Real Results -->
   {% else %}
 
-  <!-- Header + PDF Button -->
-  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
-    <h2 class="h3 mb-0">Audit Results for <span class="text-primary">{{ url }}</span></h2>
-    <form method="post" action="/audit/pdf" class="d-inline">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-4 mb-5">
+    <div>
+      <h1 class="h2 mb-1">Audit Results</h1>
+      <p class="muted mb-0">Target: <code>{{ url }}</code></p>
+    </div>
+    <form method="post" action="/audit/pdf">
       <input type="hidden" name="url" value="{{ url }}">
       <button type="submit" class="btn btn-outline-primary btn-lg">
-        <i class="bi bi-file-earmark-arrow-down me-2"></i>Download PDF Report
+        <i class="bi bi-download me-2"></i>Download PDF Report
       </button>
     </form>
   </div>
@@ -65,109 +44,175 @@
   <!-- KPI Cards -->
   <div class="row g-4 mb-5">
     <div class="col-md-4">
-      <div class="card shadow-soft text-center kpi-card py-4">
+      <div class="card shadow-soft text-center py-4">
         <div class="card-body">
-          <div class="display-4 text-primary">
+          <div class="display-4 text-primary fw-bold">
             {{ metrics['overall.health_score'] | round(1) }}%
           </div>
-          <div class="h5 muted mt-2">Overall Health Score</div>
+          <p class="h5 muted mt-3 mb-0">Overall Health Score</p>
         </div>
       </div>
     </div>
 
     <div class="col-md-4">
       {% set grade = metrics['overall.grade'] | default('—') %}
-      {% set grade_class = 'bg-primary' %}
-      {% if grade in ['A+', 'A'] %}{% set grade_class = 'bg-success' %}
-      {% elif grade in ['B', 'C'] %}{% set grade_class = 'bg-warning text-dark' %}
-      {% elif grade in ['D', 'F'] %}{% set grade_class = 'bg-danger' %}{% endif %}
+      {% set grade_color = 'bg-primary' %}
+      {% if grade in ['A+', 'A'] %}{% set grade_color = 'bg-success' %}
+      {% elif grade in ['B', 'C'] %}{% set grade_color = 'bg-warning text-dark' %}
+      {% elif grade in ['D', 'F'] %}{% set grade_color = 'bg-danger' %}{% endif %}
       <div class="card shadow-soft text-center py-4">
-        <div class="card-body d-flex flex-column justify-content-center" style="min-height: 160px;">
-          <span class="badge {{ grade_class }} badge-grade">{{ grade }}</span>
-          <div class="h5 muted mt-3">SEO Grade</div>
+        <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 180px;">
+          <div class="badge {{ grade_color }} badge-grade">{{ grade }}</div>
         </div>
+        <p class="h5 muted text-center mt-3 mb-0">SEO Grade</p>
       </div>
     </div>
 
     <div class="col-md-4">
       <div class="card shadow-soft text-center py-4">
         <div class="card-body">
-          <div class="fs-4 text-dark">
+          <div class="fs-4 fw-medium">
             {{ metrics['generated_at'][:19] | replace("T", " ") }} UTC
           </div>
-          <div class="h5 muted mt-2">Report Generated</div>
+          <p class="h5 muted mt-3 mb-0">Report Generated</p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Re-audit Form -->
-  <div class="card shadow-soft mb-5 p-4">
+  <!-- Quick Re-audit -->
+  <div class="card shadow-soft p-4 mb-5">
     <form method="post" action="/audit/open" class="row g-3 align-items-center">
       <div class="col-md-8">
-        <input type="url" name="url" class="form-control form-control-lg" 
-               placeholder="Audit another site..." value="">
+        <input type="url" name="url" class="form-control form-control-lg" placeholder="Audit another website...">
       </div>
       <div class="col-md-4">
         <button type="submit" class="btn btn-primary btn-lg w-100">
-          <i class="bi bi-play-fill"></i> Run New Audit
+          <i class="bi bi-arrow-clockwise me-2"></i>New Audit
         </button>
       </div>
     </form>
   </div>
 
-  <!-- Rows Overview -->
-  <div class="card shadow-soft mb-5">
-    <div class="card-body">
-      <h5 class="card-title mb-4">Performance Overview</h5>
-      {% if rows|length == 0 %}
-        <div class="alert alert-info">No data available.</div>
-      {% else %}
-        <div class="row g-4">
-          {% for row in rows %}
-            {% set value = row.value %}
-            {% set pct = 0 if value is none else value %}
-            {% set cls = 'good' if pct >= 70 else 'warn' if pct >= 40 else 'bad' %}
-            <div class="col-12 col-md-6 col-lg-4">
-              <div class="card shadow-soft h-100">
-                <div class="card-body">
-                  <div class="d-flex justify-content-between align-items-start mb-3">
-                    <h6 class="mb-0">{{ row.label }}</h6>
-                    <span class="fs-5 fw-bold text-primary">
-                      {% if value is not none %}
-                        {{ value | round(1) }}%
-                      {% else %}
-                        —
-                      {% endif %}
-                    </span>
-                  </div>
-                  <div class="progress">
-                    <div class="progress-bar {{ cls }}" 
-                         style="width: {{ pct }}%;" 
-                         role="progressbar">
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {% endfor %}
+  <!-- Executive Summary Panels -->
+  <div class="row g-4 mb-5">
+    <div class="col-lg-4">
+      <div class="card shadow-soft h-100">
+        <div class="card-body">
+          <h5 class="text-success"><i class="bi bi-check-circle me-2"></i>Strengths</h5>
+          <ul class="list-unstyled mb-0">
+            {% for item in metrics['summary.strengths'] %}
+              <li class="mb-2">• {{ item }}</li>
+            {% else %}
+              <li class="text-muted">No major strengths detected.</li>
+            {% endfor %}
+          </ul>
         </div>
-      {% endif %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-soft h-100">
+        <div class="card-body">
+          <h5 class="text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Weaknesses</h5>
+          <ul class="list-unstyled mb-0">
+            {% for item in metrics['summary.weaknesses'] %}
+              <li class="mb-2">• {{ item }}</li>
+            {% else %}
+              <li class="text-muted">No critical issues found.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-soft h-100">
+        <div class="card-body">
+          <h5 class="text-danger"><i class="bi bi-tools me-2"></i>Priority Fixes</h5>
+          <ol class="mb-0">
+            {% for item in metrics['summary.priority_fixes'] %}
+              <li class="mb-2">{{ item }}</li>
+            {% else %}
+              <li class="text-muted">Your site has strong foundations!</li>
+            {% endfor %}
+          </ol>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- All Metrics Table -->
+  <!-- Category Chips + Progress -->
+  {% set cat = metrics['summary.category_breakdown'] %}
+  {% if cat %}
+  <div class="card shadow-soft mb-5">
+    <div class="card-body">
+      <h5>Category Breakdown</h5>
+      <div class="d-flex flex-wrap gap-3 my-4">
+        {% for key, val in cat.items() %}
+          <div class="chip px-4 py-2 bg-light rounded-pill">
+            <strong>{{ key }}</strong>
+            <span class="ms-2 fw-bold text-primary">{{ (val|round(1)) }}%</span>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="row g-4">
+        {% for key, val in cat.items() %}
+          {% set pct = val or 0 %}
+          {% set bar_class = 'good' if pct >= 70 else 'warn' if pct >= 40 else 'bad' %}
+          <div class="col-md-6">
+            <div class="d-flex justify-content-between mb-1">
+              <span>{{ key }}</span>
+              <span class="fw-bold">{{ pct|round(1) }}%</span>
+            </div>
+            <div class="progress">
+              <div class="progress-bar {{ bar_class }}" style="width: {{ pct }}%"></div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Signal Rows -->
+  <div class="card shadow-soft mb-5">
+    <div class="card-body">
+      <h5>Key Signals</h5>
+      <div class="row g-4">
+        {% for row in rows %}
+          {% set val = row.value or 0 %}
+          {% set bar_class = 'good' if val >= 70 else 'warn' if val >= 40 else 'bad' %}
+          <div class="col-md-6 col-lg-4">
+            <div class="card shadow-soft h-100">
+              <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                  <span class="fw-medium">{{ row.label }}</span>
+                  <span class="fw-bold text-primary">{{ val|round(1) }}%</span>
+                </div>
+                <div class="progress">
+                  <div class="progress-bar {{ bar_class }}" style="width: {{ val }}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Metrics Table -->
   <div class="card shadow-soft">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="card-title mb-0">All Metrics ({{ metrics|length - 1 }})</h5>
-        <input id="metricsFilter" type="text" class="form-control filter-input" placeholder="Search metrics...">
+        <h5>All Metrics ({{ (metrics|length) - 1 }})</h5>
+        <input id="filter" type="text" class="form-control filter-input" placeholder="Filter metrics...">
       </div>
-      <div class="table-responsive mt-3">
-        <table class="table table-hover align-middle" id="metricsTable">
+      <div class="table-responsive">
+        <table class="table table-hover" id="metricsTable">
           <thead class="table-light">
             <tr>
-              <th>Metric Key</th>
+              <th>Key</th>
               <th>Value</th>
             </tr>
           </thead>
@@ -180,7 +225,7 @@
                   {% if val is none %}
                     <em class="text-muted">—</em>
                   {% elif val is mapping or (val is iterable and val is not string) %}
-                    <pre class="mb-0 small bg-light p-2 rounded">{{ val }}</pre>
+                    <pre class="mb-0 small bg-light p-2 rounded">{{ val|pprint }}</pre>
                   {% else %}
                     {{ val }}
                   {% endif %}
@@ -195,25 +240,22 @@
   </div>
 
   {% endif %}
-
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  const filterInput = document.getElementById('metricsFilter');
-  if (!filterInput) return;
-  
-  const rows = document.querySelectorAll('#metricsTable tbody tr');
-  
-  filterInput.addEventListener('input', () => {
-    const query = filterInput.value.toLowerCase().trim();
-    rows.forEach(row => {
-      const key = row.dataset.key;
-      row.style.display = key.includes(query) ? '' : 'none';
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('filter');
+    if (!input) return;
+    const rows = document.querySelectorAll('#metricsTable tbody tr');
+    input.addEventListener('input', () => {
+      const q = input.value.toLowerCase();
+      rows.forEach(r => {
+        const key = r.dataset.key;
+        r.style.display = key.includes(q) ? '' : 'none';
+      });
     });
   });
-});
 </script>
 {% endblock %}
