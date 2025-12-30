@@ -6,22 +6,13 @@ from typing import Optional
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 
-# --- Engine & session setup ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "audit.sqlite3")
 
-# Read DATABASE_URL from env (Railway provides)
-raw_url = os.getenv("DATABASE_URL")  # e.g., postgres://user:pass@host:port/db OR postgresql://user:pass@host:port/db
+raw_url = os.getenv("DATABASE_URL")
 engine = None
 
 def _force_pg8000(url: str) -> str:
-    """
-    Normalize Railway URL and force pg8000 driver for Python 3.13 compatibility.
-    Converts:
-    - postgres://...          -> postgresql+pg8000://...
-    - postgresql://...        -> postgresql+pg8000://...
-    Leaves alone if already: postgresql+pg8000://...
-    """
     if not url:
         return url
     url = url.strip()
@@ -29,57 +20,47 @@ def _force_pg8000(url: str) -> str:
         return url.replace("postgres://", "postgresql+pg8000://", 1)
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+pg8000://", 1)
-    # Already has a driver (e.g., postgresql+pg8000://) – keep it
     return url
 
 if raw_url:
     DATABASE_URL = _force_pg8000(raw_url)
     engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 else:
-    # Local SQLite fallback if no DATABASE_URL
     engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False}, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
-
-# --- Models ---
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    plan = Column(String(50), default="free")  # 'free' or 'subscriber'
+    plan = Column(String(50), default="free")
     created_at = Column(DateTime, default=dt.datetime.utcnow)
-
 
 class Schedule(Base):
     __tablename__ = "schedules"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url = Column(String(1024), nullable=False)
-    frequency = Column(String(32), default="weekly")  # 'daily'|'weekly'|'monthly'
-    time_of_day = Column(String(16), default="09:00")  # HH:MM in UTC
+    frequency = Column(String(32), default="weekly")
+    time_of_day = Column(String(16), default="09:00")
     timezone = Column(String(64), default="UTC")
     created_at = Column(DateTime, default=dt.datetime.utcnow)
     user = relationship("User")
 
-
 class AuditHistory(Base):
     __tablename__ = "audit_history"
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # nullable for open-access audits
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     url = Column(String(1024), nullable=False)
     health_score = Column(Float, default=0.0)
     created_at = Column(DateTime, default=dt.datetime.utcnow)
     user = relationship("User")
 
-
-# --- Init ---
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-
-# --- User helpers ---
 def upsert_user(db: Session, email: str) -> User:
     u = db.query(User).filter(User.email == email).first()
     if not u:
@@ -89,12 +70,9 @@ def upsert_user(db: Session, email: str) -> User:
         db.refresh(u)
     return u
 
-
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     return db.query(User).filter(User.email == email).first()
 
-
-# --- Schedule helpers ---
 def save_schedule(db: Session, user_id: int, url: str, frequency: str, time_of_day: str, timezone: str) -> Schedule:
     s = Schedule(user_id=user_id, url=url, frequency=frequency, time_of_day=time_of_day, timezone=timezone)
     db.add(s)
@@ -102,8 +80,6 @@ def save_schedule(db: Session, user_id: int, url: str, frequency: str, time_of_d
     db.refresh(s)
     return s
 
-
-# --- Audit history helpers ---
 def create_audit_history(db: Session, url: str, health_score: float, user_id: Optional[int] = None) -> AuditHistory:
     a = AuditHistory(url=url, health_score=health_score, user_id=user_id)
     db.add(a)
@@ -111,18 +87,14 @@ def create_audit_history(db: Session, url: str, health_score: float, user_id: Op
     db.refresh(a)
     return a
 
-
 def count_user_audits(db: Session, user_id: int) -> int:
     return db.query(AuditHistory).filter(AuditHistory.user_id == user_id).count()
 
-
-# --- Scheduling time helper (UTC, simple) ---
 def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
     now = dt.datetime.utcnow()
     try:
         hour, minute = (time_of_day or "09:00").split(":")
-        hour = int(hour)
-        minute = int(minute)
+        hour = int(hour); minute = int(minute)
     except Exception:
         hour, minute = 9, 0
 
@@ -149,4 +121,3 @@ def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
 
     target = now + dt.timedelta(days=7)
     return target.replace(hour=hour, minute=minute, second=0, microsecond=0)
-``
