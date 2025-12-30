@@ -36,7 +36,7 @@ class Schedule(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url = Column(String(1024), nullable=False)
-    frequency = Column(String(32), default="weekly")  # daily/weekly/monthly
+    frequency = Column(String(32), default="weekly")  # 'daily' | 'weekly' | 'monthly'
     time_of_day = Column(String(16), default="09:00")  # HH:MM in UTC
     timezone = Column(String(64), default="UTC")
     created_at = Column(DateTime, default=dt.datetime.utcnow)
@@ -136,7 +136,7 @@ def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
         return target
 
     if frequency == "weekly":
-        # Schedule next occurrence of the same weekday/time; if already passed today, go 7 days ahead
+        # Next same weekday/time; if already passed today, schedule next week
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if target <= now:
             target += dt.timedelta(days=7)
@@ -155,4 +155,3 @@ def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
     # Default: weekly one week later
     target = now + dt.timedelta(days=7)
     return target.replace(hour=hour, minute=minute, second=0, microsecond=0)
-``
