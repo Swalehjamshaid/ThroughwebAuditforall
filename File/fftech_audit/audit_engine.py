@@ -259,28 +259,24 @@ ALL_KEYS: List[str] = (
 )
 
 # ---------------------------
-# Base regex (fixed: use < > not &lt; &gt;)
+# Base regex (correct: uses < and >, raw strings, escaped quotes)
 # ---------------------------
-META_DESC_RE = re.compile(
-    r"<meta\b[^>]*\bname\s*=\s*['\"]description['\"][^>]*\bcontent\s*=\s*['\"](?P<content>[^
-)
-TITLE_RE     = re.compile(r"<title\b[^>]*>(?P<title>.*?)</title>", re.I | re.S)
-H1_RE        = re.compile(r"<h1\b[^>]*>(?P<h1>.*?)</h1>", re.I | re.S)
-VIEWPORT_RE  = re.compile(r"<meta\b[^>]*\bname\s*=\s*['\"]viewport['\"][^>]*>", re.I)
-CANONICAL_RE = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]canonical['\"][^>]*\bhref\s*=\s*['\"][^'\"]+['\"]", re.I)
-ROBOTS_NOIDX_RE = re.compile(r"<meta\b[^>]*\bname\s*=\s*['\"]robots['\"][^>]*\bcontent\s*=\s*['\"][^'\"]*noindex[^'\"]*['\"]", re.I)
-OG_TAG_RE    = re.compile(r"<meta\b[^>]*\bproperty\s*=\s*['\"]og:[^'\"]+['\"][^>]*>", re.I)
-LDJSON_RE    = re.compile(r"<script\b[^>]*\btype\s*=\s*['\"]application/ld\+json['\"][^>]*>", re.I)
-IMG_TAG_RE   = re.compile(r"<img\b[^>]*>", re.I)
-IMG_ALT_RE   = re.compile(r"<img\b[^>]*\balt\s*=\s*['\"][^'\"]*['\"][^>]*>", re.I)
-A_TAG_RE     = re.compile(r"<a\b[^>]*\bhref\s*=\s*['\"][^'\"]+['\"][^>]*>", re.I)
-ABS_LINK_RE  = re.compile(r"<a\b[^>]*\bhref\s*=\s*['\"]https?://[^'\"]+['\"][^>]*>", re.I)
-MIXED_HTTP_RE = re.compile(r"""(?:src|href)\s*=\s*['\"]http://[^'\"]+['\"]""", re.I)
+META_DESC_RE   = re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]description[\'"][^>]*\bcontent\s*=\s*[\'"](?P<content>[^\'"]+E       = re.compile(r'<title\b[^>]*>(?P<title>.*?)</title>', re.I | re.S)
+H1_RE          = re.compile(r'<h1\b[^>]*>(?P<h1>.*?)</h1>', re.I | re.S)
+VIEWPORT_RE    = re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]viewport[\'"][^>]*>', re.I)
+CANONICAL_RE   = re.compile(r'<link\b[^>]*\brel\s*=\s*[\'"]canonical[\'"][^>]*\bhref\s*=\s*[\'"][^\'"]+[\'"]', re.I)
+ROBOTS_NOIDX_RE= re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]robots[\'"][^>]*\bcontent\s*=\s*[\'"][^\'"]*noindex[^\'"]*[\'"]', re.I)
+OG_TAG_RE      = re.compile(r'<meta\b[^>]*\bproperty\s*=\s*[\'"]og:[^\'"]+[\'"][^>]*>', re.I)
+LDJSON_RE      = re.compile(r'<script\b[^>]*\btype\s*=\s*[\'"]application/ld\+json[\'"][^>]*>', re.I)
+IMG_TAG_RE     = re.compile(r'<img\b[^>]*>', re.I)
+IMG_ALT_RE     = re.compile(r'<img\b[^>]*\balt\s*=\s*[\'"][^\'"]*[\'"][^>]*>', re.I)
+A_TAG_RE       = re.compile(r'<a\b[^>]*\bhref\s*=\s*[\'"][^\'"]+[\'"][^>]*>', re.I)
+ABS_LINK_RE    = re.compile(r'<a\b[^>]*\bhref\s*=\s*[\'"]https?://[^\'"]+[\'"][^>]*>', re.I)
+MIXED_HTTP_RE  = re.compile(r'(?:src|href)\s*=\s*[\'"]http://[^\'"]+[\'"]', re.I)
 
-SCRIPT_TAG_RE = re.compile(r"<script\b[^>]*>", re.I)
-CSS_LINK_RE   = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]stylesheet['\"][^>]*>", re.I)
-
-HREFLANG_RE   = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]alternate['\"][^>]*\bhreflang\s*=\s*['\"][^'\"]+['\"][^>]*>", re.I)
+SCRIPT_TAG_RE  = re.compile(r'<script\b[^>]*>', re.I)
+CSS_LINK_RE    = re.compile(r'<link\b[^>]*\brel\s*=\s*[\'"]stylesheet[\'"][^>]*>', re.I)
+HREFLANG_RE    = re.compile(r'<link\b[^>]*\brel\s*=\s*[\'"]alternate[\'"][^>]*\bhreflang\s*=\s*[\'"][^\'"]+[\'"][^>]*>', re.I)
 
 # ---------------------------
 # Helpers
@@ -303,14 +299,11 @@ def page_size_score(page_bytes: int) -> float:
     return clamp(100.0 - drop)
 
 def inverse_count_score(count: int, max_good: int, max_bad: int) -> float:
-    """
-    Maps a count to 0–100, where <=max_good => ~100, >=max_bad => ~0.
-    """
+    """0–100 where <=max_good ≈100, >=max_bad ≈0; linear in between."""
     if count <= max_good:
         return 100.0
     if count >= max_bad:
         return 0.0
-    # linear between max_good and max_bad
     frac = (count - max_good) / (max_bad - max_good)
     return clamp(100.0 * (1.0 - frac))
 
@@ -324,7 +317,7 @@ def weighted_average(parts: dict[str, float], weights: dict[str, float]) -> floa
     return clamp(s / total_w)
 
 # ---------------------------
-# Engine
+# Scoring & Engine
 # ---------------------------
 def grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
@@ -335,7 +328,10 @@ def grade_from_score(score: float) -> str:
     return "F"
 
 class AuditEngine:
-    """Flexible, API-driven engine. Single-page analysis (no crawler)."""
+    """
+    Flexible, API-driven engine. Single-page analysis (no crawler).
+    Produces: metrics dict + rows list for UI.
+    """
 
     def _fetch(self, url: str, timeout_s: float = 15.0) -> tuple[int, str]:
         if httpx is None:
@@ -349,7 +345,7 @@ class AuditEngine:
         status, html = self._fetch(url) if url else (0, "")
         page_bytes = len(html.encode("utf-8")) if html else 0
 
-        # Signals
+        # Signals from HTML
         title_present     = bool(TITLE_RE.search(html))
         meta_desc_present = bool(META_DESC_RE.search(html))
         h1_present        = bool(H1_RE.search(html))
@@ -370,7 +366,7 @@ class AuditEngine:
         is_https          = url.lower().startswith("https://") if url else False
         mixed_content     = bool(MIXED_HTTP_RE.search(html)) if (is_https and html) else False
 
-        # Category scores (0–100) — all variable (no fixed 50)
+        # Category scores (0–100) — variable, no fixed baselines
         onpage_score = weighted_average({
             "Title":             to_pct(title_present),
             "Meta Description":  to_pct(meta_desc_present),
@@ -424,7 +420,7 @@ class AuditEngine:
         }), 1)
         grade = grade_from_score(overall)
 
-        # Executive panels (basic rules-based text)
+        # Executive panels
         strengths, weaknesses, priority_fixes = [], [], []
         if is_https: strengths.append("HTTPS implemented")
         else:
@@ -686,4 +682,3 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.save()
     buf.seek(0)
     return buf.read()
-``
