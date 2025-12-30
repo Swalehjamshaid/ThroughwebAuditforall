@@ -7,7 +7,7 @@ from typing import Dict, List, Any
 
 try:
     import httpx
-except ImportError:  # More specific than bare except
+except ImportError:
     httpx = None
 
 # ---------------------------
@@ -304,12 +304,10 @@ def page_size_score(page_bytes: int) -> float:
     """Score page size: 100 for ≤700KB, linear drop to 0 at ≥3MB."""
     low_threshold = 700 * 1024
     high_threshold = 3 * 1024 * 1024
-
     if page_bytes <= low_threshold:
         return 100.0
     if page_bytes >= high_threshold:
         return 0.0
-
     drop = (page_bytes - low_threshold) * 100.0 / (high_threshold - low_threshold)
     return clamp(100.0 - drop)
 
@@ -332,7 +330,6 @@ def weighted_average(
     total_weight = sum(weights.values())
     if total_weight == 0:
         return 0.0
-
     weighted_sum = sum(clamp(values.get(k, 0.0)) * w for k, w in weights.items())
     return clamp(weighted_sum / total_weight)
 
@@ -362,10 +359,11 @@ class AuditEngine:
     """
     Lightweight, single-page SEO audit engine (no crawling).
     Produces metrics dictionary compatible with existing app UI and PDF generator.
+    Handles empty state beautifully.
     """
 
     def _fetch(self, url: str, timeout_s: float = 15.0) -> tuple[int, str]:
-        if httpx is None:
+        if httpx is None or not url:
             return 0, ""
 
         try:
@@ -380,153 +378,243 @@ class AuditEngine:
         except httpx.RequestError:
             return 0, ""
 
-    def run(self, url: str) -> Dict[str, Any]:
-        status, html = self._fetch(url) if url else (0, "")
+    def run(self, url: str = "") -> Dict[str, Any]:
+        status, html = self._fetch(url)
+        analyzed = bool(html and status == 200)
         page_bytes = len(html.encode("utf-8")) if html else 0
 
-        # --- HTML signal extraction ---
-        title_present = bool(TITLE_RE.search(html))
-        meta_desc_present = bool(META_DESC_RE.search(html))
-        h1_present = bool(H1_RE.search(html))
-        viewport_present = bool(VIEWPORT_RE.search(html))
-        canonical_present = bool(CANONICAL_RE.search(html))
-        robots_noindex = bool(ROBOTS_NOIDX_RE.search(html))
-        og_count = len(OG_TAG_RE.findall(html))
-        ldjson_present = bool(LDJSON_RE.search(html))
+        # Beautiful empty state when no URL or fetch failed
+        if not analyzed:
+            executive_text = (
+                "👋 Welcome to FF Tech AI Website Audit!\n\n"
+                "Enter a website URL to instantly analyze its SEO health, performance, security, "
+                "mobile-friendliness, and crawlability.\n\n"
+                "You'll receive a beautiful, professional report with:\n"
+                "• Overall Health Score & Grade\n"
+                "• Category Breakdown\n"
+                "• Strengths & Opportunities\n"
+                "• Priority Fixes Roadmap\n"
+                "• Print-ready PDF Export\n\n"
+                "Start auditing now — get actionable insights in seconds."
+            )
+            strengths = [
+                "Ready to analyze any website",
+                "Professional PDF reports",
+                "Instant foundational SEO checks",
+            ]
+            weaknesses = []
+            priority_fixes = [
+                "Enter a valid URL (e.g., https://example.com) to begin your audit."
+            ]
+            category_scores = {
+                "On-Page SEO": None,
+                "Security": None,
+                "Mobile": None,
+                "Performance": None,
+                "Crawlability": None,
+            }
+            overall_score = None
+            grade = "—"
+            rows = [
+                {"label": "Overall Score", "value": None},
+                {"label": "On-Page SEO", "value": None},
+                {"label": "Security", "value": None},
+                {"label": "Mobile", "value": None},
+                {"label": "Performance", "value": None},
+                {"label": "Crawlability", "value": None},
+            ]
+            mixed_content = False
+            robots_noindex = False
+            canonical_present = False
+            hreflang_count = 0
+            title_present = False
+            meta_desc_present = False
+            h1_present = False
+            ldjson_present = False
+            og_count = 0
+            alt_ratio = 0.0
+            abs_link_count = 0
+            viewport_present = False
+            is_https = False
+            script_count = 0
+            css_count = 0
 
-        img_count = len(IMG_TAG_RE.findall(html))
-        img_alt_count = len(IMG_ALT_RE.findall(html))
-        alt_ratio = (img_alt_count / img_count * 100.0) if img_count > 0 else 100.0
+        else:
+            # HTML signal extraction
+            title_present = bool(TITLE_RE.search(html))
+            meta_desc_present = bool(META_DESC_RE.search(html))
+            h1_present = bool(H1_RE.search(html))
+            viewport_present = bool(VIEWPORT_RE.search(html))
+            canonical_present = bool(CANONICAL_RE.search(html))
+            robots_noindex = bool(ROBOTS_NOIDX_RE.search(html))
+            og_count = len(OG_TAG_RE.findall(html))
+            ldjson_present = bool(LDJSON_RE.search(html))
+            img_count = len(IMG_TAG_RE.findall(html))
+            img_alt_count = len(IMG_ALT_RE.findall(html))
+            alt_ratio = (img_alt_count / img_count * 100.0) if img_count > 0 else 100.0
+            link_count = len(A_TAG_RE.findall(html))
+            abs_link_count = len(ABS_LINK_RE.findall(html))
+            script_count = len(SCRIPT_TAG_RE.findall(html))
+            css_count = len(CSS_LINK_RE.findall(html))
+            hreflang_count = len(HREFLANG_RE.findall(html))
+            is_https = url.lower().startswith("https://") if url else False
+            mixed_content = bool(MIXED_HTTP_RE.search(html)) if (is_https and html) else False
 
-        link_count = len(A_TAG_RE.findall(html))
-        abs_link_count = len(ABS_LINK_RE.findall(html))
-        script_count = len(SCRIPT_TAG_RE.findall(html))
-        css_count = len(CSS_LINK_RE.findall(html))
-        hreflang_count = len(HREFLANG_RE.findall(html))
-
-        is_https = url.lower().startswith("https://") if url else False
-        mixed_content = bool(MIXED_HTTP_RE.search(html)) if (is_https and html) else False
-
-        # --- Category scoring ---
-        onpage_score = weighted_average(
-            {
-                "Title": to_pct(title_present),
-                "Meta Description": to_pct(meta_desc_present),
-                "H1": to_pct(h1_present),
-                "Structured Data": to_pct(ldjson_present),
-                "Open Graph": clamp(og_count * 20.0),
-                "Image Alt Ratio": alt_ratio,
-                "Canonical": to_pct(canonical_present),
-            },
-            {
-                "Title": 0.18,
-                "Meta Description": 0.18,
-                "H1": 0.12,
-                "Structured Data": 0.12,
-                "Open Graph": 0.10,
-                "Image Alt Ratio": 0.20,
-                "Canonical": 0.10,
-            },
-        )
-
-        security_score = weighted_average(
-            {
-                "HTTPS": to_pct(is_https),
-                "Mixed Content": 100.0 if not mixed_content else 0.0,
-            },
-            {"HTTPS": 0.6, "Mixed Content": 0.4},
-        )
-
-        mobile_score = to_pct(viewport_present)
-
-        perf_score = weighted_average(
-            {
-                "Page Size": page_size_score(page_bytes),
-                "External Scripts": inverse_count_score(script_count, max_good=3, max_bad=20),
-                "CSS Sheets": inverse_count_score(css_count, max_good=2, max_bad=15),
-            },
-            {"Page Size": 0.6, "External Scripts": 0.2, "CSS Sheets": 0.2},
-        )
-
-        crawl_score = weighted_average(
-            {
-                "Canonical": to_pct(canonical_present),
-                "Noindex": 100.0 if not robots_noindex else 0.0,
-                "Hreflang": clamp(hreflang_count * 20.0),
-                "Reasonable Links": clamp(min(link_count, 80) / 80 * 100.0 if link_count else 0.0),
-            },
-            {"Canonical": 0.35, "Noindex": 0.35, "Hreflang": 0.15, "Reasonable Links": 0.15},
-        )
-
-        category_scores = {
-            "On-Page SEO": round(onpage_score, 1),
-            "Security": round(security_score, 1),
-            "Mobile": round(mobile_score, 1),
-            "Performance": round(perf_score, 1),
-            "Crawlability": round(crawl_score, 1),
-        }
-
-        overall_score = round(
-            weighted_average(
-                category_scores,
+            # Category scoring
+            onpage_score = weighted_average(
                 {
-                    "On-Page SEO": 0.35,
-                    "Security": 0.20,
-                    "Mobile": 0.10,
-                    "Performance": 0.20,
-                    "Crawlability": 0.15,
+                    "Title": to_pct(title_present),
+                    "Meta Description": to_pct(meta_desc_present),
+                    "H1": to_pct(h1_present),
+                    "Structured Data": to_pct(ldjson_present),
+                    "Open Graph": clamp(og_count * 20.0),
+                    "Image Alt Ratio": alt_ratio,
+                    "Canonical": to_pct(canonical_present),
                 },
-            ),
-            1,
-        )
-        grade = grade_from_score(overall_score)
+                {
+                    "Title": 0.18,
+                    "Meta Description": 0.18,
+                    "H1": 0.12,
+                    "Structured Data": 0.12,
+                    "Open Graph": 0.10,
+                    "Image Alt Ratio": 0.20,
+                    "Canonical": 0.10,
+                },
+            )
 
-        # --- Executive summary content ---
-        strengths: List[str] = []
-        weaknesses: List[str] = []
-        priority_fixes: List[str] = []
+            security_score = weighted_average(
+                {
+                    "HTTPS": to_pct(is_https),
+                    "Mixed Content": 100.0 if not mixed_content else 0.0,
+                },
+                {"HTTPS": 0.6, "Mixed Content": 0.4},
+            )
 
-        if is_https:
-            strengths.append("HTTPS implemented")
-        else:
-            weaknesses.append("Missing HTTPS")
-            priority_fixes.append("Implement SSL/HTTPS across the entire site.")
+            mobile_score = to_pct(viewport_present)
 
-        if title_present:
-            strengths.append("Title tag present")
-        else:
-            weaknesses.append("Missing title tag")
-            priority_fixes.append("Add unique, optimized <title> tags to all pages.")
+            perf_score = weighted_average(
+                {
+                    "Page Size": page_size_score(page_bytes),
+                    "External Scripts": inverse_count_score(script_count, max_good=3, max_bad=20),
+                    "CSS Sheets": inverse_count_score(css_count, max_good=2, max_bad=15),
+                },
+                {"Page Size": 0.6, "External Scripts": 0.2, "CSS Sheets": 0.2},
+            )
 
-        if meta_desc_present:
-            strengths.append("Meta description present")
-        else:
-            weaknesses.append("Missing meta description")
-            priority_fixes.append("Add compelling meta descriptions (≤160 characters).")
+            crawl_score = weighted_average(
+                {
+                    "Canonical": to_pct(canonical_present),
+                    "Noindex": 100.0 if not robots_noindex else 0.0,
+                    "Hreflang": clamp(hreflang_count * 20.0),
+                    "Reasonable Links": clamp(min(link_count, 80) / 80 * 100.0 if link_count else 0.0),
+                },
+                {"Canonical": 0.35, "Noindex": 0.35, "Hreflang": 0.15, "Reasonable Links": 0.15},
+            )
 
-        if canonical_present:
-            strengths.append("Canonical tag present")
-        else:
-            weaknesses.append("Missing canonical tag")
-            priority_fixes.append("Add proper canonical tags to avoid duplicate content issues.")
+            category_scores = {
+                "On-Page SEO": round(onpage_score, 1),
+                "Security": round(security_score, 1),
+                "Mobile": round(mobile_score, 1),
+                "Performance": round(perf_score, 1),
+                "Crawlability": round(crawl_score, 1),
+            }
 
-        if ldjson_present:
-            strengths.append("Structured data (JSON-LD) detected")
+            overall_score = round(
+                weighted_average(
+                    category_scores,
+                    {
+                        "On-Page SEO": 0.35,
+                        "Security": 0.20,
+                        "Mobile": 0.10,
+                        "Performance": 0.20,
+                        "Crawlability": 0.15,
+                    },
+                ),
+                1,
+            )
+            grade = grade_from_score(overall_score)
 
-        if viewport_present:
-            strengths.append("Mobile viewport meta tag present")
+            # Rich executive content
+            executive_text = (
+                f"Professional SEO Audit for {url}\n\n"
+                "This single-page analysis evaluates key on-page SEO elements, security protocols, "
+                "mobile responsiveness, performance metrics, and crawlability signals from the HTML source.\n\n"
+                "FF Tech provides instant, actionable insights to optimize your site. For full site-wide "
+                "audits including backlinks and competitors, enable advanced modules."
+            )
 
-        if mixed_content:
-            weaknesses.append("Mixed content detected (HTTP resources on HTTPS page)")
+            strengths = []
+            weaknesses = []
+            priority_fixes = []
 
-        executive_text = (
-            "This single-page audit evaluates foundational on-page SEO, security, mobile-readiness, "
-            "performance indicators, and crawlability signals directly from the HTML source. "
-            "For comprehensive site-wide analysis (including Core Web Vitals, internal linking, "
-            "backlinks, and competitor benchmarking), enable the full crawler and performance modules."
-        )
+            if is_https:
+                strengths.append("🔒 HTTPS Securely Implemented")
+            else:
+                weaknesses.append("⚠️ HTTPS Missing")
+                priority_fixes.append("Implement SSL/HTTPS across the site for security and SEO benefits.")
 
-        # --- Metrics dictionary (preserves ALL expected keys for app compatibility) ---
+            if title_present:
+                strengths.append("📝 Title Tag Present")
+            else:
+                weaknesses.append("❌ Title Tag Missing")
+                priority_fixes.append("Add unique, keyword-rich <title> tags to improve click-through rates.")
+
+            if meta_desc_present:
+                strengths.append("📄 Meta Description Present")
+            else:
+                weaknesses.append("❌ Meta Description Missing")
+                priority_fixes.append("Craft engaging meta descriptions under 160 characters for better SERP performance.")
+
+            if canonical_present:
+                strengths.append("✅ Canonical Tag Detected")
+            else:
+                weaknesses.append("⚠️ Canonical Tag Missing")
+                priority_fixes.append("Add rel=\"canonical\" tags to avoid duplicate content penalties.")
+
+            if ldjson_present:
+                strengths.append("🧩 Structured Data (JSON-LD) Found")
+            else:
+                priority_fixes.append("Implement structured data for rich snippets and enhanced visibility.")
+
+            if viewport_present:
+                strengths.append("📱 Mobile Viewport Configured")
+            else:
+                weaknesses.append("⚠️ Viewport Meta Missing")
+                priority_fixes.append("Add viewport meta tag for responsive mobile design.")
+
+            if og_count > 0:
+                strengths.append("🎨 Open Graph Tags for Social Sharing")
+
+            if mixed_content:
+                weaknesses.append("🔥 Mixed Content Issues Detected")
+                priority_fixes.append("Resolve HTTP resources on HTTPS pages to prevent security warnings.")
+
+            if not strengths:
+                strengths = ["Basic page structure detected – ready for optimization."]
+            if not weaknesses:
+                weaknesses = ["No major foundational issues found."]
+            if not priority_fixes:
+                priority_fixes = ["Site foundations are solid – consider deeper analysis for growth opportunities."]
+
+            rows = [
+                {"label": "Overall Health Score", "value": overall_score},
+                {"label": "On-Page SEO", "value": category_scores["On-Page SEO"]},
+                {"label": "Security", "value": category_scores["Security"]},
+                {"label": "Mobile", "value": category_scores["Mobile"]},
+                {"label": "Performance", "value": category_scores["Performance"]},
+                {"label": "Crawlability", "value": category_scores["Crawlability"]},
+                {"label": "Title Tag Present", "value": to_pct(title_present)},
+                {"label": "Meta Description Present", "value": to_pct(meta_desc_present)},
+                {"label": "H1 Present", "value": to_pct(h1_present)},
+                {"label": "Structured Data Present", "value": to_pct(ldjson_present)},
+                {"label": "Open Graph Tags Present", "value": to_pct(og_count > 0)},
+                {"label": "Viewport Meta Present", "value": to_pct(viewport_present)},
+                {"label": "Canonical Present", "value": to_pct(canonical_present)},
+                {"label": "Mixed Content Detected", "value": to_pct(mixed_content)},
+                {"label": "Image Alt Coverage (%)", "value": alt_ratio},
+            ]
+
+        # Metrics dictionary – always include all keys for compatibility
         metrics: Dict[str, Any] = {
             # Executive
             "overall.health_score": overall_score,
@@ -540,84 +628,59 @@ class AuditEngine:
                 "RobotsNoindex": robots_noindex,
             },
             "summary.category_breakdown": category_scores,
-            "summary.presentation_standard": "Industry-standard layout",
+            "summary.presentation_standard": "Premium SaaS Layout",
             "summary.print_ready": True,
 
             # Site health
             "health.score": overall_score,
-            "health.audit_completion_status": "partial (single-page analysis)",
+            "health.audit_completion_status": "Complete" if analyzed else "Awaiting URL",
 
             # Crawlability
-            "crawl.missing_canonical_tags": 0 if canonical_present else 1,
-            "crawl.hreflang_errors": 0 if hreflang_count >= 1 else 1,
+            "crawl.missing_canonical_tags": 0 if canonical_present else 1 if analyzed else None,
+            "crawl.hreflang_errors": 0 if hreflang_count >= 1 else 1 if analyzed else None,
             "crawl.hreflang_conflicts": None,
 
             # On-page
-            "onpage.missing_title_tags": 0 if title_present else 1,
-            "onpage.missing_meta_descriptions": 0 if meta_desc_present else 1,
-            "onpage.missing_h1": 0 if h1_present else 1,
-            "onpage.missing_structured_data": 0 if ldjson_present else 1,
-            "onpage.missing_open_graph_tags": 0 if og_count > 0 else 1,
-            "onpage.external_links_count": abs_link_count,
-            "onpage.missing_image_alt_tags": 0 if alt_ratio >= 60.0 else 1,
+            "onpage.missing_title_tags": 0 if title_present else 1 if analyzed else None,
+            "onpage.missing_meta_descriptions": 0 if meta_desc_present else 1 if analyzed else None,
+            "onpage.missing_h1": 0 if h1_present else 1 if analyzed else None,
+            "onpage.missing_structured_data": 0 if ldjson_present else 1 if analyzed else None,
+            "onpage.missing_open_graph_tags": 0 if og_count > 0 else 1 if analyzed else None,
+            "onpage.external_links_count": abs_link_count if analyzed else None,
+            "onpage.missing_image_alt_tags": 0 if alt_ratio >= 60.0 else 1 if analyzed else None,
 
-            # Performance proxies
-            "perf.total_page_size": page_bytes,
-            "perf.requests_per_page": script_count + css_count,
-            "perf.render_blocking_resources": css_count,
+            # Performance
+            "perf.total_page_size": page_bytes if analyzed else None,
+            "perf.requests_per_page": script_count + css_count if analyzed else None,
+            "perf.render_blocking_resources": css_count if analyzed else None,
 
-            # Mobile / Security / Social
-            "mobile.viewport_meta_tag": viewport_present,
-            "mobile.mobile_friendly": viewport_present,  # reasonable proxy
-            "security.https_implementation": is_https,
-            "security.mixed_content": mixed_content,
-            "index.noindex_issues": robots_noindex,
-            "social.metadata_presence": og_count > 0,
+            # Mobile/Security/Social
+            "mobile.viewport_meta_tag": viewport_present if analyzed else None,
+            "mobile.mobile_friendly": viewport_present if analyzed else None,  # proxy
+            "security.https_implementation": is_https if analyzed else None,
+            "security.mixed_content": mixed_content if analyzed else None,
+            "index.noindex_issues": robots_noindex if analyzed else None,
+            "social.metadata_presence": og_count > 0 if analyzed else None,
 
             # Raw signals
-            "page.bytes": page_bytes,
-            "http.status": status,
+            "page.bytes": page_bytes if analyzed else None,
+            "http.status": status if analyzed else None,
             "generated_at": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
+
+            # UI rows
+            "rows": rows,
         }
 
-        # Fill remaining expected keys with None to avoid KeyError in UI
-        for key_list in [
-            ONPAGE_KEYS,
-            PERF_KEYS,
-            MOBILE_SEC_INTL_KEYS,
-            COMPETITOR_KEYS,
-            BROKEN_LINKS_KEYS,
-            OPPORTUNITY_KEYS,
-        ]:
-            for key in key_list:
-                if key not in metrics:
-                    metrics[key] = None
+        # Fill remaining keys with None
+        for key in ALL_KEYS:
+            if key not in metrics:
+                metrics[key] = None
 
-        # --- UI rows (progress bars) ---
-        rows: List[Dict[str, Any]] = [
-            {"label": "Overall Score", "value": overall_score},
-            {"label": "On-Page SEO", "value": onpage_score},
-            {"label": "Security", "value": security_score},
-            {"label": "Mobile", "value": mobile_score},
-            {"label": "Performance", "value": perf_score},
-            {"label": "Crawlability", "value": crawl_score},
-            {"label": "Title Tag Present", "value": to_pct(title_present)},
-            {"label": "Meta Description Present", "value": to_pct(meta_desc_present)},
-            {"label": "H1 Present", "value": to_pct(h1_present)},
-            {"label": "Structured Data Present", "value": to_pct(ldjson_present)},
-            {"label": "Open Graph Tags", "value": to_pct(og_count > 0)},
-            {"label": "Viewport Meta Present", "value": to_pct(viewport_present)},
-            {"label": "Canonical Tag Present", "value": to_pct(canonical_present)},
-            {"label": "Mixed Content Detected", "value": to_pct(mixed_content)},
-            {"label": "Image Alt Coverage (%)", "value": alt_ratio},
-        ]
-
-        metrics["rows"] = rows
         return metrics
 
 
 # ---------------------------
-# PDF Report Generator (refactored for clarity, no functional change)
+# PDF Report Generator (Premium, Branded Design)
 # ---------------------------
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -626,13 +689,18 @@ from reportlab.lib.units import cm
 
 
 def _draw_header(c: canvas.Canvas, title: str, url: str, page_no: int) -> None:
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(2 * cm, 28 * cm, title)
+    width, _ = A4
+    c.setFillColor(colors.HexColor("#4f46e5"))  # Premium indigo
+    c.rect(0, 27 * cm, width, 3 * cm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(width / 2, 28.5 * cm, "FF Tech AI Website Audit")
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width / 2, 27.8 * cm, title)
+    c.setFillColor(colors.grey)
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 27.4 * cm, f"Target: {url}")
-    c.drawRightString(19 * cm, 27.4 * cm, f"Page {page_no}/5")
-    c.line(2 * cm, 27.2 * cm, 19 * cm, 27.2 * cm)
+    c.drawString(2 * cm, 27.2 * cm, f"Target: {url}")
+    c.drawRightString(width - 2 * cm, 27.2 * cm, f"Page {page_no}/5")
 
 
 def _draw_bar(
@@ -641,65 +709,53 @@ def _draw_bar(
     y: float,
     width: float,
     height: float,
-    pct: float,
+    pct: float | None,
     label: str,
 ) -> None:
+    if pct is None:
+        c.setFillColor(colors.grey)
+        c.drawString(x, y + height / 2 - 0.2 * cm, f"{label} – Pending Analysis")
+        return
     pct = clamp(pct)
     # Background
-    c.setFillColor(colors.HexColor("#e9ecef"))
+    c.setFillColor(colors.HexColor("#e5e7eb"))
     c.rect(x, y, width, height, fill=1, stroke=0)
-    # Fill
-    c.setFillColor(colors.HexColor("#6f42c1"))
+    # Fill (gradient-like with premium color)
+    c.setFillColor(colors.HexColor("#6366f1"))
     c.rect(x, y, width * (pct / 100.0), height, fill=1, stroke=0)
     # Label
     c.setFillColor(colors.black)
-    c.setFont("Helvetica", 9)
-    c.drawString(x, y + height + 2, f"{label} – {pct:.1f}%")
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(x + 0.5 * cm, y + height / 2 - 0.2 * cm, f"{label} – {pct:.1f}%")
 
 
 def generate_pdf_report(url: str, metrics: Dict[str, Any]) -> bytes:
-    rows = metrics.get("rows", [])
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    width, height = A4
 
     # Page 1 – Executive Summary
-    _draw_header(c, "FF Tech – Executive Summary", url, 1)
-    grade = metrics.get("overall.grade", "-")
-    score = metrics.get("overall.health_score", 0)
-
+    _draw_header(c, "Executive Summary", url, 1)
+    grade = metrics.get("overall.grade", "—")
+    score = metrics.get("overall.health_score", None)
+    y = 24 * cm
     c.setFont("Helvetica-Bold", 48)
-    c.setFillColor(colors.HexColor("#0d6efd"))
-    c.drawString(2 * cm, 23 * cm, f"Grade: {grade}")
-
-    c.setFont("Helvetica", 14)
-    c.setFillColor(colors.black)
-    c.drawString(2 * cm, 21.5 * cm, f"Overall Site Health Score: {score:.1f}%")
-
-    y_pos = 19.5 * cm
-    for row in rows[:6]:  # Show main categories + top signals
-        _draw_bar(
-            c,
-            2 * cm,
-            y_pos,
-            16 * cm,
-            0.6 * cm,
-            float(row.get("value", 0.0)),
-            str(row.get("label", "Metric")),
-        )
-        y_pos -= 1.2 * cm
-
-    c.setFont("Helvetica", 10)
-    c.drawString(
-        2 * cm,
-        6 * cm,
-        "Conclusion: Foundational signals evaluated. Enable full crawler and performance modules for complete analysis.",
-    )
+    c.setFillColor(colors.HexColor("#10b981" if score and score > 70 else "#ef4444"))
+    c.drawCentredString(width / 2, y, grade)
+    if score is not None:
+        c.setFont("Helvetica", 18)
+        c.drawCentredString(width / 2, y - 2 * cm, f"{score:.1f}% Overall Score")
+    else:
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(width / 2, y - 2 * cm, "Enter URL to Audit")
+    c.setFont("Helvetica", 12)
+    c.drawString(2 * cm, y - 4 * cm, metrics.get("summary.executive_text", ""))
     c.showPage()
 
     # Page 2 – Category Breakdown
     _draw_header(c, "Category Breakdown", url, 2)
     cat = metrics.get("summary.category_breakdown", {})
-    y_pos = 24 * cm
+    y = 24 * cm
     for label, key in [
         ("On-Page SEO", "On-Page SEO"),
         ("Security", "Security"),
@@ -707,68 +763,59 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any]) -> bytes:
         ("Performance", "Performance"),
         ("Crawlability", "Crawlability"),
     ]:
-        _draw_bar(c, 2 * cm, y_pos, 16 * cm, 0.6 * cm, float(cat.get(key, 0)), label)
-        y_pos -= 1.2 * cm
-
+        _draw_bar(c, 2 * cm, y, 16 * cm, 0.8 * cm, cat.get(key), label)
+        y -= 1.5 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Prioritize HTTPS, meta tags, canonicals, and page weight optimization.")
+    c.drawString(2 * cm, 6 * cm, "Focus on low-scoring categories for quick improvements.")
     c.showPage()
 
     # Page 3 – Strengths & Weaknesses
     _draw_header(c, "Strengths & Weaknesses", url, 3)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2 * cm, 25.5 * cm, "Strengths")
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(2 * cm, 25 * cm, "Strengths ✅")
     c.setFont("Helvetica", 10)
-    y_pos = 24.5 * cm
+    y = 24 * cm
     for s in metrics.get("summary.strengths", []):
-        c.drawString(2 * cm, y_pos, f"• {s}")
-        y_pos -= 0.7 * cm
-    if not metrics.get("summary.strengths"):
-        c.drawString(2 * cm, y_pos, "• No major strengths detected in base checks.")
-
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2 * cm, y_pos - 0.5 * cm, "Weaknesses")
+        c.drawString(2 * cm, y, f"• {s}")
+        y -= 0.7 * cm
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(2 * cm, y - 1 * cm, "Weaknesses ⚠️")
+    y -= 1.5 * cm
     c.setFont("Helvetica", 10)
-    y_pos -= 1.2 * cm
     for w in metrics.get("summary.weaknesses", []):
-        c.drawString(2 * cm, y_pos, f"• {w}")
-        y_pos -= 0.7 * cm
-    if not metrics.get("summary.weaknesses"):
-        c.drawString(2 * cm, y_pos, "• No critical weaknesses detected.")
-
+        c.drawString(2 * cm, y, f"• {w}")
+        y -= 0.7 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Address foundational issues first, then expand to full site audit.")
+    c.drawString(2 * cm, 6 * cm, "Leverage strengths and address weaknesses to boost performance.")
     c.showPage()
 
     # Page 4 – Priority Fixes
     _draw_header(c, "Priority Fixes & Roadmap", url, 4)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(2 * cm, 25 * cm, "Recommended Actions")
     c.setFont("Helvetica", 10)
-    y_pos = 25 * cm
-    for fix in metrics.get("summary.priority_fixes", []):
-        c.drawString(2 * cm, y_pos, f"• {fix}")
-        y_pos -= 0.8 * cm
-
-    c.drawString(2 * cm, 6 * cm, "Start with high-impact foundational fixes for quick wins.")
+    y = 24 * cm
+    for f in metrics.get("summary.priority_fixes", []):
+        c.drawString(2 * cm, y, f"• {f}")
+        y -= 0.7 * cm
+    c.setFont("Helvetica", 10)
+    c.drawString(2 * cm, 6 * cm, "Implement these fixes in priority order for maximum impact.")
     c.showPage()
 
     # Page 5 – Certification
-    _draw_header(c, "Certified Export", url, 5)
+    _draw_header(c, "Certified Report", url, 5)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(2 * cm, 25 * cm, "Certification")
     c.setFont("Helvetica", 12)
-    c.drawString(2 * cm, 25.5 * cm, "Certification")
-    c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 24.7 * cm, "Generated by FF Tech AI Website Audit")
-    c.drawString(
-        2 * cm,
-        24.0 * cm,
-        "This report reflects single-page foundational analysis. Full site audit recommended for deeper insights.",
-    )
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(2 * cm, 22.5 * cm, f"Overall Grade: {grade}")
-    c.drawString(2 * cm, 21.8 * cm, f"Overall Score: {score:.1f}%")
+    c.drawString(2 * cm, 24 * cm, "This report is generated by FF Tech AI Website Audit SaaS.")
+    c.drawString(2 * cm, 23 * cm, "For comprehensive site-wide insights, contact us for premium features.")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(2 * cm, 21 * cm, f"Grade: {grade}")
+    c.drawString(2 * cm, 20 * cm, f"Score: {score:.1f}%" if score else "Pending")
     c.setFont("Helvetica", 9)
     c.drawString(2 * cm, 6 * cm, f"Generated: {metrics.get('generated_at', '')}")
     c.showPage()
 
     c.save()
-    buffer.seek(0)
-    return buffer.read()
+    buf.seek(0)
+    return buf.read()
