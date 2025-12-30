@@ -264,7 +264,7 @@ ALL_KEYS: List[str] = (
 )
 
 # ---------------------------
-# Simple, reliable base checks
+# Base checks (regex)
 # ---------------------------
 META_DESC_RE = re.compile(
     r"<meta\b[^>]*\bname\s*=\s*['\"]description['\"][^>]*\bcontent\s*=\s*'\"['\"]",
@@ -273,7 +273,7 @@ META_DESC_RE = re.compile(
 TITLE_RE = re.compile(r"<title\b[^>]*>(?P<title>.*?)</title>", re.I | re.S)
 
 # ---------------------------
-# Core Scoring
+# Scoring
 # ---------------------------
 def grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
@@ -287,7 +287,7 @@ class AuditEngine:
     """Flexible, API-driven engine. Frontend-agnostic."""
 
     def _fetch(self, url: str, timeout_s: float = 15.0) -> tuple[int, str]:
-        """Return (status_code, html). Uses httpx if available; otherwise returns (0, '')."""
+        """Return (status_code, html). Uses httpx if available."""
         if httpx is None:
             return 0, ""
         with httpx.Client(timeout=timeout_s, follow_redirects=True, headers={"User-Agent": "FFTechAudit/1.0"}) as client:
@@ -300,21 +300,18 @@ class AuditEngine:
         status, html = self._fetch(url) if url else (0, "")
         page_bytes = len(html.encode("utf-8")) if html else 0
 
-        # Base signals from single-page fetch
         has_desc = bool(META_DESC_RE.search(html))
         has_title = bool(TITLE_RE.search(html))
         is_https = url.lower().startswith("https://") if url else False
 
-        # Core score (deterministic, no simulated data)
         score = 0.0
         score += 35.0 if has_desc else 0.0
         score += 25.0 if has_title else 0.0
         score += 10.0 if is_https else 0.0
-        score += min(page_bytes / 1024.0, 30.0)  # size contributes up to +30
+        score += min(page_bytes / 1024.0, 30.0)
         score = max(0.0, min(100.0, score))
         grade = grade_from_score(score)
 
-        # Metrics dict – populate what we can from single fetch; rest as None (to be implemented by crawlers/integrations)
         metrics: Dict[str, Any] = {
             "overall.health_score": round(score, 2),
             "overall.grade": grade,
@@ -324,10 +321,9 @@ class AuditEngine:
             "summary.priority_fixes": None,
             "summary.severity_indicators": None,
             "summary.category_breakdown": None,
-            "summary.presentation_standard": "Industry standard layout",  # static descriptor
+            "summary.presentation_standard": "Industry standard layout",
             "summary.print_ready": True,
 
-            # Site health (single-page signals only)
             "health.score": round(score, 2),
             "health.errors_total": None,
             "health.warnings_total": None,
@@ -337,25 +333,19 @@ class AuditEngine:
             "health.issues_trend": None,
             "health.crawl_budget_efficiency": None,
             "health.orphan_pages_pct": None,
-            "health.audit_completion_status": "partial",  # single fetch only
+            "health.audit_completion_status": "partial",
 
-            # Crawlability (placeholders – require crawler)
             **{key: None for key in CRAWL_KEYS},
 
-            # On-Page SEO (some single-page approximations)
             "onpage.missing_title_tags": 0 if has_title else 1,
             "onpage.missing_meta_descriptions": 0 if has_desc else 1,
-            # all other onpage signals require DOM-wide analysis
             **{key: None for key in ONPAGE_KEYS if key not in {"onpage.missing_title_tags", "onpage.missing_meta_descriptions"}},
 
-            # Performance (require lab/field data; None for now)
             **{key: None for key in PERF_KEYS},
 
-            # Mobile/Security/Intl – we can set https
             "security.https_implementation": is_https,
             **{key: None for key in MOBILE_SEC_INTL_KEYS if key != "security.https_implementation"},
 
-            # Competitor, Broken links, Opportunity – require external data
             **{key: None for key in COMPETITOR_KEYS},
             **{key: None for key in BROKEN_LINKS_KEYS},
             **{key: None for key in OPPORTUNITY_KEYS},
@@ -365,7 +355,6 @@ class AuditEngine:
             "generated_at": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
 
-        # Rows for UI visualization (0–100). Several representative bars.
         rows: List[Dict[str, Any]] = [
             {"label": "Meta Description", "value": 100.0 if has_desc else 0.0},
             {"label": "Title Tag", "value": 100.0 if has_title else 0.0},
@@ -417,7 +406,6 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.setFont("Helvetica", 14)
     c.setFillColor(colors.black)
     c.drawString(2 * cm, 21.5 * cm, f"Overall Site Health Score: {score:.2f}%")
-    # Bars for first 4 rows
     y = 19.5 * cm
     for row in rows[:4]:
         _bar(c, 2 * cm, y, 16 * cm, 0.6 * cm, float(row.get("value", 0.0)), str(row.get("label", "Metric")))
@@ -457,7 +445,6 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
         strengths.append("Meta description present")
     if not strengths:
         strengths = ["No strong signals detected in base checks."]
-
     y = 24.5 * cm
     for s in strengths:
         c.drawString(2 * cm, y, f"• {s}")
@@ -475,7 +462,6 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
         weaknesses.append("Missing meta description")
     if not weaknesses:
         weaknesses = ["No immediate weaknesses detected in base checks."]
-
     y = y - 1.2 * cm
     for w in weaknesses:
         c.drawString(2 * cm, y, f"• {w}")
@@ -485,7 +471,7 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.drawString(2 * cm, 6 * cm, "Conclusion: Address missing HTTPS and meta elements first, then proceed to full crawl and performance audit.")
     c.showPage()
 
-    # Page 4 – Priority Fixes & Roadmap (static guidance)
+    # Page 4 – Priority Fixes & Roadmap
     _draw_header(c, "Priority Fixes & Roadmap", url, 4)
     c.setFont("Helvetica", 10)
     fixes = [
@@ -519,4 +505,3 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.save()
     buf.seek(0)
     return buf.read()
-``
