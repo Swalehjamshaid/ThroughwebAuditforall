@@ -10,12 +10,34 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "audit.sqlite3")
 
-DATABASE_URL = os.getenv("DATABASE_URL")  # Railway provides Postgres URL
-if DATABASE_URL:
-    # SQLAlchemy expects 'postgresql://'
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
+# Read DATABASE_URL from env
+raw_url = os.getenv("DATABASE_URL")  # Railway provides Postgres URL
+engine = None
+
+def _force_pg8000(url: str) -> str:
+    """
+    Normalize Railway URL and force pg8000 driver for Python 3.13 compatibility.
+    - Converts postgres:// -> postgresql+pg8000://
+    - Converts postgresql:// -> postgresql+pg8000://
+    - Leaves driver if already specified
+    """
+    if not url:
+        return url
+    url = url.strip()
+    if url.startswith("postgres://"):
+        # Railway legacy prefix -> ensure pg8000 driver
+        return url.replace("postgres://", "postgresql+pg8000://", 1)
+    if url.startswith("postgresql://"):
+        # Default SQLAlchemy dialect -> explicitly set pg8000
+        return url.replace("postgresql://", "postgresql+pg8000://", 1)
+    # If the URL already specifies a driver (e.g., postgresql+pg8000://), leave it
+    return url
+
+if raw_url:
+    DATABASE_URL = _force_pg8000(raw_url)
     engine = create_engine(DATABASE_URL)
 else:
+    # Local SQLite fallback
     engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -36,7 +58,7 @@ class Schedule(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     url = Column(String(1024), nullable=False)
-    frequency = Column(String(32), default="weekly")  # 'daily' | 'weekly' | 'monthly'
+    frequency = Column(String(32), default="weekly")  # 'daily'|'weekly'|'monthly'
     time_of_day = Column(String(16), default="09:00")  # HH:MM in UTC
     timezone = Column(String(64), default="UTC")
     created_at = Column(DateTime, default=dt.datetime.utcnow)
@@ -55,13 +77,11 @@ class AuditHistory(Base):
 
 # --- Init ---
 def init_db():
-    """Create tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
 
 
 # --- User helpers ---
 def upsert_user(db: Session, email: str) -> User:
-    """Find a user by email, creating it if missing."""
     u = db.query(User).filter(User.email == email).first()
     if not u:
         u = User(email=email)
@@ -76,21 +96,8 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
 
 
 # --- Schedule helpers ---
-def save_schedule(
-    db: Session,
-    user_id: int,
-    url: str,
-    frequency: str,
-    time_of_day: str,
-    timezone: str,
-) -> Schedule:
-    s = Schedule(
-        user_id=user_id,
-        url=url,
-        frequency=frequency,
-        time_of_day=time_of_day,
-        timezone=timezone,
-    )
+def save_schedule(db: Session, user_id: int, url: str, frequency: str, time_of_day: str, timezone: str) -> Schedule:
+    s = Schedule(user_id=user_id, url=url, frequency=frequency, time_of_day=time_of_day, timezone=timezone)
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -98,12 +105,7 @@ def save_schedule(
 
 
 # --- Audit history helpers ---
-def create_audit_history(
-    db: Session,
-    url: str,
-    health_score: float,
-    user_id: Optional[int] = None,
-) -> AuditHistory:
+def create_audit_history(db: Session, url: str, health_score: float, user_id: Optional[int] = None) -> AuditHistory:
     a = AuditHistory(url=url, health_score=health_score, user_id=user_id)
     db.add(a)
     db.commit()
@@ -117,10 +119,6 @@ def count_user_audits(db: Session, user_id: int) -> int:
 
 # --- Scheduling time helper (UTC, simple) ---
 def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
-    """
-    Compute next run time in UTC based on frequency and HH:MM.
-    This is a simple calculator (no timezone conversion). For real TZs, use zoneinfo/pytz.
-    """
     now = dt.datetime.utcnow()
     try:
         hour, minute = (time_of_day or "09:00").split(":")
@@ -136,14 +134,12 @@ def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
         return target
 
     if frequency == "weekly":
-        # Next same weekday/time; if already passed today, schedule next week
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if target <= now:
             target += dt.timedelta(days=7)
         return target
 
     if frequency == "monthly":
-        # Next month, same day where possible (cap at 28 to avoid invalid dates)
         year = now.year
         month = now.month + 1
         if month > 12:
@@ -152,6 +148,6 @@ def compute_next_run_utc(frequency: str, time_of_day: str) -> dt.datetime:
         day = min(now.day, 28)
         return dt.datetime(year, month, day, hour, minute)
 
-    # Default: weekly one week later
     target = now + dt.timedelta(days=7)
     return target.replace(hour=hour, minute=minute, second=0, microsecond=0)
+``
