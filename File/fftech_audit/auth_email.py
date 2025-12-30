@@ -1,48 +1,49 @@
 
-import os, smtplib
-from email.mime.text import MIMEText
-from itsdangerous import URLSafeSerializer
+# fftech_audit/auth_email.py
+import time
+import hmac
+import base64
+import hashlib
+from typing import Tuple, Optional
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'super-secret-key-change-me')
-BASE_URL = os.getenv('BASE_URL', 'http://localhost:8000')
-SENDER = os.getenv('FROM_EMAIL', 'no-reply@fftech.ai')
-SMTP_HOST = os.getenv('SMTP_HOST')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
-SMTP_USER = os.getenv('SMTP_USER')
-SMTP_PASS = os.getenv('SMTP_PASS')
+# In production, put this in env secrets
+_SECRET = b"change-me-to-a-long-random-secret"
 
-ser = URLSafeSerializer(SECRET_KEY, salt='fftech-email')
+def _sign(payload: str) -> str:
+    sig = hmac.new(_SECRET, payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(sig).decode("utf-8").rstrip("=")
 
-def generate_token(payload: dict) -> str:
-    return ser.dumps(payload)
+def _now_ts() -> int:
+    return int(time.time())
 
-def verify_magic_or_verify_link(token: str) -> str:
-    data = ser.loads(token)
-    return data.get('email')
+class verify_token:
+    @staticmethod
+    def issue(email: str, ttl_seconds: int = 900) -> str:
+        exp = _now_ts() + ttl_seconds
+        payload = f"{email}|{exp}"
+        sig = _sign(payload)
+        token = base64.urlsafe_b64encode(f"{payload}|{sig}".encode("utf-8")).decode("utf-8").rstrip("=")
+        return token
 
-def verify_session_token(token: str) -> dict:
-    return ser.loads(token)
+    @staticmethod
+    def check(token: str) -> Tuple[bool, Optional[str]]:
+        try:
+            raw = base64.urlsafe_b64decode(token + "==").decode("utf-8")
+            email, exp_s, sig = raw.split("|")
+            payload = f"{email}|{exp_s}"
+            if _sign(payload) != sig:
+                return False, None
+            if _now_ts() > int(exp_s):
+                return False, None
+            return True, email
+        except Exception:
+            return False, None
 
-def send_verification_link(email: str):
-    token = generate_token({'email': email, 'purpose': 'verify'})
-    link = f"{BASE_URL}/auth/verify-link?token={token}"
-    body = f"""
-    <h3>FF Tech AI • Website Audit</h3>
-    <p>Click to verify and sign in:</p>
-    <p><a href='{link}'>Verify & Sign In</a></p>
+
+def send_magic_link_email(email: str, token: str):
     """
-    msg = MIMEText(body, 'html')
-    msg['Subject'] = 'Verify your email • FF Tech AI'
-    msg['From'] = SENDER
-    msg['To'] = email
-    if SMTP_HOST and SMTP_USER and SMTP_PASS:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.send_message(msg)
-    else:
-        print('[EMAIL] Would send to', email, 'link:', link)
-
-def send_email_with_pdf(to_email: str, subject: str, text: str, pdf_bytes: bytes):
-    # Minimal: log-only when SMTP not configured
-    print(f"[EMAIL] PDF to {to_email} — bytes: {len(pdf_bytes)}")
+    Stub: replace with real SMTP or provider call.
+    For local dev, just print the link.
+    """
+    link = f"http://localhost:8000/verify?token={token}"
+    print(f"[Magic Link] Send to {email}: {link}")
