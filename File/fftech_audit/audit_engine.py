@@ -261,7 +261,8 @@ ALL_KEYS: List[str] = (
 # ---------------------------
 # Base regex (correct: uses < and >, raw strings, escaped quotes)
 # ---------------------------
-META_DESC_RE   = re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]description[\'"][^>]*\bcontent\s*=\s*[\'"](?P<content>[^\'"]+E       = re.compile(r'<title\b[^>]*>(?P<title>.*?)</title>', re.I | re.S)
+META_DESC_RE   = re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]description[\'"][^>]*\bcontent\s*=\s*\'"[\'"]', re.I)
+TITLE_RE       = re.compile(r'<title\b[^>]*>(?P<title>.*?)</title>', re.I | re.S)
 H1_RE          = re.compile(r'<h1\b[^>]*>(?P<h1>.*?)</h1>', re.I | re.S)
 VIEWPORT_RE    = re.compile(r'<meta\b[^>]*\bname\s*=\s*[\'"]viewport[\'"][^>]*>', re.I)
 CANONICAL_RE   = re.compile(r'<link\b[^>]*\brel\s*=\s*[\'"]canonical[\'"][^>]*\bhref\s*=\s*[\'"][^\'"]+[\'"]', re.I)
