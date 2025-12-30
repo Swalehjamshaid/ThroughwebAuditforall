@@ -1,5 +1,7 @@
 
 # fftech_audit/crawlers.py
+
+import os                      # <-- for environment variables
 import re
 import ssl
 import time
@@ -16,10 +18,12 @@ import xml.etree.ElementTree as ET
 import urllib.robotparser as robotparser
 
 # -------- Config --------
-MAX_PAGES = int(float((up.os.getenv("MAX_PAGES") or 120)))  # reasonable BFS cap
+# Use os.getenv (NOT urllib.parse.os) to read environment variables.
+MAX_PAGES = int(os.getenv("MAX_PAGES", "120"))   # reasonable BFS cap
 TIMEOUT = 12.0
-MAX_LINK_CHECKS = 150  # limit broken link verification cost
+MAX_LINK_CHECKS = 150
 USER_AGENT = "FFTechAI-AuditBot/1.0 (+https://fftech.ai)"
+
 
 @dataclass
 class PageInfo:
@@ -45,6 +49,7 @@ class PageInfo:
     stylesheets: int = 0
     dom_nodes_est: int = 0
     mixed_content_http: int = 0  # number of http resources on https
+
 
 @dataclass
 class CrawlResult:
@@ -122,6 +127,7 @@ def _parse_sitemap(url: str) -> List[str]:
             r = client.get(url)
             if r.status_code != 200:
                 return urls
+            # If lxml is not available in the deployment image, ET works fine for basic sitemaps.
             root = ET.fromstring(r.text)
             ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
             for loc in root.findall(".//sm:loc", ns):
@@ -148,16 +154,23 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     q = deque([seed])
     seen: Set[str] = {seed}
 
-    # Discover sitemaps
+    # Discover sitemaps and inject URLs into queue (host‑only)
     sitemap_urls = _discover_sitemaps(seed)
     for sm in list(sitemap_urls):
         for u in _parse_sitemap(sm):
             if _same_host(seed, u) and len(seen) < max_pages:
-                seen.add(u)
-                q.append(u)
+                if u not in seen:
+                    seen.add(u)
+                    q.append(u)
+
+    # Choose parser: 'lxml' if available, else 'html.parser' (pure Python)
+    soup_parser = "lxml"
+    try:
+        import lxml  # noqa: F401
+    except Exception:
+        soup_parser = "html.parser"
 
     with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}, follow_redirects=True) as client:
-
         while q and len(pages) < max_pages:
             url = q.popleft()
             try:
@@ -172,7 +185,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                 pi = PageInfo(url=url, status=status, content_type=ctype, content_len=clen)
 
                 if "text/html" in ctype and r.text:
-                    soup = BeautifulSoup(r.text, "lxml")
+                    soup = BeautifulSoup(r.text, soup_parser)
 
                     # Basic content
                     title_el = soup.find("title")
@@ -207,12 +220,12 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     missing = 0
                     for img in imgs:
                         alt = img.get("alt")
-                        if not (alt and alt.strip()):
+                        if not (alt and str(alt).strip()):
                             missing += 1
                     pi.images_missing_alt = missing
 
                     # OpenGraph & Schema
-                    og = soup.find_all("meta", property=re.compile("^og:"))
+                    og = soup.find_all("meta", property=re.compile(r"^og:"))
                     pi.og_tags_present = len(og) > 0
                     script_ld = soup.find_all("script", type="application/ld+json")
                     pi.schema_present = len(script_ld) > 0
@@ -221,6 +234,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     for ln in soup.find_all("link", attrs={"rel": "alternate"}):
                         if ln.get("hreflang") and ln.get("href"):
                             pi.hreflang.append((ln.get("hreflang"), ln.get("href")))
+
                     # Pagination
                     prev = soup.find("link", rel="prev")
                     next_ = soup.find("link", rel="next")
@@ -234,17 +248,16 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     pi.dom_nodes_est = sum(1 for _ in soup.descendants if getattr(_, "name", None))
 
                     # Mixed content (http resources on https page)
+                    pi.mixed_content_http = 0
                     if url.startswith("https://"):
-                        res_http = 0
                         for tag in soup.find_all(["img", "script", "link"], src=True):
                             src = tag.get("src")
                             if src and str(src).strip().startswith("http://"):
-                                res_http += 1
+                                pi.mixed_content_http += 1
                         for tag in soup.find_all("link", href=True):
                             href = tag.get("href")
                             if href and str(href).strip().startswith("http://"):
-                                res_http += 1
-                        pi.mixed_content_http = res_http
+                                pi.mixed_content_http += 1
 
                 pages.append(pi)
 
@@ -256,18 +269,21 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
         try:
             with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
                 r = client.head(u, follow_redirects=True)
+                # consider 2xx and 3xx as OK
                 return 200 <= r.status_code < 400
         except Exception:
             return False
 
     checks = 0
     for u in list(internal_links):
-        if checks > MAX_LINK_CHECKS: break
+        if checks > MAX_LINK_CHECKS:
+            break
         checks += 1
         if not _head_ok(u):
             broken_internal.add(u)
     for u in list(external_links):
-        if checks > MAX_LINK_CHECKS: break
+        if checks > MAX_LINK_CHECKS:
+            break
         checks += 1
         if not _head_ok(u):
             broken_external.add(u)
