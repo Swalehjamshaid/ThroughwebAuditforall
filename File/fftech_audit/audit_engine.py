@@ -1,13 +1,11 @@
 
-# fftech_audit/audit_engine.py (improved)
+# fftech_audit/audit_engine.py (v2.0 — realistic scoring)
+
 from __future__ import annotations
 import datetime as dt
 from typing import Dict, Any
-from statistics import mean
 from fftech_audit.crawlers import crawl_site
 from fftech_audit.analyzers import summarize_crawl
-
-# ------------------ Public API ------------------
 
 def _grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
@@ -18,15 +16,10 @@ def _grade_from_score(score: float) -> str:
     return "F"
 
 def run_audit(url: str) -> Dict[str, Any]:
-    """
-    Executes site crawl + analyzers, computes category scores, overall,
-    and returns a rich metrics dict with NO empty values.
-    """
     cr = crawl_site(url)
     res = summarize_crawl(cr)
     m = res["metrics"]
 
-    # Category scores
     score_perf = _score_performance(m)
     score_mobile = _score_mobile(m)
     score_a11y = _score_accessibility(m)
@@ -44,7 +37,6 @@ def run_audit(url: str) -> Dict[str, Any]:
         "Metadata": 0.12,
         "Structure": 0.13,
     }
-
     overall = (
         score_perf * weights["Performance"] +
         score_mobile * weights["Mobile"] +
@@ -68,7 +60,6 @@ def run_audit(url: str) -> Dict[str, Any]:
     strengths, weaknesses, fixes = _summarize_strengths_weaknesses(m, category_breakdown)
     exec_summary = _generate_exec_summary(url, category_breakdown, strengths, weaknesses, fixes)
 
-    # Final metrics dict: ensure site health score populated and no empty fields
     out_metrics: Dict[str, Any] = {
         "target.url": url,
         "generated_at": dt.datetime.utcnow().isoformat(),
@@ -81,91 +72,61 @@ def run_audit(url: str) -> Dict[str, Any]:
         "summary.executive": exec_summary,
         **m,
     }
-
-    # Mirror overall into metric 11 for table visibility
     out_metrics["11.Site Health Score"] = round(overall, 1)
 
-    # Charts
     charts = {
         "status_distribution": out_metrics.get("173.Status Code Distribution", {}),
     }
+    return {"metrics": out_metrics, "category_breakdown": category_breakdown, "charts": charts}
 
-    return {
-        "metrics": out_metrics,
-        "category_breakdown": category_breakdown,
-        "charts": charts,
-    }
-
-# ------------------ Scoring helpers ------------------
-def _clamp(x: float) -> float:
-    return max(0.0, min(100.0, x))
-
+# -------- scoring helpers
+def _clamp(x: float) -> float: return max(0.0, min(100.0, x))
 def _safe_total(m: Dict[str, Any]) -> float:
     t = float(m.get("15.Total Crawled Pages") or 0)
     return t if t > 0 else 1
 
 def _score_performance(m: Dict[str, Any]) -> float:
-    # Use per-page averages to avoid penalizing larger crawls
     size_bytes = float(m.get("84.Total Page Size") or 0)  # avg per page
     req = float(m.get("85.Requests Per Page") or 1)
     rbr_pages = float(m.get("88.Render Blocking Resources") or 0)
     big_dom_pages = float(m.get("89.Excessive DOM Size") or 0)
     total = _safe_total(m)
-
     rbr_ratio = rbr_pages / total
     big_dom_ratio = big_dom_pages / total
-
     penalties = 0.0
-    if size_bytes > 2_000_000: penalties += 20  # >2MB avg/page
+    if size_bytes > 2_000_000: penalties += 20
     elif size_bytes > 1_000_000: penalties += 10
-
     if req > 60: penalties += 20
     elif req > 40: penalties += 10
-
     penalties += rbr_ratio * 25
     penalties += big_dom_ratio * 20
-
-    base = 95.0
-    return _clamp(base - penalties)
+    return _clamp(95.0 - penalties)
 
 def _score_mobile(m: Dict[str, Any]) -> float:
-    viewport_yes = float(m.get("98.Viewport Meta Tag") or 0)
-    total_pages = _safe_total(m)
-    ratio = viewport_yes / total_pages
-    # Mobile friendliness (test not run) keeps baseline moderate
-    baseline = 55.0
-    return _clamp(baseline + 45.0 * ratio)
+    ratio = float(m.get("98.Viewport Meta Tag") or 0) / _safe_total(m)
+    return _clamp(55.0 + 45.0 * ratio)
 
 def _score_accessibility(m: Dict[str, Any]) -> float:
     missing_alt = float(m.get("55.Missing Image Alt Tags") or 0)
-    # Estimate total images via alt missing + a small constant to avoid division by zero
     total_images_est = max(missing_alt + 5, 1)
     miss_ratio = missing_alt / total_images_est
-    penalties = miss_ratio * 60
-    base = 90.0
-    return _clamp(base - penalties)
+    return _clamp(90.0 - miss_ratio * 60)
 
 def _score_security(m: Dict[str, Any]) -> float:
     https_impl = float(m.get("105.HTTPS Implementation") or 0)
     mixed = float(m.get("108.Mixed Content") or 0)
-    total_pages = _safe_total(m)
-    https_ratio = https_impl / total_pages
+    https_ratio = https_impl / _safe_total(m)
     penalties = 0.0
     if https_ratio < 0.9: penalties += 20
     if https_ratio < 0.7: penalties += 35
     if mixed > 0: penalties += min(30.0, mixed * 3.0)
-    base = 95.0
-    return _clamp(base - penalties)
+    return _clamp(95.0 - penalties)
 
 def _score_indexing(m: Dict[str, Any]) -> float:
-    non_canonical = float(m.get("31.Non-Canonical Pages") or 0)
-    missing_can = float(m.get("32.Missing Canonical Tags") or 0)
-    meta_blocked = float(m.get("30.Meta Robots Blocked URLs") or 0)
-    total = _safe_total(m)
-    ratio = (non_canonical + missing_can + meta_blocked) / total
-    penalties = ratio * 100
-    base = 95.0
-    return _clamp(base - penalties)
+    ratio = (float(m.get("31.Non-Canonical Pages") or 0) +
+             float(m.get("32.Missing Canonical Tags") or 0) +
+             float(m.get("30.Meta Robots Blocked URLs") or 0)) / _safe_total(m)
+    return _clamp(95.0 - ratio * 100)
 
 def _score_metadata(m: Dict[str, Any]) -> float:
     missing_title = float(m.get("41.Missing Title Tags") or 0)
@@ -176,31 +137,20 @@ def _score_metadata(m: Dict[str, Any]) -> float:
     miss_ratio = (missing_title + missing_meta) / total
     length_issues = (too_long + too_short) / total
     penalties = miss_ratio * 60 + length_issues * 20
-    base = 90.0
-    return _clamp(base - penalties)
+    return _clamp(90.0 - penalties)
 
 def _score_structure(m: Dict[str, Any]) -> float:
-    missing_h1 = float(m.get("49.Missing H1") or 0)
-    multiple_h1 = float(m.get("50.Multiple H1") or 0)
-    non_seo_urls = float(m.get("65.Non-SEO-Friendly URLs") or 0)
-    total = _safe_total(m)
-    ratio = (missing_h1 + multiple_h1 + non_seo_urls) / total
-    penalties = ratio * 100
-    base = 90.0
-    return _clamp(base - penalties)
+    ratio = (float(m.get("49.Missing H1") or 0) +
+             float(m.get("50.Multiple H1") or 0) +
+             float(m.get("65.Non-SEO-Friendly URLs") or 0)) / _safe_total(m)
+    return _clamp(90.0 - ratio * 100)
 
-
-# ------------------ Narrative helpers ------------------
 def _summarize_strengths_weaknesses(m: Dict[str, Any], cb: Dict[str, float]):
     strengths, weaknesses, fixes = [], [], []
     for k, v in cb.items():
-        if v >= 80:
-            strengths.append(f"{k} is strong ({v:.0f}%).")
+        if v >= 80: strengths.append(f"{k} is strong ({v:.0f}%).")
     for k, v in cb.items():
-        if v < 60:
-            weaknesses.append(f"{k} below target ({v:.0f}%).")
-
-    # Priority fixes
+        if v < 60: weaknesses.append(f"{k} below target ({v:.0f}%).")
     if (m.get("74.Broken External Links", 0) or 0) > 0 or (m.get("27.Broken Internal Links", 0) or 0) > 0:
         fixes.append("Resolve broken internal/external links to recover link equity and UX.")
     if (m.get("45.Missing Meta Descriptions", 0) or 0) > 0 or (m.get("41.Missing Title Tags", 0) or 0) > 0:
@@ -217,10 +167,8 @@ def _generate_exec_summary(url: str, cb: Dict[str, float], strengths: list, weak
     parts = []
     parts.append(f"This report audits {url} across seven dimensions—Performance, Mobile, Accessibility, Security, Indexing, Metadata, and Structure—to produce an overall executive score.")
     parts.append("Category scores: " + ", ".join([f"{k} {v:.0f}%" for k, v in cb.items()]) + ".")
-    if strengths:
-        parts.append("Strengths: " + "; ".join(strengths) + ".")
-    if weaknesses:
-        parts.append("Weaknesses: " + "; ".join(weaknesses) + ".")
+    if strengths: parts.append("Strengths: " + "; ".join(strengths) + ".")
+    if weaknesses: parts.append("Weaknesses: " + "; ".join(weaknesses) + ".")
     parts.append("Priority actions: " + "; ".join(fixes) + ".")
-    parts.append("Scores are derived from transparent heuristics (avg page size, request counts, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals and backlink authority in future iterations.")
+    parts.append("Scores are derived from transparent heuristics (avg page size, request counts, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals.")
     return " ".join(parts)
