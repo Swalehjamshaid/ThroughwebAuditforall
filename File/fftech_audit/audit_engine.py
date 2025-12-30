@@ -13,9 +13,8 @@ except Exception:
     httpx = None
 
 # ---------------------------
-# Metric Catalog (keys only)
+# Metric catalogs (keys only)
 # ---------------------------
-# A. Executive Summary & Grading (1–10)
 EXECUTIVE_KEYS = [
     "overall.health_score",
     "overall.grade",
@@ -29,7 +28,6 @@ EXECUTIVE_KEYS = [
     "summary.print_ready",
 ]
 
-# B. Overall Site Health (11–20)
 SITE_HEALTH_KEYS = [
     "health.score",
     "health.errors_total",
@@ -43,7 +41,6 @@ SITE_HEALTH_KEYS = [
     "health.audit_completion_status",
 ]
 
-# C. Crawlability & Indexation (21–40)
 CRAWL_KEYS = [
     "crawl.http_2xx",
     "crawl.http_3xx",
@@ -67,7 +64,6 @@ CRAWL_KEYS = [
     "crawl.duplicate_parameter_urls",
 ]
 
-# D. On-Page SEO (41–75)
 ONPAGE_KEYS = [
     "onpage.missing_title_tags",
     "onpage.duplicate_title_tags",
@@ -106,7 +102,6 @@ ONPAGE_KEYS = [
     "onpage.anchor_text_issues",
 ]
 
-# E. Performance & Technical (76–96)
 PERF_KEYS = [
     "perf.lcp",
     "perf.fcp",
@@ -131,7 +126,6 @@ PERF_KEYS = [
     "perf.resource_load_errors",
 ]
 
-# F. Mobile, Security & International (97–150)
 MOBILE_SEC_INTL_KEYS = [
     "mobile.mobile_friendly",
     "mobile.viewport_meta_tag",
@@ -141,6 +135,7 @@ MOBILE_SEC_INTL_KEYS = [
     "mobile.layout_issues",
     "mobile.intrusive_interstitials",
     "mobile.navigation_issues",
+
     "security.https_implementation",
     "security.ssl_validity",
     "security.expired_ssl",
@@ -149,11 +144,13 @@ MOBILE_SEC_INTL_KEYS = [
     "security.missing_security_headers",
     "security.open_directory_listing",
     "security.login_without_https",
+
     "intl.missing_hreflang",
     "intl.incorrect_language_codes",
     "intl.hreflang_conflicts",
     "intl.region_targeting_issues",
     "intl.multi_domain_seo_issues",
+
     "backlinks.domain_authority",
     "backlinks.referring_domains",
     "backlinks.total_backlinks",
@@ -162,6 +159,7 @@ MOBILE_SEC_INTL_KEYS = [
     "backlinks.anchor_distribution",
     "backlinks.referring_ips",
     "backlinks.lost_new_backlinks",
+
     "rendering.js_rendering_issues",
     "rendering.css_blocking",
     "crawl.crawl_budget_waste",
@@ -189,7 +187,6 @@ MOBILE_SEC_INTL_KEYS = [
     "stability.overall_index",
 ]
 
-# G. Competitor Analysis (151–167)
 COMPETITOR_KEYS = [
     "competitor.health_score",
     "competitor.performance_comparison",
@@ -210,7 +207,6 @@ COMPETITOR_KEYS = [
     "competitor.overall_rank",
 ]
 
-# H. Broken Links Intelligence (168–180)
 BROKEN_LINKS_KEYS = [
     "broken.total",
     "broken.internal",
@@ -227,7 +223,6 @@ BROKEN_LINKS_KEYS = [
     "broken.risk_severity_index",
 ]
 
-# I. Opportunities, Growth & ROI (181–200)
 OPPORTUNITY_KEYS = [
     "opportunity.high_impact",
     "opportunity.quick_wins_score",
@@ -264,16 +259,31 @@ ALL_KEYS: List[str] = (
 )
 
 # ---------------------------
-# Base checks (regex) — FIXED: use real < and >
+# Base regex (fixed: use < > not &lt; &gt;)
 # ---------------------------
 META_DESC_RE = re.compile(
-    r"<meta\b[^>]*\bname\s*=\s*['\"]description['\"][^>]*\bcontent\s*=\s*'\"['\"]",
-    re.I,
+    r"<meta\b[^>]*\bname\s*=\s*['\"]description['\"][^>]*\bcontent\s*=\s*['\"](?P<content>[^
 )
-TITLE_RE = re.compile(r"<title\b[^>]*>(?P<title>.*?)</title>", re.I | re.S)
+TITLE_RE     = re.compile(r"<title\b[^>]*>(?P<title>.*?)</title>", re.I | re.S)
+H1_RE        = re.compile(r"<h1\b[^>]*>(?P<h1>.*?)</h1>", re.I | re.S)
+VIEWPORT_RE  = re.compile(r"<meta\b[^>]*\bname\s*=\s*['\"]viewport['\"][^>]*>", re.I)
+CANONICAL_RE = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]canonical['\"][^>]*\bhref\s*=\s*['\"][^'\"]+['\"]", re.I)
+ROBOTS_NOIDX_RE = re.compile(r"<meta\b[^>]*\bname\s*=\s*['\"]robots['\"][^>]*\bcontent\s*=\s*['\"][^'\"]*noindex[^'\"]*['\"]", re.I)
+OG_TAG_RE    = re.compile(r"<meta\b[^>]*\bproperty\s*=\s*['\"]og:[^'\"]+['\"][^>]*>", re.I)
+LDJSON_RE    = re.compile(r"<script\b[^>]*\btype\s*=\s*['\"]application/ld\+json['\"][^>]*>", re.I)
+IMG_TAG_RE   = re.compile(r"<img\b[^>]*>", re.I)
+IMG_ALT_RE   = re.compile(r"<img\b[^>]*\balt\s*=\s*['\"][^'\"]*['\"][^>]*>", re.I)
+A_TAG_RE     = re.compile(r"<a\b[^>]*\bhref\s*=\s*['\"][^'\"]+['\"][^>]*>", re.I)
+ABS_LINK_RE  = re.compile(r"<a\b[^>]*\bhref\s*=\s*['\"]https?://[^'\"]+['\"][^>]*>", re.I)
+MIXED_HTTP_RE = re.compile(r"""(?:src|href)\s*=\s*['\"]http://[^'\"]+['\"]""", re.I)
+
+SCRIPT_TAG_RE = re.compile(r"<script\b[^>]*>", re.I)
+CSS_LINK_RE   = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]stylesheet['\"][^>]*>", re.I)
+
+HREFLANG_RE   = re.compile(r"<link\b[^>]*\brel\s*=\s*['\"]alternate['\"][^>]*\bhreflang\s*=\s*['\"][^'\"]+['\"][^>]*>", re.I)
 
 # ---------------------------
-# Scoring helpers
+# Helpers
 # ---------------------------
 def clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, float(x)))
@@ -282,11 +292,7 @@ def to_pct(flag: bool) -> float:
     return 100.0 if flag else 0.0
 
 def page_size_score(page_bytes: int) -> float:
-    """
-    Score 100 for small pages, linearly penalize large ones.
-    - ≤ 700 KB => 100
-    - ≥ 3 MB   => 0
-    """
+    """Score 100 for ≤700KB; linearly drop to 0 at ≥3MB."""
     low = 700 * 1024
     high = 3 * 1024 * 1024
     if page_bytes <= low:
@@ -295,6 +301,18 @@ def page_size_score(page_bytes: int) -> float:
         return 0.0
     drop = (page_bytes - low) * 100.0 / (high - low)
     return clamp(100.0 - drop)
+
+def inverse_count_score(count: int, max_good: int, max_bad: int) -> float:
+    """
+    Maps a count to 0–100, where <=max_good => ~100, >=max_bad => ~0.
+    """
+    if count <= max_good:
+        return 100.0
+    if count >= max_bad:
+        return 0.0
+    # linear between max_good and max_bad
+    frac = (count - max_good) / (max_bad - max_good)
+    return clamp(100.0 * (1.0 - frac))
 
 def weighted_average(parts: dict[str, float], weights: dict[str, float]) -> float:
     total_w = sum(weights.values())
@@ -317,10 +335,9 @@ def grade_from_score(score: float) -> str:
     return "F"
 
 class AuditEngine:
-    """Flexible, API-driven engine. Frontend-agnostic."""
+    """Flexible, API-driven engine. Single-page analysis (no crawler)."""
 
     def _fetch(self, url: str, timeout_s: float = 15.0) -> tuple[int, str]:
-        """Return (status_code, html). Uses httpx if available."""
         if httpx is None:
             return 0, ""
         with httpx.Client(timeout=timeout_s, follow_redirects=True, headers={"User-Agent": "FFTechAudit/1.0"}) as client:
@@ -329,66 +346,111 @@ class AuditEngine:
             return r.status_code, r.text or ""
 
     def run(self, url: str) -> Dict[str, Any]:
-        """Run audit and return metrics dict with 'rows' for UI and scoring."""
         status, html = self._fetch(url) if url else (0, "")
         page_bytes = len(html.encode("utf-8")) if html else 0
 
-        has_desc = bool(META_DESC_RE.search(html))
-        has_title = bool(TITLE_RE.search(html))
-        is_https = url.lower().startswith("https://") if url else False
+        # Signals
+        title_present     = bool(TITLE_RE.search(html))
+        meta_desc_present = bool(META_DESC_RE.search(html))
+        h1_present        = bool(H1_RE.search(html))
+        viewport_present  = bool(VIEWPORT_RE.search(html))
+        canonical_present = bool(CANONICAL_RE.search(html))
+        robots_noindex    = bool(ROBOTS_NOIDX_RE.search(html))
+        og_count          = len(OG_TAG_RE.findall(html))
+        ldjson_present    = bool(LDJSON_RE.search(html))
+        img_count         = len(IMG_TAG_RE.findall(html))
+        img_alt_count     = len(IMG_ALT_RE.findall(html))
+        alt_ratio         = (img_alt_count / img_count * 100.0) if img_count else 0.0
+        link_count        = len(A_TAG_RE.findall(html))
+        abs_link_count    = len(ABS_LINK_RE.findall(html))
+        script_count      = len(SCRIPT_TAG_RE.findall(html))
+        css_count         = len(CSS_LINK_RE.findall(html))
+        hreflang_count    = len(HREFLANG_RE.findall(html))
 
-        # Category scores (0–100) — interim logic
-        onpage_score = (to_pct(has_title) + to_pct(has_desc)) / 2.0
-        security_score = to_pct(is_https)
-        size_score = page_size_score(page_bytes)
+        is_https          = url.lower().startswith("https://") if url else False
+        mixed_content     = bool(MIXED_HTTP_RE.search(html)) if (is_https and html) else False
 
-        # Neutral placeholders until full crawl/perf implemented
-        crawl_score = 50.0
-        perf_score = 50.0
+        # Category scores (0–100) — all variable (no fixed 50)
+        onpage_score = weighted_average({
+            "Title":             to_pct(title_present),
+            "Meta Description":  to_pct(meta_desc_present),
+            "H1":                to_pct(h1_present),
+            "Structured Data":   to_pct(ldjson_present),
+            "Open Graph":        clamp(og_count * 20.0, 0, 100),   # 0..5+ tags → up to 100
+            "Image Alt Ratio":   clamp(alt_ratio),                 # % of images with alt
+            "Canonical":         to_pct(canonical_present),
+        }, {
+            "Title": 0.18, "Meta Description": 0.18, "H1": 0.12,
+            "Structured Data": 0.12, "Open Graph": 0.10,
+            "Image Alt Ratio": 0.20, "Canonical": 0.10
+        })
+
+        security_score = weighted_average({
+            "HTTPS":          to_pct(is_https),
+            "Mixed Content":  100.0 - to_pct(mixed_content),  # penalize if mixed
+        }, {"HTTPS": 0.6, "Mixed Content": 0.4})
+
+        mobile_score = weighted_average({
+            "Viewport": to_pct(viewport_present),
+        }, {"Viewport": 1.0})
+
+        perf_score = weighted_average({
+            "Page Size":             page_size_score(page_bytes),
+            "Ext Scripts (inverse)": inverse_count_score(script_count, max_good=3, max_bad=20),
+            "CSS Sheets (inverse)":  inverse_count_score(css_count,    max_good=2, max_bad=15),
+        }, {"Page Size": 0.6, "Ext Scripts (inverse)": 0.2, "CSS Sheets (inverse)": 0.2})
+
+        crawl_score = weighted_average({
+            "Canonical":  to_pct(canonical_present),
+            "Noindex":    100.0 - to_pct(robots_noindex),  # penalize if noindex
+            "Hreflang":   clamp(hreflang_count * 20.0, 0, 100),  # presence/variety
+            "Links":      clamp(link_count and min(link_count, 80) / 80 * 100.0 or 0.0),
+        }, {"Canonical": 0.35, "Noindex": 0.35, "Hreflang": 0.15, "Links": 0.15})
 
         category_scores = {
             "On-Page SEO": round(onpage_score, 1),
             "Security": round(security_score, 1),
-            "Page Size": round(size_score, 1),
-            "Crawlability": round(crawl_score, 1),
+            "Mobile": round(mobile_score, 1),
             "Performance": round(perf_score, 1),
-        }
-        weights = {
-            "On-Page SEO": 0.35,
-            "Security": 0.25,
-            "Page Size": 0.20,
-            "Crawlability": 0.10,
-            "Performance": 0.10,
+            "Crawlability": round(crawl_score, 1),
         }
 
-        overall = round(weighted_average(category_scores, weights), 1)
+        overall = round(weighted_average(category_scores, {
+            "On-Page SEO": 0.35,
+            "Security":    0.20,
+            "Mobile":      0.10,
+            "Performance": 0.20,
+            "Crawlability":0.15,
+        }), 1)
         grade = grade_from_score(overall)
 
-        # Executive summary (simple template; can be replaced by GPT later)
-        strengths = []
-        weaknesses = []
-        priority_fixes = []
-
+        # Executive panels (basic rules-based text)
+        strengths, weaknesses, priority_fixes = [], [], []
         if is_https: strengths.append("HTTPS implemented")
         else:
             weaknesses.append("HTTPS missing")
             priority_fixes.append("Implement/renew SSL (HTTPS) across all pages.")
-
-        if has_title: strengths.append("Title tag present")
+        if title_present: strengths.append("Title tag present")
         else:
             weaknesses.append("Missing title tag")
             priority_fixes.append("Add and optimize unique Title tags.")
-
-        if has_desc: strengths.append("Meta description present")
+        if meta_desc_present: strengths.append("Meta description present")
         else:
             weaknesses.append("Missing meta description")
             priority_fixes.append("Add compelling Meta descriptions (≤ 160 chars).")
+        if canonical_present: strengths.append("Canonical tag present")
+        else:
+            weaknesses.append("Canonical tag missing")
+            priority_fixes.append("Add canonical tags to prevent duplication.")
+        if ldjson_present: strengths.append("Structured data detected")
+        if viewport_present: strengths.append("Viewport meta for mobile detected")
+        if mixed_content: weaknesses.append("Mixed content (HTTP resources on HTTPS)")
 
         executive_text = (
-            "This preliminary audit summarizes foundational signals. To fully comply with the "
-            "200-metric framework, enable the crawler and performance modules. Immediate priorities "
-            "include HTTPS (if missing) and complete on-page basics (Title and Meta Description). "
-            "Subsequent phases should address performance, crawl hygiene, and structured data."
+            "This audit summarizes foundational signals from the page HTML. Scores vary by Title/Meta/H1, "
+            "structured data, mobile viewport, canonicalization, link/mixed-content hygiene, and page weight. "
+            "For full 200-metric coverage (crawlability across the whole site, Core Web Vitals, backlinks, "
+            "competitor analysis), enable crawler and performance modules."
         )
 
         metrics: Dict[str, Any] = {
@@ -399,37 +461,68 @@ class AuditEngine:
             "summary.strengths": strengths,
             "summary.weaknesses": weaknesses,
             "summary.priority_fixes": priority_fixes,
-            "summary.severity_indicators": None,  # to be computed from category deltas/severities
+            "summary.severity_indicators": {
+                "MixedContent": mixed_content,
+                "RobotsNoindex": robots_noindex,
+            },
             "summary.category_breakdown": category_scores,
             "summary.presentation_standard": "Industry standard layout",
             "summary.print_ready": True,
 
-            # B. Overall site health
+            # B. Site health (single-page proxy)
             "health.score": overall,
-            "health.errors_total": None,
-            "health.warnings_total": None,
-            "health.notices_total": None,
-            "health.crawled_pages": None,
-            "health.indexed_pages": None,
-            "health.issues_trend": None,
-            "health.crawl_budget_efficiency": None,
-            "health.orphan_pages_pct": None,
             "health.audit_completion_status": "partial",
 
-            # C. Crawlability placeholders
-            **{key: None for key in CRAWL_KEYS},
+            # C. Crawlability (single-page proxies + placeholders)
+            "crawl.missing_canonical_tags": 0 if canonical_present else 1,
+            "crawl.hreflang_errors": 0 if hreflang_count >= 1 else 1,
+            "crawl.hreflang_conflicts": None,
+            "crawl.robots_blocked_urls": None,
 
-            # D. On-page signals we can compute now
-            "onpage.missing_title_tags": 0 if has_title else 1,
-            "onpage.missing_meta_descriptions": 0 if has_desc else 1,
-            **{key: None for key in ONPAGE_KEYS if key not in {"onpage.missing_title_tags", "onpage.missing_meta_descriptions"}},
+            # D. On-page
+            "onpage.missing_title_tags": 0 if title_present else 1,
+            "onpage.missing_meta_descriptions": 0 if meta_desc_present else 1,
+            "onpage.missing_h1": 0 if h1_present else 1,
+            "onpage.missing_structured_data": 0 if ldjson_present else 1,
+            "onpage.missing_open_graph_tags": 0 if og_count > 0 else 1,
+            "onpage.external_links_count": abs_link_count,
+            "onpage.missing_image_alt_tags": 0 if alt_ratio >= 60.0 else 1,  # threshold 60%
+            # Placeholders for deeper checks
+            **{key: None for key in ONPAGE_KEYS if key not in {
+                "onpage.missing_title_tags",
+                "onpage.missing_meta_descriptions",
+                "onpage.missing_h1",
+                "onpage.missing_structured_data",
+                "onpage.missing_open_graph_tags",
+                "onpage.external_links_count",
+                "onpage.missing_image_alt_tags",
+            }},
 
-            # E. Performance placeholders
-            **{key: None for key in PERF_KEYS},
+            # E. Performance (proxies + placeholders)
+            "perf.total_page_size": page_bytes,
+            "perf.requests_per_page": script_count + css_count,  # crude proxy
+            "perf.render_blocking_resources": css_count,          # crude proxy
+            **{key: None for key in PERF_KEYS if key not in {
+                "perf.total_page_size",
+                "perf.requests_per_page",
+                "perf.render_blocking_resources",
+            }},
 
-            # F. Mobile/Security/Intl — a few basic signals
+            # F. Mobile/Security/Intl
+            "mobile.viewport_meta_tag": viewport_present,
+            "mobile.mobile_friendly": viewport_present,  # proxy
             "security.https_implementation": is_https,
-            **{key: None for key in MOBILE_SEC_INTL_KEYS if key != "security.https_implementation"},
+            "security.mixed_content": mixed_content,
+            "index.noindex_issues": robots_noindex,
+            "social.metadata_presence": og_count > 0,
+            **{key: None for key in MOBILE_SEC_INTL_KEYS if key not in {
+                "mobile.viewport_meta_tag",
+                "mobile.mobile_friendly",
+                "security.https_implementation",
+                "security.mixed_content",
+                "index.noindex_issues",
+                "social.metadata_presence",
+            }},
 
             # G/H/I placeholders
             **{key: None for key in COMPETITOR_KEYS},
@@ -442,18 +535,26 @@ class AuditEngine:
             "generated_at": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
 
-        # Rows for UI (0–100)
+        # Rows for UI (category bars + direct signals)
         rows: List[Dict[str, Any]] = [
-            {"label": "Overall Score", "value": overall},
-            {"label": "On-Page SEO", "value": onpage_score},
-            {"label": "Security (HTTPS)", "value": security_score},
-            {"label": "Page Size", "value": size_score},
-            {"label": "Crawlability (baseline)", "value": crawl_score},
-            {"label": "Performance (baseline)", "value": perf_score},
-            # Direct signals
-            {"label": "Title Tag Present", "value": to_pct(has_title)},
-            {"label": "Meta Description Present", "value": to_pct(has_desc)},
+            {"label": "Overall Score",         "value": overall},
+            {"label": "On-Page SEO",           "value": onpage_score},
+            {"label": "Security (HTTPS/Mixed)","value": security_score},
+            {"label": "Mobile (Viewport)",     "value": mobile_score},
+            {"label": "Performance (Weight/Req)","value": perf_score},
+            {"label": "Crawlability (Canon/Noindex/Hreflang/Links)","value": crawl_score},
+
+            {"label": "Title Tag Present",            "value": to_pct(title_present)},
+            {"label": "Meta Description Present",     "value": to_pct(meta_desc_present)},
+            {"label": "H1 Present",                   "value": to_pct(h1_present)},
+            {"label": "Structured Data Present",      "value": to_pct(ldjson_present)},
+            {"label": "Open Graph Tags Present",      "value": to_pct(og_count > 0)},
+            {"label": "Viewport Meta Present",        "value": to_pct(viewport_present)},
+            {"label": "Canonical Present",            "value": to_pct(canonical_present)},
+            {"label": "Mixed Content Detected (bad)", "value": 100.0 if mixed_content else 0.0},
+            {"label": "Image Alt Coverage (%)",       "value": clamp(alt_ratio)},
         ]
+
         metrics["rows"] = rows
         return metrics
 
@@ -497,13 +598,13 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.drawString(2 * cm, 23 * cm, f"Grade: {grade}")
     c.setFont("Helvetica", 14)
     c.setFillColor(colors.black)
-    c.drawString(2 * cm, 21.5 * cm, f"Overall Site Health Score: {score:.2f}%")
+    c.drawString(2 * cm, 21.5 * cm, f"Overall Site Health Score: {score:.1f}%")
     y = 19.5 * cm
     for row in rows[:4]:
         _bar(c, 2 * cm, y, 16 * cm, 0.6 * cm, float(row.get("value", 0.0)), str(row.get("label", "Metric")))
         y -= 1.2 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Foundational signals summarized. See next pages for categories and actions.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Foundational signals summarized. Enable crawler/perf modules for full coverage.")
     c.showPage()
 
     # Page 2 – Category Breakdown
@@ -512,15 +613,15 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     y = 24 * cm
     for label, pct in [
         ("On-Page SEO", cat.get("On-Page SEO", 0)),
-        ("Security", cat.get("Security", 0)),
-        ("Page Size", cat.get("Page Size", 0)),
-        ("Crawlability", cat.get("Crawlability", 0)),
+        ("Security",    cat.get("Security", 0)),
+        ("Mobile",      cat.get("Mobile", 0)),
         ("Performance", cat.get("Performance", 0)),
+        ("Crawlability",cat.get("Crawlability", 0)),
     ]:
         _bar(c, 2 * cm, y, 16 * cm, 0.6 * cm, float(pct or 0), label)
         y -= 1.2 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Prioritize HTTPS and on‑page basics, then crawl/performance modules.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Prioritize HTTPS, meta basics, canonicalization, and page weight.")
     c.showPage()
 
     # Page 3 – Strengths & Weaknesses
@@ -548,7 +649,7 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     else:
         c.drawString(2 * cm, y, "• No immediate weaknesses detected in base checks.")
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Address missing HTTPS and meta elements first; then full crawl & performance.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Address HTTPS/meta/canonical first; then crawler & performance.")
     c.showPage()
 
     # Page 4 – Priority Fixes
@@ -557,15 +658,15 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     fixes = metrics.get("summary.priority_fixes") or [
         "Implement/renew SSL (HTTPS) across all pages.",
         "Ensure unique Title and Meta Description for every page.",
-        "Run a full crawl to identify broken links, redirects, and canonical issues.",
-        "Measure Core Web Vitals (lab + field) and optimize blocking resources.",
-        "Optimize images and enable compression/caching.",
+        "Add canonical tags to prevent duplication.",
+        "Optimize page weight; reduce blocking CSS/JS.",
+        "Add structured data; validate with Rich Results Test.",
     ]
     y = 25 * cm
     for f in fixes:
         c.drawString(2 * cm, y, f"• {f}")
         y -= 0.8 * cm
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Start with foundational SEO signals, then performance and crawl hygiene.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Stabilize foundation, then deeper crawl/perf analysis.")
     c.showPage()
 
     # Page 5 – Certified Export
@@ -574,7 +675,7 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.drawString(2 * cm, 25.5 * cm, "Certification")
     c.setFont("Helvetica", 10)
     c.drawString(2 * cm, 24.7 * cm, "This report is generated by FF Tech AI Website Audit SaaS.")
-    c.drawString(2 * cm, 24.0 * cm, "It summarizes base signals and recommends a full audit for comprehensive insights.")
+    c.drawString(2 * cm, 24.0 * cm, "It summarizes base signals and recommends enabling full modules for comprehensive insights.")
     c.setFont("Helvetica-Bold", 10)
     c.drawString(2 * cm, 22.5 * cm, f"Overall Grade: {metrics.get('overall.grade', '-')}")
     c.drawString(2 * cm, 21.8 * cm, f"Overall Score: {metrics.get('overall.health_score', 0):.1f}%")
@@ -585,3 +686,4 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.save()
     buf.seek(0)
     return buf.read()
+``
