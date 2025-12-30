@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import StreamingResponse
@@ -18,22 +18,35 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message
 app = FastAPI(title="FFTech AI Website Audit SaaS")
 
 templates = Jinja2Templates(directory="fftech_audit/templates")
-templates.env.globals["len"] = len  # optional
+# optional convenience — your templates already use |length, so this is not required
+templates.env.globals["len"] = len
 
 engine = AuditEngine()
 
 @app.get("/", include_in_schema=False)
 async def index() -> RedirectResponse:
-    # Redirect to /audit/open
+    # Redirect to a GET-capable route so browsers don't hit a POST-only endpoint
     return RedirectResponse(url="/audit/open")
 
-# ✅ Added GET handler to fix 405 error
+# ✅ GET handler to prevent 405 when redirected from "/"
 @app.get("/audit/open")
-async def audit_open_get(request: Request):
+async def audit_open_get(request: Request, url: Optional[str] = None) -> Any:
     """
-    GET handler for /audit/open to display the audit form.
-    This prevents 405 errors when redirected from '/'.
+    GET: Show the audit form. If a query param ?url=... is provided,
+    it will run the audit and render results.
     """
+    if url:
+        logger.info("[GET /audit/open] Running audit for %s", url)
+        metrics: Dict[str, Any] = engine.run(url)
+        rows = metrics.get("rows", [])
+        return templates.TemplateResponse("results.html", {
+            "request": request,
+            "url": url,
+            "metrics": metrics,
+            "rows": rows,
+        })
+
+    # No URL provided -> render form-only page
     return templates.TemplateResponse("results.html", {
         "request": request,
         "url": None,
@@ -44,7 +57,7 @@ async def audit_open_get(request: Request):
 @app.post("/audit/open")
 async def audit_open_post(request: Request, url: str = Form(...)) -> Any:
     """
-    POST handler: executes the audit for the submitted URL and renders results.
+    POST: Executes the audit for the submitted URL and renders results.
     """
     logger.info("[POST /audit/open] Starting audit for %s", url)
     metrics: Dict[str, Any] = engine.run(url)
@@ -75,4 +88,3 @@ async def audit_pdf(url: str = Form(...)) -> StreamingResponse:
 @app.get("/health", include_in_schema=False)
 async def health() -> Dict[str, str]:
     return {"status": "ok"}
-``
