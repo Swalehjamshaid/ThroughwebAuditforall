@@ -1,66 +1,51 @@
 
 {% extends "base.html" %}
-
 {% block title %}Audit Results{% endblock %}
-
 {% block content %}
 <style>
-  /* Extra polish if base.html doesn’t provide it */
-  .page-header {
-    margin-bottom: 1.5rem;
-  }
-  .metric-badge {
-    font-size: 0.85rem;
-  }
-  .progress {
-    height: 10px;
-    background-color: #e9ecef;
-  }
-  .progress-bar {
-    background: linear-gradient(90deg, #0d6efd, #6f42c1);
-  }
-  .card-title {
-    font-weight: 600;
-  }
-  .table thead th {
-    white-space: nowrap;
-  }
-  .text-muted-sm {
-    font-size: 0.9rem;
-    color: #6c757d;
-  }
+  .page-header { margin-bottom: 1.5rem; }
+  .metric-badge { font-size: 0.85rem; }
+  .progress { height: 10px; background-color: #e9ecef; }
+  .progress-bar { background: linear-gradient(90deg, #0d6efd, #6f42c1); }
+  .card-title { font-weight: 600; }
+  .table thead th { white-space: nowrap; }
+  .text-muted-sm { font-size: 0.9rem; color: #6c757d; }
 </style>
-
 <div class="container py-3">
-
-  <!-- Header -->
   <div class="page-header d-flex justify-content-between align-items-center">
     <div>
       <h2 class="mb-1">Audit Results</h2>
       {% if url %}
-      <div class="text-muted-sm">
-        Target: <code>{{ url }}</code>
-      </div>
+      <div class="text-muted-sm">Target: <code>{{ url }}</code></div>
       {% endif %}
     </div>
     <div>
-      <span class="badge bg-primary metric-badge">
-        Metrics: {{ metrics|length if metrics is defined else 0 }}
-      </span>
-      <span class="badge bg-secondary metric-badge">
-        Rows: {{ rows|length if rows is defined else 0 }}
-      </span>
+      <span class="badge bg-primary metric-badge">Metrics: {{ metrics|length if metrics is defined else 0 }}</span>
+      <span class="badge bg-secondary metric-badge">Rows: {{ rows|length if rows is defined else 0 }}</span>
     </div>
   </div>
 
-  <!-- Summary Cards -->
+  /audit/open
+    <div class="col-md-8">
+      <input type="url" name="url" class="form-control" placeholder="https://example.com" required>
+    </div>
+    <div class="col-md-4 d-grid">
+      <button class="btn btn-primary" type="submit">Run Audit</button>
+    </div>
+  </form>
+  {% if url %}
+  /audit/pdf
+    <input type="hidden" name="url" value="{{ url }}" />
+    <button class="btn btn-outline-secondary" type="submit">Download PDF Report</button>
+  </form>
+  {% endif %}
+
   <div class="row g-3">
     <div class="col-12 col-md-6">
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="card-title mb-3">Overall Summary</h5>
           <div class="d-flex flex-wrap gap-2">
-            <span class="badge bg-success">OK</span>
             <span class="badge bg-info">Generated: {{ (metrics.generated_at if metrics.generated_at is defined) or "—" }}</span>
             <span class="badge bg-dark">Items: {{ metrics|length if metrics is defined else 0 }}</span>
           </div>
@@ -70,8 +55,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Optional Key Stats (edit keys as you like) -->
     <div class="col-12 col-md-6">
       <div class="card shadow-sm">
         <div class="card-body">
@@ -85,8 +68,8 @@
             </div>
             <div class="col-6">
               <div class="border rounded p-3 h-100">
-                <div class="text-muted-sm">Metrics Count</div>
-                <div class="fs-4 fw-semibold">{{ metrics|length if metrics is defined else 0 }}</div>
+                <div class="text-muted-sm">Overall Score</div>
+                <div class="fs-4 fw-semibold">{{ metrics.get('overall.health_score', 0) }}</div>
               </div>
             </div>
           </div>
@@ -95,7 +78,6 @@
     </div>
   </div>
 
-  <!-- Rows (Progress Cards) -->
   <div class="mt-4">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="mb-0">Rows Overview</h5>
@@ -108,7 +90,6 @@
     {% else %}
       <div class="row g-3">
         {% for row in rows %}
-          {# Safeguards: label and value fallbacks #}
           {% set label = row.label if row.label is defined else row.get('label', 'Item ' ~ loop.index) %}
           {% set value = row.value if row.value is defined else row.get('value', 0) %}
           {% set safe_value = (0 if value is none else value)|float %}
@@ -122,14 +103,8 @@
                   <div class="text-muted-sm">{{ clamped|round(1) }}%</div>
                 </div>
                 <div class="progress">
-                  <div class="progress-bar" role="progressbar"
-                       style="width: {{ clamped }}%;"
-                       aria-valuenow="{{ clamped }}"
-                       aria-valuemin="0" aria-valuemax="100">
-                  </div>
+                  <div class="progress-bar" role="progressbar" style="width: {{ clamped }}%;" aria-valuenow="{{ clamped }}" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
-
-                {# Optional: show raw JSON for the row below #}
                 {% if row|length > 1 %}
                 <details class="mt-2">
                   <summary class="text-muted-sm">Details</summary>
@@ -144,7 +119,6 @@
     {% endif %}
   </div>
 
-  <!-- Metrics Table -->
   <div class="mt-5">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <h5 class="mb-0">All Metrics</h5>
@@ -164,6 +138,7 @@
           </thead>
           <tbody>
             {% for key, val in metrics.items() | sort %}
+              {% if key != 'rows' %}
               <tr>
                 <td><code>{{ key }}</code></td>
                 <td>
@@ -174,6 +149,7 @@
                   {% endif %}
                 </td>
               </tr>
+              {% endif %}
             {% endfor %}
           </tbody>
         </table>
@@ -181,10 +157,8 @@
     {% endif %}
   </div>
 
-  <!-- Footer -->
   <div class="mt-4 text-muted-sm">
     <small>Rendered at: {{ (metrics.generated_at if metrics.generated_at is defined) or (now if now is defined) or "—" }}</small>
   </div>
-
 </div>
 {% endblock %}
