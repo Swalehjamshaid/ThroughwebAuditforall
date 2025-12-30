@@ -10,35 +10,34 @@ from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "audit.sqlite3")
 
-# Read DATABASE_URL from env
-raw_url = os.getenv("DATABASE_URL")  # Railway provides Postgres URL
+# Read DATABASE_URL from env (Railway provides)
+raw_url = os.getenv("DATABASE_URL")  # e.g., postgres://user:pass@host:port/db OR postgresql://user:pass@host:port/db
 engine = None
 
 def _force_pg8000(url: str) -> str:
     """
     Normalize Railway URL and force pg8000 driver for Python 3.13 compatibility.
-    - Converts postgres:// -> postgresql+pg8000://
-    - Converts postgresql:// -> postgresql+pg8000://
-    - Leaves driver if already specified
+    Converts:
+    - postgres://...          -> postgresql+pg8000://...
+    - postgresql://...        -> postgresql+pg8000://...
+    Leaves alone if already: postgresql+pg8000://...
     """
     if not url:
         return url
     url = url.strip()
     if url.startswith("postgres://"):
-        # Railway legacy prefix -> ensure pg8000 driver
         return url.replace("postgres://", "postgresql+pg8000://", 1)
     if url.startswith("postgresql://"):
-        # Default SQLAlchemy dialect -> explicitly set pg8000
         return url.replace("postgresql://", "postgresql+pg8000://", 1)
-    # If the URL already specifies a driver (e.g., postgresql+pg8000://), leave it
+    # Already has a driver (e.g., postgresql+pg8000://) – keep it
     return url
 
 if raw_url:
     DATABASE_URL = _force_pg8000(raw_url)
-    engine = create_engine(DATABASE_URL)
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 else:
-    # Local SQLite fallback
-    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+    # Local SQLite fallback if no DATABASE_URL
+    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False}, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
