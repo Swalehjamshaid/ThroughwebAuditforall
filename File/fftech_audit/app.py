@@ -140,10 +140,57 @@ async def register_post(request: Request, background_tasks: BackgroundTasks, ema
 
     return templates.TemplateResponse("register_done.html", base_ctx(request, {"email": email}))
 
+# ✅ ALIASES so /auth/register links also work (GET/POST)
+@app.get("/auth/register")
+async def auth_register_get(request: Request):
+    """
+    Alias of /register (GET).
+    """
+    return templates.TemplateResponse("register.html", base_ctx(request))
+
+@app.post("/auth/register")
+async def auth_register_post(request: Request, background_tasks: BackgroundTasks, email: str = Form(...)):
+    """
+    Alias of /register (POST).
+    """
+    email = (email or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    if db_get_user_by_email and db_create_user:
+        try:
+            user = db_get_user_by_email(email)
+            if not user:
+                db_create_user(email=email)
+        except Exception as e:
+            logger.warning(f"DB user create/get failed: {e}")
+
+    if send_verification_email:
+        try:
+            background_tasks.add_task(send_verification_email, email)
+        except Exception as e:
+            logger.warning(f"Email send failed: {e}")
+
+    return templates.TemplateResponse("register_done.html", base_ctx(request, {"email": email}))
+
 @app.get("/verify-success")
 async def verify_success(request: Request, token: Optional[str] = Query(None), email: Optional[str] = Query(None)):
     """
     Email verification success page.
+    """
+    verified = False
+    if verify_token and token and email:
+        try:
+            verified = bool(verify_token(email=email, token=token))
+        except Exception as e:
+            logger.warning(f"Token verification failed: {e}")
+    return templates.TemplateResponse("verify_success.html", base_ctx(request, {"verified": verified, "email": email}))
+
+# ✅ Optional alias for /auth/verify-success
+@app.get("/auth/verify-success")
+async def auth_verify_success(request: Request, token: Optional[str] = Query(None), email: Optional[str] = Query(None)):
+    """
+    Alias of /verify-success (GET).
     """
     verified = False
     if verify_token and token and email:
