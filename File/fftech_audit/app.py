@@ -1,36 +1,18 @@
-
 # fftech_audit/app.py
 from __future__ import annotations
-
 import logging
 from typing import Any, Dict, Optional
 from datetime import datetime
-
 from fastapi import FastAPI, Request, Form, BackgroundTasks, HTTPException, Query
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
 
-# ---- External modules (with safe fallbacks) -------------------------------
-try:
-    from .audit_engine import AuditEngine
-except Exception as e:
-    raise RuntimeError(f"Failed to import AuditEngine: {e}")
+# ---- Import AuditEngine and PDF generator from audit_engine.py ----
+from .audit_engine import AuditEngine, generate_pdf_report
 
-# PDF generator can exist either in audit_engine or a dedicated ui_and_pdf module.
-generate_pdf_report = None
-try:
-    from .ui_and_pdf import generate_pdf_report as _pdf_gen
-    generate_pdf_report = _pdf_gen
-except Exception:
-    try:
-        # Fallback to the one in audit_engine if available
-        from .audit_engine import generate_pdf_report as _pdf_gen2
-        generate_pdf_report = _pdf_gen2
-    except Exception:
-        generate_pdf_report = None  # we will guard when using it
-
+# ---- Optional external modules (safe fallbacks) --------------------
 # Email (passwordless) helpers
 send_verification_email = None
 verify_token = None
@@ -39,8 +21,7 @@ try:
     send_verification_email = _send_verif
     verify_token = _verify_tok
 except Exception:
-    # Keep None; routes will no-op or explain feature not configured.
-    pass
+    pass  # Feature disabled if not configured
 
 # DB helpers
 db_create_user = None
@@ -59,38 +40,35 @@ try:
     db_save_audit = _save_audit
     db_list_audits = _list_audits
 except Exception:
-    # Optional; feature will still work without persistence.
-    pass
+    pass  # Persistence optional
 
-# ---- Logging --------------------------------------------------------------
+# ---- Logging -------------------------------------------------------
 logger = logging.getLogger("fftech")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s")
 
-# ---- FastAPI app ----------------------------------------------------------
-app = FastAPI(title="FFTech AI Website Audit SaaS")
+# ---- FastAPI app ---------------------------------------------------
+app = FastAPI(title="FF Tech AI Website Audit SaaS")
 
-# ---- CORS (optional; adjust domains for production) -----------------------
+# ---- CORS ----------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this in production
+    allow_origins=["*"],  # Restrict in production!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---- Static files ---------------------------------------------------------
-# Serve /static from fftech_audit/static (if the folder exists)
+# ---- Static files --------------------------------------------------
 app.mount("/static", StaticFiles(directory="fftech_audit/static"), name="static")
 
-# ---- Jinja templates ------------------------------------------------------
+# ---- Templates -----------------------------------------------------
 templates = Jinja2Templates(directory="fftech_audit/templates")
-# Optional convenience; templates already use Jinja filters like |length
 templates.env.globals["len"] = len
 
-# ---- Engine ---------------------------------------------------------------
+# ---- Audit Engine --------------------------------------------------
 engine = AuditEngine()
 
-# Utility: common context
+# ---- Utility functions ---------------------------------------------
 def base_ctx(request: Request, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     ctx: Dict[str, Any] = {"request": request, "now": datetime.utcnow()}
     if extra:
@@ -98,59 +76,63 @@ def base_ctx(request: Request, extra: Optional[Dict[str, Any]] = None) -> Dict[s
     return ctx
 
 def _normalize_url(raw: str) -> str:
-    """Ensure URL has a scheme and is stripped; default to https if missing."""
+    """Add https:// if missing and strip whitespace."""
     url = (raw or "").strip()
     if not url:
-        return url
-    lower = url.lower()
-    if not lower.startswith("http://") and not lower.startswith("https://"):
+        return ""
+    if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
     return url
 
 def _render_results(request: Request, url: Optional[str]) -> Any:
-    """Run audit and render results.html with proper context."""
-    if not url:
-        # render form-only page
+    """
+    Central function: runs audit and renders results.html.
+    Handles both analyzed and empty (no URL) states gracefully.
+    """
+    norm = _normalize_url(url or "")
+
+    # No URL → beautiful welcome / empty state
+    if not norm:
+        # We still call engine.run("") to get the welcome metrics (with None scores)
+        metrics = engine.run("")
+        rows = metrics.get("rows", [])
         return templates.TemplateResponse(
             "results.html",
-            base_ctx(request, {"url": None, "metrics": {}, "rows": []}),
+            base_ctx(request, {"url": None, "metrics": metrics, "rows": rows}),
         )
 
+    # Real audit
     try:
-        metrics: Dict[str, Any] = engine.run(url)
+        logger.info("Starting audit for %s", norm)
+        metrics = engine.run(norm)
     except Exception as e:
-        logger.exception("Engine run failed for %s: %s", url, e)
-        raise HTTPException(status_code=500, detail="Audit engine error")
+        logger.exception("Audit failed for %s: %s", norm, e)
+        raise HTTPException(status_code=500, detail="Failed to analyze website. Please try again.")
 
     rows = metrics.get("rows", [])
-    # Optional: save audit to DB
+
+    # Optional: save to DB
     if db_save_audit:
         try:
-            db_save_audit(url=url, metrics=metrics)
+            db_save_audit(url=norm, metrics=metrics)
         except Exception as e:
-            logger.warning("Saving audit failed: %s", e)
+            logger.warning("Failed to save audit to DB: %s", e)
 
     return templates.TemplateResponse(
         "results.html",
-        base_ctx(request, {"url": url, "metrics": metrics, "rows": rows}),
+        base_ctx(request, {"url": norm, "metrics": metrics, "rows": rows}),
     )
 
 # ---------------------------
-# ROUTES (HTML pages)
+# ROUTES
 # ---------------------------
 
 @app.get("/", include_in_schema=False)
 async def landing(request: Request):
-    """
-    Landing page (200 OK). Extends base.html via landing.html.
-    """
     return templates.TemplateResponse("landing.html", base_ctx(request))
 
 @app.get("/register")
 async def register_get(request: Request):
-    """
-    Show registration (email) form.
-    """
     return templates.TemplateResponse("register.html", base_ctx(request))
 
 @app.post("/register")
@@ -159,177 +141,114 @@ async def register_post(
     background_tasks: BackgroundTasks,
     email: str = Form(...),
 ):
-    """
-    Handle email-based registration (passwordless).
-    - Optional DB: create user record
-    - Optional Email: send verification/magic link
-    - Render register_done.html
-    """
-    email = (email or "").strip()
+    email = (email or "").strip().lower()
     if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+        raise HTTPException(status_code=400, detail="Valid email required.")
 
-    # Persist user (optional)
-    if db_get_user_by_email and db_create_user:
+    if db_create_user and db_get_user_by_email:
         try:
-            user = db_get_user_by_email(email)
-            if not user:
+            if not db_get_user_by_email(email):
                 db_create_user(email=email)
         except Exception as e:
-            logger.warning(f"DB user create/get failed: {e}")
+            logger.warning("DB user operation failed: %s", e)
 
-    # Send verification email (optional)
     if send_verification_email:
         try:
             background_tasks.add_task(send_verification_email, email)
         except Exception as e:
-            logger.warning(f"Email send failed: {e}")
+            logger.warning("Failed to send verification email: %s", e)
 
     return templates.TemplateResponse("register_done.html", base_ctx(request, {"email": email}))
 
-# ✅ ALIASES so /auth/register links also work (GET/POST)
+# Alias routes
 @app.get("/auth/register")
 async def auth_register_get(request: Request):
-    """Alias of /register (GET)."""
-    return templates.TemplateResponse("register.html", base_ctx(request))
+    return await register_get(request)
 
 @app.post("/auth/register")
-async def auth_register_post(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    email: str = Form(...),
-):
-    """Alias of /register (POST)."""
-    email = (email or "").strip()
-    if not email or "@" not in email:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
-
-    if db_get_user_by_email and db_create_user:
-        try:
-            user = db_get_user_by_email(email)
-            if not user:
-                db_create_user(email=email)
-        except Exception as e:
-            logger.warning(f"DB user create/get failed: {e}")
-
-    if send_verification_email:
-        try:
-            background_tasks.add_task(send_verification_email, email)
-        except Exception as e:
-            logger.warning(f"Email send failed: {e}")
-
-    return templates.TemplateResponse("register_done.html", base_ctx(request, {"email": email}))
+async def auth_register_post(request: Request, background_tasks: BackgroundTasks, email: str = Form(...)):
+    return await register_post(request, background_tasks, email)
 
 @app.get("/verify-success")
+@app.get("/auth/verify-success")
 async def verify_success(
     request: Request,
     token: Optional[str] = Query(None),
     email: Optional[str] = Query(None),
 ):
-    """Email verification success page."""
     verified = False
     if verify_token and token and email:
         try:
             verified = bool(verify_token(email=email, token=token))
         except Exception as e:
-            logger.warning(f"Token verification failed: {e}")
-    return templates.TemplateResponse("verify_success.html", base_ctx(request, {"verified": verified, "email": email}))
-
-# ✅ Optional alias for /auth/verify-success
-@app.get("/auth/verify-success")
-async def auth_verify_success(
-    request: Request,
-    token: Optional[str] = Query(None),
-    email: Optional[str] = Query(None),
-):
-    """Alias of /verify-success (GET)."""
-    verified = False
-    if verify_token and token and email:
-        try:
-            verified = bool(verify_token(email=email, token=token))
-        except Exception as e:
-            logger.warning(f"Token verification failed: {e}")
+            logger.warning("Token verification failed: %s", e)
     return templates.TemplateResponse("verify_success.html", base_ctx(request, {"verified": verified, "email": email}))
 
 @app.get("/schedule")
 async def schedule_get(request: Request):
-    """Scheduling page (for registered users)."""
     return templates.TemplateResponse("schedule.html", base_ctx(request))
 
 # ---------------------------
-# AUDIT: GET (form or run) + POST (run)
+# AUDIT ROUTES
 # ---------------------------
 
 @app.get("/audit/open")
 async def audit_open_get(request: Request, url: Optional[str] = Query(None)):
-    """
-    GET: Show audit form (results.html) or run audit if ?url= provided.
-    """
-    norm = _normalize_url(url or "")
-    if norm:
-        logger.info("[GET /audit/open] Running audit for %s", norm)
-        return _render_results(request, norm)
-    return _render_results(request, None)
+    """Supports direct access with ?url=https://example.com"""
+    return _render_results(request, url)
 
 @app.post("/audit/open")
 async def audit_open_post(request: Request, url: str = Form(...)):
-    """
-    POST: Executes the audit and renders results.
-    """
-    norm = _normalize_url(url)
-    if not norm:
-        raise HTTPException(status_code=400, detail="Please provide a URL to audit.")
-    logger.info("[POST /audit/open] Starting audit for %s", norm)
-
-    return _render_results(request, norm)
+    """Form submission from landing page"""
+    return _render_results(request, url)
 
 # ---------------------------
-# JSON API (optional for debugging/integration)
+# API (JSON)
 # ---------------------------
+
 @app.post("/api/audit")
-async def api_audit(url: str = Form(...)) -> JSONResponse:
-    """
-    Programmatic audit API: returns metrics JSON for the given URL.
-    """
+async def api_audit(url: str = Form(...)):
     norm = _normalize_url(url)
     if not norm:
-        raise HTTPException(status_code=400, detail="URL is required.")
+        raise HTTPException(status_code=400, detail="URL required")
     try:
         metrics = engine.run(norm)
+        return JSONResponse(metrics)
     except Exception as e:
-        logger.exception("Engine run failed for %s: %s", norm, e)
-        raise HTTPException(status_code=500, detail="Audit engine error")
-    return JSONResponse(metrics)
+        logger.exception("API audit failed: %s", e)
+        raise HTTPException(status_code=500, detail="Audit failed")
 
 # ---------------------------
-# PDF
+# PDF EXPORT
 # ---------------------------
+
 @app.post("/audit/pdf")
-async def audit_pdf(url: str = Form(...)) -> StreamingResponse:
-    """
-    Generate a 5-page, client-ready PDF for the given URL and return it.
-    """
+async def audit_pdf(url: str = Form(...)):
     norm = _normalize_url(url)
     if not norm:
-        raise HTTPException(status_code=400, detail="URL is required to generate PDF.")
+        raise HTTPException(status_code=400, detail="URL required for PDF")
+
     metrics = engine.run(norm)
     rows = metrics.get("rows", [])
 
     if not generate_pdf_report:
-        raise HTTPException(status_code=501, detail="PDF generation is not configured.")
+        raise HTTPException(status_code=501, detail="PDF generation not available")
 
-    pdf_bytes = generate_pdf_report(url=norm, metrics=metrics, rows=rows)
-    filename = f"FFTech_Audit_{norm.replace('https://','').replace('http://','').replace('/','_')}.pdf"
+    pdf_bytes = generate_pdf_report(url=norm, metrics=metrics)
+
+    safe_domain = norm.replace("https://", "").replace("http://", "").split("/")[0]
+    filename = f"FFTech_Audit_Report_{safe_domain}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+
     return StreamingResponse(
         iter([pdf_bytes]),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
     )
 
 # ---------------------------
-# HEALTH
+# HEALTH CHECK
 # ---------------------------
-@app.get("/health", include_in_schema=False)
-async def health() -> Dict[str, str]:
-    """Simple health endpoint (200 OK) for platform liveness."""
-    return {"status": "ok"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "timestamp": datetime.utcnow().isoformat() + "Z"}
