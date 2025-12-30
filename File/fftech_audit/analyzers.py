@@ -1,64 +1,17 @@
 
-# fftech_audit/analyzers.py (improved)
-"""
-Builds a comprehensive metrics dictionary from a CrawlResult.
-This version avoids empty values (no None), fills easy-to-compute
-signals, and sets sensible defaults/averages so scores differ across sites.
-
-It does NOT require a headless browser. Core Web Vitals remain 0 unless
-you integrate Lighthouse/Puppeteer separately.
-"""
+# fftech_audit/analyzers.py (v2.0 — solids + no-empty metrics)
 from __future__ import annotations
 import re
 from typing import Dict, Any, List, Tuple
 from collections import Counter
 from statistics import mean
 from urllib.parse import urlparse
+import os
+import json
+import subprocess
 
-# Typing hint for the expected CrawlResult/Page shape.
-# The crawler should populate these attributes; we fall back safely if missing.
-class PageLike:
-    url: str
-    status: int
-    content_len: int
-    response_ms: int
-    headers: Dict[str, str]
-    raw_html: str
-    html_title: str
-    meta_desc: str
-    meta_robots: str
-    canonical: str
-    hreflang: List[Tuple[str, str]]
-    rel_prev: bool
-    rel_next: bool
-    h1_count: int
-    dom_nodes_est: int
-    images_missing_alt: int
-    images: List[Dict]
-    scripts: int
-    stylesheets: int
-    scripts_src: List[str]
-    stylesheets_href: List[str]
-    schema_present: bool
-    og_tags_present: bool
-    mixed_content_http: int
-    links_internal: List[str]
-    external_links: List[str]
-    depth: int
-    viewport_meta: bool
-
-class CrawlResult:
-    start_url: str
-    pages: List[PageLike]
-    status_counts: Dict[int, int]
-    broken_links_internal: List[str]
-    broken_links_external: List[str]
-    external_links: List[str]
-    robots_allowed: bool
-    robots_blocked: List[str]
-    sitemap_urls: List[str]
-    errors: List[str]
-
+class PageLike: ...
+class CrawlResult: ...
 
 def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics: Dict[str, Any] = {}
@@ -67,38 +20,48 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     pages: List[PageLike] = getattr(cr, 'pages', []) or []
     total_pages = len(pages)
 
+    # Normalize to avoid type surprises
+    def _normalize_page(p):
+        imgs = getattr(p, 'images', [])
+        if isinstance(imgs, int):
+            p.images = [{"src": None, "attrs": {}} for _ in range(int(imgs))]
+        elif imgs is None:
+            p.images = []
+        p.images_missing_alt = int(getattr(p, 'images_missing_alt', 0) or 0)
+        p.scripts = int(getattr(p, 'scripts', 0) or 0)
+        p.stylesheets = int(getattr(p, 'stylesheets', 0) or 0)
+        p.dom_nodes_est = int(getattr(p, 'dom_nodes_est', 0) or 0)
+        p.response_ms = int(getattr(p, 'response_ms', 0) or 0)
+
+    for p in pages:
+        _normalize_page(p)
+
     status_bucket = getattr(cr, 'status_counts', {}) or {}
     two_xx = int(status_bucket.get(200, 0))
     three_xx = int(status_bucket.get(300, 0))
     four_xx = int(status_bucket.get(400, 0))
     five_xx = int(status_bucket.get(500, 0))
 
-    # ---- B. Overall Site Health (11–20)
-    metrics["11.Site Health Score"] = 0  # will be overwritten in audit_engine with overall
+    # ---- Overall Site Health (11–20)
+    metrics["11.Site Health Score"] = 0  # overwritten later
     metrics["12.Total Errors"] = four_xx + five_xx
     metrics["13.Total Warnings"] = three_xx
     metrics["14.Total Notices"] = 0
     metrics["15.Total Crawled Pages"] = total_pages
-
-    # Approximate indexed pages: pages not explicitly noindex
     meta_noindex_count = sum(1 for p in pages if getattr(p, 'meta_robots', '') and 'noindex' in p.meta_robots.lower())
     metrics["16.Total Indexed Pages"] = max(total_pages - meta_noindex_count, 0)
-
-    metrics["17.Issues Trend"] = "n/a"  # needs time-series; avoid None
+    metrics["17.Issues Trend"] = "n/a"
     metrics["18.Crawl Budget Efficiency"] = (two_xx / max(total_pages, 1)) if total_pages else 0.0
-    metrics["19.Orphan Pages Percentage"] = 0.0  # requires link graph; keep 0
+    metrics["19.Orphan Pages Percentage"] = 0.0
     metrics["20.Audit Completion Status"] = "complete" if total_pages > 0 and not getattr(cr, 'errors', []) else "partial"
 
-    # ---- C. Crawlability & Indexation (21–40)
+    # ---- Crawlability & Indexation (21–40)
     metrics["21.HTTP 2xx Pages"] = two_xx
     metrics["22.HTTP 3xx Pages"] = three_xx
     metrics["23.HTTP 4xx Pages"] = four_xx
     metrics["24.HTTP 5xx Pages"] = five_xx
-
-    # Redirect chains/loops if provided by crawler
     metrics["25.Redirect Chains"] = len(getattr(cr, 'redirect_chains', []) or [])
     metrics["26.Redirect Loops"] = len(getattr(cr, 'redirect_loops', []) or [])
-
     metrics["27.Broken Internal Links"] = len(getattr(cr, 'broken_links_internal', []) or [])
     metrics["28.Broken External Links"] = len(getattr(cr, 'broken_links_external', []) or [])
 
@@ -111,7 +74,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     dup_param_urls = 0
 
     for p in pages:
-        meta_robots = getattr(p, 'meta_robots', '') or ''
+        meta_robots = (getattr(p, 'meta_robots', '') or '')
         if 'noindex' in meta_robots.lower() or 'nofollow' in meta_robots.lower():
             meta_blocked += 1
 
@@ -126,10 +89,8 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
             missing_canonical += 1
 
         for pair in getattr(p, 'hreflang', []) or []:
-            try:
-                lang, href = pair
-            except Exception:
-                lang, href = None, None
+            try: lang, href = pair
+            except Exception: lang, href = None, None
             if not lang or not href:
                 hreflang_errors += 1
 
@@ -148,22 +109,18 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["32.Missing Canonical Tags"] = missing_canonical
     metrics["33.Incorrect Canonical Tags"] = incorrect_canonical
 
-    # Sitemap comparisons (if crawler fetched sitemap)
     sitemap_urls = set(getattr(cr, 'sitemap_urls', []) or [])
     crawled_urls = set(p.url for p in pages)
     metrics["34.Sitemap Missing Pages"] = len(sitemap_urls - crawled_urls) if sitemap_urls else 0
     metrics["35.Sitemap Not Crawled Pages"] = len(crawled_urls - sitemap_urls) if sitemap_urls else 0
-
     metrics["36.Hreflang Errors"] = hreflang_errors
     metrics["37.Hreflang Conflicts"] = 0
     metrics["38.Pagination Issues"] = pagination_issues
-
-    # Crawl depth distribution if depth recorded
     depth_counts = Counter(getattr(p, 'depth', 0) for p in pages)
     metrics["39.Crawl Depth Distribution"] = dict(depth_counts)
     metrics["40.Duplicate Parameter URLs"] = dup_param_urls
 
-    # ---- D. On-Page SEO (41–75)
+    # ---- On-Page SEO (41–75)
     missing_title = 0
     dup_title = 0
     too_long_title = 0
@@ -191,47 +148,34 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
             missing_title += 1
         else:
             seen_titles[title.lower()] += 1
-            if len(title) > 70:
-                too_long_title += 1
-            if len(title) < 10:
-                too_short_title += 1
+            if len(title) > 70: too_long_title += 1
+            if len(title) < 10: too_short_title += 1
 
         desc = (getattr(p, 'meta_desc', '') or '').strip()
         if not desc:
             missing_meta += 1
         else:
             seen_metas[desc.lower()] += 1
-            if len(desc) > 160:
-                meta_too_long += 1
-            if len(desc) < 50:
-                meta_too_short += 1
+            if len(desc) > 160: meta_too_long += 1
+            if len(desc) < 50: meta_too_short += 1
 
         h1_count = int(getattr(p, 'h1_count', 0) or 0)
-        if h1_count == 0:
-            missing_h1 += 1
-        if h1_count > 1:
-            multiple_h1 += 1
+        if h1_count == 0: missing_h1 += 1
+        if h1_count > 1: multiple_h1 += 1
 
         dom_nodes = int(getattr(p, 'dom_nodes_est', 0) or 0)
-        if dom_nodes and dom_nodes < 100:
-            thin_content_pages += 1
-        if dom_nodes and dom_nodes < 200:
-            low_t2h_ratio += 1
+        if dom_nodes and dom_nodes < 100: thin_content_pages += 1
+        if dom_nodes and dom_nodes < 200: low_t2h_ratio += 1
 
         missing_alt += int(getattr(p, 'images_missing_alt', 0) or 0)
 
         url = getattr(p, 'url', '') or ''
         last = url.split('/')[-1] if '/' in url else url
-        if len(url) > 115:
-            long_urls += 1
-        if any(c.isupper() for c in (last or '')):
-            uppercase_urls += 1
-        # Non-SEO-friendly (query string, long number sequences, or no hyphens)
-        if ('?' in url) or (re.search(r"\d{5,}", last or "")) or ('-' not in (last or '')):
-            non_seo_friendly_urls += 1
+        if len(url) > 115: long_urls += 1
+        if any(c.isupper() for c in (last or '')): uppercase_urls += 1
+        if ('?' in url) or (re.search(r"\d{5,}", last or "")) or ('-' not in (last or '')): non_seo_friendly_urls += 1
 
-        if len(getattr(p, 'links_internal', []) or []) > 300:
-            too_many_internal_links += 1
+        if len(getattr(p, 'links_internal', []) or []) > 300: too_many_internal_links += 1
 
     dup_title = sum(1 for _, v in seen_titles.items() if v > 1)
     dup_meta = sum(1 for _, v in seen_metas.items() if v > 1)
@@ -274,15 +218,13 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         "75.Anchor Text Issues": 0,
     })
 
-    # ---- E. Performance & Technical (76–96)
+    # ---- Performance & Technical (76–96)
     total_size = sum(int(getattr(p, 'content_len', 0) or 0) for p in pages)
     avg_page_size = total_size / max(total_pages, 1)
-
     avg_scripts = mean([int(getattr(p, 'scripts', 0) or 0) for p in pages]) if pages else 0
     avg_styles = mean([int(getattr(p, 'stylesheets', 0) or 0) for p in pages]) if pages else 0
     render_blocking_resources = sum(1 for p in pages if int(getattr(p, 'stylesheets', 0) or 0) > 0)
 
-    # Server response time (ms)
     resp_times = [int(getattr(p, 'response_ms', 0) or 0) for p in pages if getattr(p, 'response_ms', None) is not None]
     avg_resp_ms = int(mean(resp_times)) if resp_times else 0
 
@@ -293,12 +235,10 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     unmin_css = sum(1 for p in pages for href in (getattr(p, 'stylesheets_href', []) or []) if _is_unminified(href))
     unmin_js = sum(1 for p in pages for src in (getattr(p, 'scripts_src', []) or []) if _is_unminified(src))
 
-    origin_host = urlparse(getattr(cr, 'start_url', '') or '').hostname or ''
+    origin_host = urlparse(getattr(cr, 'seed', '') or '').hostname or ''
     def _host(u: str) -> str:
-        try:
-            return urlparse(u or '').hostname or ''
-        except Exception:
-            return ''
+        try: return urlparse(u or '').hostname or ''
+        except Exception: return ''
 
     third_party_scripts = sum(
         1 for p in pages for src in (getattr(p, 'scripts_src', []) or [])
@@ -311,7 +251,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
 
     missing_compression = sum(1 for p in pages if not _compressed(getattr(p, 'headers', {}) or {}))
 
-    # Lazy loading images (count of images without loading=lazy)
+    # Lazy loading images
     def _has_lazy(attrs: Dict[str, Any]) -> bool:
         val = str((attrs or {}).get('loading', '')).lower()
         return val == 'lazy'
@@ -324,16 +264,39 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
             if not _has_lazy(attrs):
                 lazy_issues += 1
 
+    # OPTIONAL Lighthouse lab metrics (Core Web Vitals)
+    lcp = fcp = cls = tbt = fid = si = tti = dcl = 0
+    if os.getenv("ENABLE_LIGHTHOUSE", "0") == "1" and total_pages > 0:
+        try:
+            cmd = ["lighthouse", cr.seed, "--quiet", "--output=json", "--chrome-flags=--headless"]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=int(os.getenv("LIGHTHOUSE_TIMEOUT", "90")))
+            if proc.returncode == 0 and proc.stdout:
+                lh = json.loads(proc.stdout)
+                audits = lh.get("audits", {})
+                def _val(key):
+                    a = audits.get(key, {})
+                    return a.get("numericValue") or a.get("score") or 0
+                lcp = _val("largest-contentful-paint")
+                fcp = _val("first-contentful-paint")
+                cls = _val("cumulative-layout-shift")
+                tbt = _val("total-blocking-time")
+                si  = _val("speed-index")
+                tti = _val("interactive")
+                dcl = _val("dom-content-loaded")
+                fid = 0  # field value typically; keep 0 unless measured
+        except Exception:
+            pass
+
     metrics.update({
-        "76.Largest Contentful Paint (LCP)": 0,
-        "77.First Contentful Paint (FCP)": 0,
-        "78.Cumulative Layout Shift (CLS)": 0,
-        "79.Total Blocking Time": 0,
-        "80.First Input Delay": 0,
-        "81.Speed Index": 0,
-        "82.Time to Interactive": 0,
-        "83.DOM Content Loaded": 0,
-        "84.Total Page Size": int(avg_page_size),  # bytes per page
+        "76.Largest Contentful Paint (LCP)": lcp,
+        "77.First Contentful Paint (FCP)": fcp,
+        "78.Cumulative Layout Shift (CLS)": cls,
+        "79.Total Blocking Time": tbt,
+        "80.First Input Delay": fid,
+        "81.Speed Index": si,
+        "82.Time to Interactive": tti,
+        "83.DOM Content Loaded": dcl,
+        "84.Total Page Size": int(avg_page_size),  # bytes/page
         "85.Requests Per Page": float(avg_scripts + avg_styles + 1),
         "86.Unminified CSS": unmin_css,
         "87.Unminified JavaScript": unmin_js,
@@ -348,51 +311,38 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         "96.Resource Load Errors": len(getattr(cr, 'errors', []) or []),
     })
 
-    # ---- F/G/H/I additional basics
-    metrics["97.Mobile Friendly Test"] = 0  # headless/browser needed
-
-    # Viewport meta detection
-    def _has_viewport_meta(p: PageLike) -> bool:
-        if hasattr(p, 'viewport_meta') and p.viewport_meta is not None:
-            return bool(p.viewport_meta)
-        raw = str(getattr(p, 'raw_html', '') or '')
-        return ('<meta' in raw.lower()) and ('name="viewport"' in raw.lower())
-
-    viewport_yes = sum(1 for p in pages if _has_viewport_meta(p))
+    # ---- Additional basics
+    metrics["97.Mobile Friendly Test"] = 0
+    viewport_yes = sum(1 for p in pages if bool(getattr(p, 'viewport_meta', False)))
     metrics["98.Viewport Meta Tag"] = viewport_yes
 
-    # Security basics
     metrics["105.HTTPS Implementation"] = sum(1 for p in pages if str(getattr(p, 'url', '') or '').startswith('https://'))
     metrics["108.Mixed Content"] = sum(int(getattr(p, 'mixed_content_http', 0) or 0) for p in pages)
 
-    # Index signals
     metrics["136.Sitemap Presence"] = 1 if sitemap_urls else 0
     metrics["137.Noindex Issues"] = meta_noindex_count
 
-    # Broken link totals & distribution
     metrics["168.Total Broken Links"] = metrics["27.Broken Internal Links"] + metrics["28.Broken External Links"]
     metrics["169.Internal Broken Links"] = metrics["27.Broken Internal Links"]
     metrics["170.External Broken Links"] = metrics["28.Broken External Links"]
     metrics["173.Status Code Distribution"] = {str(k): int(v) for k, v in status_bucket.items()}
 
-    # ---- Fill the remaining metric IDs with 0 instead of None to avoid empty display
-    # Known IDs that we have already set above are left as-is.
-    def _ensure_no_empty(metrics: Dict[str, Any]) -> None:
-        # If a metric value is None, convert to 0 or {} depending on type intent
-        for k, v in list(metrics.items()):
-            if v is None:
-                if k.endswith('Distribution'):
-                    metrics[k] = {}
-                else:
-                    metrics[k] = 0
+    # ---- Fill placeholder IDs with 0 (no empties in "All Metrics")
+    for i in list(range(99, 105)) + list(range(106, 136)) + list(range(138, 167)) + list(range(171, 180)) + list(range(181, 201)):
+        key = f"{i}.Placeholder"
+        if key not in metrics:
+            metrics[key] = 0
 
+    # Ensure no None values
+    def _ensure_no_empty(d: Dict[str, Any]) -> None:
+        for k, v in list(d.items()):
+            if v is None:
+                d[k] = {} if k.endswith("Distribution") else 0
     _ensure_no_empty(metrics)
 
     return {"metrics": metrics, "details": details}
 
-
 def _count_missing_cache_headers(pages: List[PageLike]) -> int:
-    """Count pages missing cache-control or with short max-age (< 60s)."""
     count = 0
     for p in pages:
         headers = getattr(p, 'headers', {}) or {}
@@ -400,8 +350,7 @@ def _count_missing_cache_headers(pages: List[PageLike]) -> int:
         if not cc:
             count += 1
         else:
-            # crude parse of max-age
-            m = re.search(r'max-age=(\\d+)', cc)
+            m = re.search(r'max-age=(\d+)', cc)
             if not m:
                 count += 1
             else:
