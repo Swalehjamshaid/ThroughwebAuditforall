@@ -1,14 +1,6 @@
 
-# railway.toml
 [service]
 name = "my-app"
-
-# For FastAPI / Starlette (recommended)
 startCommand = "gunicorn -k uvicorn.workers.UvicornWorker app:app --workers ${WEB_CONCURRENCY:-2} --bind 0.0.0.0:$PORT --timeout ${WEB_TIMEOUT:-300} --keep-alive 5 --log-level info --access-logfile -"
-
-# For Flask/Django (if not using ASGI):
-# startCommand = "gunicorn app:app --workers ${WEB_CONCURRENCY:-2} --bind 0.0.0.0:$PORT --timeout ${WEB_TIMEOUT:-300} --keep-alive 5 --log-level info --access-logfile -"
-
-# Health check should be fast and simple (no DB, no heavy work)
 healthcheckPath = "/health"
 healthcheckTimeout = 180
