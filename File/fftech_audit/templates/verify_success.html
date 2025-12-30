@@ -1,22 +1,24 @@
-
+<!-- fftech_audit/templates/verify_success.html -->
 {% extends "base.html" %}
+
+{% block title %}Verified • FF Tech AI{% endblock %}
+
 {% block content %}
-<section class="card">
-  <h2>{{ message }}</h2>
-  <p class="muted">You are verified. We saved your session token to your browser.</p>
-  <pre id="tokenBox" class="token">{{ token }}</pre>
-  <div class="form-row">
-    <a href="/" class="btn ghost">Go to Homepage</a>
-    <a href="/schedule" class="btn ghost">Schedule Reports</a>
+<div class="container py-5 text-center">
+  <div class="col-lg-6 mx-auto">
+    {% if verified %}
+      <i class="bi bi-check-circle-fill display-1 text-success mb-4"></i>
+      <h1 class="h3 mb-3">Successfully Verified!</h1>
+      <p class="lead">You're now logged in.</p>
+    {% else %}
+      <i class="bi bi-x-circle display-1 text-danger mb-4"></i>
+      <h1 class="h3 mb-3">Verification Failed</h1>
+      <p class="text-muted">The link may have expired or been used already.</p>
+    {% endif %}
+    <div class="mt-4">
+      <a href="/" class="btn btn-primary me-3">Go to Dashboard</a>
+      <a href="/schedule" class="btn btn-outline-primary">Schedule Reports</a>
+    </div>
   </div>
-</section>
-<script>
-  (function(){
-    const t = (document.getElementById('tokenBox').innerText||'').trim();
-    if (t) {
-      localStorage.setItem('fftech_token', t);
-      document.cookie = 'token='+encodeURIComponent(t)+'; Max-Age='+(60*60*24*180)+'; Path=/; SameSite=Lax';
-    }
-  })();
-</script>
+</div>
 {% endblock %}
