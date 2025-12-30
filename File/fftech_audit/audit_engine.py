@@ -264,7 +264,7 @@ ALL_KEYS: List[str] = (
 )
 
 # ---------------------------
-# Base checks (regex)
+# Base checks (regex) — FIXED: use real < and >
 # ---------------------------
 META_DESC_RE = re.compile(
     r"<meta\b[^>]*\bname\s*=\s*['\"]description['\"][^>]*\bcontent\s*=\s*'\"['\"]",
@@ -273,7 +273,40 @@ META_DESC_RE = re.compile(
 TITLE_RE = re.compile(r"<title\b[^>]*>(?P<title>.*?)</title>", re.I | re.S)
 
 # ---------------------------
-# Scoring
+# Scoring helpers
+# ---------------------------
+def clamp(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
+    return max(lo, min(hi, float(x)))
+
+def to_pct(flag: bool) -> float:
+    return 100.0 if flag else 0.0
+
+def page_size_score(page_bytes: int) -> float:
+    """
+    Score 100 for small pages, linearly penalize large ones.
+    - ≤ 700 KB => 100
+    - ≥ 3 MB   => 0
+    """
+    low = 700 * 1024
+    high = 3 * 1024 * 1024
+    if page_bytes <= low:
+        return 100.0
+    if page_bytes >= high:
+        return 0.0
+    drop = (page_bytes - low) * 100.0 / (high - low)
+    return clamp(100.0 - drop)
+
+def weighted_average(parts: dict[str, float], weights: dict[str, float]) -> float:
+    total_w = sum(weights.values())
+    if total_w == 0:
+        return 0.0
+    s = 0.0
+    for k, w in weights.items():
+        s += clamp(parts.get(k, 0.0)) * w
+    return clamp(s / total_w)
+
+# ---------------------------
+# Engine
 # ---------------------------
 def grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
@@ -304,27 +337,75 @@ class AuditEngine:
         has_title = bool(TITLE_RE.search(html))
         is_https = url.lower().startswith("https://") if url else False
 
-        score = 0.0
-        score += 35.0 if has_desc else 0.0
-        score += 25.0 if has_title else 0.0
-        score += 10.0 if is_https else 0.0
-        score += min(page_bytes / 1024.0, 30.0)
-        score = max(0.0, min(100.0, score))
-        grade = grade_from_score(score)
+        # Category scores (0–100) — interim logic
+        onpage_score = (to_pct(has_title) + to_pct(has_desc)) / 2.0
+        security_score = to_pct(is_https)
+        size_score = page_size_score(page_bytes)
+
+        # Neutral placeholders until full crawl/perf implemented
+        crawl_score = 50.0
+        perf_score = 50.0
+
+        category_scores = {
+            "On-Page SEO": round(onpage_score, 1),
+            "Security": round(security_score, 1),
+            "Page Size": round(size_score, 1),
+            "Crawlability": round(crawl_score, 1),
+            "Performance": round(perf_score, 1),
+        }
+        weights = {
+            "On-Page SEO": 0.35,
+            "Security": 0.25,
+            "Page Size": 0.20,
+            "Crawlability": 0.10,
+            "Performance": 0.10,
+        }
+
+        overall = round(weighted_average(category_scores, weights), 1)
+        grade = grade_from_score(overall)
+
+        # Executive summary (simple template; can be replaced by GPT later)
+        strengths = []
+        weaknesses = []
+        priority_fixes = []
+
+        if is_https: strengths.append("HTTPS implemented")
+        else:
+            weaknesses.append("HTTPS missing")
+            priority_fixes.append("Implement/renew SSL (HTTPS) across all pages.")
+
+        if has_title: strengths.append("Title tag present")
+        else:
+            weaknesses.append("Missing title tag")
+            priority_fixes.append("Add and optimize unique Title tags.")
+
+        if has_desc: strengths.append("Meta description present")
+        else:
+            weaknesses.append("Missing meta description")
+            priority_fixes.append("Add compelling Meta descriptions (≤ 160 chars).")
+
+        executive_text = (
+            "This preliminary audit summarizes foundational signals. To fully comply with the "
+            "200-metric framework, enable the crawler and performance modules. Immediate priorities "
+            "include HTTPS (if missing) and complete on-page basics (Title and Meta Description). "
+            "Subsequent phases should address performance, crawl hygiene, and structured data."
+        )
 
         metrics: Dict[str, Any] = {
-            "overall.health_score": round(score, 2),
+            # A. Executive summary & grading
+            "overall.health_score": overall,
             "overall.grade": grade,
-            "summary.executive_text": None,
-            "summary.strengths": None,
-            "summary.weaknesses": None,
-            "summary.priority_fixes": None,
-            "summary.severity_indicators": None,
-            "summary.category_breakdown": None,
+            "summary.executive_text": executive_text,
+            "summary.strengths": strengths,
+            "summary.weaknesses": weaknesses,
+            "summary.priority_fixes": priority_fixes,
+            "summary.severity_indicators": None,  # to be computed from category deltas/severities
+            "summary.category_breakdown": category_scores,
             "summary.presentation_standard": "Industry standard layout",
             "summary.print_ready": True,
 
-            "health.score": round(score, 2),
+            # B. Overall site health
+            "health.score": overall,
             "health.errors_total": None,
             "health.warnings_total": None,
             "health.notices_total": None,
@@ -335,32 +416,43 @@ class AuditEngine:
             "health.orphan_pages_pct": None,
             "health.audit_completion_status": "partial",
 
+            # C. Crawlability placeholders
             **{key: None for key in CRAWL_KEYS},
 
+            # D. On-page signals we can compute now
             "onpage.missing_title_tags": 0 if has_title else 1,
             "onpage.missing_meta_descriptions": 0 if has_desc else 1,
             **{key: None for key in ONPAGE_KEYS if key not in {"onpage.missing_title_tags", "onpage.missing_meta_descriptions"}},
 
+            # E. Performance placeholders
             **{key: None for key in PERF_KEYS},
 
+            # F. Mobile/Security/Intl — a few basic signals
             "security.https_implementation": is_https,
             **{key: None for key in MOBILE_SEC_INTL_KEYS if key != "security.https_implementation"},
 
+            # G/H/I placeholders
             **{key: None for key in COMPETITOR_KEYS},
             **{key: None for key in BROKEN_LINKS_KEYS},
             **{key: None for key in OPPORTUNITY_KEYS},
 
+            # Raw signals
             "page.bytes": page_bytes,
             "http.status": status,
             "generated_at": dt.datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
 
+        # Rows for UI (0–100)
         rows: List[Dict[str, Any]] = [
-            {"label": "Meta Description", "value": 100.0 if has_desc else 0.0},
-            {"label": "Title Tag", "value": 100.0 if has_title else 0.0},
-            {"label": "HTTPS Enabled", "value": 100.0 if is_https else 0.0},
-            {"label": "Page Size (normalized)", "value": min(page_bytes / (1024.0 * 2.0) * 100.0, 100.0)},
-            {"label": "Overall Score", "value": score},
+            {"label": "Overall Score", "value": overall},
+            {"label": "On-Page SEO", "value": onpage_score},
+            {"label": "Security (HTTPS)", "value": security_score},
+            {"label": "Page Size", "value": size_score},
+            {"label": "Crawlability (baseline)", "value": crawl_score},
+            {"label": "Performance (baseline)", "value": perf_score},
+            # Direct signals
+            {"label": "Title Tag Present", "value": to_pct(has_title)},
+            {"label": "Meta Description Present", "value": to_pct(has_desc)},
         ]
         metrics["rows"] = rows
         return metrics
@@ -411,24 +503,24 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
         _bar(c, 2 * cm, y, 16 * cm, 0.6 * cm, float(row.get("value", 0.0)), str(row.get("label", "Metric")))
         y -= 1.2 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Your website shows the above signals. See subsequent pages for category breakdown and priorities.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Foundational signals summarized. See next pages for categories and actions.")
     c.showPage()
 
-    # Page 2 – Category Scores (placeholders)
+    # Page 2 – Category Breakdown
     _draw_header(c, "Category Breakdown", url, 2)
-    categories = [
-        ("Site Health", metrics.get("health.score", 0)),
-        ("On-Page", 50 if metrics.get("onpage.missing_title_tags") == 0 and metrics.get("onpage.missing_meta_descriptions") == 0 else 20),
-        ("Crawlability", 0),
-        ("Performance", 0),
-        ("Mobile/Security", 100 if metrics.get("security.https_implementation") else 20),
-    ]
+    cat = metrics.get("summary.category_breakdown") or {}
     y = 24 * cm
-    for label, pct in categories:
+    for label, pct in [
+        ("On-Page SEO", cat.get("On-Page SEO", 0)),
+        ("Security", cat.get("Security", 0)),
+        ("Page Size", cat.get("Page Size", 0)),
+        ("Crawlability", cat.get("Crawlability", 0)),
+        ("Performance", cat.get("Performance", 0)),
+    ]:
         _bar(c, 2 * cm, y, 16 * cm, 0.6 * cm, float(pct or 0), label)
         y -= 1.2 * cm
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Prioritize HTTPS, on-page completeness, and full crawl/performance assessments.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Prioritize HTTPS and on‑page basics, then crawl/performance modules.")
     c.showPage()
 
     # Page 3 – Strengths & Weaknesses
@@ -436,56 +528,44 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.setFont("Helvetica-Bold", 12)
     c.drawString(2 * cm, 25.5 * cm, "Strengths")
     c.setFont("Helvetica", 10)
-    strengths = []
-    if metrics.get("security.https_implementation"):
-        strengths.append("HTTPS implemented")
-    if metrics.get("onpage.missing_title_tags") == 0:
-        strengths.append("Title tag present")
-    if metrics.get("meta.description.present") or metrics.get("onpage.missing_meta_descriptions") == 0:
-        strengths.append("Meta description present")
-    if not strengths:
-        strengths = ["No strong signals detected in base checks."]
+    strengths = metrics.get("summary.strengths") or []
     y = 24.5 * cm
-    for s in strengths:
-        c.drawString(2 * cm, y, f"• {s}")
-        y -= 0.7 * cm
-
+    if strengths:
+        for s in strengths:
+            c.drawString(2 * cm, y, f"• {s}")
+            y -= 0.7 * cm
+    else:
+        c.drawString(2 * cm, y, "• No strong signals detected in base checks.")
     c.setFont("Helvetica-Bold", 12)
     c.drawString(2 * cm, y - 0.5 * cm, "Weak Areas")
     c.setFont("Helvetica", 10)
-    weaknesses = []
-    if not metrics.get("security.https_implementation"):
-        weaknesses.append("HTTPS missing")
-    if metrics.get("onpage.missing_title_tags") == 1:
-        weaknesses.append("Missing title tag")
-    if metrics.get("onpage.missing_meta_descriptions") == 1:
-        weaknesses.append("Missing meta description")
-    if not weaknesses:
-        weaknesses = ["No immediate weaknesses detected in base checks."]
+    weaknesses = metrics.get("summary.weaknesses") or []
     y = y - 1.2 * cm
-    for w in weaknesses:
-        c.drawString(2 * cm, y, f"• {w}")
-        y -= 0.7 * cm
-
+    if weaknesses:
+        for w in weaknesses:
+            c.drawString(2 * cm, y, f"• {w}")
+            y -= 0.7 * cm
+    else:
+        c.drawString(2 * cm, y, "• No immediate weaknesses detected in base checks.")
     c.setFont("Helvetica", 10)
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Address missing HTTPS and meta elements first, then proceed to full crawl and performance audit.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Address missing HTTPS and meta elements first; then full crawl & performance.")
     c.showPage()
 
-    # Page 4 – Priority Fixes & Roadmap
+    # Page 4 – Priority Fixes
     _draw_header(c, "Priority Fixes & Roadmap", url, 4)
     c.setFont("Helvetica", 10)
-    fixes = [
+    fixes = metrics.get("summary.priority_fixes") or [
         "Implement/renew SSL (HTTPS) across all pages.",
-        "Ensure every page has a unique Title and Meta Description.",
+        "Ensure unique Title and Meta Description for every page.",
         "Run a full crawl to identify broken links, redirects, and canonical issues.",
-        "Measure Core Web Vitals using lab + field data.",
+        "Measure Core Web Vitals (lab + field) and optimize blocking resources.",
         "Optimize images and enable compression/caching.",
     ]
     y = 25 * cm
     for f in fixes:
         c.drawString(2 * cm, y, f"• {f}")
         y -= 0.8 * cm
-    c.drawString(2 * cm, 6 * cm, "Conclusion: Prioritize foundational SEO signals, then performance and crawl hygiene for stable gains.")
+    c.drawString(2 * cm, 6 * cm, "Conclusion: Start with foundational SEO signals, then performance and crawl hygiene.")
     c.showPage()
 
     # Page 5 – Certified Export
@@ -494,10 +574,10 @@ def generate_pdf_report(url: str, metrics: Dict[str, Any], rows: List[Dict[str, 
     c.drawString(2 * cm, 25.5 * cm, "Certification")
     c.setFont("Helvetica", 10)
     c.drawString(2 * cm, 24.7 * cm, "This report is generated by FF Tech AI Website Audit SaaS.")
-    c.drawString(2 * cm, 24.0 * cm, "It summarizes signals from a base fetch and recommends a full audit for comprehensive insights.")
+    c.drawString(2 * cm, 24.0 * cm, "It summarizes base signals and recommends a full audit for comprehensive insights.")
     c.setFont("Helvetica-Bold", 10)
     c.drawString(2 * cm, 22.5 * cm, f"Overall Grade: {metrics.get('overall.grade', '-')}")
-    c.drawString(2 * cm, 21.8 * cm, f"Overall Score: {metrics.get('overall.health_score', 0):.2f}%")
+    c.drawString(2 * cm, 21.8 * cm, f"Overall Score: {metrics.get('overall.health_score', 0):.1f}%")
     c.setFont("Helvetica", 9)
     c.drawString(2 * cm, 6 * cm, f"Generated at: {metrics.get('generated_at', '')}")
 
