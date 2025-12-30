@@ -1,6 +1,6 @@
 
 # fftech_audit/app.py
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, Body
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -13,26 +13,24 @@ from fftech_audit.audit_engine import run_audit
 
 app = FastAPI()
 
-# Templates directory (fixed in your project)
+# Templates directory (you shared these as fixed)
 templates = Jinja2Templates(directory="fftech_audit/templates")
 
 # ---------- SAFE STATIC MOUNT ----------
-# Prefer a package-local static directory so it ships with your code.
-# Ensure it exists BEFORE mounting to avoid RuntimeError.
+# Prefer a package-local static directory so it ships with code. Create if missing.
 static_dir = Path(os.getenv("STATIC_DIR", "fftech_audit/static")).resolve()
-
 try:
-    static_dir.mkdir(parents=True, exist_ok=True)  # create if missing
+    static_dir.mkdir(parents=True, exist_ok=True)  # ensure exists
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
     print(f"[startup] Mounted static at '/static' -> {static_dir}")
 except Exception as e:
-    # If filesystem is read-only or another issue occurs, skip mount gracefully.
     print(f"[startup][warn] Could not mount static directory '{static_dir}': {e}")
 
-# ---------- ROUTES ----------
+# ---------- MODELS ----------
 class AuditRequest(BaseModel):
     url: str
 
+# ---------- ROUTES ----------
 @app.get("/", response_class=HTMLResponse)
 async def landing(request: Request):
     return templates.TemplateResponse("landing.html", {
@@ -40,24 +38,36 @@ async def landing(request: Request):
         "now": datetime.datetime.utcnow()
     })
 
-# Form submit from landing page (templates given are fixed)
+# Accept BOTH form and JSON on /audit/open so browsers and API clients succeed.
 @app.post("/audit/open", response_class=HTMLResponse)
-async def audit_open(request: Request, url: str = Form(...)):
+async def audit_open(
+    request: Request,
+    url: str | None = Form(default=None),
+    json_body: dict | None = Body(default=None),
+):
     try:
-        audit = run_audit(url)
+        # Prefer form field if present; otherwise accept JSON {"url": "..."}
+        target_url = url or (json_body.get("url") if json_body else None)
+        if not target_url or not str(target_url).strip():
+            raise HTTPException(status_code=400, detail="Missing URL")
+
+        audit = run_audit(target_url.strip())
         return templates.TemplateResponse("results.html", {
             "request": request,
             "audit": audit,
             "now": datetime.datetime.utcnow()
         })
+    except HTTPException:
+        raise
     except Exception as e:
+        # Return a 400 with message instead of crashing
         raise HTTPException(status_code=400, detail=f"Audit failed: {e}")
 
-# JSON API for programmatic audits
+# Pure JSON endpoint for programmatic calls
 @app.post("/audit/api")
 async def audit_api(req: AuditRequest):
     try:
-        return run_audit(req.url)
+        return run_audit(req.url.strip())
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Audit failed: {e}")
 
@@ -85,7 +95,7 @@ async def schedule(request: Request):
 
 @app.post("/schedule/set")
 async def schedule_set(payload: dict):
-    # Stub: implement a real scheduler/database storage as needed.
+    # Stub: integrate with scheduler/DB; UI expects JSON with "next_run_at_utc"
     return {"status": "ok", "next_run_at_utc": "2025-01-01T09:00:00Z"}
 
 @app.get("/verify_success", response_class=HTMLResponse)
