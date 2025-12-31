@@ -1,0 +1,35 @@
+
+{% extends 'base.html' %}
+{% block title %}Schedule Report{% endblock %}
+{% block content %}
+<h2>Schedule Daily Report</h2>
+{% if website %}
+  <form method="post" action="/ui/schedule" class="card" style="max-width:520px">
+    <input type="hidden" name="website_id" value="{{ website.id }}"/>
+    <label>Timezone<br/>
+      <input type="text" name="timezone_name" value="Asia/Karachi" required aria-label="Timezone"/>
+      <div class="muted" id="tzPrompt">Prompt suggestions: Use ↑/↓ keys to navigate</div>
+    </label><br/>
+    <label>Hour (0-23)<br/><input type="number" min="0" max="23" name="hour" value="9" required/></label><br/>
+    <label>Minute (0-59)<br/><input type="number" min="0" max="59" name="minute" value="0" required/></label><br/>
+    <button class="btn primary" type="submit">Save Schedule</button>
+  </form>
+{% endif %}
+{% if saved %}
+  <p class="muted">Schedule saved for {{ schedule.timezone }} at {{ schedule.hour }}:{{ '%02d'|format(schedule.minute) }}.</p>
+{% endif %}
+<script>
+  const tzInput = document.querySelector('input[name="timezone_name"]');
+  const suggestions = ['Asia/Karachi','Asia/Dubai','Europe/London','America/New_York','UTC'];
+  let idx = -1;
+  tzInput.addEventListener('keydown',(e)=>{
+    if(['ArrowDown','ArrowUp','Enter'].includes(e.key)){
+      e.preventDefault();
+      if(e.key==='ArrowDown'){ idx = (idx+1)%suggestions.length; }
+      if(e.key==='ArrowUp'){ idx = (idx-1+suggestions.length)%suggestions.length; }
+      if(e.key==='Enter' && idx>=0){ tzInput.value = suggestions[idx]; }
+      document.getElementById('tzPrompt').textContent = 'Suggestion: '+(suggestions[idx]||'');
+    }
+  });
+</script>
+{% endblock %}
