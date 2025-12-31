@@ -1,10 +1,20 @@
 
-# fftech_audit/audit_engine.py (v2.1 — grounded scoring)
+# fftech_audit/audit_engine.py (v2.2 — grounded scoring + competitor analysis + rows)
 from __future__ import annotations
+import os
 import datetime as dt
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from fftech_audit.crawlers import crawl_site
 from fftech_audit.analyzers import summarize_crawl
+
+# ----- brand competitors (override via env COMPETITOR_URLS, comma-separated)
+_PK_APPLIANCE_COMPETITORS = [
+    "https://www.dawlance.com.pk",
+    "https://orient.com.pk",
+    "https://pel.com.pk",
+    "https://kenwoodpakistan.com",
+    "https://www.samsung.com/pk/",
+]
 
 def _grade_from_score(score: float) -> str:
     if score >= 95: return "A+"
@@ -15,7 +25,8 @@ def _grade_from_score(score: float) -> str:
     return "F"
 
 def run_audit(url: str) -> Dict[str, Any]:
-    cr = crawl_site(url)
+    target = (url or "").strip() or "https://www.haier.com.pk"
+    cr = crawl_site(target, max_pages=int(os.getenv("MAX_PAGES_MAIN", "120")))
     res = summarize_crawl(cr)
     m = res["metrics"]
     details = res.get("details", {})
@@ -58,10 +69,13 @@ def run_audit(url: str) -> Dict[str, Any]:
     }
 
     strengths, weaknesses, fixes = _summarize_strengths_weaknesses(m, category_breakdown)
-    exec_summary = _generate_exec_summary(url, category_breakdown, strengths, weaknesses, fixes)
+    exec_summary = _generate_exec_summary(target, category_breakdown, strengths, weaknesses, fixes)
+
+    # fill signal rows for results.html
+    rows = [{"label": k, "value": v} for k, v in category_breakdown.items()]
 
     out_metrics: Dict[str, Any] = {
-        "target.url": url,
+        "target.url": target,
         "generated_at": dt.datetime.utcnow().isoformat(),
         "overall.health_score": round(overall, 1),
         "overall.grade": _grade_from_score(overall),
@@ -70,15 +84,67 @@ def run_audit(url: str) -> Dict[str, Any]:
         "summary.priority_fixes": fixes,
         "summary.category_breakdown": category_breakdown,
         "summary.executive": exec_summary,
+        "rows": rows,   # ensure non-empty signals
         **m,
     }
     out_metrics["11.Site Health Score"] = round(overall, 1)
 
+    # ----- competitor analysis (lightweight)
+    competitors_cfg = os.getenv("COMPETITOR_URLS", "")
+    competitors_list = [u.strip() for u in competitors_cfg.split(",") if u.strip()] or _PK_APPLIANCE_COMPETITORS
+    max_pages_comp = int(os.getenv("MAX_PAGES_COMP", "40"))
+
+    comp_results: List[Dict[str, Any]] = []
+    for cu in competitors_list:
+        try:
+            ccr = crawl_site(cu, max_pages=max_pages_comp)
+            cres = summarize_crawl(ccr)
+            cm = cres["metrics"]
+            cd = cres.get("details", {})
+            cps = _score_performance(cm)
+            cmo = _score_mobile(cm)
+            ca11y = _score_accessibility(cm, cd)
+            csec = _score_security(cm)
+            cind = _score_indexing(cm)
+            cmeta = _score_metadata(cm)
+            cstr = _score_structure(cm)
+            cov = (
+                cps * weights["Performance"] +
+                cmo * weights["Mobile"] +
+                ca11y * weights["Accessibility"] +
+                csec * weights["Security"] +
+                cind * weights["Indexing"] +
+                cmeta * weights["Metadata"] +
+                cstr * weights["Structure"]
+            )
+            comp_results.append({
+                "url": cu,
+                "overall": round(cov, 1),
+                "grade": _grade_from_score(cov),
+                "breakdown": {
+                    "Performance": round(cps, 1),
+                    "Mobile": round(cmo, 1),
+                    "Accessibility": round(ca11y, 1),
+                    "Security": round(csec, 1),
+                    "Indexing": round(cind, 1),
+                    "Metadata": round(cmeta, 1),
+                    "Structure": round(cstr, 1),
+                }
+            })
+        except Exception:
+            comp_results.append({"url": cu, "overall": 0.0, "grade": "F", "breakdown": {}})
+
     charts = {
-        # Use original dict (stored in details) for charts; metrics has JSON string for table
         "status_distribution": details.get("173.Status Code Distribution", {}),
+        "competitor_scores": [{"url": r["url"], "score": r["overall"]} for r in comp_results],
     }
-    return {"metrics": out_metrics, "category_breakdown": category_breakdown, "charts": charts}
+
+    return {
+        "metrics": out_metrics,
+        "category_breakdown": category_breakdown,
+        "charts": charts,
+        "competitors": comp_results,
+    }
 
 # -------- scoring helpers
 def _clamp(x: float) -> float: return max(0.0, min(100.0, x))
@@ -115,7 +181,6 @@ def _score_accessibility(m: Dict[str, Any], details: Dict[str, Any]) -> float:
     missing_alt = float(m.get("55.Missing Image Alt Tags") or 0)
     total_images = float(details.get("total_images") or 0)
     if total_images <= 0:
-        # Fallback to a light penalty if we couldn't count images
         miss_ratio = 0.0 if missing_alt == 0 else 0.5
     else:
         miss_ratio = missing_alt / total_images
@@ -160,6 +225,7 @@ def _summarize_strengths_weaknesses(m: Dict[str, Any], cb: Dict[str, float]):
         if v >= 80: strengths.append(f"{k} is strong ({v:.0f}%).")
     for k, v in cb.items():
         if v < 60: weaknesses.append(f"{k} below target ({v:.0f}%).")
+
     if (m.get("74.Broken External Links", 0) or 0) > 0 or (m.get("27.Broken Internal Links", 0) or 0) > 0:
         fixes.append("Resolve broken internal/external links to recover link equity and UX.")
     if (m.get("45.Missing Meta Descriptions", 0) or 0) > 0 or (m.get("41.Missing Title Tags", 0) or 0) > 0:
@@ -168,6 +234,10 @@ def _summarize_strengths_weaknesses(m: Dict[str, Any], cb: Dict[str, float]):
         fixes.append("Fix canonical implementation to consolidate signals.")
     if (m.get("98.Viewport Meta Tag", 0) or 0) == 0:
         fixes.append("Add responsive viewport meta for mobile friendliness.")
+    if (m.get("108.Mixed Content", 0) or 0) > 0:
+        fixes.append("Eliminate mixed HTTP assets on HTTPS pages (use HTTPS-only resources).")
+    if (m.get("94.Browser Caching Issues", 0) or 0) > 0:
+        fixes.append("Set Cache-Control with sufficient max-age to improve repeat performance.")
     if not fixes:
         fixes.append("Maintain current performance; monitor periodic changes and trends.")
     return strengths, weaknesses, fixes
@@ -179,5 +249,5 @@ def _generate_exec_summary(url: str, cb: Dict[str, float], strengths: list, weak
     if strengths: parts.append("Strengths: " + "; ".join(strengths) + ".")
     if weaknesses: parts.append("Weaknesses: " + "; ".join(weaknesses) + ".")
     parts.append("Priority actions: " + "; ".join(fixes) + ".")
-    parts.append("Scores are derived from transparent heuristics (avg page size, request counts incl. images, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals.")
+    parts.append("Scores are derived from transparent heuristics (avg page size, request counts incl. images, canonical/meta/alt coverage, HTTPS/mixed content, viewport meta) and optionally Core Web Vitals via Lighthouse.")
     return " ".join(parts)
