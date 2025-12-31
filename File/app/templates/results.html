@@ -1,0 +1,36 @@
+
+{% extends 'base.html' %}
+{% block title %}Audit Results{% endblock %}
+{% block content %}
+<h2>Latest Audit Results</h2>
+{% if website and audit %}
+  <p><strong>Site:</strong> {{ website.url }} • <strong>Grade:</strong> {{ audit.grade }} • <strong>Metrics:</strong> {{ audit.metrics_count }}</p>
+  <div class="card">
+    <canvas id="radar" height="160"></canvas>
+  </div>
+  <div class="card">
+    <p class="muted">Sample metrics (first 8):</p>
+    <ul>
+      {% for k, v in audit.metrics.items()|list[:8] %}
+      <li><strong>{{ k }}</strong>: {{ v }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const radar = document.getElementById('radar');
+    const data = {
+      labels: ['Performance','Accessibility','SEO','Best Practices','Security'],
+      datasets: [{
+        label: 'Scores',
+        data: [88,95,90,92,89],
+        borderColor: '#5cc8ff',
+        backgroundColor: 'rgba(92,200,255,.2)'
+      }]
+    };
+    new Chart(radar,{type:'radar',data,options:{scales:{r:{angleLines:{color:'#203042'},grid:{color:'#203042'},pointLabels:{color:'#8aa0b6'}}}}});
+  </script>
+{% else %}
+  <p>No audit found for this website yet.</p>
+{% endif %}
+{% endblock %}

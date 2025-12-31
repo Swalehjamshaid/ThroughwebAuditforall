@@ -1,0 +1,24 @@
+
+{% extends 'base.html' %}
+{% block title %}Audit History{% endblock %}
+{% block content %}
+<h2>Audit History</h2>
+{% if website %}
+  <p><strong>Site:</strong> {{ website.url }}</p>
+  {% if audits and audits|length > 0 %}
+    <table class="card" style="width:100%">
+      <tr><th>Date</th><th>Grade</th><th>Metrics</th><th>Actions</th></tr>
+      {% for a in audits %}
+      <tr>
+        <td>{{ a.created_at }}</td>
+        <td>{{ a.grade }}</td>
+        <td>{{ a.metrics_count }}</td>
+        <td><a class="btn" href="/results?website_id={{ website.id }}">View</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p>No audits yet.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}
