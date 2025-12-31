@@ -1,5 +1,5 @@
 
-# fftech_audit/crawlers.py (v2.1 — robust URL handling)
+# fftech_audit/crawlers.py (v2.2 — robust URL handling w/ 'haier' brand mapping)
 import os
 import re
 import time
@@ -15,11 +15,10 @@ import urllib.robotparser as robotparser
 MAX_PAGES = int(os.getenv("MAX_PAGES", "120"))
 TIMEOUT = float(os.getenv("CRAWL_TIMEOUT", "15.0"))
 MAX_LINK_CHECKS = int(os.getenv("MAX_LINK_CHECKS", "150"))
-# Friendlier UA; allow override via env
 USER_AGENT = os.getenv(
     "CRAWL_UA",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36 FFTechAI-AuditBot/2.1 (+https://fftech.ai)"
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36 FFTechAI-AuditBot/2.2 (+https://fftech.ai)"
 )
 
 @dataclass
@@ -66,18 +65,35 @@ class CrawlResult:
     broken_links_external: Set[str]
     robots_allowed: bool
     sitemap_urls: List[str]
+    redirect_chains: List[List[str]] = field(default_factory=list)
+    redirect_loops: List[List[str]] = field(default_factory=list)
+    robots_blocked: List[str] = field(default_factory=list)
+
+_BRAND_MAP = {
+    # brand-friendly fallback for Pakistan market
+    "haier": "https://www.haier.com.pk",
+}
 
 def _normalize_seed(url: str) -> str:
     url = (url or "").strip()
     if not url:
-        return "https://"
+        return _BRAND_MAP.get("haier", "https://www.haier.com.pk")
+
+    # single-word brand -> mapped origin
+    if "." not in url and "/" not in url:
+        lower = url.lower()
+        if lower in _BRAND_MAP:
+            return _BRAND_MAP[lower]
+        # generic heuristic: assume .com
+        return "https://" + lower
+
     # add scheme if missing
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
     return url
 
 def _probe_fallback(url: str) -> str:
-    """Try https first; if it fails to connect quickly, fallback to http."""
+    """Try https first; fallback to http if origin blocks quick connects."""
     parsed = up.urlparse(url)
     if parsed.scheme == "https":
         origin = f"{parsed.scheme}://{parsed.netloc}"
@@ -85,14 +101,12 @@ def _probe_fallback(url: str) -> str:
             with httpx.Client(timeout=5.0, headers={"User-Agent": USER_AGENT}) as client:
                 r = client.head(origin)
                 if r.status_code >= 400:
-                    # Some servers block HEAD; try GET
                     rg = client.get(origin)
-                    if rg.status_code < 400:
+                    if 200 <= rg.status_code < 400:
                         return url
                 else:
                     return url
         except Exception:
-            # fallback to http
             return up.urlunparse(parsed._replace(scheme="http"))
     return url
 
@@ -168,6 +182,9 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     external_links: Set[str] = set()
     broken_internal: Set[str] = set()
     broken_external: Set[str] = set()
+    redirect_chains: List[List[str]] = []
+    redirect_loops: List[List[str]] = []
+    robots_blocked: List[str] = []
 
     rp = _fetch_robots(seed)
     robots_allowed = rp.can_fetch(USER_AGENT, seed) if rp.default_entry is not None else True
@@ -184,7 +201,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
 
     soup_parser = "lxml"
     try:
-        import lxml  # noqa: F401
+        import lxml  # noqa
     except Exception:
         soup_parser = "html.parser"
 
@@ -194,16 +211,28 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
         "Accept-Language": os.getenv("ACCEPT_LANGUAGE", "en-US,en;q=0.8"),
     }
 
+    def _track_redirects(history: List[httpx.Response]) -> None:
+        if not history:
+            return
+        chain = [str(h.request.url) for h in history]
+        if len(chain) >= 2:
+            redirect_chains.append(chain)
+            if chain[0] == chain[-1]:
+                redirect_loops.append(chain)
+
     with httpx.Client(timeout=TIMEOUT, headers=headers_common, follow_redirects=True) as client:
         while q and len(pages) < max_pages:
             url, depth = q.popleft()
             try:
                 if rp.default_entry is not None and not rp.can_fetch(USER_AGENT, url):
+                    robots_blocked.append(url)
                     continue
 
                 start = time.time()
                 r = client.get(url)
                 elapsed_ms = int((time.time() - start) * 1000)
+
+                _track_redirects(r.history)
 
                 status = r.status_code
                 status_counts[status // 100 * 100] += 1
@@ -333,4 +362,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
         broken_links_external=broken_external,
         robots_allowed=robots_allowed,
         sitemap_urls=sitemap_urls,
+        redirect_chains=redirect_chains,
+        redirect_loops=redirect_loops,
+        robots_blocked=robots_blocked,
     )
