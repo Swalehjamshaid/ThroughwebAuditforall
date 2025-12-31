@@ -1,26 +1,28 @@
 # Dockerfile
 FROM python:3.11-slim
 
-# Python best practices
+# Python best practices (no .pyc files, unbuffered output)
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Optional: Use virtual env (kept from your original)
+# Virtual environment path (from your original setup)
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
-# Install dependencies efficiently
+# Copy requirements first for better Docker layer caching
 COPY requirements.txt /app/
+
+# Create venv and install dependencies
 RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
+# Copy the rest of your app code
 COPY . /app
 
-# Expose (informational only)
+# Expose port (informational; Railway ignores this)
 EXPOSE 8080
 
-# CRITICAL: Use SHELL FORM (no brackets) so $PORT is expanded by bash
-CMD uvicorn fftech_audit.app:app --host 0.0.0.0 --port ${PORT:-8080}
+# FIXED CMD: Use sh -c for shell expansion of $PORT
+CMD ["sh", "-c", "uvicorn fftech_audit.app:app --host 0.0.0.0 --port ${PORT:-8080}"]
