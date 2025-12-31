@@ -1,6 +1,5 @@
 
-# fftech_audit/crawlers.py (v2.0 — robust, consistent types)
-
+# fftech_audit/crawlers.py (v2.1 — robust URL handling)
 import os
 import re
 import time
@@ -14,12 +13,19 @@ import xml.etree.ElementTree as ET
 import urllib.robotparser as robotparser
 
 MAX_PAGES = int(os.getenv("MAX_PAGES", "120"))
-TIMEOUT = float(os.getenv("CRAWL_TIMEOUT", "12.0"))
+TIMEOUT = float(os.getenv("CRAWL_TIMEOUT", "15.0"))
 MAX_LINK_CHECKS = int(os.getenv("MAX_LINK_CHECKS", "150"))
-USER_AGENT = os.getenv("CRAWL_UA", "FFTechAI-AuditBot/2.0 (+https://fftech.ai)")
+# Friendlier UA; allow override via env
+USER_AGENT = os.getenv(
+    "CRAWL_UA",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0 Safari/537.36 FFTechAI-AuditBot/2.1 (+https://fftech.ai)"
+)
 
 @dataclass
 class PageInfo:
+    # ... (unchanged fields)
+    # keep your existing dataclass as-is
     url: str
     status: int
     content_type: str
@@ -34,7 +40,7 @@ class PageInfo:
     meta_robots: Optional[str] = None
     links_internal: List[str] = field(default_factory=list)
     links_external: List[str] = field(default_factory=list)
-    images: List[Dict] = field(default_factory=list)  # [{"src":..., "attrs":{...}}]
+    images: List[Dict] = field(default_factory=list)
     images_missing_alt: int = 0
     og_tags_present: bool = False
     schema_present: bool = False
@@ -52,6 +58,7 @@ class PageInfo:
 
 @dataclass
 class CrawlResult:
+    # ... (unchanged fields)
     seed: str
     pages: List[PageInfo]
     errors: List[str]
@@ -64,9 +71,32 @@ class CrawlResult:
     sitemap_urls: List[str]
 
 def _normalize_seed(url: str) -> str:
-    url = url.strip()
+    url = (url or "").strip()
+    if not url:
+        return "https://"
+    # add scheme if missing
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
+    return url
+
+def _probe_fallback(url: str) -> str:
+    """Try https first; if it fails to connect quickly, fallback to http."""
+    parsed = up.urlparse(url)
+    if parsed.scheme == "https":
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        try:
+            with httpx.Client(timeout=5.0, headers={"User-Agent": USER_AGENT}) as client:
+                r = client.head(origin)
+                if r.status_code >= 400:
+                    # Some servers block HEAD; try GET
+                    rg = client.get(origin)
+                    if rg.status_code < 400:
+                        return url
+                else:
+                    return url
+        except Exception:
+            # fallback to http
+            return up.urlunparse(parsed._replace(scheme="http"))
     return url
 
 def _same_host(u1: str, u2: str) -> bool:
@@ -96,44 +126,10 @@ def _fetch_robots(seed: str) -> robotparser.RobotFileParser:
         pass
     return rp
 
-def _discover_sitemaps(seed: str) -> List[str]:
-    urls = []
-    try:
-        origin = f"{up.urlparse(seed).scheme}://{up.urlparse(seed).netloc}"
-        robots_txt = up.urljoin(origin, "/robots.txt")
-        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
-            r = client.get(robots_txt)
-            if r.status_code == 200:
-                for line in r.text.splitlines():
-                    if line.lower().startswith("sitemap:"):
-                        urls.append(line.split(":", 1)[1].strip())
-        candidate = up.urljoin(origin, "/sitemap.xml")
-        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
-            r = client.get(candidate)
-            if r.status_code == 200 and "xml" in r.headers.get("Content-Type", ""):
-                urls.append(candidate)
-    except Exception:
-        pass
-    return list(dict.fromkeys(urls))
-
-def _parse_sitemap(url: str) -> List[str]:
-    urls = []
-    try:
-        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
-            r = client.get(url)
-            if r.status_code != 200:
-                return urls
-            root = ET.fromstring(r.text)
-            ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-            for loc in root.findall(".//sm:loc", ns):
-                if loc.text:
-                    urls.append(loc.text.strip())
-    except Exception:
-        pass
-    return urls
+# ... keep _discover_sitemaps and _parse_sitemap as-is ...
 
 def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
-    seed = _normalize_seed(seed)
+    seed = _probe_fallback(_normalize_seed(seed))
     errors: List[str] = []
     pages: List[PageInfo] = []
     status_counts = Counter()
@@ -161,7 +157,13 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     except Exception:
         soup_parser = "html.parser"
 
-    with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}, follow_redirects=True) as client:
+    headers_common = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": os.getenv("ACCEPT_LANGUAGE", "en-US,en;q=0.8"),
+    }
+
+    with httpx.Client(timeout=TIMEOUT, headers=headers_common, follow_redirects=True) as client:
         while q and len(pages) < max_pages:
             url, depth = q.popleft()
             try:
@@ -185,8 +187,8 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                 if "text/html" in ctype and r.text:
                     soup = BeautifulSoup(r.text, soup_parser)
 
-                    # Content
-                    pi.html_title = soup.title.string.strip() if soup.title else None
+                    # Content (same as your v2.0)
+                    pi.html_title = soup.title.string.strip() if soup.title and soup.title.string else None
                     desc_el = soup.find("meta", attrs={"name": "description"})
                     pi.meta_desc = (desc_el.get("content", "").strip() if desc_el else None)
                     pi.h1_count = len(soup.find_all("h1"))
@@ -221,7 +223,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     pi.images = img_list
                     pi.images_missing_alt = missing
 
-                    # Open Graph & JSON-LD
+                    # OG & JSON-LD
                     pi.og_tags_present = len(soup.find_all("meta", property=re.compile(r"^og:"))) > 0
                     pi.schema_present = len(soup.find_all("script", type="application/ld+json")) > 0
 
@@ -266,8 +268,11 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     # Broken-link sample checks (HEAD)
     def _head_ok(u: str) -> bool:
         try:
-            with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
-                r = client.head(u, follow_redirects=True)
+            with httpx.Client(timeout=TIMEOUT, headers=headers_common, follow_redirects=True) as client:
+                r = client.head(u)
+                if r.status_code >= 400:
+                    rg = client.get(u)
+                    return 200 <= rg.status_code < 400
                 return 200 <= r.status_code < 400
         except Exception:
             return False
