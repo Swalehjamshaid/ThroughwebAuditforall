@@ -1,18 +1,13 @@
 
 # railway.toml
-[build]
-# Railway auto-detects Python via requirements.txt; no custom build needed.
-# If you use Docker, comment this section and add a Dockerfile.
 
 [deploy]
 startCommand = "uvicorn fftech_audit.app:app --host 0.0.0.0 --port $PORT"
 
 [env]
-# Safe defaults; tune as needed.
-ENABLE_LIGHTHOUSE = "0"         # Set to "1" only if you install Node + lighthouse in the image
+ENABLE_LIGHTHOUSE = "0"
 MAX_PAGES_MAIN = "120"
 MAX_PAGES_COMP = "40"
 CRAWL_TIMEOUT = "15.0"
 MAX_LINK_CHECKS = "150"
 ACCEPT_LANGUAGE = "en-US,en;q=0.8"
-``
