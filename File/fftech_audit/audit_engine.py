@@ -1,6 +1,5 @@
 
-# fftech_audit/audit_engine.py (v2.0 — realistic scoring)
-
+# fftech_audit/audit_engine.py (v2.1 — grounded scoring)
 from __future__ import annotations
 import datetime as dt
 from typing import Dict, Any
@@ -19,10 +18,11 @@ def run_audit(url: str) -> Dict[str, Any]:
     cr = crawl_site(url)
     res = summarize_crawl(cr)
     m = res["metrics"]
+    details = res.get("details", {})
 
     score_perf = _score_performance(m)
     score_mobile = _score_mobile(m)
-    score_a11y = _score_accessibility(m)
+    score_a11y = _score_accessibility(m, details)
     score_security = _score_security(m)
     score_indexing = _score_indexing(m)
     score_metadata = _score_metadata(m)
@@ -75,7 +75,8 @@ def run_audit(url: str) -> Dict[str, Any]:
     out_metrics["11.Site Health Score"] = round(overall, 1)
 
     charts = {
-        "status_distribution": out_metrics.get("173.Status Code Distribution", {}),
+        # The original dict is in details; metrics holds JSON string for table view
+        "status_distribution": res.get("details", {}).get("173.Status Code Distribution", {}) or res.get("metrics", {}).get("173.Status Code Distribution", {}),
     }
     return {"metrics": out_metrics, "category_breakdown": category_breakdown, "charts": charts}
 
@@ -94,23 +95,31 @@ def _score_performance(m: Dict[str, Any]) -> float:
     rbr_ratio = rbr_pages / total
     big_dom_ratio = big_dom_pages / total
     penalties = 0.0
-    if size_bytes > 2_000_000: penalties += 20
-    elif size_bytes > 1_000_000: penalties += 10
-    if req > 60: penalties += 20
-    elif req > 40: penalties += 10
-    penalties += rbr_ratio * 25
-    penalties += big_dom_ratio * 20
-    return _clamp(95.0 - penalties)
+    # Size penalties
+    if size_bytes > 2_000_000: penalties += 22
+    elif size_bytes > 1_000_000: penalties += 12
+    # Request count penalties (includes images now)
+    if req > 80: penalties += 24
+    elif req > 50: penalties += 12
+    # Render-blocking and DOM penalties
+    penalties += rbr_ratio * 22
+    penalties += big_dom_ratio * 18
+    base = 96.0
+    return _clamp(base - penalties)
 
 def _score_mobile(m: Dict[str, Any]) -> float:
     ratio = float(m.get("98.Viewport Meta Tag") or 0) / _safe_total(m)
     return _clamp(55.0 + 45.0 * ratio)
 
-def _score_accessibility(m: Dict[str, Any]) -> float:
+def _score_accessibility(m: Dict[str, Any], details: Dict[str, Any]) -> float:
     missing_alt = float(m.get("55.Missing Image Alt Tags") or 0)
-    total_images_est = max(missing_alt + 5, 1)
-    miss_ratio = missing_alt / total_images_est
-    return _clamp(90.0 - miss_ratio * 60)
+    total_images = float(details.get("total_images") or 0)
+    if total_images <= 0:
+        # Fallback to a light penalty if we couldn't count images
+        miss_ratio = 0.0 if missing_alt == 0 else 0.5
+    else:
+        miss_ratio = missing_alt / total_images
+    return _clamp(92.0 - miss_ratio * 60)
 
 def _score_security(m: Dict[str, Any]) -> float:
     https_impl = float(m.get("105.HTTPS Implementation") or 0)
@@ -170,5 +179,6 @@ def _generate_exec_summary(url: str, cb: Dict[str, float], strengths: list, weak
     if strengths: parts.append("Strengths: " + "; ".join(strengths) + ".")
     if weaknesses: parts.append("Weaknesses: " + "; ".join(weaknesses) + ".")
     parts.append("Priority actions: " + "; ".join(fixes) + ".")
-    parts.append("Scores are derived from transparent heuristics (avg page size, request counts, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals.")
+    parts.append("Scores are derived from transparent heuristics (avg page size, request counts incl. images, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals.")
     return " ".join(parts)
+``
