@@ -126,3 +126,12 @@ async def verify_success(request: Request, verified: bool = True):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# --- Direct runner (reads PORT and starts Uvicorn) ---
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    # Railway injects PORT; fallback to 8080 for local runs
+    port = int(os.getenv("PORT", "8080"))
+    uvicorn.run("fftech_audit.app:app", host="0.0.0.0", port=port)
