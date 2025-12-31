@@ -75,8 +75,8 @@ def run_audit(url: str) -> Dict[str, Any]:
     out_metrics["11.Site Health Score"] = round(overall, 1)
 
     charts = {
-        # The original dict is in details; metrics holds JSON string for table view
-        "status_distribution": res.get("details", {}).get("173.Status Code Distribution", {}) or res.get("metrics", {}).get("173.Status Code Distribution", {}),
+        # Use original dict (stored in details) for charts; metrics has JSON string for table
+        "status_distribution": details.get("173.Status Code Distribution", {}),
     }
     return {"metrics": out_metrics, "category_breakdown": category_breakdown, "charts": charts}
 
@@ -181,4 +181,3 @@ def _generate_exec_summary(url: str, cb: Dict[str, float], strengths: list, weak
     parts.append("Priority actions: " + "; ".join(fixes) + ".")
     parts.append("Scores are derived from transparent heuristics (avg page size, request counts incl. images, canonical/meta/alt coverage, HTTPS/mixed content) and can be extended with Core Web Vitals.")
     return " ".join(parts)
-``
