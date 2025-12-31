@@ -24,8 +24,6 @@ USER_AGENT = os.getenv(
 
 @dataclass
 class PageInfo:
-    # ... (unchanged fields)
-    # keep your existing dataclass as-is
     url: str
     status: int
     content_type: str
@@ -40,7 +38,7 @@ class PageInfo:
     meta_robots: Optional[str] = None
     links_internal: List[str] = field(default_factory=list)
     links_external: List[str] = field(default_factory=list)
-    images: List[Dict] = field(default_factory=list)
+    images: List[Dict] = field(default_factory=list)  # [{"src":..., "attrs":{...}}]
     images_missing_alt: int = 0
     og_tags_present: bool = False
     schema_present: bool = False
@@ -58,7 +56,6 @@ class PageInfo:
 
 @dataclass
 class CrawlResult:
-    # ... (unchanged fields)
     seed: str
     pages: List[PageInfo]
     errors: List[str]
@@ -126,7 +123,41 @@ def _fetch_robots(seed: str) -> robotparser.RobotFileParser:
         pass
     return rp
 
-# ... keep _discover_sitemaps and _parse_sitemap as-is ...
+def _discover_sitemaps(seed: str) -> List[str]:
+    urls = []
+    try:
+        origin = f"{up.urlparse(seed).scheme}://{up.urlparse(seed).netloc}"
+        robots_txt = up.urljoin(origin, "/robots.txt")
+        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
+            r = client.get(robots_txt)
+            if r.status_code == 200:
+                for line in r.text.splitlines():
+                    if line.lower().startswith("sitemap:"):
+                        urls.append(line.split(":", 1)[1].strip())
+        candidate = up.urljoin(origin, "/sitemap.xml")
+        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
+            r = client.get(candidate)
+            if r.status_code == 200 and "xml" in r.headers.get("Content-Type", ""):
+                urls.append(candidate)
+    except Exception:
+        pass
+    return list(dict.fromkeys(urls))
+
+def _parse_sitemap(url: str) -> List[str]:
+    urls = []
+    try:
+        with httpx.Client(timeout=TIMEOUT, headers={"User-Agent": USER_AGENT}) as client:
+            r = client.get(url)
+            if r.status_code != 200:
+                return urls
+            root = ET.fromstring(r.text)
+            ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+            for loc in root.findall(".//sm:loc", ns):
+                if loc.text:
+                    urls.append(loc.text.strip())
+    except Exception:
+        pass
+    return urls
 
 def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
     seed = _probe_fallback(_normalize_seed(seed))
@@ -187,7 +218,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                 if "text/html" in ctype and r.text:
                     soup = BeautifulSoup(r.text, soup_parser)
 
-                    # Content (same as your v2.0)
+                    # Content
                     pi.html_title = soup.title.string.strip() if soup.title and soup.title.string else None
                     desc_el = soup.find("meta", attrs={"name": "description"})
                     pi.meta_desc = (desc_el.get("content", "").strip() if desc_el else None)
@@ -223,7 +254,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
                     pi.images = img_list
                     pi.images_missing_alt = missing
 
-                    # OG & JSON-LD
+                    # Open Graph & JSON-LD
                     pi.og_tags_present = len(soup.find_all("meta", property=re.compile(r"^og:"))) > 0
                     pi.schema_present = len(soup.find_all("script", type="application/ld+json")) > 0
 
@@ -265,7 +296,7 @@ def crawl_site(seed: str, max_pages: int = MAX_PAGES) -> CrawlResult:
             except Exception as e:
                 errors.append(f"{url} -> {e}")
 
-    # Broken-link sample checks (HEAD)
+    # Broken-link sample checks (HEAD with fallback to GET)
     def _head_ok(u: str) -> bool:
         try:
             with httpx.Client(timeout=TIMEOUT, headers=headers_common, follow_redirects=True) as client:
