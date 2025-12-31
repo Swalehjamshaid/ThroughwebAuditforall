@@ -1,5 +1,5 @@
 
-# fftech_audit/app.py
+# fftech_audit/app.py (v2.2 — safer defaults + rows & competitors exposed)
 from fastapi import FastAPI, Request, Form, HTTPException, Body
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -15,8 +15,6 @@ from fftech_audit.audit_engine import run_audit
 log = logging.getLogger("uvicorn.error")
 
 app = FastAPI()
-
-# Templates directory (fixed in your project)
 templates = Jinja2Templates(directory="fftech_audit/templates")
 
 # ---------- SAFE STATIC MOUNT ----------
@@ -30,7 +28,7 @@ except Exception as e:
 
 # ---------- MODELS ----------
 class AuditRequest(BaseModel):
-    url: str
+    url: str | None = None
 
 # ---------- ROUTES ----------
 @app.get("/", response_class=HTMLResponse)
@@ -48,39 +46,34 @@ async def audit_open(
 ):
     """
     Accept BOTH form and JSON for convenience.
-    Render results.html with top-level variables expected by your fixed template:
-    - metrics
-    - category_breakdown
-    - charts
+    Defaults to Haier Pakistan if URL is missing/blank.
     """
     try:
-        target_url = (url or (json_body.get("url") if json_body else None) or "").strip()
-        if not target_url:
-            raise HTTPException(status_code=400, detail="Missing URL")
+        target_url = (url or (json_body.get("url") if json_body else None) or "").strip() or "https://www.haier.com.pk"
 
         audit = run_audit(target_url)
         metrics = audit.get("metrics", {})
         category_breakdown = audit.get("category_breakdown", {})
         charts = audit.get("charts", {})
+        competitors = audit.get("competitors", [])
 
-        # Log some context to help future triage
-        log.info(f"[audit] Completed for {metrics.get('target.url')} with overall {metrics.get('overall.health_score')}")
+        log.info(f"[audit] Completed for {metrics.get('target.url')} overall {metrics.get('overall.health_score')} ({metrics.get('overall.grade')})")
 
         return templates.TemplateResponse("results.html", {
             "request": request,
             "now": datetime.datetime.utcnow(),
-            # Provide both nested and top-level keys so either template style works
             "audit": audit,
             "metrics": metrics,
             "category_breakdown": category_breakdown,
             "charts": charts,
+            "rows": metrics.get("rows", []),          # ensure non-empty rows for Key Signals
+            "competitors": competitors,               # exposed in case you add to template later
         })
 
     except HTTPException:
         raise
     except Exception as e:
         log.exception(f"[audit_open] Rendering failed: {e}")
-        # Return a simple HTML error so users don't see raw JSON detail
         return HTMLResponse(
             content=f"<h3>Audit failed</h3><p>{str(e)}</p>",
             status_code=400
@@ -89,7 +82,8 @@ async def audit_open(
 @app.post("/audit/api")
 async def audit_api(req: AuditRequest):
     try:
-        return run_audit(req.url.strip())
+        target = (req.url or "").strip() or "https://www.haier.com.pk"
+        return run_audit(target)
     except Exception as e:
         log.exception(f"[audit_api] {e}")
         raise HTTPException(status_code=400, detail=f"Audit failed: {e}")
