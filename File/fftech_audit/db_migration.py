@@ -1,4 +1,3 @@
-
 # fftech_audit/db_migration.py
 from fftech_audit.db import init_db
 
