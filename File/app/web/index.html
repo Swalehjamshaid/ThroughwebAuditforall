@@ -1,0 +1,73 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF Tech AI Website Audit — Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">FF Tech AI Website Audit</div>
+    <nav class="nav">
+      <a href="#dashboard" class="active">Dashboard</a>
+      <a href="#history">History</a>
+      <a href="#admin">Admin</a>
+      <a href="#docs">Docs</a>
+    </nav>
+    <div class="auth">
+      <button id="btn-send-link">Send Magic Link</button>
+      <input id="email" type="email" placeholder="email@domain.com" />
+      <input id="token" type="text" placeholder="Paste token" />
+      <button id="btn-verify">Verify & Get JWT</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="dashboard" class="panel">
+      <h2>Run Audit</h2>
+      <div class="audit-form">
+        <input id="url" type="url" placeholder="https://example.com" />
+        <button id="btn-audit">Audit Now</button>
+      </div>
+      <div id="grade" class="grade"></div>
+      <div class="grid" id="category-grid"></div>
+      <section class="charts">
+        <div class="chart-card"><h3>Category Scores</h3><canvas id="categoryChart"></canvas></div>
+        <div class="chart-card"><h3>Trend (Stub)</h3><canvas id="trendChart"></canvas></div>
+      </section>
+      <div class="panel" id="details"></div>
+    </section>
+
+    <section id="history" class="panel hidden">
+      <h2>Recent Audits</h2>
+      <div id="history-list" class="list"></div>
+    </section>
+
+    <section id="admin" class="panel hidden">
+      <h2>Admin — Latest 50 Audits</h2>
+      <div id="admin-list" class="list"></div>
+    </section>
+
+    <section id="docs" class="panel hidden">
+      <h2>Documentation</h2>
+      <ul>
+        <li><code>POST /auth/send-link</code></li>
+        <li><code>POST /auth/verify</code> → returns <code>{ access_token, token_type }</code></li>
+        <li><code>POST /audit</code> → persists audit + metrics</li>
+        <li><code>GET /audit/{audit_id}</code>, <code>GET /audit/{audit_id}/metrics</code></li>
+        <li><code>GET /admin/audits</code> → admin‑only</li>
+        <li><code>GET /report/{audit_id}</code> → certified PDF</li>
+      </ul>
+      <p><a href="/docs" target="_blank">OpenAPI (Swagger) Docs</a></p>
+    </section>
+  </main>
+  <footer class="footer">© FF Tech · Executive‑grade Website Intelligence</footer>
+  <script src="app.js"></script>
+</body>
+</html>
