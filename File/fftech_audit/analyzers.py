@@ -1,5 +1,5 @@
 
-# fftech_audit/analyzers.py (v2.1 — no-empty metrics + better totals)
+# fftech_audit/analyzers.py (v2.2 — no-empty metrics + signal rows + better totals)
 from __future__ import annotations
 import re
 from typing import Dict, Any, List, Tuple
@@ -43,12 +43,12 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     five_xx = int(status_bucket.get(500, 0))
 
     # ---- Overall Site Health (11–20)
-    metrics["11.Site Health Score"] = 0  # overwritten later
+    metrics["11.Site Health Score"] = 0  # overwritten later by audit_engine
     metrics["12.Total Errors"] = four_xx + five_xx
     metrics["13.Total Warnings"] = three_xx
     metrics["14.Total Notices"] = 0
     metrics["15.Total Crawled Pages"] = total_pages
-    meta_noindex_count = sum(1 for p in pages if getattr(p, 'meta_robots', '') and 'noindex' in str(p.meta_robots).lower())
+    meta_noindex_count = sum(1 for p in pages if getattr(p, 'meta_robots', '') and 'noindex' in str(getattr(p, 'meta_robots', '')).lower())
     metrics["16.Total Indexed Pages"] = max(total_pages - meta_noindex_count, 0)
     metrics["17.Issues Trend"] = "n/a"
     metrics["18.Crawl Budget Efficiency"] = (two_xx / max(total_pages, 1)) if total_pages else 0.0
@@ -77,7 +77,6 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     total_images_missing_alt = 0
 
     for p in pages:
-        # tallies needed for scoring later
         total_images += len(getattr(p, 'images', []) or [])
         total_images_missing_alt += int(getattr(p, 'images_missing_alt', 0) or 0)
 
@@ -126,7 +125,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["37.Hreflang Conflicts"] = 0
     metrics["38.Pagination Issues"] = pagination_issues
     depth_counts = Counter(int(getattr(p, 'depth', 0) or 0) for p in pages)
-    metrics["39.Crawl Depth Distribution"] = dict(depth_counts)  # stringified later
+    metrics["39.Crawl Depth Distribution"] = dict(depth_counts)  # kept JSON for table, dict in details
     metrics["40.Duplicate Parameter URLs"] = dup_param_urls
 
     # ---- On-Page SEO (41–75)
@@ -292,7 +291,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
                 si  = _val("speed-index")
                 tti = _val("interactive")
                 dcl = _val("dom-content-loaded")
-                fid = 0  # field value typically; keep 0 unless measured
+                fid = 0  # Field values are not available in lab reliably
         except Exception:
             pass
 
@@ -322,13 +321,14 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     })
 
     # ---- Additional basics
-    metrics["97.Mobile Friendly Test"] = 0
     viewport_yes = sum(1 for p in pages if bool(getattr(p, 'viewport_meta', False)))
+    metrics["97.Mobile Friendly Test"] = 0
     metrics["98.Viewport Meta Tag"] = viewport_yes
 
     metrics["105.HTTPS Implementation"] = sum(1 for p in pages if str(getattr(p, 'url', '') or '').startswith('https://'))
     metrics["108.Mixed Content"] = sum(int(getattr(p, 'mixed_content_http', 0) or 0) for p in pages)
 
+    sitemap_list = set(getattr(cr, 'sitemap_urls', []) or [])
     metrics["136.Sitemap Presence"] = 1 if sitemap_list else 0
     metrics["137.Noindex Issues"] = meta_noindex_count
 
@@ -348,9 +348,8 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         for k, v in list(d.items()):
             if v is None:
                 d[k] = 0 if not k.endswith("Distribution") else {}
-            # If UI expects scalar values, stringify known dicts
             if isinstance(v, dict):
-                # keep charts-friendly originals in details, but stringify for table value
+                # keep charts-friendly originals in details, but stringify for the table
                 details[k] = v
                 d[k] = json.dumps(v, ensure_ascii=False)
             elif isinstance(v, (list, set, tuple)):
@@ -361,10 +360,29 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     # Store useful aggregates for scoring and UI
     details["total_images"] = total_images
     details["total_images_missing_alt"] = total_images_missing_alt
+    details["173.Status Code Distribution"] = json.loads(metrics["173.Status Code Distribution"])
+
+    # Provide non-empty signal rows for results.html
+    # (Values will be overwritten by audit_engine with real category %)
+    metrics["rows"] = [
+        {"label": "Performance", "value": 0},
+        {"label": "Mobile", "value": 0},
+        {"label": "Accessibility", "value": 0},
+        {"label": "Security", "value": 0},
+        {"label": "Indexing", "value": 0},
+        {"label": "Metadata", "value": 0},
+        {"label": "Structure", "value": 0},
+    ]
 
     return {"metrics": metrics, "details": details}
 
 def _count_missing_cache_headers(pages: List[PageLike]) -> int:
+    """
+    Count pages whose response lacks usable Cache-Control caching signals:
+    - missing Cache-Control
+    - Cache-Control without max-age
+    - max-age < 60 seconds
+    """
     count = 0
     for p in pages:
         headers = getattr(p, 'headers', {}) or {}
@@ -382,4 +400,3 @@ def _count_missing_cache_headers(pages: List[PageLike]) -> int:
                 except Exception:
                     count += 1
     return count
-``
