@@ -1,27 +1,26 @@
 # Dockerfile
-ARG PYTHON_VERSION=3.11-slim
-FROM python:${PYTHON_VERSION}
+FROM python:3.11-slim
 
-# Environment variables for Python
+# Python best practices
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Use virtual environment (good practice)
+# Optional: Use virtual env (kept from your original)
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
-# Install dependencies (better caching)
+# Install dependencies efficiently
 COPY requirements.txt /app/
 RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy app code
 COPY . /app
 
-# Expose port (informational only)
+# Expose (informational only)
 EXPOSE 8080
 
-# Critical fix: Use SHELL FORM so $PORT is expanded by the shell
+# CRITICAL: Use SHELL FORM (no brackets) so $PORT is expanded by bash
 CMD uvicorn fftech_audit.app:app --host 0.0.0.0 --port ${PORT:-8080}
