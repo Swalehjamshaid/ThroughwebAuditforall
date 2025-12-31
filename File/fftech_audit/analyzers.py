@@ -1,5 +1,5 @@
 
-# fftech_audit/analyzers.py (v2.0 — solids + no-empty metrics)
+# fftech_audit/analyzers.py (v2.1 — no-empty metrics + better totals)
 from __future__ import annotations
 import re
 from typing import Dict, Any, List, Tuple
@@ -48,7 +48,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["13.Total Warnings"] = three_xx
     metrics["14.Total Notices"] = 0
     metrics["15.Total Crawled Pages"] = total_pages
-    meta_noindex_count = sum(1 for p in pages if getattr(p, 'meta_robots', '') and 'noindex' in p.meta_robots.lower())
+    meta_noindex_count = sum(1 for p in pages if getattr(p, 'meta_robots', '') and 'noindex' in str(p.meta_robots).lower())
     metrics["16.Total Indexed Pages"] = max(total_pages - meta_noindex_count, 0)
     metrics["17.Issues Trend"] = "n/a"
     metrics["18.Crawl Budget Efficiency"] = (two_xx / max(total_pages, 1)) if total_pages else 0.0
@@ -73,8 +73,15 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     pagination_issues = 0
     dup_param_urls = 0
 
+    total_images = 0
+    total_images_missing_alt = 0
+
     for p in pages:
-        meta_robots = (getattr(p, 'meta_robots', '') or '')
+        # tallies needed for scoring later
+        total_images += len(getattr(p, 'images', []) or [])
+        total_images_missing_alt += int(getattr(p, 'images_missing_alt', 0) or 0)
+
+        meta_robots = str(getattr(p, 'meta_robots', '') or '')
         if 'noindex' in meta_robots.lower() or 'nofollow' in meta_robots.lower():
             meta_blocked += 1
 
@@ -89,8 +96,10 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
             missing_canonical += 1
 
         for pair in getattr(p, 'hreflang', []) or []:
-            try: lang, href = pair
-            except Exception: lang, href = None, None
+            try:
+                lang, href = pair
+            except Exception:
+                lang, href = None, None
             if not lang or not href:
                 hreflang_errors += 1
 
@@ -109,15 +118,15 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["32.Missing Canonical Tags"] = missing_canonical
     metrics["33.Incorrect Canonical Tags"] = incorrect_canonical
 
-    sitemap_urls = set(getattr(cr, 'sitemap_urls', []) or [])
-    crawled_urls = set(p.url for p in pages)
-    metrics["34.Sitemap Missing Pages"] = len(sitemap_urls - crawled_urls) if sitemap_urls else 0
-    metrics["35.Sitemap Not Crawled Pages"] = len(crawled_urls - sitemap_urls) if sitemap_urls else 0
+    sitemap_list = set(getattr(cr, 'sitemap_urls', []) or [])
+    crawled_urls = set(getattr(p, 'url', '') for p in pages if getattr(p, 'url', None))
+    metrics["34.Sitemap Missing Pages"] = len(sitemap_list - crawled_urls) if sitemap_list else 0
+    metrics["35.Sitemap Not Crawled Pages"] = len(crawled_urls - sitemap_list) if sitemap_list else 0
     metrics["36.Hreflang Errors"] = hreflang_errors
     metrics["37.Hreflang Conflicts"] = 0
     metrics["38.Pagination Issues"] = pagination_issues
-    depth_counts = Counter(getattr(p, 'depth', 0) for p in pages)
-    metrics["39.Crawl Depth Distribution"] = dict(depth_counts)
+    depth_counts = Counter(int(getattr(p, 'depth', 0) or 0) for p in pages)
+    metrics["39.Crawl Depth Distribution"] = dict(depth_counts)  # stringified later
     metrics["40.Duplicate Parameter URLs"] = dup_param_urls
 
     # ---- On-Page SEO (41–75)
@@ -133,7 +142,6 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     multiple_h1 = 0
     thin_content_pages = 0
     low_t2h_ratio = 0
-    missing_alt = 0
     long_urls = 0
     uppercase_urls = 0
     non_seo_friendly_urls = 0
@@ -167,8 +175,6 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         if dom_nodes and dom_nodes < 100: thin_content_pages += 1
         if dom_nodes and dom_nodes < 200: low_t2h_ratio += 1
 
-        missing_alt += int(getattr(p, 'images_missing_alt', 0) or 0)
-
         url = getattr(p, 'url', '') or ''
         last = url.split('/')[-1] if '/' in url else url
         if len(url) > 115: long_urls += 1
@@ -195,7 +201,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         "52.Thin Content Pages": thin_content_pages,
         "53.Duplicate Content Pages": 0,
         "54.Low Text-to-HTML Ratio": low_t2h_ratio,
-        "55.Missing Image Alt Tags": missing_alt,
+        "55.Missing Image Alt Tags": total_images_missing_alt,
         "56.Duplicate Alt Tags": 0,
         "57.Large Uncompressed Images": 0,
         "58.Pages Without Indexed Content": 0,
@@ -223,6 +229,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     avg_page_size = total_size / max(total_pages, 1)
     avg_scripts = mean([int(getattr(p, 'scripts', 0) or 0) for p in pages]) if pages else 0
     avg_styles = mean([int(getattr(p, 'stylesheets', 0) or 0) for p in pages]) if pages else 0
+    avg_images = mean([len(getattr(p, 'images', []) or []) for p in pages]) if pages else 0
     render_blocking_resources = sum(1 for p in pages if int(getattr(p, 'stylesheets', 0) or 0) > 0)
 
     resp_times = [int(getattr(p, 'response_ms', 0) or 0) for p in pages if getattr(p, 'response_ms', None) is not None]
@@ -237,8 +244,10 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
 
     origin_host = urlparse(getattr(cr, 'seed', '') or '').hostname or ''
     def _host(u: str) -> str:
-        try: return urlparse(u or '').hostname or ''
-        except Exception: return ''
+        try:
+            return urlparse(u or '').hostname or ''
+        except Exception:
+            return ''
 
     third_party_scripts = sum(
         1 for p in pages for src in (getattr(p, 'scripts_src', []) or [])
@@ -287,6 +296,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         except Exception:
             pass
 
+    # Requests per page now includes images (approx)
     metrics.update({
         "76.Largest Contentful Paint (LCP)": lcp,
         "77.First Contentful Paint (FCP)": fcp,
@@ -297,7 +307,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
         "82.Time to Interactive": tti,
         "83.DOM Content Loaded": dcl,
         "84.Total Page Size": int(avg_page_size),  # bytes/page
-        "85.Requests Per Page": float(avg_scripts + avg_styles + 1),
+        "85.Requests Per Page": float(avg_scripts + avg_styles + avg_images + 1),
         "86.Unminified CSS": unmin_css,
         "87.Unminified JavaScript": unmin_js,
         "88.Render Blocking Resources": render_blocking_resources,
@@ -319,7 +329,7 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["105.HTTPS Implementation"] = sum(1 for p in pages if str(getattr(p, 'url', '') or '').startswith('https://'))
     metrics["108.Mixed Content"] = sum(int(getattr(p, 'mixed_content_http', 0) or 0) for p in pages)
 
-    metrics["136.Sitemap Presence"] = 1 if sitemap_urls else 0
+    metrics["136.Sitemap Presence"] = 1 if sitemap_list else 0
     metrics["137.Noindex Issues"] = meta_noindex_count
 
     metrics["168.Total Broken Links"] = metrics["27.Broken Internal Links"] + metrics["28.Broken External Links"]
@@ -327,18 +337,30 @@ def summarize_crawl(cr: CrawlResult) -> Dict[str, Any]:
     metrics["170.External Broken Links"] = metrics["28.Broken External Links"]
     metrics["173.Status Code Distribution"] = {str(k): int(v) for k, v in status_bucket.items()}
 
-    # ---- Fill placeholder IDs with 0 (no empties in "All Metrics")
+    # ---- Fill placeholder IDs with 0 (no empties)
     for i in list(range(99, 105)) + list(range(106, 136)) + list(range(138, 167)) + list(range(171, 180)) + list(range(181, 201)):
         key = f"{i}.Placeholder"
         if key not in metrics:
             metrics[key] = 0
 
-    # Ensure no None values
-    def _ensure_no_empty(d: Dict[str, Any]) -> None:
+    # Ensure no None values AND scalarize dicts/lists for table rendering
+    def _finalize_values(d: Dict[str, Any]) -> None:
         for k, v in list(d.items()):
             if v is None:
-                d[k] = {} if k.endswith("Distribution") else 0
-    _ensure_no_empty(metrics)
+                d[k] = 0 if not k.endswith("Distribution") else {}
+            # If UI expects scalar values, stringify known dicts
+            if isinstance(v, dict):
+                # keep charts-friendly originals in details, but stringify for table value
+                details[k] = v
+                d[k] = json.dumps(v, ensure_ascii=False)
+            elif isinstance(v, (list, set, tuple)):
+                d[k] = len(v)
+
+    _finalize_values(metrics)
+
+    # Store useful aggregates for scoring and UI
+    details["total_images"] = total_images
+    details["total_images_missing_alt"] = total_images_missing_alt
 
     return {"metrics": metrics, "details": details}
 
@@ -360,3 +382,4 @@ def _count_missing_cache_headers(pages: List[PageLike]) -> int:
                 except Exception:
                     count += 1
     return count
+``
