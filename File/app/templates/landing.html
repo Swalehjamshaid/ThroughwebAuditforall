@@ -1,0 +1,25 @@
+
+{% extends 'base.html' %}
+{% block title %}FF Tech – Landing{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1 class="title">AI Powered Website Audit</h1>
+    <p class="subtitle">Audit 1100+ metrics. Certified PDFs. Railway-ready.</p>
+  </div>
+  <div class="grade-badge">A</div>
+</section>
+<section class="panel">
+  <h3>Add Your Website</h3>
+  {% if user %}
+  <form method="post" action="/ui/add-website" class="card" style="max-width:520px">
+    <label>Website URL<br/>
+      <input type="url" name="url" placeholder="https://example.com" required style="width:100%"/>
+    </label><br/>
+    <button class="btn primary" type="submit">Add Website</button>
+  </form>
+  {% else %}
+  <p class="muted">Please <a href="/login">login</a> or <a href="/register">register</a> to add a website.</p>
+  {% endif %}
+</section>
+{% endblock %}

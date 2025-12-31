@@ -1,0 +1,13 @@
+
+{% extends 'base.html' %}
+{% block title %}Registration Complete{% endblock %}
+{% block content %}
+<h2>Registration Complete</h2>
+<p>Account created for <strong>{{ email }}</strong>.</p>
+{% if auto_verified %}
+  <p class="muted">Auto-verified (SMTP not configured). You can sign in and proceed.</p>
+{% else %}
+  <p class="muted">We sent a verification email. Please click the link to complete verification.</p>
+{% endif %}
+<a class="btn" href="/login">Login</a>
+{% endblock %}
