@@ -1,14 +1,18 @@
+
 FROM python:3.11-slim
 
-ENV PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
+# Install dependencies BEFORE copying the whole app (better layer caching)
 COPY requirements.txt ./
-RUN python -m pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
+# Copy the rest of your source
 COPY . .
 
-# NO "ENV PORT" here - let Railway provide it
-# NO Square brackets - this allows Railway to swap $PORT for a number
-CMD gunicorn app.main:app -b 0.0.0.0:$PORT -w 2
+# Default for local runs (Railway injects PORT at runtime)
+ENV PORT=8000
+
+# Shell-wrapped CMD ensures ${PORT} expands
+CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2"]
+``
