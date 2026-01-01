@@ -1,5 +1,6 @@
 
 {
-  "build": { "builder": "NIXPACKS" },
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": { "builder": "DOCKERFILE" },
   "deploy": { "restartPolicyType": "ON_FAILURE" }
 }
