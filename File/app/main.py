@@ -80,6 +80,7 @@ def open_audit():
     url = normalize_url(request.form.get('url'))
     stub = stub_open_metrics(url)
     cat_scores = stub['cat_scores']
+    # Pad any missing categories to avoid KeyError
     for c in CATEGORY_WEIGHTS.keys():
         cat_scores.setdefault(c, round(random.uniform(6.5, 8.5), 2))
     score = compute_overall(cat_scores)
@@ -102,20 +103,31 @@ def register():
         name = request.form.get('name')
         company = request.form.get('company')
         email = request.form.get('email')
+
         s = get_session()
-        if s and s.query(User).filter_by(email=email).first():
-            flash('Email already registered', 'error')
-            return redirect(url_for('register'))
+        if s:
+            try:
+                if s.query(User).filter_by(email=email).first():
+                    flash('Email already registered', 'error')
+                    return redirect(url_for('register'))
+            except Exception:
+                # If DB is not ready, fall back to JSON only
+                s = None
+
         token = f'verify-{random.randint(100000, 999999)}'
         users = load(USERS_FILE)
         users.append({'email': email, 'name': name, 'company': company, 'role': 'user', 'password': None, 'verified': False, 'token': token})
         save(USERS_FILE, users)
+
         if s:
-            s.add(User(email=email, name=name, company=company, role='user', password=None, verified=False))
+            # ✅ set password_hash='' to satisfy NOT NULL until user sets it in /set_password
+            s.add(User(email=email, name=name, company=company, role='user', password_hash='', verified=False))
             s.commit()
+
         verify_link = url_for('verify', token=token, _external=True)
         send_verification_email(email, verify_link, name, DATA_PATH)
         return render_template('register_done.html', email=email, verify_link=verify_link)
+
     return render_template('register.html')
 
 @app.route('/verify')
@@ -137,6 +149,8 @@ def verify():
 def set_password():
     token = request.form.get('token')
     password = request.form.get('password')
+
+    # Update JSON store
     users = load(USERS_FILE)
     for u in users:
         if u.get('token') == token:
@@ -144,15 +158,20 @@ def set_password():
             u['password'] = password
             u['token'] = None
             save(USERS_FILE, users)
+
+            # Update DB
             s = get_session()
             if s:
                 dbu = s.query(User).filter_by(email=u['email']).first()
                 if dbu:
+                    # ✅ store into password_hash (you can swap in hashing later)
                     dbu.verified = True
-                    dbu.password = password
+                    dbu.password_hash = password
                     s.commit()
+
             flash('Password set. You can now log in.', 'success')
             return render_template('verify_success.html')
+
     abort(400)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -160,14 +179,17 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
+
         s = get_session()
         if s:
             dbu = s.query(User).filter_by(email=email).first()
-            if dbu and (dbu.password or '') == (password or '') and dbu.verified:
+            if dbu and (dbu.password_hash or '') == (password or '') and dbu.verified:
                 session['user'] = dbu.email
                 session['role'] = dbu.role
                 flash('Logged in successfully', 'success')
                 return redirect(url_for('results_page'))
+
+        # Fallback to JSON store
         users = load(USERS_FILE)
         for u in users:
             if u['email'] == email and (u['password'] or '') == (password or '') and u.get('verified'):
@@ -175,7 +197,9 @@ def login():
                 session['role'] = u['role']
                 flash('Logged in successfully', 'success')
                 return redirect(url_for('results_page'))
+
         flash('Invalid credentials or unverified email', 'error')
+
     return render_template('login.html')
 
 @app.route('/logout')
