@@ -7,9 +7,8 @@ COPY requirements.txt ./
 RUN python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+ENV PORT=8000  # default for local runs
 
-# Default for local runs (Railway injects PORT at runtime)
-ENV PORT=8000
-
-# Shell-wrapped CMD ensures ${PORT} expands before Gunicorn runs
+# Shell-wrapped CMD so ${PORT} is expanded before Gunicorn starts
 CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2"]
+``
