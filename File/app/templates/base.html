@@ -5,16 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title or 'FF Tech' }}</title>
 
-  <!-- Keep your custom styles link intact -->
+  <!-- Your custom styles remain intact -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
   <!-- Modern fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Icons (Heroicons via CDN) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous"></script>
 
   <style>
     :root {
@@ -37,50 +34,59 @@
       color: var(--gray-900);
     }
 
-    header {
+    /* Hero Header with branding and description */
+    .hero {
       background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
       color: white;
-      padding: 3rem 0;
+      padding: 6rem 0;
+      text-align: center;
       position: relative;
       overflow: hidden;
     }
 
-    header::before {
+    .hero::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: url('data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M0 0h100v100H0z"/%3E%3C/g%3E%3C/svg%3E');
+      background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%);
       pointer-events: none;
     }
 
-    header .container {
+    .hero .container {
       max-width: 1280px;
       margin: 0 auto;
       padding: 0 1.5rem;
       position: relative;
       z-index: 1;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
     }
 
-    header .logo {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      font-size: 2.5rem;
+    .hero-logo {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 1.5rem;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .hero-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
       font-weight: 800;
-      letter-spacing: -0.5px;
+      margin: 0 0 1rem;
+      letter-spacing: -1px;
     }
 
-    header .logo i {
-      font-size: 3rem;
-      opacity: 0.9;
-    }
-
-    header .tagline {
-      font-size: 1.25rem;
+    .hero p {
+      font-size: 1.5rem;
       font-weight: 500;
+      max-width: 800px;
+      margin: 0 auto;
       opacity: 0.95;
     }
 
@@ -99,13 +105,13 @@
       background: white;
       border-radius: 1.5rem;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-      overflow: hidden;
+      padding: 2.5rem;
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .alert {
-      margin: 0 2rem 2rem;
+      margin-bottom: 2rem;
       border: none;
       border-radius: 1rem;
       padding: 1.25rem 1.5rem;
@@ -127,48 +133,39 @@
       font-size: 0.95rem;
     }
 
-    .footer a {
-      color: #c4b5fd;
-      text-decoration: none;
-    }
-
-    .footer a:hover {
-      text-decoration: underline;
-    }
-
     @media (max-width: 768px) {
-      header .container {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
+      .hero {
+        padding: 4rem 0;
       }
-
-      header .logo {
-        font-size: 2rem;
-      }
-
-      header .logo i {
+      .hero h1 {
         font-size: 2.5rem;
       }
-
-      .alert {
-        margin: 0 1rem 1.5rem;
+      .hero p {
+        font-size: 1.25rem;
+      }
+      .hero-logo {
+        width: 100px;
+        height: 100px;
+      }
+      .card {
+        padding: 1.5rem;
       }
     }
   </style>
 </head>
 <body>
-<header>
+
+<!-- Hero Section with Strong Branding & Description -->
+<section class="hero">
   <div class="container">
-    <div class="logo">
-      <i class="fas fa-search-dollar"></i>
-      <div>
-        <strong>FF Tech</strong>
-        <div class="tagline">Website Audit Platform</div>
-      </div>
+    <div class="hero-logo">
+      <!-- Modern gradient FF logo for strong branding -->
+      <img src="https://branition.com/assets/img/users/logos/18897-kVBV0l6.webp" alt="FF Tech Logo">
     </div>
+    <h1>FF Tech</h1>
+    <p>Empowering Digital Excellence Through Comprehensive Website Audits</p>
   </div>
-</header>
+</section>
 
 <main>
   <div class="container">
@@ -189,5 +186,6 @@
 <div class="footer">
   © {{ 2026 }} FF Tech. All rights reserved.
 </div>
+
 </body>
 </html>
