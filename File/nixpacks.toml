@@ -1,5 +1,0 @@
-
-# nixpacks.toml
-providers = ["...", "python"]
-[start]
-cmd = "gunicorn app.main:app -b 0.0.0.0:$PORT -w 2"
