@@ -1,0 +1,1 @@
+{% extends "base.html" %}{% block content %}<h1>Audit History</h1><ul>{% for a in audits %}<li>{{ a.date }} – <a href="/results?url={{ a.url }}">{{ a.url }}</a> – Grade {{ a.grade }}</li>{% endfor %}</ul>{% endblock %}

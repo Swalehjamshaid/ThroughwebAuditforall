@@ -1,0 +1,25 @@
+
+{% extends 'base.html' %}{% block content %}
+<h1>AI Powered Website Audit</h1>
+<p>Audit 1100+ metrics. Certified PDFs. Railway-ready.</p>
+<div class="card">
+  <h2>1️⃣ Open Audit (No Registration Required)</h2>
+  <form method="post" action="/audit">
+    <label>Website URL</label><br>
+    <input type="url" name="url" placeholder="https://example.com" required style="width:100%"><br><br>
+    <button type="submit">Run Open Audit</button>
+  </form>
+  <p><small>Public access • Lead generation • Demo (no storage)</small></p>
+</div>
+<div class="card">
+  <h2>2️⃣ Registered Audit (Full Access)</h2>
+  <p><a class="badge" href="/register">Register</a> or <a class="badge" href="/login">Login</a> for 150+ metrics, history, scheduling & certified reports.</p>
+</div>
+<div id="spinnerOverlay" class="spinner-overlay"><div class="spinner" aria-label="Loading"></div></div>
+<script>
+  const openAuditForm = document.querySelector('form[action="/audit"]');
+  if (openAuditForm) openAuditForm.addEventListener('submit', ()=>{
+    const overlay = document.getElementById('spinnerOverlay'); if (overlay) overlay.style.display='flex';
+  });
+</script>
+{% endblock %}
