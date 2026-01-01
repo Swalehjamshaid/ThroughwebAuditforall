@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, te
 from sqlalchemy.orm import declarative_base, sessionmaker
 from .settings import DATABASE_URL
 
-# Create engine and session factory
+# SQLAlchemy setup
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 Base = declarative_base()
@@ -12,13 +12,13 @@ Base = declarative_base()
 # ----------------------- ORM Models -----------------------
 class User(Base):
     __tablename__ = 'users'
-    id       = Column(Integer, primary_key=True)
-    email    = Column(String, unique=True, index=True)
-    name     = Column(String)         # display name
-    company  = Column(String)         # company name
-    role     = Column(String, default='user')
-    password = Column(String, nullable=True)
-    verified = Column(Boolean, default=False)
+    id            = Column(Integer, primary_key=True)
+    email         = Column(String, unique=True, index=True)
+    name          = Column(String)                # display name
+    company       = Column(String)                # company name
+    role          = Column(String, default='user')
+    password_hash = Column(String, nullable=False, default='')  # align with DB: NOT NULL + default ''
+    verified      = Column(Boolean, default=False)
 
 class Audit(Base):
     __tablename__ = 'audits'
@@ -33,15 +33,15 @@ class Audit(Base):
 _engine_inited = False
 
 def init_engine():
-    """Mark engine initialized (hook for future init steps)."""
+    """Hook for future engine init steps."""
     global _engine_inited
     if not _engine_inited:
         _engine_inited = True
 
 def create_schema():
     """
-    Create tables if they do not exist, then ensure the users table
-    has all expected columns (Postgres-safe).
+    Create tables if they do not exist, then ensure columns exist
+    for Postgres. This prevents 'UndefinedColumn' and NOT NULL violations.
     """
     Base.metadata.create_all(engine)
     _ensure_user_columns()
@@ -55,28 +55,24 @@ def get_session():
 # ----------------------- Lightweight Migration -----------------------
 def _ensure_user_columns():
     """
-    Add any missing columns on the 'users' table, but only for Postgres.
-    SQLAlchemy's create_all() does not ALTER existing tables, so we
-    run raw DDL statements using IF NOT EXISTS.
-
-    For other backends (e.g., SQLite), you might prefer Alembic or
-    explicit migration scripts; here we focus on the Postgres case
-    because your error stack shows psycopg2 (Postgres driver).
+    Add (or align) columns on the 'users' table for Postgres.
+    We use IF NOT EXISTS / DEFAULT to avoid errors if columns already exist.
     """
     dialect = engine.dialect.name.lower()
     if dialect != "postgresql":
-        # No-op for non-Postgres backends (avoid dialect differences).
+        # Only run raw DDL on Postgres
         return
 
     ddl_statements = [
         # Add columns if missing
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS name     VARCHAR",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS company  VARCHAR",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role     VARCHAR DEFAULT 'user'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR NULL",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN  DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS name          VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS company       VARCHAR",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role          VARCHAR DEFAULT 'user'",
+        # Critical fix: ensure password_hash exists and has a default to satisfy NOT NULL
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR NOT NULL DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS verified      BOOLEAN DEFAULT FALSE",
 
-        # Helpful indexes (no-op if they already exist)
+        # Helpful indexes (no-op if already exist)
         "CREATE INDEX IF NOT EXISTS idx_users_email    ON users (email)",
         "CREATE INDEX IF NOT EXISTS idx_users_verified ON users (verified)"
     ]
