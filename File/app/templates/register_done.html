@@ -1,9 +1,0 @@
-
-{% extends 'base.html' %}
-{% block content %}
-<h2>Check your email</h2>
-<p>We sent a verification link to <strong>{{ email }}</strong>.</p>
-{% if verify_link %}
-<p>For demo, here is your verification link: <a href="{{ verify_link }}">Verify Email</a></p>
-{% endif %}
-{% endblock %}
