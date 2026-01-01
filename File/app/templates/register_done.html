@@ -1,7 +1,0 @@
-
-{% extends 'base.html' %}{% block content %}
-<h1>Registration Submitted</h1>
-<p>We sent a verification link to <strong>{{ email }}</strong>.</p>
-{% if verify_link %}<p><em>Demo only:</em> Click to verify now → <a href="{{ verify_link }}">Verify Email</a></p>{% endif %}
-<p><small>An email file has been generated in the outbox (demo) if SMTP is not configured.</small></p>
-{% endblock %}
