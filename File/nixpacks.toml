@@ -1,12 +1,9 @@
 
 # nixpacks.toml
+# Ensures Nixpacks starts your Flask app with Gunicorn importing app.main:app
+# and binding to Railway's $PORT.
 
-# (Optional) Make sure the Python provider is included alongside auto-detected ones.
 providers = ["...", "python"]
 
-# Override the start command used by Nixpacks so Gunicorn imports your app correctly.
 [start]
 cmd = "gunicorn app.main:app -b 0.0.0.0:$PORT -w 2"
-
-# If you want more verbose logs while debugging, you can use:
-# cmd = "gunicorn app.main:app -b 0.0.0.0:$PORT -w 1 --log-level debug --capture-output"
