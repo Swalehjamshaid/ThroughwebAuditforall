@@ -13,17 +13,20 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
-from security import (
+# --- FIXED RELATIVE IMPORTS ---
+# The '.' prefix tells Python to look in the current package directory.
+from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
+from .security import (
     load, save, normalize_url, ensure_nonempty_structs,
     generate_summary
 )
-from models import (
+from .models import (
     init_engine, create_schema, get_session,
     migrate_json_to_db, ensure_fixed_admin, User, Audit
 )
-from emailer import send_verification_email
-from audit_stub import stub_open_metrics
+from .emailer import send_verification_email
+from .audit_stub import stub_open_metrics
+# ------------------------------
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -394,7 +397,7 @@ def report_pdf():
 
     return send_file(
         path,
-        mimetype='application/pdf',
+        contentType='application/pdf',
         as_attachment=True,
         download_name=f'FFTech_Audit_{datetime.utcnow().strftime("%Y%m%d")}.pdf'
     )
