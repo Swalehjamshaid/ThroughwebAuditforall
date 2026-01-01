@@ -1,0 +1,82 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ mode == 'open' and 'Open Audit Results' or 'Registered Audit Results' }}</h1>
+<p><strong>Website:</strong> {{ url }} &nbsp; • &nbsp; <strong>Date:</strong> {{ date }}</p>
+
+<div class="grid">
+  <div class="kpi"><h3>Site Health Score</h3><div class="value">{{ results.site_health.score }} <span class="badge grade">{{ results.site_health.grade }}</span></div></div>
+  <div class="kpi"><h3>Total Errors</h3><div class="value">{{ results.site_health.errors }}</div></div>
+  <div class="kpi"><h3>Total Warnings</h3><div class="value">{{ results.site_health.warnings }}</div></div>
+  <div class="kpi"><h3>Total Notices</h3><div class="value">{{ results.site_health.notices }}</div></div>
+</div>
+
+<div class="card">
+  <h2>Visual Overview</h2>
+  <div class="grid">
+    <div class="card"><canvas id="kpiChart"></canvas></div>
+    <div class="card"><canvas id="vitalsChart"></canvas></div>
+    <div class="card"><canvas id="catChart"></canvas></div>
+  </div>
+</div>
+
+{% if mode == 'open' %}
+  <h2>Key Issue Highlights</h2>
+  <ul>
+    {% for item in results.highlights %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  <h2>High-level Recommendations</h2>
+  <ul>
+    {% for rec in results.recommendations %}
+      <li>{{ rec }}</li>
+    {% endfor %}
+  </ul>
+  <div class="alert"><em>Public demo – results are not stored.</em></div>
+{% else %}
+  <h2>Executive Summary</h2>
+  <p style="line-height:1.6">{{ results.summary }}</p>
+
+  <h2>All Metrics (150)</h2>
+  <table class="table">
+    <thead><tr><th>#</th><th>Category</th><th>Metric</th><th>Status/Value</th></tr></thead>
+    <tbody>
+      {% for row in results.full %}
+        <tr><td>{{ row.id }}</td><td>{{ row.category }}</td><td>{{ row.name }}</td><td>{{ row.value }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p>
+    <a href="/report.pdf?url={{ url }}" class="badge">Download Certified Report (PDF)</a>
+  </p>
+{% endif %}
+
+<script>
+  const siteHealth = {{ results.site_health | tojson }};
+  const vitals     = {{ vitals | tojson if vitals else '{}' }};
+  const catScores  = {{ cat_scores | tojson if cat_scores else '{}' }};
+  new Chart(document.getElementById('kpiChart'), {
+    type: 'bar',
+    data: { labels: ['Errors','Warnings','Notices'],
+      datasets: [{ data: [siteHealth.errors, siteHealth.warnings, siteHealth.notices],
+                   backgroundColor: ['#ef4444','#f59e0b','#22c55e'] }] }
+  });
+  new Chart(document.getElementById('vitalsChart'), {
+    type: 'bar',
+    data: { labels: Object.keys(vitals),
+      datasets: [{ label:'Vitals', data: Object.values(vitals), backgroundColor:'#00a3ff' }] }
+  });
+  new Chart(document.getElementById('catChart'), {
+    type: 'line',
+    data: { labels: Object.keys(catScores),
+      datasets: [{ label:'Scores (0–10)', data: Object.values(catScores), borderColor:'#22c55e' }] }
+  });
+</script>
+
+<div id="spinnerOverlay" class="spinner-overlay"></div>
+<script>
+  const overlay = document.getElementById('spinnerOverlay');
+  if (overlay) overlay.style.display = 'none';
+</script>
+{% endblock %}
