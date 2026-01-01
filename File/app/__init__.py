@@ -1,1 +1,1 @@
-# Marks 'app' as a Python package.
+# Marks 'app' as a Python package
