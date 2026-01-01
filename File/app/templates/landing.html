@@ -13,6 +13,7 @@
     <h2>Audit Any Website – Instant Free Report</h2>
     <p>No login required. Enter any website URL below and get a professional-grade audit in seconds.</p>
 
+    <!-- FIXED FORM: action and method added -->
     <form action="/ui/audit_guest" method="post" class="audit-form">
         <div class="form-group">
             <input
@@ -38,8 +39,8 @@
     <h3>Welcome back, {{ user.email }}!</h3>
     <p>Manage your saved websites, view history, schedule automated audits, and download certified reports.</p>
     <div class="actions">
-        <a href="/dashboard" class="btn-secondary">Go to Dashboard</a>
-        <!-- You can add a dashboard route later if needed -->
+        <!-- Add a dashboard later if you create one -->
+        <a href="/" class="btn-secondary">Refresh</a>
     </div>
 </div>
 {% else %}
