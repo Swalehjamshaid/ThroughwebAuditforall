@@ -1,11 +1,10 @@
-
-Flask==3.0.0
-itsdangerous==2.2.0
-Jinja2==3.1.4
-Werkzeug==3.0.1
-reportlab==4.0.8
-PyJWT==2.8.0
-matplotlib==3.8.0
-SQLAlchemy==2.0.25
-psycopg2-binary==2.9.11
-gunicorn==21.2.0
+Flask==3.0.3          # Latest in 3.0 series (from 3.0.0)
+itsdangerous==2.2.0   # Already latest – no newer release
+Jinja2==3.1.6         # Latest patch (from 3.1.4)
+Werkzeug==3.0.4       # Latest in 3.0 series (from 3.0.1)
+reportlab==4.2.5      # Latest stable (from 4.0.8)
+PyJWT==2.10.1         # Latest (from 2.8.0)
+matplotlib==3.9.2     # Latest stable (from 3.8.0)
+SQLAlchemy==2.0.36    # Latest in 2.0 series (from 2.0.25)
+psycopg2-binary==2.9.11  # Already latest – no newer release
+gunicorn==22.0.0      # Latest major with improvements (from 21.2.0 – fully compatible with Flask 3.x)
