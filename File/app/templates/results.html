@@ -1,32 +1,115 @@
-
 {% extends 'base.html' %}
 {% block content %}
-<h2>{{ title }} – {{ url }}</h2>
-<p>Date: {{ date }}</p>
-<h3>Overall Site Health</h3>
-<ul>
-  <li>Score: {{ results.site_health.score }}</li>
-  <li>Errors: {{ results.site_health.errors }}</li>
-  <li>Warnings: {{ results.site_health.warnings }}</li>
-  <li>Notices: {{ results.site_health.notices }}</li>
-  <li>Grade: {{ results.site_health.grade }}</li>
-</ul>
-<h3>Category Scores</h3>
-<ul>
-{% for k, v in cat_scores.items() %}
-  <li>{{ k }}: {{ v }}</li>
-{% endfor %}
-</ul>
+
+<div class="report-header mb-5 text-center py-5 bg-gradient rounded-4 shadow-lg">
+  <h1 class="display-5 fw-bold text-white mb-3">{{ title }}</h1>
+  <p class="lead text-white opacity-90 mb-2">{{ url }}</p>
+  <p class="text-white opacity-80 fs-5">Audit Date: {{ date }}</p>
+</div>
+
+<div class="row g-4 mb-5">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body p-5">
+        <h2 class="h3 fw-bold text-primary mb-4 text-center">
+          Overall Site Health
+        </h2>
+        <div class="row text-center">
+          <div class="col-md-3 col-sm-6 mb-4">
+            <div class="health-metric">
+              <div class="metric-value display-4 fw-bold text-primary">{{ results.site_health.score }}</div>
+              <div class="metric-label fs-5 text-muted">Score</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6 mb-4">
+            <div class="health-metric">
+              <div class="metric-value display-4 fw-bold text-danger">{{ results.site_health.errors }}</div>
+              <div class="metric-label fs-5 text-muted">Errors</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6 mb-4">
+            <div class="health-metric">
+              <div class="metric-value display-4 fw-bold text-warning">{{ results.site_health.warnings }}</div>
+              <div class="metric-label fs-5 text-muted">Warnings</div>
+            </div>
+          </div>
+          <div class="col-md-3 col-sm-6 mb-4">
+            <div class="health-metric">
+              <div class="metric-value display-4 fw-bold {{ 'text-success' if results.site_health.grade in ['A', 'B'] else 'text-info' }}">
+                {{ results.site_health.grade }}
+              </div>
+              <div class="metric-label fs-5 text-muted">Grade</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-5">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-5">
+        <h2 class="h3 fw-bold text-primary mb-4">Category Scores</h2>
+        <div class="row g-4">
+          {% for category, score in cat_scores.items() %}
+          <div class="col-lg-3 col-md-4 col-sm-6">
+            <div class="category-card text-center p-4 rounded-4 shadow-sm border {{ 'border-success' if score >= 90 else 'border-warning' if score >= 70 else 'border-danger' }}">
+              <div class="score-circle mx-auto mb-3 position-relative d-inline-flex align-items-center justify-content-center rounded-circle bg-light"
+                   style="width: 120px; height: 120px;">
+                <span class="display-5 fw-bold text-primary">{{ score }}</span>
+              </div>
+              <h5 class="fw-semibold text-capitalize">{{ category.replace('_', ' ') }}</h5>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if mode == 'registered' %}
-<h3>Full Metrics ({{ results.full|length }})</h3>
-<table class="table">
-  <thead><tr><th>ID</th><th>Category</th><th>Name</th><th>Value</th></tr></thead>
-  <tbody>
-  {% for r in results.full %}
-    <tr><td>{{ r.id }}</td><td>{{ r.category }}</td><td>{{ r.name }}</td><td>{{ r.value }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-<p><a href="{{ url_for('report_pdf') }}?url={{ url }}"><button>Download Certified PDF</button></a></p>
+<div class="card border-0 shadow-sm mb-5">
+  <div class="card-body p-5">
+    <h2 class="h3 fw-bold text-primary mb-4">Detailed Metrics ({{ results.full|length }})</h2>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-primary">
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Category</th>
+            <th scope="col">Metric Name</th>
+            <th scope="col">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in results.full %}
+          <tr>
+            <td class="fw-medium">{{ loop.index }}</td>
+            <td><span class="badge bg-secondary text-capitalize">{{ r.category }}</span></td>
+            <td class="fw-medium">{{ r.name }}</td>
+            <td>
+              {% if r.value is number %}
+                <strong>{{ r.value }}</strong>
+              {% else %}
+                {{ r.value }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="text-center py-4">
+  <a href="{{ url_for('report_pdf') }}?url={{ url }}" class="btn btn-lg btn-primary shadow-lg px-5 py-3 rounded-pill fw-bold">
+    <i class="fas fa-file-pdf me-2"></i> Download Certified PDF Report
+  </a>
+</div>
 {% endif %}
+
 {% endblock %}
