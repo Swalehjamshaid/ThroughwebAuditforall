@@ -1,13 +1,14 @@
 
 # Dockerfile
 FROM python:3.11-slim
-
 WORKDIR /app
+
 COPY requirements.txt ./
 RUN python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+
 COPY . .
 
-# Default for local runs (Railway sets PORT at runtime)
+# Default for local runs (Railway injects PORT at runtime)
 ENV PORT=8000
 
 # Shell-wrapped CMD ensures ${PORT} expands before Gunicorn runs
