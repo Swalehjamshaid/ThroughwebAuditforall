@@ -1,0 +1,42 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF Tech – {{ title or 'Audit' }}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+<header>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/audit">Audit</a>
+    <a href="/register">Register</a>
+    {% if not session.get('user') %}
+      <a href="/login">Login</a>
+      <a href="/admin/login">Admin Login</a>
+    {% else %}
+      <a href="/logout">Logout</a>
+    {% endif %}
+    {% if session.get('role') == 'admin' %}
+      <a href="/admin/dashboard" class="primary">Admin</a>
+    {% endif %}
+  </nav>
+</header>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+        <div class="alert {{ category }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+<footer>
+  © FF Tech – World-class audits using global standards.
+</footer>
+</body>
+</html>
