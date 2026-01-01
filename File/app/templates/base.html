@@ -1,29 +1,193 @@
 <!doctype html>
 <html lang="en">
 <head>
-&nbsp;&nbsp;<meta charset="utf-8">
-&nbsp;&nbsp;<meta name="viewport" content="width=device-width, initial-scale=1">
-&nbsp;&nbsp;<title>{{ title or 'FF Tech' }}</title>
-&nbsp;&nbsp;<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or 'FF Tech' }}</title>
+
+  <!-- Keep your custom styles link intact -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <!-- Modern fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Icons (Heroicons via CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --secondary: #8b5cf6;
+      --gray-900: #111827;
+      --gray-800: #1f2937;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      color: var(--gray-900);
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      padding: 3rem 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: url('data:image/svg+xml,%3Csvg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Cpath d="M0 0h100v100H0z"/%3E%3C/g%3E%3C/svg%3E');
+      pointer-events: none;
+    }
+
+    header .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header .logo {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    header .logo i {
+      font-size: 3rem;
+      opacity: 0.9;
+    }
+
+    header .tagline {
+      font-size: 1.25rem;
+      font-weight: 500;
+      opacity: 0.95;
+    }
+
+    main {
+      flex: 1;
+      padding: 4rem 0;
+    }
+
+    main .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .card {
+      background: white;
+      border-radius: 1.5rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .alert {
+      margin: 0 2rem 2rem;
+      border: none;
+      border-radius: 1rem;
+      padding: 1.25rem 1.5rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .alert-success { background: #ecfdf5; color: #065f46; }
+    .alert-danger { background: #fee2e2; color: #991b1b; }
+    .alert-info { background: #dbeafe; color: #1e40af; }
+    .alert-warning { background: #fffbeb; color: #92400e; }
+
+    .footer {
+      background: var(--gray-800);
+      color: #9ca3af;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      margin-top: auto;
+      font-size: 0.95rem;
+    }
+
+    .footer a {
+      color: #c4b5fd;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      header .container {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+      }
+
+      header .logo {
+        font-size: 2rem;
+      }
+
+      header .logo i {
+        font-size: 2.5rem;
+      }
+
+      .alert {
+        margin: 0 1rem 1.5rem;
+      }
+    }
+  </style>
 </head>
 <body>
 <header>
-&nbsp;&nbsp;<div class="container">
-&nbsp;&nbsp;&nbsp;&nbsp;<strong>FF Tech</strong> – Website Audit Platform
-&nbsp;&nbsp;</div>
+  <div class="container">
+    <div class="logo">
+      <i class="fas fa-search-dollar"></i>
+      <div>
+        <strong>FF Tech</strong>
+        <div class="tagline">Website Audit Platform</div>
+      </div>
+    </div>
+  </div>
 </header>
+
 <main>
-&nbsp;&nbsp;<div class="container">
-&nbsp;&nbsp;&nbsp;&nbsp;{% with messages = get_flashed_messages(with_categories=true) %}
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% if messages %}
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% for cat, msg in messages %}
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<div class="alert {{ cat }}">{{ msg }}</div>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endfor %}
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{% endif %}
-&nbsp;&nbsp;&nbsp;&nbsp;{% endwith %}
-&nbsp;&nbsp;&nbsp;&nbsp;{% block content %}{% endblock %}
-&nbsp;&nbsp;</div>
+  <div class="container">
+    <div class="card">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="alert alert-{{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
 </main>
-<div class="footer">© {{ 2026 }} FF Tech</div>
+
+<div class="footer">
+  © {{ 2026 }} FF Tech. All rights reserved.
+</div>
 </body>
 </html>
