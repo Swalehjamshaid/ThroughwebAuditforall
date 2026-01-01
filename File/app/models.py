@@ -1,84 +1,39 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker
-# --- FIXED RELATIVE IMPORTS ---
-from .settings import DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD
-from .security import load, save
-# ------------------------------
-import os
+import os, smtplib
+from email.mime.text import MIMEText
+from email.utils import formataddr
+# FIXED RELATIVE IMPORT
+from .settings import MAIL_SERVER, MAIL_PORT, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM, MAIL_USE_TLS
+from datetime import datetime
 
-Base = declarative_base()
-engine=None
-SessionLocal=None
+def send_verification_email(to_email, verify_link, name, data_path):
+    subject = 'Verify your email – FF Tech'
+    
+    # FIXED: Using triple quotes for multi-line string to prevent SyntaxError
+    body = f"""Hi {name},
 
-class User(Base):
-    __tablename__='users'
-    id=Column(Integer, primary_key=True)
-    email=Column(String(255), unique=True, nullable=False)
-    name=Column(String(255))
-    company=Column(String(255))
-    role=Column(String(50), default='user')
-    password=Column(String(255))
-    verified=Column(Boolean, default=False)
+Please click the link to verify your email and complete registration:
+{verify_link}
 
-class Audit(Base):
-    __tablename__='audits'
-    id=Column(Integer, primary_key=True)
-    user_email=Column(String(255), index=True)
-    url=Column(String(2048))
-    date=Column(String(32))
-    grade=Column(String(8))
+If you did not request this, ignore this email."""
 
-def init_engine():
-    global engine, SessionLocal
-    if DATABASE_URL:
-        url = DATABASE_URL
-        if url.startswith('postgres://'): url='postgresql://'+url[len('postgres://'):]
-        engine=create_engine(url, pool_pre_ping=True)
-        SessionLocal=sessionmaker(bind=engine)
-    else:
-        engine=None; SessionLocal=None
-
-def create_schema():
-    if engine: Base.metadata.create_all(engine)
-
-def get_session():
-    return SessionLocal() if SessionLocal else None
-
-def migrate_json_to_db(data_path):
-    if not engine: return
-    s=get_session()
-    try:
-        users_js=load(os.path.join(data_path,'users.json'))
-        audits_js=load(os.path.join(data_path,'audits.json'))
-        if s.query(User).count()==0:
-            for u in users_js:
-                s.add(User(email=u.get('email'), name=u.get('name'), company=u.get('company'), role=u.get('role','user'), password=u.get('password'), verified=u.get('verified',False)))
-            s.commit()
-        if s.query(Audit).count()==0:
-            for a in audits_js:
-                s.add(Audit(user_email=a.get('user'), url=a.get('url'), date=a.get('date'), grade=a.get('grade')))
-            s.commit()
-    except Exception:
-        pass
-
-def ensure_fixed_admin(data_path):
-    s=get_session()
-    if s:
+    if MAIL_SERVER and MAIL_PORT and MAIL_USERNAME and MAIL_PASSWORD:
         try:
-            admin=s.query(User).filter_by(email=ADMIN_EMAIL).first()
-            if not admin:
-                s.add(User(email=ADMIN_EMAIL, name='Admin', company='FF Tech', role='admin', password=ADMIN_PASSWORD, verified=True)); s.commit()
-            else:
-                admin.role='admin'; admin.password=ADMIN_PASSWORD; admin.verified=True; s.commit()
+            msg = MIMEText(body, 'plain', 'utf-8')
+            msg['Subject'] = subject
+            msg['From'] = formataddr(('FF Tech', MAIL_FROM))
+            msg['To'] = to_email
+            with smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=30) as s:
+                if MAIL_USE_TLS:
+                    s.starttls()
+                s.login(MAIL_USERNAME, MAIL_PASSWORD)
+                s.sendmail(MAIL_FROM, [to_email], msg.as_string())
+            return True
         except Exception:
             pass
-    else:
-        users_file=os.path.join(data_path,'users.json')
-        users=load(users_file)
-        found=False
-        for u in users:
-            if u.get('email')==ADMIN_EMAIL:
-                u['role']='admin'; u['password']=ADMIN_PASSWORD; u['verified']=True; found=True; break
-        if not found:
-            users.append({'email':ADMIN_EMAIL,'name':'Admin','company':'FF Tech','role':'admin','password':ADMIN_PASSWORD,'verified':True})
-        save(users_file, users)
+
+    outbox = os.path.join(data_path, 'outbox')
+    os.makedirs(outbox, exist_ok=True)
+    fname = os.path.join(outbox, f"verify_{to_email.replace('@', '_')}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.eml")
+    with open(fname, 'w', encoding='utf-8') as fh:
+        fh.write(f"From: FF Tech <{MAIL_FROM}>\nTo: {to_email}\nSubject: {subject}\n\n{body}")
+    return False
