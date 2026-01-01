@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Response, Request, Depends, HTTPException, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -44,13 +43,11 @@ def db_health() -> dict:
     return {"database_ok": db_ok()}
 
 # DB dependency
-
 def get_db():
     with SessionLocal() as db:
         yield db
 
 # Helpers
-
 def absolute_url(request: Request, path: str) -> str:
     scheme = request.headers.get('x-forwarded-proto') or request.url.scheme
     host = request.headers.get('x-forwarded-host') or request.url.netloc
@@ -72,6 +69,53 @@ async def landing(request: Request, db: Session = Depends(get_db)):
     tpl = jinja_env.get_template('landing.html')
     return tpl.render(user=user)
 
+# === NEW: Guest Audit Endpoint ===
+@app.post('/ui/audit_guest', response_class=RedirectResponse)
+async def audit_guest(request: Request, url: str = Form(...), db: Session = Depends(get_db)):
+    """
+    Allows non-logged-in users to audit any website directly from the homepage.
+    Creates a temporary Website entry (user_id=None), runs audit, saves results.
+    """
+    url = url.strip()
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    try:
+        # Create temporary website entry (no user associated)
+        website = Website(user_id=None, url=url)
+        db.add(website)
+        db.commit()
+        db.refresh(website)
+
+        # Run stub audit
+        metrics = run_stub_audit(website.url)
+        numeric = [v for v in metrics.values() if isinstance(v, (int, float))]
+        overall = sum(numeric) / len(numeric) if numeric else 0
+        grade = compute_grade(overall)
+
+        # Save audit
+        audit = Audit(
+            website_id=website.id,
+            metrics=metrics,
+            grade=grade,
+            metrics_count=1100
+        )
+        db.add(audit)
+        db.commit()
+        db.refresh(audit)
+
+        # Redirect to results page
+        return RedirectResponse(
+            url=f"/results?website_id={website.id}",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    except Exception as e:
+        logging.error(f"Guest audit failed for URL {url}: {str(e)}")
+        # Redirect back to home with flash message (optional enhancement later)
+        return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+
+# Existing routes below (unchanged)
 @app.get('/register', response_class=HTMLResponse)
 async def register_page(request: Request):
     tpl = jinja_env.get_template('register.html')
@@ -128,7 +172,7 @@ async def ui_logout(response: Response):
     resp.delete_cookie('auth')
     return resp
 
-# UI: Add Website
+# UI: Add Website (logged-in users)
 @app.post('/ui/add-website', response_class=HTMLResponse)
 async def add_website(request: Request, url: str = Form(...), db: Session = Depends(get_db)):
     user = ui_current_user(request, db)
@@ -138,16 +182,18 @@ async def add_website(request: Request, url: str = Form(...), db: Session = Depe
     db.add(w); db.commit(); db.refresh(w)
     return RedirectResponse(url=f"/results?website_id={w.id}", status_code=status.HTTP_303_SEE_OTHER)
 
-# Results page
+# Results page (works for both guest and logged-in audits)
 @app.get('/results', response_class=HTMLResponse)
 async def results_page(request: Request, website_id: int, db: Session = Depends(get_db)):
     user = ui_current_user(request, db)
     w = db.query(Website).get(website_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Website not found")
     last = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
     tpl = jinja_env.get_template('results.html')
     return tpl.render(user=user, website=w, audit=last)
 
-# UI: Run Audit Now
+# UI: Run Audit Now (logged-in only)
 @app.post('/ui/audits/run')
 async def ui_run_audit(request: Request, website_id: int = Form(...), db: Session = Depends(get_db)):
     user = ui_current_user(request, db)
@@ -203,7 +249,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     tpl = jinja_env.get_template('admin_dashboard.html')
     return tpl.render(user=u, users=users, websites=websites)
 
-# Minimal APIs (kept)
+# Minimal APIs (kept unchanged)
 @app.post('/websites')
 def add_site(payload: dict, db: Session = Depends(get_db)):
     email = payload.get('email')
