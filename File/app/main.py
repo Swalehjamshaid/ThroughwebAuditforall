@@ -14,7 +14,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # --- FIXED RELATIVE IMPORTS ---
-# The '.' prefix tells Python to look in the current package directory.
 from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
 from .security import (
     load, save, normalize_url, ensure_nonempty_structs,
@@ -185,7 +184,6 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
 
-        # Check DB first
         s = get_session()
         if s:
             user = s.query(User).filter_by(email=email).first()
@@ -195,7 +193,6 @@ def login():
                 flash('Logged in successfully', 'success')
                 return redirect(url_for('dashboard'))
 
-        # Fallback to JSON
         users = load(USERS_FILE)
         for u in users:
             if u.get('email') == email and u.get('verified') and check_password_hash(u.get('password', ''), password):
@@ -276,7 +273,6 @@ def results_page():
     sh, vt, csc, fr = ensure_nonempty_structs(site, vit, cs, full)
     summary = generate_summary(url, sh, csc)
 
-    # Save audit record
     s = get_session()
     if s:
         s.add(Audit(user_email=session['user'], url=url, date=datetime.utcnow().strftime('%Y-%m-%d'), grade=grade))
@@ -319,7 +315,7 @@ def schedule():
     if 'user' not in session:
         return redirect(url_for('login'))
     if request.method == 'POST':
-        flash('Schedule created successfully (demo mode). In production, integrate with Celery or similar.', 'success')
+        flash('Schedule created successfully (demo mode).', 'success')
     return render_template('schedule.html')
 
 @app.route('/admin/dashboard')
@@ -344,7 +340,7 @@ def dashboard():
 @app.route('/report.pdf')
 def report_pdf():
     if 'user' not in session:
-        flash('Login required to download report', 'error')
+        flash('Login required', 'error')
         return redirect(url_for('login'))
 
     url = request.args.get('url', 'https://example.com')
@@ -355,14 +351,12 @@ def report_pdf():
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
 
-    # Header
     c.setFillColorRGB(0, 0.64, 1)
     c.rect(40, height - 80, 520, 40, fill=1)
     c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 20)
     c.drawString(50, height - 65, 'FF Tech – Certified Audit Report')
 
-    # Content
     c.setFillColorRGB(0.1, 0.1, 0.1)
     c.setFont("Helvetica", 14)
     c.drawString(40, height - 130, f'Website: {url}')
@@ -372,20 +366,14 @@ def report_pdf():
 
     c.setFont("Helvetica", 12)
     summary_text = (
-        "This certified audit confirms strong technical health with excellent Core Web Vitals, "
-        "robust security headers, and mobile optimization. Minor improvements in image compression "
-        "and render-blocking resources will push performance to elite levels. Structured data and "
-        "canonical implementation are exemplary. Recommended: enable Brotli compression and lazy loading."
+        "This certified audit confirms strong technical health. "
+        "Recommended: enable Brotli compression and lazy loading."
     )
     y = height - 270
     for line in summary_text.split('. '):
         c.drawString(40, y, line + ".")
         y -= 20
-        if y < 100:
-            c.showPage()
-            y = height - 50
-
-    # Footer seal
+    
     c.setFillColorRGB(0, 0.64, 1)
     c.circle(width - 100, 80, 40, fill=1)
     c.setFillColorRGB(1, 1, 1)
@@ -397,7 +385,7 @@ def report_pdf():
 
     return send_file(
         path,
-        contentType='application/pdf',
+        mimetype='application/pdf',
         as_attachment=True,
         download_name=f'FFTech_Audit_{datetime.utcnow().strftime("%Y%m%d")}.pdf'
     )
