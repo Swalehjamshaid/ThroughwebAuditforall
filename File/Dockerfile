@@ -9,8 +9,6 @@ RUN python -m pip install --upgrade pip && \
 
 COPY . .
 
-# We hardcode 8000 here and in the CMD to prevent expansion errors
-ENV PORT=8000
-
-# Using the number directly is the most stable way to fix this error
-CMD gunicorn app.main:app -b 0.0.0.0:8000 -w 2
+# NO "ENV PORT" here - let Railway provide it
+# NO Square brackets - this allows Railway to swap $PORT for a number
+CMD gunicorn app.main:app -b 0.0.0.0:$PORT -w 2
