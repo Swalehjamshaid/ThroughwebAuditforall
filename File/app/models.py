@@ -1,8 +1,9 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker
-# FIXED RELATIVE IMPORTS
+# --- FIXED RELATIVE IMPORTS ---
 from .settings import DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD
 from .security import load, save
+# ------------------------------
 import os
 
 Base = declarative_base()
