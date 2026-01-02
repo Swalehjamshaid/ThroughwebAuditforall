@@ -41,10 +41,9 @@ except ImportError:
     from webpagetest import run_wpt_test
     PACKAGE_MODE = False
 
-# --- Hard-coded API key fallback (as requested) ---
+# Hard-coded fallback, if settings/env not provided
 HARDCODED_API_KEY = "AIzaSyDUVptDEm1ZbiBdb5m1DGjvKCW_LBVJMEw"
-# If env/settings did not set the key, use the hard-coded one
-GOOGLE_PSI_API_KEY = GOOGLE_PSI_API_KEY or HARDCODED_API_KEY
+GOOGLE_PSI_API_KEY = GOOGLE_PSI_API_KEY or os.getenv("GOOGLE_PSI_API_KEY") or HARDCODED_API_KEY
 
 # ----------------------- Flask app -----------------------
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -224,8 +223,8 @@ def open_audit():
         mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
         desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
     except Exception as e:
-        # Graceful handling for 429 or network errors
-        flash(f'We were rate-limited by PageSpeed Insights. Please try again soon. ({e})', 'error')
+        # Graceful handling for 403 or any PSI error
+        flash(f'PageSpeed Insights refused the request (check API key/config). Details: {e}', 'error')
         return redirect(url_for('home'))
 
     # Merge Lighthouse categories (0..100)
@@ -397,7 +396,7 @@ def results_page():
         mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
         desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
     except Exception as e:
-        flash(f'PageSpeed Insights is temporarily rate-limited. Please try again soon. ({e})', 'error')
+        flash(f'PageSpeed Insights refused the request (check API key/config). Details: {e}', 'error')
         return redirect(url_for('home'))
 
     psi_cat = {}
@@ -535,7 +534,7 @@ def report_pdf():
         mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
         desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
     except Exception as e:
-        flash(f'PageSpeed Insights is temporarily rate-limited. Please try again soon. ({e})', 'error')
+        flash(f'PageSpeed Insights refused the request (check API key/config). Details: {e}', 'error')
         return redirect(url_for('home'))
 
     performance = int(round(((mobile['categories'].get('Performance &amp; Web Vitals',0) +
