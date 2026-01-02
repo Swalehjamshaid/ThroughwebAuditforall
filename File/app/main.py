@@ -1,61 +1,50 @@
 
-import os
-import json
-import random
+import os, json, random
 from datetime import datetime, timedelta
 
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, abort
-)
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, abort
 import matplotlib
 matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# Robust imports: works as package OR script
+# Robust imports
 try:
-    # Package mode: python -m app.main (or gunicorn app.main:app)
-    from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS
-    from .security import load, save, normalize_url, ensure_nonempty_structs, generate_summary
+    from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, DATABASE_URL, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from .security import load, save, normalize_url, generate_summary
     from .models import init_engine, create_schema, get_session, User, Audit
     from .emailer import send_verification_email
-    from .audit_stub import stub_open_metrics
+    from .pagespeed import fetch_pagespeed
+    from .webpagetest import run_wpt_test
     PACKAGE_MODE = True
 except ImportError:
-    # Script mode: python main.py (modules in same directory)
-    from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS
-    from security import load, save, normalize_url, ensure_nonempty_structs, generate_summary
+    from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, DATABASE_URL, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from security import load, save, normalize_url, generate_summary
     from models import init_engine, create_schema, get_session, User, Audit
     from emailer import send_verification_email
-    from audit_stub import stub_open_metrics
+    from pagespeed import fetch_pagespeed
+    from webpagetest import run_wpt_test
     PACKAGE_MODE = False
 
-# Flask app
-app = Flask(__name__)
+# Flask
+app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if PACKAGE_MODE else os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, 'data')
 USERS_FILE = os.path.join(DATA_PATH, 'users.json')
 AUDITS_FILE = os.path.join(DATA_PATH, 'audits.json')
 CATALOGUE_FILE = os.path.join(DATA_PATH, 'metrics_catalogue_full.json')
-
-# Ensure data directory & files exist
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+CHARTS_DIR = os.path.join(STATIC_DIR, 'charts')
 os.makedirs(DATA_PATH, exist_ok=True)
-def _ensure_json(path, default):
-    if not os.path.exists(path):
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(default, f)
+os.makedirs(CHARTS_DIR, exist_ok=True)
+for fp, default in [(USERS_FILE, []), (AUDITS_FILE, []), (CATALOGUE_FILE, [])]:
+    if not os.path.exists(fp):
+        with open(fp, 'w', encoding='utf-8') as f: json.dump(default, f)
 
-_ensure_json(USERS_FILE, [])
-_ensure_json(AUDITS_FILE, [])
-_ensure_json(CATALOGUE_FILE, [])
-
-# Initialize DB (if env supplied)
-# Your models.py should use DATABASE_URL=os.getenv('DATABASE_URL') and handle SSL if needed.
+# DB
 init_engine()
 create_schema()
 
@@ -64,104 +53,237 @@ create_schema()
 def healthz():
     return {"status": "ok"}, 200
 
-# ----------------------- Landing Page -----------------------
+# ----------------------- Landing -----------------------
 @app.route('/')
 def home():
     return render_template('landing.html', title='Landing')
 
 # ----------------------- Scoring -----------------------
-def strict_score_to_grade(score: float) -> str:
-    return 'A+' if score >= 9.5 else 'A' if score >= 8.5 else 'B' if score >= 7.0 else 'C' if score >= 5.5 else 'D'
+def strict_score_to_grade(score10: float) -> str:
+    return 'A+' if score10 >= 9.5 else 'A' if score10 >= 8.5 else 'B' if score10 >= 7.0 else 'C' if score10 >= 5.5 else 'D'
 
 CATEGORY_WEIGHTS = {
-    'Overall Site Health': 0.12,
-    'Crawlability & Indexation': 0.12,
-    'On-Page SEO': 0.12,
-    'URL & Internal Linking': 0.10,
-    'Performance & Web Vitals': 0.18,
-    'Mobile & Usability': 0.12,
+    'Performance & Web Vitals': 0.25,
+    'Accessibility': 0.10,
+    'Best Practices': 0.10,
+    'SEO': 0.15,
+    'Crawlability & Indexation': 0.10,
+    'URL & Internal Linking': 0.08,
     'Security & HTTPS': 0.12,
-    'International SEO': 0.06,
-    'Backlinks & Authority': 0.06,
-    'Advanced & Historical': 0.10
+    'Mobile & Usability': 0.10
 }
 
-def generate_full_rows():
-    with open(CATALOGUE_FILE, 'r', encoding='utf-8') as f:
-        catalogue = json.load(f)
-    values = ['OK', 'Warning', 'Error', 'Improvement']
-    rows = []
-    for m in catalogue:
-        if isinstance(m, dict):
-            rows.append({
-                'id': m.get('id'),
-                'category': m.get('category'),
-                'name': m.get('name'),
-                'value': random.choice(values)
-            })
-    return rows
+# basic heuristics for non-PSI categories (Crawlability, Security, etc.)
+import requests
 
-def compute_category_scores(full_rows):
-    mapv = {'OK': 1.0, 'Improvement': 0.7, 'Warning': 0.3, 'Error': 0.0}
-    by_cat = {}
-    for r in full_rows:
-        cat = r.get('category')
-        val = mapv.get(r.get('value'), 0.5)
-        if cat:
-            by_cat.setdefault(cat, []).append(val)
-    cat_scores = {c: round((sum(vals) / max(len(vals), 1)) * 10, 2) for c, vals in by_cat.items()}
-    for c in CATEGORY_WEIGHTS.keys():
-        cat_scores.setdefault(c, round(random.uniform(6.5, 8.5), 2))
-    return cat_scores
+def quick_checks(url: str):
+    """
+    Lightweight checks: robots.txt, sitemap, HTTPS, HSTS, canonical presence, mobile viewport, internal link hints.
+    """
+    res = {'Crawlability & Indexation': 0, 'URL & Internal Linking': 0, 'Security & HTTPS': 0, 'Mobile & Usability': 0}
+    try:
+        # HEAD request for headers
+        r_head = requests.head(url, timeout=15, allow_redirects=True)
+        final_url = r_head.url
+        https_ok = final_url.startswith('https://')
+        hsts = r_head.headers.get('Strict-Transport-Security')
+        security_score = 70 + (15 if https_ok else 0) + (15 if hsts else 0)
 
-def compute_overall(cat_scores):
-    DEFAULT = 7.5
+        # robots.txt
+        from urllib.parse import urlparse
+        p = urlparse(final_url)
+        robots_url = f"{p.scheme}://{p.netloc}/robots.txt"
+        sm_url = f"{p.scheme}://{p.netloc}/sitemap.xml"
+        robots_ok = False
+        sitemap_ok = False
+        try:
+            rr = requests.get(robots_url, timeout=10)
+            robots_ok = (rr.status_code == 200 and 'User-agent' in rr.text)
+        except Exception:
+            pass
+        try:
+            sm = requests.get(sm_url, timeout=10)
+            sitemap_ok = (sm.status_code == 200 and ('<urlset' in sm.text or '<sitemapindex' in sm.text))
+        except Exception:
+            pass
+        crawl_score = 60 + (20 if robots_ok else 0) + (20 if sitemap_ok else 0)
+
+        # GET for meta tags
+        g = requests.get(final_url, timeout=20)
+        html = g.text.lower()
+        has_viewport = '<meta name="viewport"' in html
+        has_canonical = 'rel="canonical"' in html or "rel='canonical'" in html
+        mobile_score = 60 + (20 if has_viewport else 0) + 20  # base bonus assuming PSI mobile already covers UX
+        link_score = 60 + (20 if has_canonical else 0) + 20  # internal linking/canonical presence
+
+        res['Security & HTTPS'] = min(security_score, 100)
+        res['Crawlability & Indexation'] = min(crawl_score, 100)
+        res['Mobile & Usability'] = min(mobile_score, 100)
+        res['URL & Internal Linking'] = min(link_score, 100)
+    except Exception:
+        # fallbacks
+        res['Security & HTTPS'] = 60
+        res['Crawlability & Indexation'] = 60
+        res['Mobile & Usability'] = 60
+        res['URL & Internal Linking'] = 60
+    return res
+
+def compute_overall(cat_scores_100: dict) -> float:
+    """
+    cat_scores_100: dict of 0..100
+    returns 0..10 score for UI grade
+    """
+    DEFAULT = 75.0
     total = 0.0
     for c, w in CATEGORY_WEIGHTS.items():
-        total += (cat_scores.get(c, DEFAULT)) * w
-    return round(total / max(sum(CATEGORY_WEIGHTS.values()), 1e-9), 2)
+        total += (float(cat_scores_100.get(c, DEFAULT)) * w)
+    # Convert weighted 0..100 to 0..10
+    weighted_100 = total / max(sum(CATEGORY_WEIGHTS.values()), 1e-9)
+    return round(weighted_100 / 10.0, 2)
 
-# ----------------------- Open Audit -----------------------
+# ----------------------- Charts -----------------------
+def _save_fig(fig, name):
+    path = os.path.join(CHARTS_DIR, name)
+    fig.savefig(path, bbox_inches='tight', dpi=160)
+    plt.close(fig)
+    return f'/static/charts/{name}'
+
+def chart_category_bars(cat_scores_100: dict):
+    labels = list(cat_scores_100.keys())
+    values = [cat_scores_100[l] for l in labels]
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    ax.bar(labels, values, color='#0a84ff')
+    ax.set_ylim(0, 100)
+    ax.set_title('Category Scores (0–100)')
+    ax.set_ylabel('Score')
+    ax.tick_params(axis='x', rotation=25)
+    for i, v in enumerate(values):
+        ax.text(i, v + 1.5, f'{v:.0f}', ha='center', fontsize=9)
+    return _save_fig(fig, 'category_scores.png')
+
+def chart_issue_donut(errors, warnings, notices):
+    sizes = [errors, warnings, notices]
+    labels = [f'Errors ({errors})', f'Warnings ({warnings})', f'Notices ({notices})']
+    colors = ['#ff3b30', '#ff9f0a', '#34c759']
+    fig, ax = plt.subplots(figsize=(5,5))
+    wedges, _ = ax.pie(sizes, colors=colors, startangle=90, wedgeprops=dict(width=0.42))
+    ax.legend(wedges, labels, loc='center left', bbox_to_anchor=(1,0.5))
+    ax.set_title('Issue Composition')
+    centre_circle = plt.Circle((0,0),0.58,fc='white')
+    fig.gca().add_artist(centre_circle)
+    return _save_fig(fig, 'issues_donut.png')
+
+def chart_overall_gauge(score10: float):
+    fig, ax = plt.subplots(figsize=(8, 1.1))
+    ax.barh([0], [score10], color='#0a84ff', height=0.5)
+    ax.set_xlim(0, 10)
+    ax.set_yticks([])
+    ax.set_title(f'Overall Site Health: {score10:.2f} / 10', fontsize=11, pad=8)
+    for t in [5.5, 7.0, 8.5, 9.5]: ax.axvline(t, color='#999', linestyle='--', linewidth=1)
+    for x, g in [(5.5,'C'),(7.0,'B'),(8.5,'A'),(9.5,'A+')]:
+        ax.text(x, 0.45, g, color='#333', fontsize=9, ha='center')
+    return _save_fig(fig, 'overall_gauge.png')
+
+def chart_worldwide(metrics):
+    regions = [m['region'] for m in metrics]
+    latency = [m['latency_ms'] for m in metrics]
+    fig, ax = plt.subplots(figsize=(8, 4.8))
+    y = list(range(len(regions)))
+    ax.barh(y, latency, color='#5856d6')
+    ax.set_yticks(y)
+    ax.set_yticklabels(regions)
+    ax.set_xlabel('Median Latency (ms)')
+    ax.set_title('Worldwide Network Latency & Vitals')
+    for i, m in enumerate(metrics):
+        ax.text(latency[i] + 5, i, f"LCP {m.get('lcp_ms', '—')}ms | INP {m.get('inp_ms', '—')}ms | CLS {m.get('cls', '—')}", va='center', fontsize=8)
+    return _save_fig(fig, 'worldwide.png')
+
+# ----------------------- Open Audit (PSI + optional WPT) -----------------------
 @app.route('/audit', methods=['POST'])
 def open_audit():
-    url = normalize_url(request.form.get('url', ''))
-    stub = stub_open_metrics(url)
-    cat_scores = stub.get('cat_scores', {})
-    for c in CATEGORY_WEIGHTS.keys():
-        cat_scores.setdefault(c, round(random.uniform(6.5, 8.5), 2))
-    score = compute_overall(cat_scores)
-    grade = strict_score_to_grade(score)
-    site_health_stub = stub.get('site_health', {})
+    url = normalize_url(request.form.get('url'))
+    if not url:
+        flash('Please provide a valid URL', 'error')
+        return redirect(url_for('home'))
+
+    # PSI: mobile & desktop
+    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    # Merge Lighthouse categories (average of mobile+desktop)
+    psi_cat = {}
+    for k in set(mobile['categories'].keys()) | set(desktop['categories'].keys()):
+        psi_cat[k] = round(((mobile['categories'].get(k, 0) + desktop['categories'].get(k, 0)) / 2.0), 1)
+
+    # Additional checks (crawl, https, canonical, viewport)
+    extra = quick_checks(url)
+    cat_scores_100 = {**psi_cat, **extra}
+
+    overall10 = compute_overall(cat_scores_100)
+    grade = strict_score_to_grade(overall10)
+
+    # Issue counts (demo). You can compute from Lighthouse opportunities/diagnostics if desired.
     site_health = {
-        'score': score,
-        'errors': site_health_stub.get('errors', 0),
-        'warnings': site_health_stub.get('warnings', 0),
-        'notices': site_health_stub.get('notices', 0),
-        'grade': grade
+        'score': overall10,
+        'grade': grade,
+        'errors': random.randint(5, 25),
+        'warnings': random.randint(40, 140),
+        'notices': random.randint(100, 300)
     }
+
+    # Worldwide metrics: if WPT key exists, run a few regions; else show synthetic
+    ww = []
+    if WPT_API_KEY:
+        regions = ["Dulles:Chrome","London:Chrome","Frankfurt:Chrome","Sydney:Chrome","Singapore:Chrome"]
+        for loc in regions:
+            try:
+                m = run_wpt_test(url, location=loc, api_key=WPT_API_KEY, timeout=210)
+                if m:
+                    ww.append({'region': loc, 'latency_ms': m['ttfb_ms'], 'lcp_ms': m.get('lcp_ms'), 'inp_ms': None, 'cls': None})
+            except Exception:
+                pass
+    else:
+        # synthetic fallback (kept for demo only)
+        regions = ['North America','Europe','Middle East','South Asia','East Asia','Oceania','Latin America','Africa']
+        for r in regions:
+            ww.append({'region': r, 'latency_ms': random.randint(80, 280), 'lcp_ms': random.randint(2200, 4200), 'inp_ms': random.randint(150, 300), 'cls': round(random.uniform(0.05, 0.25),2)})
+
+    # Charts
+    chart_overall = chart_overall_gauge(overall10)
+    chart_categories = chart_category_bars(cat_scores_100)
+    chart_issues = chart_issue_donut(site_health['errors'], site_health['warnings'], site_health['notices'])
+    chart_world = chart_worldwide(ww)
+
+    # Summary
+    summary = generate_summary(url, site_health, {k: v/10.0 for k, v in cat_scores_100.items()})  # convert 0..100 → 0..10
+
     results = {
         'site_health': site_health,
-        'full': [],
-        'summary': generate_summary(url, site_health, cat_scores)
+        'summary': summary,
+        'charts': {
+            'overall_gauge': chart_overall,
+            'category_bar': chart_categories,
+            'issues_donut': chart_issues,
+            'worldwide_latency': chart_world
+        },
+        'worldwide': ww,
+        'psi': {'mobile': mobile, 'desktop': desktop},
+        'categories_100': cat_scores_100
     }
-    return render_template(
-        'results.html',
-        title='Open Audit',
-        url=url,
-        date=datetime.utcnow().strftime('%Y-%m-%d'),
-        results=results,
-        mode='open',
-        cat_scores=cat_scores
-    )
 
+    return render_template('results.html',
+                           title='Open Audit',
+                           url=url,
+                           date=datetime.utcnow().strftime('%Y-%m-%d'),
+                           results=results,
+                           mode='open',
+                           BRAND_NAME=BRAND_NAME)
 # ----------------------- Registration & Login -----------------------
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
         name = request.form.get('name')
         company = request.form.get('company')
         email = request.form.get('email')
-
         s = get_session()
         if s:
             try:
@@ -170,28 +292,15 @@ def register():
                     return redirect(url_for('register'))
             except Exception:
                 s = None
-
-        token = f'verify-{random.randint(100000, 999999)}'
+        token = f'verify-{random.randint(100000,999999)}'
         users = load(USERS_FILE)
-        users.append({
-            'email': email,
-            'name': name,
-            'company': company,
-            'role': 'user',
-            'password': None,
-            'verified': False,
-            'token': token
-        })
+        users.append({'email':email,'name':name,'company':company,'role':'user','password_hash':None,'verified':False,'token':token})
         save(USERS_FILE, users)
-
         if s:
-            s.add(User(email=email, name=name, company=company, role='user', password_hash='', verified=False))
-            s.commit()
-
+            s.add(User(email=email, name=name, company=company, role='user', password_hash='', verified=False)); s.commit()
         verify_link = url_for('verify', token=token, _external=True)
         send_verification_email(email, verify_link, name, DATA_PATH)
         return render_template('register_done.html', email=email, verify_link=verify_link)
-
     return render_template('register.html')
 
 @app.route('/verify')
@@ -203,9 +312,7 @@ def verify():
             s = get_session()
             if s:
                 dbu = s.query(User).filter_by(email=u['email']).first()
-                if dbu:
-                    dbu.verified = True
-                    s.commit()
+                if dbu: dbu.verified = True; s.commit()
             return render_template('set_password.html', token=token, email=u['email'])
     abort(400)
 
@@ -217,188 +324,190 @@ def set_password():
     for u in users:
         if u.get('token') == token:
             u['verified'] = True
-            u['password'] = password
+            u['password_hash'] = generate_password_hash(password)
             u['token'] = None
             save(USERS_FILE, users)
-
             s = get_session()
             if s:
                 dbu = s.query(User).filter_by(email=u['email']).first()
                 if dbu:
                     dbu.verified = True
-                    dbu.password_hash = password
+                    dbu.password_hash = u['password_hash']
                     s.commit()
-
             flash('Password set. You can now log in.', 'success')
             return render_template('verify_success.html')
     abort(400)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email = request.form.get('email'); password = request.form.get('password')
         s = get_session()
         if s:
             dbu = s.query(User).filter_by(email=email).first()
-            if dbu and (dbu.password_hash or '') == (password or '') and dbu.verified:
-                session['user'] = dbu.email
-                session['role'] = dbu.role
-                flash('Logged in successfully', 'success')
-                return redirect(url_for('results_page'))
+            if dbu and dbu.verified and check_password_hash(dbu.password_hash or '', password or ''):
+                session['user'] = dbu.email; session['role'] = dbu.role
+                flash('Logged in successfully','success'); return redirect(url_for('results_page'))
         users = load(USERS_FILE)
         for u in users:
-            if u['email'] == email and (u['password'] or '') == (password or '') and u.get('verified'):
-                session['user'] = email
-                session['role'] = u['role']
-                flash('Logged in successfully', 'success')
-                return redirect(url_for('results_page'))
-        flash('Invalid credentials or unverified email', 'error')
+            if u['email']==email and u.get('verified') and check_password_hash(u.get('password_hash') or '', password or ''):
+                session['user']=email; session['role']=u['role']
+                flash('Logged in successfully','success'); return redirect(url_for('results_page'))
+        flash('Invalid credentials or unverified email','error')
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    session.clear()
-    flash('Logged out', 'success')
-    return redirect(url_for('home'))
+    session.clear(); flash('Logged out','success'); return redirect(url_for('home'))
 
-# ----------------------- Registered Audit -----------------------
+# ----------------------- Registered Audit (stores Audit) -----------------------
 @app.route('/results')
 def results_page():
-    if not session.get('user'):
-        return redirect(url_for('login'))
-    url = normalize_url(request.args.get('url', 'https://example.com'))
-    full_rows = generate_full_rows()
-    cat_scores = compute_category_scores(full_rows)
-    score = compute_overall(cat_scores)
-    grade = strict_score_to_grade(score)
-    site_health = {
-        'score': score,
-        'errors': random.randint(0, 60),
-        'warnings': random.randint(20, 160),
-        'notices': random.randint(50, 280),
-        'grade': grade
-    }
-    summary = generate_summary(url, site_health, cat_scores)
+    if not session.get('user'): return redirect(url_for('login'))
+    url = normalize_url(request.args.get('url','https://example.com'))
 
+    # PSI both strategies
+    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    psi_cat = {}
+    for k in set(mobile['categories'].keys()) | set(desktop['categories'].keys()):
+        psi_cat[k] = round(((mobile['categories'].get(k, 0) + desktop['categories'].get(k, 0)) / 2.0), 1)
+    extra = quick_checks(url)
+    cat_scores_100 = {**psi_cat, **extra}
+    overall10 = compute_overall(cat_scores_100)
+    grade = strict_score_to_grade(overall10)
+    site_health = {'score': overall10, 'errors': random.randint(0,60),'warnings':random.randint(20,160),'notices':random.randint(50,280),'grade':grade}
+
+    # Persist
     s = get_session()
+    summary = generate_summary(url, site_health, {k: v/10.0 for k, v in cat_scores_100.items()})
     if s:
-        s.add(Audit(
-            user_email=session['user'],
-            url=url,
-            date=datetime.utcnow().strftime('%Y-%m-%d'),
-            grade=grade,
-            summary=summary
-        ))
+        s.add(Audit(user_email=session['user'], url=url, date=datetime.utcnow().strftime('%Y-%m-%d'),
+                    grade=grade, summary=summary, overall_score=int(round(overall10*10))))
         s.commit()
     else:
         audits = load(AUDITS_FILE)
-        audits.append({
-            'user': session['user'],
-            'url': url,
-            'date': datetime.utcnow().strftime('%Y-%m-%d'),
-            'grade': grade
-        })
-        save(AUDITS_FILE, audits)
+        audits.append({'user': session['user'], 'url': url, 'date': datetime.utcnow().strftime('%Y-%m-%d'),
+                       'grade': grade}); save(AUDITS_FILE, audits)
 
-    results = {'site_health': site_health, 'full': full_rows, 'summary': summary}
-    return render_template(
-        'results.html',
-        title='Registered Audit',
-        url=url,
-        date=datetime.utcnow().strftime('%Y-%m-%d'),
-        results=results,
-        mode='registered',
-        cat_scores=cat_scores
-    )
+    # Charts
+    chart_overall = chart_overall_gauge(overall10)
+    chart_categories = chart_category_bars(cat_scores_100)
+    chart_issues = chart_issue_donut(site_health['errors'], site_health['warnings'], site_health['notices'])
+
+    # Worldwide: optional WPT
+    ww = []
+    if WPT_API_KEY:
+        for loc in ["Dulles:Chrome","London:Chrome","Frankfurt:Chrome","Sydney:Chrome","Singapore:Chrome"]:
+            try:
+                m = run_wpt_test(url, location=loc, api_key=WPT_API_KEY, timeout=210)
+                if m:
+                    ww.append({'region': loc, 'latency_ms': m['ttfb_ms'], 'lcp_ms': m.get('lcp_ms'), 'inp_ms': None, 'cls': None})
+            except Exception: pass
+    chart_world = chart_worldwide(ww if ww else [
+        {'region':'North America','latency_ms':140,'lcp_ms':2800,'inp_ms':180,'cls':0.08},
+        {'region':'Europe','latency_ms':110,'lcp_ms':2600,'inp_ms':170,'cls':0.07},
+        {'region':'South Asia','latency_ms':200,'lcp_ms':3400,'inp_ms':220,'cls':0.12},
+    ])
+
+    results = {
+        'site_health': site_health,
+        'summary': summary,
+        'charts': {'overall_gauge': chart_overall, 'category_bar': chart_categories, 'issues_donut': chart_issues, 'worldwide_latency': chart_world},
+        'worldwide': ww if ww else [],
+        'psi': {'mobile': mobile, 'desktop': desktop},
+        'categories_100': cat_scores_100
+    }
+
+    return render_template('results.html', title='Registered Audit', url=url,
+                           date=datetime.utcnow().strftime('%Y-%m-%d'), results=results,
+                           mode='registered', BRAND_NAME=BRAND_NAME)
 
 @app.route('/history')
 def history():
-    if not session.get('user'):
-        return redirect(url_for('login'))
+    if not session.get('user'): return redirect(url_for('login'))
     s = get_session()
     if s:
         rows = s.query(Audit).filter_by(user_email=session.get('user')).all()
-        audits = [{'date': r.date, 'url': r.url, 'grade': r.grade} for r in rows]
+        audits = [{'date': r.date, 'url': r.url, 'grade': r.grade, 'overall_score': r.overall_score} for r in rows]
     else:
         audits = [a for a in load(AUDITS_FILE) if a.get('user') == session.get('user')]
     return render_template('audit_history.html', audits=audits)
 
-@app.route('/schedule', methods=['GET', 'POST'])
+@app.route('/schedule', methods=['GET','POST'])
 def schedule():
-    if not session.get('user'):
-        return redirect(url_for('login'))
+    if not session.get('user'): return redirect(url_for('login'))
     if request.method == 'POST':
         flash('Schedule created (demo). Integrate with a scheduler/worker in production.', 'success')
     return render_template('schedule.html')
 
 # ----------------------- Admin -----------------------
-@app.route('/admin/login', methods=['GET', 'POST'])
+@app.route('/admin/login', methods=['GET','POST'])
 def admin_login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email = request.form.get('email'); password = request.form.get('password')
         if email == ADMIN_EMAIL and password == ADMIN_PASSWORD:
-            session['user'] = ADMIN_EMAIL
-            session['role'] = 'admin'
-            flash('Admin logged in successfully', 'success')
-            return redirect(url_for('dashboard'))
-        flash('Invalid admin credentials', 'error')
+            session['user'] = ADMIN_EMAIL; session['role'] = 'admin'
+            flash('Admin logged in successfully','success'); return redirect(url_for('dashboard'))
+        flash('Invalid admin credentials','error')
     return render_template('login.html')
 
 @app.route('/admin/dashboard')
 def dashboard():
-    if session.get('role') != 'admin':
-        return {'detail': 'Admin only'}, 403
+    if session.get('role') != 'admin': return {'detail':'Admin only'}, 403
     s = get_session()
     if s:
-        users = s.query(User).all()
-        audits = s.query(Audit).all()
+        users = s.query(User).all(); audits = s.query(Audit).all()
         stats = {'users': len(users), 'audits': len(audits)}
         users_fmt = [{'email': u.email, 'role': u.role, 'name': u.name, 'company': u.company} for u in users]
         return render_template('admin_dashboard.html', stats=stats, users=users_fmt)
-    users = load(USERS_FILE)
-    audits = load(AUDITS_FILE)
-    stats = {'users': len(users), 'audits': len(audits)}
+    users = load(USERS_FILE); audits = load(AUDITS_FILE); stats = {'users': len(users), 'audits': len(audits)}
     return render_template('admin_dashboard.html', stats=stats, users=users)
 
 # ----------------------- Certified PDF -----------------------
 @app.route('/report.pdf')
 def report_pdf():
-    if not session.get('user'):
-        return redirect(url_for('login'))
+    if not session.get('user'): return redirect(url_for('login'))
     url = request.args.get('url', 'https://example.com')
     path = os.path.join(DATA_PATH, 'report.pdf')
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
-    score = random.uniform(6.0, 9.7)
-    grade = strict_score_to_grade(score)
+
+    # You can pull a fresh PSI score or reuse cached
+    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    performance = int(round(((mobile['categories'].get('Performance & Web Vitals',0) + desktop['categories'].get('Performance & Web Vitals',0))/2)))
+    overall10 = compute_overall({**quick_checks(url),
+                                 'Performance & Web Vitals': performance,
+                                 'Accessibility': int(round(((mobile['categories'].get('Accessibility',0)+desktop['categories'].get('Accessibility',0))/2))),
+                                 'Best Practices': int(round(((mobile['categories'].get('Best Practices',0)+desktop['categories'].get('Best Practices',0))/2))),
+                                 'SEO': int(round(((mobile['categories'].get('SEO',0)+desktop['categories'].get('SEO',0))/2))),
+                                 })
+    grade = strict_score_to_grade(overall10)
+
     c.setFillColorRGB(0, 0.64, 1)
-    c.rect(40, height - 80, 260, 30, fill=1)
+    c.rect(40, height - 80, 320, 30, fill=1)
     c.setFillColorRGB(1, 1, 1)
-    c.drawString(50, height - 65, f'{BRAND_NAME} – Certified Report')
-    c.setFillColorRGB(0.1, 0.1, 0.1)
+    c.drawString(50, height - 65, f'{BRAND_NAME} – Certified Audit')
+
+    c.setFillColorRGB(0.1,0.1,0.1)
     c.drawString(40, height - 110, f'URL: {url}')
     c.drawString(40, height - 130, f'Date: {datetime.utcnow().strftime("%Y-%m-%d")}')
     c.drawString(40, height - 150, f'Overall Grade: {grade}')
-    c.drawString(40, height - 170, f'Site Health Score: {round(score, 2)} / 10')
+    c.drawString(40, height - 170, f'Overall Score: {overall10:.2f} / 10')
     valid_until = datetime.utcnow() + timedelta(days=REPORT_VALIDITY_DAYS)
     c.drawString(40, height - 190, f'Valid Until: {valid_until.strftime("%Y-%m-%d")}')
-    summary = (
-        "This certified audit summarizes the site's technical and SEO health across crawlability, performance, "
-        "security, and mobile usability. Key improvements include optimizing images, fixing broken links, "
-        "adding canonical tags, and enabling compression and caching. Addressing render-blocking resources and "
-        "third-party script payloads will improve Core Web Vitals. Consistent structured data and security "
-        "headers enhance visibility and trust. Trend tracking and scheduled audits maintain stability over time."
-    )
+
+    summary = ("This certified audit uses Google PageSpeed Insights (Lighthouse + CrUX) to assess performance, "
+               "together with security, indexation, and mobile usability checks. Optional WebPageTest geo runs "
+               "provide real-world latency from multiple regions.")
     c.drawString(40, height - 220, 'Executive Summary:')
     wrap = 95
     for i in range(0, len(summary), wrap):
-        c.drawString(40, height - 240 - (i // wrap) * 15, summary[i:i + wrap])
-    c.setFillColorRGB(0, 0.64, 1)
-    c.circle(width - 80, 80, 30, fill=1)
-    c.setFillColorRGB(1, 1, 1)
-    c.drawString(width - 105, 80, 'CERT')
-    c.showPage()
-    c.save()
+        c.drawString(40, height - 240 - (i // wrap) * 15, summary[i:i+wrap])
+
+    c.setFillColorRGB(0, 0.64, 1); c.circle(width - 80, 80, 30, fill=1)
+    c.setFillColorRGB(1, 1, 1); c.drawString(width - 105, 80, 'CERT')
+    c.showPage(); c.save()
     return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='FFTech_Audit_Report.pdf')
+``
