@@ -3,10 +3,10 @@
 Robust Google PageSpeed Insights client with:
 - API key support (recommended for automated queries)
 - Exponential backoff with jitter and Retry-After handling on HTTP 429
-- Simple file-based caching to reduce repeated calls
+- File-based caching to reduce repeated calls
 - Cross-process file lock to serialize PSI calls across multiple Gunicorn workers
 
-Outputs category scores with keys matching templates:
+Outputs category scores with keys your templates expect:
 'Performance &amp; Web Vitals', 'Accessibility', 'Best Practices', 'SEO'
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ import fcntl
 import logging
 import hashlib
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from urllib.parse import urlencode
 from email.utils import parsedate_to_datetime
 
@@ -27,13 +27,15 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# PSI endpoint
 BASE_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+
+# --- Hard-coded API key fallback (as requested) ---
+HARDCODED_API_KEY = "AIzaSyDUVptDEm1ZbiBdb5m1DGjvKCW_LBVJMEw"
 
 # PSI categories to request (lowercase for API)
 PSI_CATEGORIES = ["performance", "accessibility", "best-practices", "seo"]
 
-# Output category keys (match your templates/main.py)
+# Output category keys (HTML-escaped names used in your templates)
 OUTPUT_KEYS = {
     "performance": "Performance &amp; Web Vitals",
     "accessibility": "Accessibility",
@@ -41,7 +43,7 @@ OUTPUT_KEYS = {
     "seo": "SEO",
 }
 
-# Cache & lock settings
+# Cache & lock
 CACHE_DIR = Path("/app/.psi_cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 LOCK_FILE_PATH = Path("/app/.psi_lock")
@@ -76,7 +78,7 @@ def _write_cache(path: Path, data: Dict[str, Any]) -> None:
 
 
 def _parse_retry_after(value: Optional[str]) -> Optional[float]:
-    """Parse Retry-After header into seconds."""
+    """Parse Retry-After header into seconds (supports seconds or HTTP-date)."""
     if not value:
         return None
     try:
@@ -93,16 +95,13 @@ def _parse_retry_after(value: Optional[str]) -> Optional[float]:
 
 
 def _transform_categories(ps_json: Dict[str, Any]) -> Dict[str, float]:
-    """
-    Convert PSI/lighthouse categories (score 0..1) to 0..100
-    with output keys matching your code.
-    """
+    """Convert PSI/lighthouse categories (score 0..1) to 0..100 with your output keys."""
     out = {}
     try:
         cats = (ps_json.get("lighthouseResult", {}) or {}).get("categories", {}) or {}
-        for key_api, key_out in OUTPUT_KEYS.items():
-            score_0_1 = (cats.get(key_api, {}) or {}).get("score", None)
-            out[key_out] = round((float(score_0_1) * 100.0) if score_0_1 is not None else 0.0, 1)
+        for api_key, out_key in OUTPUT_KEYS.items():
+            score_0_1 = (cats.get(api_key, {}) or {}).get("score", None)
+            out[out_key] = round((float(score_0_1) * 100.0) if score_0_1 is not None else 0.0, 1)
     except Exception as e:
         logger.warning("Failed to transform PSI categories: %s", e)
     return out
@@ -110,15 +109,12 @@ def _transform_categories(ps_json: Dict[str, Any]) -> Dict[str, float]:
 
 def _request_psi(endpoint: str, session: requests.Session, headers: Dict[str, str],
                  max_retries: int, base_sleep: float) -> Dict[str, Any]:
-    """
-    Perform a PSI request with robust 429 handling and backoff.
-    """
+    """Perform a PSI request with robust 429 handling and exponential backoff."""
     last_exc: Optional[Exception] = None
     for attempt in range(max_retries):
         try:
             resp = session.get(endpoint, headers=headers, timeout=60)
             if resp.status_code == 429:
-                # Respect Retry-After or backoff
                 ra = _parse_retry_after(resp.headers.get("Retry-After"))
                 wait = ra if ra is not None else base_sleep * (2 ** attempt)
                 jitter = random.uniform(0, 0.5 * base_sleep)
@@ -136,11 +132,9 @@ def _request_psi(endpoint: str, session: requests.Session, headers: Dict[str, st
             logger.warning("PSI request error: %s; retrying in %.2fs", e, wait)
             time.sleep(wait)
 
-    # Exhausted
     if last_exc:
         logger.error("PSI request failed after retries: %s", last_exc)
-        raise last_exc
-    raise RuntimeError("PSI request failed without exception")
+    raise last_exc if last_exc else RuntimeError("PSI request failed without exception")
 
 
 def fetch_pagespeed(
@@ -152,8 +146,8 @@ def fetch_pagespeed(
     base_sleep: float = 1.0,
 ) -> Dict[str, Any]:
     """
-    Public function used by main.py:
-    Returns a dict like:
+    Public function used by main.py.
+    Returns:
     {
         'categories': {
             'Performance &amp; Web Vitals': 87.0,
@@ -164,13 +158,15 @@ def fetch_pagespeed(
         'raw': <full PSI JSON>
     }
     """
-    # 1) Cache
+    # Fallback to hard-coded key if none provided
+    if not api_key:
+        api_key = HARDCODED_API_KEY
+
     cache_path = _cache_key(url, strategy)
     cached = _read_cache(cache_path, ttl_seconds)
     if cached:
         return cached
 
-    # 2) Build query
     params = [("url", url), ("strategy", strategy)]
     for c in PSI_CATEGORIES:
         params.append(("category", c))
@@ -178,7 +174,7 @@ def fetch_pagespeed(
         params.append(("key", api_key))
     endpoint = f"{BASE_URL}?{urlencode(params)}"
 
-    # 3) Serialize calls across workers to avoid bursts
+    # Serialize across workers to avoid per-minute bursts
     with LOCK_FILE_PATH.open("r+") as lockfile:
         fcntl.flock(lockfile, fcntl.LOCK_EX)
         try:
