@@ -1,4 +1,23 @@
 
+try:
+    from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from .security import load, save, normalize_url, generate_summary
+    from .models import init_engine, create_schema, get_session, User, Audit
+    from .emailer import send_verification_email
+    from .pagespeed import fetch_pagespeed
+    from .webpagetest import run_wpt_test
+    PACKAGE_MODE = True
+except ImportError:
+    # Fallback only for local script runs (python main.py) outside package context
+    from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from security import load, save, normalize_url, generate_summary
+    from models import init_engine, create_schema, get_session, User, Audit
+    from emailer import send_verification_email
+    from pagespeed import fetch_pagespeed
+    from webpagetest import run_wpt_test
+    PACKAGE_MODE = False
+``
+
 import os, json, random
 from datetime import datetime, timedelta
 
