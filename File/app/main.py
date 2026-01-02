@@ -12,7 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 # Robust imports
 try:
-    from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, DATABASE_URL, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, GOOGLE_PSI_API_KEY, WPT_API_KEY
     from .security import load, save, normalize_url, generate_summary
     from .models import init_engine, create_schema, get_session, User, Audit
     from .emailer import send_verification_email
@@ -20,7 +20,7 @@ try:
     from .webpagetest import run_wpt_test
     PACKAGE_MODE = True
 except ImportError:
-    from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, DATABASE_URL, GOOGLE_PSI_API_KEY, WPT_API_KEY
+    from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS, GOOGLE_PSI_API_KEY, WPT_API_KEY
     from security import load, save, normalize_url, generate_summary
     from models import init_engine, create_schema, get_session, User, Audit
     from emailer import send_verification_email
@@ -31,18 +31,20 @@ except ImportError:
 # Flask
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if PACKAGE_MODE else os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, 'data')
 USERS_FILE = os.path.join(DATA_PATH, 'users.json')
 AUDITS_FILE = os.path.join(DATA_PATH, 'audits.json')
 CATALOGUE_FILE = os.path.join(DATA_PATH, 'metrics_catalogue_full.json')
 STATIC_DIR = os.path.join(BASE_DIR, 'static')
 CHARTS_DIR = os.path.join(STATIC_DIR, 'charts')
+
 os.makedirs(DATA_PATH, exist_ok=True)
 os.makedirs(CHARTS_DIR, exist_ok=True)
 for fp, default in [(USERS_FILE, []), (AUDITS_FILE, []), (CATALOGUE_FILE, [])]:
     if not os.path.exists(fp):
-        with open(fp, 'w', encoding='utf-8') as f: json.dump(default, f)
+        with open(fp, 'w', encoding='utf-8') as f:
+            json.dump(default, f)
 
 # DB
 init_engine()
@@ -73,32 +75,31 @@ CATEGORY_WEIGHTS = {
     'Mobile & Usability': 0.10
 }
 
-# basic heuristics for non-PSI categories (Crawlability, Security, etc.)
 import requests
 
 def quick_checks(url: str):
     """
-    Lightweight checks: robots.txt, sitemap, HTTPS, HSTS, canonical presence, mobile viewport, internal link hints.
+    Lightweight checks: robots.txt, sitemap, HTTPS, HSTS, canonical tag, mobile viewport.
+    Returns scores 0..100 for categories outside Lighthouse.
     """
     res = {'Crawlability & Indexation': 0, 'URL & Internal Linking': 0, 'Security & HTTPS': 0, 'Mobile & Usability': 0}
     try:
-        # HEAD request for headers
         r_head = requests.head(url, timeout=15, allow_redirects=True)
         final_url = r_head.url
         https_ok = final_url.startswith('https://')
         hsts = r_head.headers.get('Strict-Transport-Security')
         security_score = 70 + (15 if https_ok else 0) + (15 if hsts else 0)
 
-        # robots.txt
         from urllib.parse import urlparse
         p = urlparse(final_url)
         robots_url = f"{p.scheme}://{p.netloc}/robots.txt"
         sm_url = f"{p.scheme}://{p.netloc}/sitemap.xml"
+
         robots_ok = False
         sitemap_ok = False
         try:
             rr = requests.get(robots_url, timeout=10)
-            robots_ok = (rr.status_code == 200 and 'User-agent' in rr.text)
+            robots_ok = (rr.status_code == 200 and 'user-agent' in rr.text.lower())
         except Exception:
             pass
         try:
@@ -106,22 +107,20 @@ def quick_checks(url: str):
             sitemap_ok = (sm.status_code == 200 and ('<urlset' in sm.text or '<sitemapindex' in sm.text))
         except Exception:
             pass
-        crawl_score = 60 + (20 if robots_ok else 0) + (20 if sitemap_ok else 0)
 
-        # GET for meta tags
         g = requests.get(final_url, timeout=20)
         html = g.text.lower()
         has_viewport = '<meta name="viewport"' in html
         has_canonical = 'rel="canonical"' in html or "rel='canonical'" in html
-        mobile_score = 60 + (20 if has_viewport else 0) + 20  # base bonus assuming PSI mobile already covers UX
-        link_score = 60 + (20 if has_canonical else 0) + 20  # internal linking/canonical presence
+
+        mobile_score = 60 + (20 if has_viewport else 0) + 20
+        link_score = 60 + (20 if has_canonical else 0) + 20
 
         res['Security & HTTPS'] = min(security_score, 100)
-        res['Crawlability & Indexation'] = min(crawl_score, 100)
+        res['Crawlability & Indexation'] = min(60 + (20 if robots_ok else 0) + (20 if sitemap_ok else 0), 100)
         res['Mobile & Usability'] = min(mobile_score, 100)
         res['URL & Internal Linking'] = min(link_score, 100)
     except Exception:
-        # fallbacks
         res['Security & HTTPS'] = 60
         res['Crawlability & Indexation'] = 60
         res['Mobile & Usability'] = 60
@@ -129,15 +128,11 @@ def quick_checks(url: str):
     return res
 
 def compute_overall(cat_scores_100: dict) -> float:
-    """
-    cat_scores_100: dict of 0..100
-    returns 0..10 score for UI grade
-    """
+    """cat_scores_100: dict of 0..100 → returns 0..10"""
     DEFAULT = 75.0
     total = 0.0
     for c, w in CATEGORY_WEIGHTS.items():
         total += (float(cat_scores_100.get(c, DEFAULT)) * w)
-    # Convert weighted 0..100 to 0..10
     weighted_100 = total / max(sum(CATEGORY_WEIGHTS.values()), 1e-9)
     return round(weighted_100 / 10.0, 2)
 
@@ -179,7 +174,8 @@ def chart_overall_gauge(score10: float):
     ax.set_xlim(0, 10)
     ax.set_yticks([])
     ax.set_title(f'Overall Site Health: {score10:.2f} / 10', fontsize=11, pad=8)
-    for t in [5.5, 7.0, 8.5, 9.5]: ax.axvline(t, color='#999', linestyle='--', linewidth=1)
+    for t in [5.5, 7.0, 8.5, 9.5]:
+        ax.axvline(t, color='#999', linestyle='--', linewidth=1)
     for x, g in [(5.5,'C'),(7.0,'B'),(8.5,'A'),(9.5,'A+')]:
         ax.text(x, 0.45, g, color='#333', fontsize=9, ha='center')
     return _save_fig(fig, 'overall_gauge.png')
@@ -198,7 +194,7 @@ def chart_worldwide(metrics):
         ax.text(latency[i] + 5, i, f"LCP {m.get('lcp_ms', '—')}ms | INP {m.get('inp_ms', '—')}ms | CLS {m.get('cls', '—')}", va='center', fontsize=8)
     return _save_fig(fig, 'worldwide.png')
 
-# ----------------------- Open Audit (PSI + optional WPT) -----------------------
+# ----------------------- Open Audit -----------------------
 @app.route('/audit', methods=['POST'])
 def open_audit():
     url = normalize_url(request.form.get('url'))
@@ -206,22 +202,19 @@ def open_audit():
         flash('Please provide a valid URL', 'error')
         return redirect(url_for('home'))
 
-    # PSI: mobile & desktop
     mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
     desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
-    # Merge Lighthouse categories (average of mobile+desktop)
+
     psi_cat = {}
     for k in set(mobile['categories'].keys()) | set(desktop['categories'].keys()):
         psi_cat[k] = round(((mobile['categories'].get(k, 0) + desktop['categories'].get(k, 0)) / 2.0), 1)
 
-    # Additional checks (crawl, https, canonical, viewport)
     extra = quick_checks(url)
     cat_scores_100 = {**psi_cat, **extra}
 
     overall10 = compute_overall(cat_scores_100)
     grade = strict_score_to_grade(overall10)
 
-    # Issue counts (demo). You can compute from Lighthouse opportunities/diagnostics if desired.
     site_health = {
         'score': overall10,
         'grade': grade,
@@ -230,11 +223,9 @@ def open_audit():
         'notices': random.randint(100, 300)
     }
 
-    # Worldwide metrics: if WPT key exists, run a few regions; else show synthetic
     ww = []
     if WPT_API_KEY:
-        regions = ["Dulles:Chrome","London:Chrome","Frankfurt:Chrome","Sydney:Chrome","Singapore:Chrome"]
-        for loc in regions:
+        for loc in ["Dulles:Chrome","London:Chrome","Frankfurt:Chrome","Sydney:Chrome","Singapore:Chrome"]:
             try:
                 m = run_wpt_test(url, location=loc, api_key=WPT_API_KEY, timeout=210)
                 if m:
@@ -242,19 +233,16 @@ def open_audit():
             except Exception:
                 pass
     else:
-        # synthetic fallback (kept for demo only)
         regions = ['North America','Europe','Middle East','South Asia','East Asia','Oceania','Latin America','Africa']
         for r in regions:
             ww.append({'region': r, 'latency_ms': random.randint(80, 280), 'lcp_ms': random.randint(2200, 4200), 'inp_ms': random.randint(150, 300), 'cls': round(random.uniform(0.05, 0.25),2)})
 
-    # Charts
     chart_overall = chart_overall_gauge(overall10)
     chart_categories = chart_category_bars(cat_scores_100)
     chart_issues = chart_issue_donut(site_health['errors'], site_health['warnings'], site_health['notices'])
     chart_world = chart_worldwide(ww)
 
-    # Summary
-    summary = generate_summary(url, site_health, {k: v/10.0 for k, v in cat_scores_100.items()})  # convert 0..100 → 0..10
+    summary = generate_summary(url, site_health, {k: v/10.0 for k, v in cat_scores_100.items()})
 
     results = {
         'site_health': site_health,
@@ -277,6 +265,7 @@ def open_audit():
                            results=results,
                            mode='open',
                            BRAND_NAME=BRAND_NAME)
+
 # ----------------------- Registration & Login -----------------------
 @app.route('/register', methods=['GET','POST'])
 def register():
@@ -360,25 +349,26 @@ def login():
 def logout():
     session.clear(); flash('Logged out','success'); return redirect(url_for('home'))
 
-# ----------------------- Registered Audit (stores Audit) -----------------------
+# ----------------------- Registered Audit -----------------------
 @app.route('/results')
 def results_page():
     if not session.get('user'): return redirect(url_for('login'))
     url = normalize_url(request.args.get('url','https://example.com'))
 
-    # PSI both strategies
     mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
     desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+
     psi_cat = {}
     for k in set(mobile['categories'].keys()) | set(desktop['categories'].keys()):
         psi_cat[k] = round(((mobile['categories'].get(k, 0) + desktop['categories'].get(k, 0)) / 2.0), 1)
+
     extra = quick_checks(url)
     cat_scores_100 = {**psi_cat, **extra}
     overall10 = compute_overall(cat_scores_100)
     grade = strict_score_to_grade(overall10)
+
     site_health = {'score': overall10, 'errors': random.randint(0,60),'warnings':random.randint(20,160),'notices':random.randint(50,280),'grade':grade}
 
-    # Persist
     s = get_session()
     summary = generate_summary(url, site_health, {k: v/10.0 for k, v in cat_scores_100.items()})
     if s:
@@ -388,14 +378,13 @@ def results_page():
     else:
         audits = load(AUDITS_FILE)
         audits.append({'user': session['user'], 'url': url, 'date': datetime.utcnow().strftime('%Y-%m-%d'),
-                       'grade': grade}); save(AUDITS_FILE, audits)
+                       'grade': grade})
+        save(AUDITS_FILE, audits)
 
-    # Charts
     chart_overall = chart_overall_gauge(overall10)
     chart_categories = chart_category_bars(cat_scores_100)
     chart_issues = chart_issue_donut(site_health['errors'], site_health['warnings'], site_health['notices'])
 
-    # Worldwide: optional WPT
     ww = []
     if WPT_API_KEY:
         for loc in ["Dulles:Chrome","London:Chrome","Frankfurt:Chrome","Sydney:Chrome","Singapore:Chrome"]:
@@ -473,9 +462,9 @@ def report_pdf():
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
 
-    # You can pull a fresh PSI score or reuse cached
     mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
     desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+
     performance = int(round(((mobile['categories'].get('Performance & Web Vitals',0) + desktop['categories'].get('Performance & Web Vitals',0))/2)))
     overall10 = compute_overall({**quick_checks(url),
                                  'Performance & Web Vitals': performance,
@@ -510,4 +499,3 @@ def report_pdf():
     c.setFillColorRGB(1, 1, 1); c.drawString(width - 105, 80, 'CERT')
     c.showPage(); c.save()
     return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='FFTech_Audit_Report.pdf')
-``
