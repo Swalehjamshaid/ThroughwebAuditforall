@@ -41,6 +41,11 @@ except ImportError:
     from webpagetest import run_wpt_test
     PACKAGE_MODE = False
 
+# --- Hard-coded API key fallback (as requested) ---
+HARDCODED_API_KEY = "AIzaSyDUVptDEm1ZbiBdb5m1DGjvKCW_LBVJMEw"
+# If env/settings did not set the key, use the hard-coded one
+GOOGLE_PSI_API_KEY = GOOGLE_PSI_API_KEY or HARDCODED_API_KEY
+
 # ----------------------- Flask app -----------------------
 app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = SECRET_KEY
