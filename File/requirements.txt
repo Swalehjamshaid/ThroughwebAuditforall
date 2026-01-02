@@ -1,14 +1,35 @@
 
+# --- Core web stack ---
 Flask==3.0.3
-itsdangerous==2.2.0
-Jinja2==3.1.6
 Werkzeug==3.0.4
-reportlab==4.2.5
-PyJWT==2.10.1
-matplotlib==3.9.2
-SQLAlchemy==2.0.36
-psycopg2-binary==2.9.11
+Jinja2==3.1.6
+itsdangerous==2.2.0
 gunicorn==22.0.0
 
-# Required by app/pagespeed.py and main.py
+# --- HTTP client for PSI/WPT calls ---
 requests==2.32.3
+
+# --- Charts & reporting ---
+matplotlib==3.9.2
+reportlab==4.2.5
+
+# --- Security & tokens (if you use JWTs anywhere) ---
+PyJWT==2.10.1
+
+# --- Database & ORM ---
+SQLAlchemy==2.0.36
+psycopg2-binary==2.9.11
+# For SQLAlchemy async/event support you might later add:
+# greenlet==3.0.3
+
+# --- Useful operational add-ons ---
+# Read env vars from .env in container/local dev
+python-dotenv==1.0.1
+# Simple rate limiting to protect /audit from bursts that can trip PSI quotas
+Flask-Limiter==3.7.0
+# DB migrations (recommended for schema evolution)
+alembic==1.13.2
+
+# --- Optional performance & caching ---
+# In-memory TTL caching for PSI responses (if you prefer in-app cache vs. file cache)
+cachetools==5.3.3
