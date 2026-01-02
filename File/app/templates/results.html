@@ -1,115 +1,104 @@
-{% extends 'base.html' %}
-{% block content %}
 
-<div class="report-header mb-5 text-center py-5 bg-gradient rounded-4 shadow-lg">
-  <h1 class="display-5 fw-bold text-white mb-3">{{ title }}</h1>
-  <p class="lead text-white opacity-90 mb-2">{{ url }}</p>
-  <p class="text-white opacity-80 fs-5">Audit Date: {{ date }}</p>
-</div>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title or 'Audit Results' }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; background: #f7f7f8; color: #111; }
+    .card { background: #fff; border-radius: 12px; padding: 18px; margin-bottom: 18px; box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 20px rgba(0,0,0,0.06); }
+    h2, h3 { margin: 10px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+    .meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: #333; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #0a84ff; color: #fff; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid #ececec; padding: 8px; text-align: left; }
+    .muted { color: #666; }
+    .chart { text-align: center; }
+    img.chart-img { max-width: 100%; height: auto; border-radius: 10px; background: #fff; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; color: #222; }
+    .pill { padding: 4px 8px; border-radius: 999px; background:#eee; margin-right:6px; }
+  </style>
+</head>
+<body>
 
-<div class="row g-4 mb-5">
-  <div class="col-12">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body p-5">
-        <h2 class="h3 fw-bold text-primary mb-4 text-center">
-          Overall Site Health
-        </h2>
-        <div class="row text-center">
-          <div class="col-md-3 col-sm-6 mb-4">
-            <div class="health-metric">
-              <div class="metric-value display-4 fw-bold text-primary">{{ results.site_health.score }}</div>
-              <div class="metric-label fs-5 text-muted">Score</div>
-            </div>
-          </div>
-          <div class="col-md-3 col-sm-6 mb-4">
-            <div class="health-metric">
-              <div class="metric-value display-4 fw-bold text-danger">{{ results.site_health.errors }}</div>
-              <div class="metric-label fs-5 text-muted">Errors</div>
-            </div>
-          </div>
-          <div class="col-md-3 col-sm-6 mb-4">
-            <div class="health-metric">
-              <div class="metric-value display-4 fw-bold text-warning">{{ results.site_health.warnings }}</div>
-              <div class="metric-label fs-5 text-muted">Warnings</div>
-            </div>
-          </div>
-          <div class="col-md-3 col-sm-6 mb-4">
-            <div class="health-metric">
-              <div class="metric-value display-4 fw-bold {{ 'text-success' if results.site_health.grade in ['A', 'B'] else 'text-info' }}">
-                {{ results.site_health.grade }}
-              </div>
-              <div class="metric-label fs-5 text-muted">Grade</div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="card">
+    <h2>Audit Results</h2>
+    <div class="meta">
+      <div><strong>URL:</strong> <span class="mono">{{ url }}</span></div>
+      <div><strong>Date:</strong> {{ date }}</div>
+      <div><strong>Mode:</strong> {{ mode|capitalize }}</div>
+      <div><strong>Brand:</strong> {{ BRAND_NAME }}</div>
     </div>
   </div>
-</div>
 
-<div class="row g-4 mb-5">
-  <div class="col-12">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body p-5">
-        <h2 class="h3 fw-bold text-primary mb-4">Category Scores</h2>
-        <div class="row g-4">
-          {% for category, score in cat_scores.items() %}
-          <div class="col-lg-3 col-md-4 col-sm-6">
-            <div class="category-card text-center p-4 rounded-4 shadow-sm border {{ 'border-success' if score >= 90 else 'border-warning' if score >= 70 else 'border-danger' }}">
-              <div class="score-circle mx-auto mb-3 position-relative d-inline-flex align-items-center justify-content-center rounded-circle bg-light"
-                   style="width: 120px; height: 120px;">
-                <span class="display-5 fw-bold text-primary">{{ score }}</span>
-              </div>
-              <h5 class="fw-semibold text-capitalize">{{ category.replace('_', ' ') }}</h5>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
+  <div class="grid">
+    <div class="card chart">
+      <h3>Overall Site Health</h3>
+      <span class="badge">{{ results.site_health.grade }}</span>
+      <div class="muted" style="margin-top:6px;">Score: {{ "%.2f"|format(results.site_health.score) }} / 10</div>
+      <img class="chart-img" src="{{ results.charts.overall_gauge }}" alt="hart">
+      <h3>Category Scores</h3>
+      <img class="chart-img" src="{{ results.charts.category_bar }}" alt="Category Scores Chart   {% for k,v in results.categories_100.items() %}
+          <span class="pill">{{ k }}: {{ v|round(0) }}</span>
+        {% endfor %}
       </div>
     </div>
-  </div>
-</div>
 
-{% if mode == 'registered' %}
-<div class="card border-0 shadow-sm mb-5">
-  <div class="card-body p-5">
-    <h2 class="h3 fw-bold text-primary mb-4">Detailed Metrics ({{ results.full|length }})</h2>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle">
-        <thead class="table-primary">
-          <tr>
-            <th scope="col">#</th>
-            <th scope="col">Category</th>
-            <th scope="col">Metric Name</th>
-            <th scope="col">Value</th>
-          </tr>
-        </thead>
+    <div class="card chart">
+      <h3>Issue Composition</h3>
+      <div class="muted">
+        Errors: {{ results.site_health.errors }} |
+        Warnings: {{ results.site_health.warnings }} |
+        Notices: {{ results.site_health.notices }}
+      </div>
+      <img class="chart-img" src="{{ results.charts.issues_d
+  <div class="card">
+    <h3>Core Web Vitals</h3>
+    <p class="muted">From PageSpeed Insights (Lighthouse + CrUX field data).</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th><th>Mobile</th><th>Desktop</th><th>Field p75</th><th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>LCP</td><td>{{ results.psi.mobile.lab_vitals.LCP_ms|default('—') }}</td><td>{{ results.psi.desktop.lab_vitals.LCP_ms|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.LCP_ms_p75|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.source }}</td></tr>
+        <tr><td>INP</td><td>{{ results.psi.mobile.lab_vitals.INP_ms|default('—') }}</td><td>{{ results.psi.desktop.lab_vitals.INP_ms|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.INP_ms_p75|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.source }}</td></tr>
+        <tr><td>CLS</td><td>{{ results.psi.mobile.lab_vitals.CLS|default('—') }}</td><td>{{ results.psi.desktop.lab_vitals.CLS|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.CLS_p75|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.source }}</td></tr>
+        <tr><td>FCP</td><td>{{ results.psi.mobile.lab_vitals.FCP_ms|default('—') }}</td><td>{{ results.psi.desktop.lab_vitals.FCP_ms|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.FCP_ms_p75|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.source }}</td></tr>
+        <tr><td>TTFB</td><td>{{ results.psi.mobile.lab_vitals.TTFB_ms|default('—') }}</td><td>{{ results.psi.desktop.lab_vitals.TTFB_ms|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.TTFB_ms_p75|default('—') }}</td><td>{{ results.psi.mobile.field_vitals.source }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Worldwide Metrics</h3>
+    {% if results.worldwide and results.worldwide|length > 0 %}
+      <img class="chart-img" src="{{ results.charts.worldwide_latency }}"op:12px;">
+        <thead><tr><th>Region/Location</th><th>Latency/TTFB (ms)</th><th>LCP (ms)</th><th>INP (ms)</th><th>CLS</th></tr></thead>
         <tbody>
-          {% for r in results.full %}
+          {% for m in results.worldwide %}
           <tr>
-            <td class="fw-medium">{{ loop.index }}</td>
-            <td><span class="badge bg-secondary text-capitalize">{{ r.category }}</span></td>
-            <td class="fw-medium">{{ r.name }}</td>
-            <td>
-              {% if r.value is number %}
-                <strong>{{ r.value }}</strong>
-              {% else %}
-                {{ r.value }}
-              {% endif %}
-            </td>
+            <td>{{ m.region }}</td>
+            <td>{{ m.latency_ms|default('—') }}</td>
+            <td>{{ m.lcp_ms|default('—') }}</td>
+            <td>{{ m.inp_ms|default('—') }}</td>
+            <td>{{ m.cls|default('—') }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-    </div>
+    {% else %}
+      <p class="muted">Add your WebPageTest API key in Railway to enable geo-distributed measurements.</p>
+    {% endif %}
   </div>
-</div>
 
-<div class="text-center py-4">
-  <a href="{{ url_for('report_pdf') }}?url={{ url }}" class="btn btn-lg btn-primary shadow-lg px-5 py-3 rounded-pill fw-bold">
-    <i class="fas fa-file-pdf me-2"></i> Download Certified PDF Report
-  </a>
-</div>
-{% endif %}
+  <div class="card">
+    <h3>Executive Summary</h3>
+    <p>{{ results.summary }}</p>
+  </div>
 
-{% endblock %}
+  <div class="card">
+    <a href="{{ url_for('report_pdf', url=url) }}" class="badgetml>
