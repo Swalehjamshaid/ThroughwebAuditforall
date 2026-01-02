@@ -79,14 +79,14 @@ def strict_score_to_grade(score10: float) -> str:
     return 'A+' if score10 >= 9.5 else 'A' if score10 >= 8.5 else 'B' if score10 >= 7.0 else 'C' if score10 >= 5.5 else 'D'
 
 CATEGORY_WEIGHTS = {
-    'Performance & Web Vitals': 0.25,
+    'Performance &amp; Web Vitals': 0.25,
     'Accessibility': 0.10,
     'Best Practices': 0.10,
     'SEO': 0.15,
-    'Crawlability & Indexation': 0.10,
-    'URL & Internal Linking': 0.08,
-    'Security & HTTPS': 0.12,
-    'Mobile & Usability': 0.10
+    'Crawlability &amp; Indexation': 0.10,
+    'URL &amp; Internal Linking': 0.08,
+    'Security &amp; HTTPS': 0.12,
+    'Mobile &amp; Usability': 0.10
 }
 
 # Lightweight HTTP checks for non-Lighthouse categories
@@ -98,17 +98,17 @@ def quick_checks(url: str) -> dict:
     Returns 0..100 scores for categories outside Lighthouse.
     """
     res = {
-        'Crawlability & Indexation': 60,
-        'URL & Internal Linking': 60,
-        'Security & HTTPS': 60,
-        'Mobile & Usability': 60
+        'Crawlability &amp; Indexation': 60,
+        'URL &amp; Internal Linking': 60,
+        'Security &amp; HTTPS': 60,
+        'Mobile &amp; Usability': 60
     }
     try:
         r_head = requests.head(url, timeout=15, allow_redirects=True)
         final_url = r_head.url
         https_ok = final_url.startswith('https://')
         hsts = r_head.headers.get('Strict-Transport-Security')
-        res['Security & HTTPS'] = min(70 + (15 if https_ok else 0) + (15 if hsts else 0), 100)
+        res['Security &amp; HTTPS'] = min(70 + (15 if https_ok else 0) + (15 if hsts else 0), 100)
 
         from urllib.parse import urlparse
         p = urlparse(final_url)
@@ -127,14 +127,14 @@ def quick_checks(url: str) -> dict:
             sitemap_ok = (sm.status_code == 200 and ('<urlset' in sm.text or '<sitemapindex' in sm.text))
         except Exception:
             pass
-        res['Crawlability & Indexation'] = min(60 + (20 if robots_ok else 0) + (20 if sitemap_ok else 0), 100)
+        res['Crawlability &amp; Indexation'] = min(60 + (20 if robots_ok else 0) + (20 if sitemap_ok else 0), 100)
 
         g = requests.get(final_url, timeout=20)
         html = g.text.lower()
         has_viewport = '<meta name="viewport"' in html
         has_canonical = 'rel="canonical"' in html or "rel='canonical'" in html
-        res['Mobile & Usability'] = min(60 + (20 if has_viewport else 0) + 20, 100)
-        res['URL & Internal Linking'] = min(60 + (20 if has_canonical else 0) + 20, 100)
+        res['Mobile &amp; Usability'] = min(60 + (20 if has_viewport else 0) + 20, 100)
+        res['URL &amp; Internal Linking'] = min(60 + (20 if has_canonical else 0) + 20, 100)
     except Exception:
         pass
     return res
@@ -201,7 +201,7 @@ def chart_worldwide(metrics):
     ax.set_yticks(y)
     ax.set_yticklabels(regions)
     ax.set_xlabel('Median Latency (ms)')
-    ax.set_title('Worldwide Network Latency & Vitals')
+    ax.set_title('Worldwide Network Latency &amp; Vitals')
     for i, m in enumerate(metrics):
         ax.text(latency[i] + 5, i, f"LCP {m.get('lcp_ms', '—')}ms | INP {m.get('inp_ms', '—')}ms | CLS {m.get('cls', '—')}", va='center', fontsize=8)
     return _save_fig(fig, 'worldwide.png')
@@ -214,9 +214,14 @@ def open_audit():
         flash('Please provide a valid URL', 'error')
         return redirect(url_for('home'))
 
-    # PSI: mobile & desktop
-    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
-    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    try:
+        # PSI: mobile & desktop (sequential to avoid bursts)
+        mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+        desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    except Exception as e:
+        # Graceful handling for 429 or network errors
+        flash(f'We were rate-limited by PageSpeed Insights. Please try again soon. ({e})', 'error')
+        return redirect(url_for('home'))
 
     # Merge Lighthouse categories (0..100)
     psi_cat = {}
@@ -383,8 +388,12 @@ def results_page():
         return redirect(url_for('login'))
     url = normalize_url(request.args.get('url','https://example.com'))
 
-    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
-    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    try:
+        mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+        desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    except Exception as e:
+        flash(f'PageSpeed Insights is temporarily rate-limited. Please try again soon. ({e})', 'error')
+        return redirect(url_for('home'))
 
     psi_cat = {}
     for k in set(mobile['categories'].keys()) | set(desktop['categories'].keys()):
@@ -517,14 +526,18 @@ def report_pdf():
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
 
-    mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
-    desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    try:
+        mobile = fetch_pagespeed(url, 'mobile', GOOGLE_PSI_API_KEY)
+        desktop = fetch_pagespeed(url, 'desktop', GOOGLE_PSI_API_KEY)
+    except Exception as e:
+        flash(f'PageSpeed Insights is temporarily rate-limited. Please try again soon. ({e})', 'error')
+        return redirect(url_for('home'))
 
-    performance = int(round(((mobile['categories'].get('Performance & Web Vitals',0) +
-                               desktop['categories'].get('Performance & Web Vitals',0))/2)))
+    performance = int(round(((mobile['categories'].get('Performance &amp; Web Vitals',0) +
+                               desktop['categories'].get('Performance &amp; Web Vitals',0))/2)))
     overall10 = compute_overall({
         **quick_checks(url),
-        'Performance & Web Vitals': performance,
+        'Performance &amp; Web Vitals': performance,
         'Accessibility': int(round(((mobile['categories'].get('Accessibility',0) +
                                      desktop['categories'].get('Accessibility',0))/2))),
         'Best Practices': int(round(((mobile['categories'].get('Best Practices',0) +
