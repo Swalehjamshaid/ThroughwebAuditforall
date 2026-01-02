@@ -1,3 +1,4 @@
+
 # Use latest stable Python
 FROM python:3.12-slim
 
@@ -10,19 +11,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
 WORKDIR /app
 
 # Copy ONLY the contents of the 'File' folder into /app
-COPY File/ .
+# (Ensure your requirements.txt lives inside File/)
+COPY File/ ./
 
 # Install dependencies
-RUN pip install --upgrade pip && \
+RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
 
-# Expose port (Railway uses $PORT)
+# Railway injects PORT; keep a local default for dev
 ENV PORT=8000
 
-# Start Gunicorn
-# CHANGE "main:app" to match your actual file and app variable
-# Examples:
-#   main:app      → if your file is main.py and app = Flask(__name__)
-#   app:app       → if your file is app.py
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "2", "--threads", "4", "--timeout", "120", "main:app"]
+# Start Gunicorn (shell-wrapped so ${PORT} expands)
+# IMPORTANT: Replace 'main:app' with your actual module:variable (e.g., app.main:app)
+CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2 --threads 4 --timeout 120"]
