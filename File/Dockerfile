@@ -2,26 +2,26 @@
 # Base image
 FROM python:3.11-slim
 
+# Ensure non-interactive apt (if you add packages later)
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Workdir
 WORKDIR /app
 
-# ---- Dependencies (layer caching) ----
+# Install Python deps first for better layer caching
 COPY requirements.txt ./
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# ---- Copy source last ----
+# Copy source last
 COPY . .
 
-# ---- Runtime configuration ----
-# Railway injects PORT at runtime; keep a sensible default
+# Runtime config: Railway injects PORT; keep a default for local runs
 ENV PORT=8000
 
-# Inject Google PageSpeed Insights API key at build time (fallback to hard-coded here)
-# NOTE: Prefer setting at runtime with: docker run -e GOOGLE_PSI_API_KEY=...
+# If you need the PSI key baked into the image (you asked for this earlier):
+# NOTE: Prefer -e GOOGLE_PSI_API_KEY at runtime for security.
 ENV GOOGLE_PSI_API_KEY="AIzaSyDUVptDEm1ZbiBdb5m1DGjvKCW_LBVJMEw"
 
-# ---- Start Gunicorn ----
-# Shell-wrapped CMD so ${PORT} expands before Gunicorn starts
+# Start Gunicorn; shell-wrapped so ${PORT} expands
 CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2"]
-``
