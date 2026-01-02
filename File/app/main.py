@@ -15,47 +15,47 @@ from reportlab.pdfgen import canvas
 import matplotlib
 matplotlib.use("Agg")
 
-# --- Robust imports (works inside a package OR as a script) ---
+# Robust imports: works as package OR script
 try:
-    # If running as a package: python -m yourpackage.main
+    # Package mode: python -m app.main (or gunicorn app.main:app)
     from .settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS
     from .security import load, save, normalize_url, ensure_nonempty_structs, generate_summary
     from .models import init_engine, create_schema, get_session, User, Audit
     from .emailer import send_verification_email
     from .audit_stub import stub_open_metrics
+    PACKAGE_MODE = True
 except ImportError:
-    # If running as a script: python main.py (modules must be in same directory)
+    # Script mode: python main.py (modules in same directory)
     from settings import SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD, BRAND_NAME, REPORT_VALIDITY_DAYS
     from security import load, save, normalize_url, ensure_nonempty_structs, generate_summary
     from models import init_engine, create_schema, get_session, User, Audit
     from emailer import send_verification_email
     from audit_stub import stub_open_metrics
+    PACKAGE_MODE = False
 
-# --- Flask app setup ---
+# Flask app
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if PACKAGE_MODE else os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, 'data')
 USERS_FILE = os.path.join(DATA_PATH, 'users.json')
 AUDITS_FILE = os.path.join(DATA_PATH, 'audits.json')
 CATALOGUE_FILE = os.path.join(DATA_PATH, 'metrics_catalogue_full.json')
 
-# Ensure data directory exists
+# Ensure data directory & files exist
 os.makedirs(DATA_PATH, exist_ok=True)
+def _ensure_json(path, default):
+    if not os.path.exists(path):
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(default, f)
 
-# Optionally ensure JSON files exist to avoid first-run errors
-for file_path in [USERS_FILE, AUDITS_FILE]:
-    if not os.path.exists(file_path):
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump([], f)
+_ensure_json(USERS_FILE, [])
+_ensure_json(AUDITS_FILE, [])
+_ensure_json(CATALOGUE_FILE, [])
 
-# If catalogue is missing, create an empty list (scores will be padded)
-if not os.path.exists(CATALOGUE_FILE):
-    with open(CATALOGUE_FILE, 'w', encoding='utf-8') as f:
-        json.dump([], f)
-
-# Initialize DB (if available)
+# Initialize DB (if env supplied)
+# Your models.py should use DATABASE_URL=os.getenv('DATABASE_URL') and handle SSL if needed.
 init_engine()
 create_schema()
 
@@ -90,11 +90,16 @@ def generate_full_rows():
     with open(CATALOGUE_FILE, 'r', encoding='utf-8') as f:
         catalogue = json.load(f)
     values = ['OK', 'Warning', 'Error', 'Improvement']
-    return [
-        {'id': m.get('id'), 'category': m.get('category'), 'name': m.get('name'), 'value': random.choice(values)}
-        for m in catalogue
-        if isinstance(m, dict)
-    ]
+    rows = []
+    for m in catalogue:
+        if isinstance(m, dict):
+            rows.append({
+                'id': m.get('id'),
+                'category': m.get('category'),
+                'name': m.get('name'),
+                'value': random.choice(values)
+            })
+    return rows
 
 def compute_category_scores(full_rows):
     mapv = {'OK': 1.0, 'Improvement': 0.7, 'Warning': 0.3, 'Error': 0.0}
@@ -105,7 +110,6 @@ def compute_category_scores(full_rows):
         if cat:
             by_cat.setdefault(cat, []).append(val)
     cat_scores = {c: round((sum(vals) / max(len(vals), 1)) * 10, 2) for c, vals in by_cat.items()}
-    # Pad any missing categories to avoid KeyError and ensure full coverage
     for c in CATEGORY_WEIGHTS.keys():
         cat_scores.setdefault(c, round(random.uniform(6.5, 8.5), 2))
     return cat_scores
@@ -115,7 +119,6 @@ def compute_overall(cat_scores):
     total = 0.0
     for c, w in CATEGORY_WEIGHTS.items():
         total += (cat_scores.get(c, DEFAULT)) * w
-    # Normalize by total weights (they may not sum to 1.0)
     return round(total / max(sum(CATEGORY_WEIGHTS.values()), 1e-9), 2)
 
 # ----------------------- Open Audit -----------------------
@@ -124,7 +127,6 @@ def open_audit():
     url = normalize_url(request.form.get('url', ''))
     stub = stub_open_metrics(url)
     cat_scores = stub.get('cat_scores', {})
-    # Pad any missing categories to avoid KeyError
     for c in CATEGORY_WEIGHTS.keys():
         cat_scores.setdefault(c, round(random.uniform(6.5, 8.5), 2))
     score = compute_overall(cat_scores)
@@ -167,7 +169,6 @@ def register():
                     flash('Email already registered', 'error')
                     return redirect(url_for('register'))
             except Exception:
-                # If DB is not ready, fall back to JSON only
                 s = None
 
         token = f'verify-{random.randint(100000, 999999)}'
@@ -177,14 +178,13 @@ def register():
             'name': name,
             'company': company,
             'role': 'user',
-            'password': None,       # Plain for demo; swap with a hash in production
+            'password': None,
             'verified': False,
             'token': token
         })
         save(USERS_FILE, users)
 
         if s:
-            # set password_hash='' to satisfy NOT NULL until user sets it in /set_password
             s.add(User(email=email, name=name, company=company, role='user', password_hash='', verified=False))
             s.commit()
 
@@ -213,12 +213,11 @@ def verify():
 def set_password():
     token = request.form.get('token')
     password = request.form.get('password')
-
     users = load(USERS_FILE)
     for u in users:
         if u.get('token') == token:
             u['verified'] = True
-            u['password'] = password             # Plain for demo; replace with hash
+            u['password'] = password
             u['token'] = None
             save(USERS_FILE, users)
 
@@ -227,12 +226,11 @@ def set_password():
                 dbu = s.query(User).filter_by(email=u['email']).first()
                 if dbu:
                     dbu.verified = True
-                    dbu.password_hash = password  # Plain for demo; replace with hash
+                    dbu.password_hash = password
                     s.commit()
 
             flash('Password set. You can now log in.', 'success')
             return render_template('verify_success.html')
-
     abort(400)
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -240,7 +238,6 @@ def login():
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
-
         s = get_session()
         if s:
             dbu = s.query(User).filter_by(email=email).first()
@@ -249,8 +246,6 @@ def login():
                 session['role'] = dbu.role
                 flash('Logged in successfully', 'success')
                 return redirect(url_for('results_page'))
-
-        # Fallback to JSON store
         users = load(USERS_FILE)
         for u in users:
             if u['email'] == email and (u['password'] or '') == (password or '') and u.get('verified'):
@@ -258,9 +253,7 @@ def login():
                 session['role'] = u['role']
                 flash('Logged in successfully', 'success')
                 return redirect(url_for('results_page'))
-
         flash('Invalid credentials or unverified email', 'error')
-
     return render_template('login.html')
 
 @app.route('/logout')
@@ -274,13 +267,11 @@ def logout():
 def results_page():
     if not session.get('user'):
         return redirect(url_for('login'))
-
     url = normalize_url(request.args.get('url', 'https://example.com'))
     full_rows = generate_full_rows()
     cat_scores = compute_category_scores(full_rows)
     score = compute_overall(cat_scores)
     grade = strict_score_to_grade(score)
-
     site_health = {
         'score': score,
         'errors': random.randint(0, 60),
@@ -288,7 +279,6 @@ def results_page():
         'notices': random.randint(50, 280),
         'grade': grade
     }
-
     summary = generate_summary(url, site_health, cat_scores)
 
     s = get_session()
@@ -326,14 +316,12 @@ def results_page():
 def history():
     if not session.get('user'):
         return redirect(url_for('login'))
-
     s = get_session()
     if s:
         rows = s.query(Audit).filter_by(user_email=session.get('user')).all()
         audits = [{'date': r.date, 'url': r.url, 'grade': r.grade} for r in rows]
     else:
         audits = [a for a in load(AUDITS_FILE) if a.get('user') == session.get('user')]
-
     return render_template('audit_history.html', audits=audits)
 
 @app.route('/schedule', methods=['GET', 'POST'])
@@ -362,7 +350,6 @@ def admin_login():
 def dashboard():
     if session.get('role') != 'admin':
         return {'detail': 'Admin only'}, 403
-
     s = get_session()
     if s:
         users = s.query(User).all()
@@ -370,7 +357,6 @@ def dashboard():
         stats = {'users': len(users), 'audits': len(audits)}
         users_fmt = [{'email': u.email, 'role': u.role, 'name': u.name, 'company': u.company} for u in users]
         return render_template('admin_dashboard.html', stats=stats, users=users_fmt)
-
     users = load(USERS_FILE)
     audits = load(AUDITS_FILE)
     stats = {'users': len(users), 'audits': len(audits)}
@@ -381,60 +367,38 @@ def dashboard():
 def report_pdf():
     if not session.get('user'):
         return redirect(url_for('login'))
-
     url = request.args.get('url', 'https://example.com')
     path = os.path.join(DATA_PATH, 'report.pdf')
-
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
-
     score = random.uniform(6.0, 9.7)
     grade = strict_score_to_grade(score)
-
-    # Header banner
     c.setFillColorRGB(0, 0.64, 1)
     c.rect(40, height - 80, 260, 30, fill=1)
     c.setFillColorRGB(1, 1, 1)
     c.drawString(50, height - 65, f'{BRAND_NAME} – Certified Report')
-
-    # Meta info
     c.setFillColorRGB(0.1, 0.1, 0.1)
     c.drawString(40, height - 110, f'URL: {url}')
     c.drawString(40, height - 130, f'Date: {datetime.utcnow().strftime("%Y-%m-%d")}')
     c.drawString(40, height - 150, f'Overall Grade: {grade}')
     c.drawString(40, height - 170, f'Site Health Score: {round(score, 2)} / 10')
-
     valid_until = datetime.utcnow() + timedelta(days=REPORT_VALIDITY_DAYS)
     c.drawString(40, height - 190, f'Valid Until: {valid_until.strftime("%Y-%m-%d")}')
-
-    # Summary text
     summary = (
-        "This certified audit summarizes the site's technical and SEO health across "
-        "crawlability, performance, security, and mobile usability. Key improvements include "
-        "optimizing images, fixing broken links, adding canonical tags, and enabling compression "
-        "and caching. Addressing render-blocking resources and third-party script payloads will "
-        "improve Core Web Vitals. Consistent structured data and security headers enhance visibility "
-        "and trust. Trend tracking and scheduled audits maintain stability over time."
+        "This certified audit summarizes the site's technical and SEO health across crawlability, performance, "
+        "security, and mobile usability. Key improvements include optimizing images, fixing broken links, "
+        "adding canonical tags, and enabling compression and caching. Addressing render-blocking resources and "
+        "third-party script payloads will improve Core Web Vitals. Consistent structured data and security "
+        "headers enhance visibility and trust. Trend tracking and scheduled audits maintain stability over time."
     )
-
     c.drawString(40, height - 220, 'Executive Summary:')
     wrap = 95
     for i in range(0, len(summary), wrap):
         c.drawString(40, height - 240 - (i // wrap) * 15, summary[i:i + wrap])
-
-    # Certification badge
     c.setFillColorRGB(0, 0.64, 1)
     c.circle(width - 80, 80, 30, fill=1)
     c.setFillColorRGB(1, 1, 1)
     c.drawString(width - 105, 80, 'CERT')
-
     c.showPage()
     c.save()
-
     return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='FFTech_Audit_Report.pdf')
-
-# ----------------------- Entrypoint -----------------------
-if __name__ == '__main__':
-    # In production, set debug=False
-    app.run(debug=True)
-``
