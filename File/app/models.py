@@ -1,112 +1,47 @@
-
-import os
+# app/models.py
+from app import db, login
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin
 from datetime import datetime
-from sqlalchemy import (
-    create_engine, Column, String, Boolean, Text, Integer, text
-)
-from sqlalchemy.orm import sessionmaker, declarative_base
 
-Base = declarative_base()
-_engine = None
-_SessionLocal = None
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), index=True, unique=True)
+    password_hash = db.Column(db.String(128))
+    verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(64))
+    audit_count = db.Column(db.Integer, default=0)
+    subscription_active = db.Column(db.Boolean, default=False)
+    subscription_id = db.Column(db.String(64))
+    subscription_start = db.Column(db.DateTime)
+    subscription_end = db.Column(db.DateTime)
 
+    websites = db.relationship('Website', backref='owner', lazy='dynamic')
+    audits = db.relationship('Audit', backref='user', lazy='dynamic')
 
-def _normalize_database_url(url: str) -> str:
-    """
-    Normalize DATABASE_URL for SQLAlchemy + psycopg2 and ensure sslmode=require.
-    - Convert 'postgres://' to 'postgresql+psycopg2://'
-    - Append '&sslmode=require' or '?sslmode=require' with a real ampersand ('&')
-    """
-    if not url:
-        return url
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
 
-    # SQLAlchemy prefers 'postgresql+psycopg2://'
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+psycopg2://", 1)
-    elif url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
-    # Append sslmode=require if not already present
-    if "sslmode=" not in url:
-        sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}sslmode=require"
+    @login.load_user
+    def load_user(id):
+        return User.query.get(int(id))
 
-    return url
+class Website(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String(256))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    schedule = db.Column(db.String(64))  # e.g., 'daily', 'weekly'
 
+    audits = db.relationship('Audit', backref='website', lazy='dynamic')
 
-def init_engine():
-    """
-    Initialize SQLAlchemy engine and session factory from DATABASE_URL.
-    Call this once on app startup.
-    """
-    global _engine, _SessionLocal
-    raw_url = os.getenv("DATABASE_URL", "")
-    if raw_url:
-        url = _normalize_database_url(raw_url)
-        _engine = create_engine(
-            url,
-            pool_pre_ping=True,   # avoids stale connections
-            pool_size=5,
-            max_overflow=10,
-        )
-        _SessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=False)
-    else:
-        _engine = None
-        _SessionLocal = None
-
-
-def create_schema():
-    """
-    Create/verify tables once, guarded by a PostgreSQL advisory lock so
-    concurrent Gunicorn workers do not race on DDL.
-
-    Safe to call multiple times; only one process will execute DDL and others
-    will skip when the lock is held.
-
-    IMPORTANT: Do NOT call this in every worker at import time.
-    Gate it behind a one-off init step (env flag) or run with --preload.
-    """
-    if not _engine:
-        return
-
-    # Any constant 64-bit integer works as an advisory lock key:
-    LOCK_KEY = 987654321
-
-    # Use transactional connection and lock
-    with _engine.begin() as conn:
-        got_lock = conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": LOCK_KEY}).scalar()
-        if not got_lock:
-            # Another process is doing the DDL; just return.
-            return
-        try:
-            # Bind create_all to the same connection; checkfirst=True by default.
-            Base.metadata.create_all(bind=conn)
-        finally:
-            conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": LOCK_KEY})
-
-
-def get_session():
-    return _SessionLocal() if _SessionLocal else None
-
-
-# ----- Models -----
-
-class User(Base):
-    __tablename__ = 'users'
-    email = Column(String(255), primary_key=True)
-    name = Column(String(255))
-    company = Column(String(255))
-    role = Column(String(50), default='user')
-    password_hash = Column(Text, nullable=False, default='')
-    verified = Column(Boolean, default=False)
-
-
-class Audit(Base):
-    __tablename__ = 'audits'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_email = Column(String(255))
-    url = Column(Text)
-    date = Column(String(20), default=lambda: datetime.utcnow().strftime('%Y-%m-%d'))
-    grade = Column(String(5))
-    summary = Column(Text)
-    overall_score = Column(Integer)  # 0..100 for convenience
+class Audit(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    website_id = db.Column(db.Integer, db.ForeignKey('website.id'))
+    report = db.Column(db.JSON)  # Store metrics as JSON
+    grade = db.Column(db.String(2))
+    pdf_path = db.Column(db.String(256))
