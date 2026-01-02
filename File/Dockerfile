@@ -1,27 +1,28 @@
+# Use latest stable Python
+FROM python:3.12-slim
 
-# Base image
-FROM python:3.11-slim
+# Prevent interactive prompts & improve Python output
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# Ensure non-interactive apt (if you add packages later)
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Workdir
+# Set working directory
 WORKDIR /app
 
-# Install Python deps first for better layer caching
-COPY requirements.txt ./
-RUN python -m pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Copy ONLY the contents of the 'File' folder into /app
+COPY File/ .
 
-# Copy source last
-COPY . .
+# Install dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir gunicorn
 
-# Runtime config: Railway injects PORT; keep a default for local runs
+# Expose port (Railway uses $PORT)
 ENV PORT=8000
 
-# If you need the PSI key baked into the image (you asked for this earlier):
-# NOTE: Prefer -e GOOGLE_PSI_API_KEY at runtime for security.
-ENV GOOGLE_PSI_API_KEY="AIzaSyDUVptDEm1ZbiBdb5m1DGjvKCW_LBVJMEw"
-
-# Start Gunicorn; shell-wrapped so ${PORT} expands
-CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2"]
+# Start Gunicorn
+# CHANGE "main:app" to match your actual file and app variable
+# Examples:
+#   main:app      → if your file is main.py and app = Flask(__name__)
+#   app:app       → if your file is app.py
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "2", "--threads", "4", "--timeout", "120", "main:app"]
