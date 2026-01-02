@@ -20,21 +20,17 @@ def fetch_pagespeed(url: str, strategy: str = 'mobile', api_key: str | None = No
         'url': url,
         'strategy': strategy,
         'category': ['PERFORMANCE', 'ACCESSIBILITY', 'BEST_PRACTICES', 'SEO'],
-        # Add 'PWA' if you want that category too.
     }
     if api_key:
         params['key'] = api_key
 
-    # Call PSI
     resp = requests.get(PSI_ENDPOINT, params=params, timeout=60)
     resp.raise_for_status()
     data = resp.json()
 
-    # Lighthouse categories
     lighthouse = data.get('lighthouseResult', {}) or {}
     cats = lighthouse.get('categories', {}) or {}
 
-    # Convert 0..1 scores to 0..100
     categories_100 = {
         'Performance & Web Vitals': round((cats.get('performance', {}).get('score', 0) or 0) * 100, 1),
         'Accessibility': round((cats.get('accessibility', {}).get('score', 0) or 0) * 100, 1),
@@ -44,7 +40,6 @@ def fetch_pagespeed(url: str, strategy: str = 'mobile', api_key: str | None = No
         'SEO': round((cats.get('seo', {}).get('score', 0) or 0) * 100, 1),
     }
 
-    # Field data (CrUX) – prefer page-level; fallback to origin-level if insufficient samples
     loading = data.get('loadingExperience') or {}
     origin = data.get('originLoadingExperience') or {}
     chosen = loading if loading.get('metrics') else origin
@@ -59,13 +54,11 @@ def fetch_pagespeed(url: str, strategy: str = 'mobile', api_key: str | None = No
         'source': 'page' if loading.get('metrics') else 'origin',
     }
 
-    # Lab vitals from Lighthouse audits
     audits = lighthouse.get('audits', {}) or {}
     lab_vitals = {
         'FCP_ms': audits.get('first-contentful-paint', {}).get('numericValue'),
         'LCP_ms': audits.get('largest-contentful-paint', {}).get('numericValue'),
         'CLS': audits.get('cumulative-layout-shift', {}).get('numericValue'),
-        # INP audit name varies by Lighthouse version
         'INP_ms': audits.get('experimental-interaction-to-next-paint', {}).get('numericValue')
                   or audits.get('interaction-to-next-paint', {}).get('numericValue'),
         'TTFB_ms': audits.get('server-response-time', {}).get('numericValue'),
