@@ -1,27 +1,26 @@
 
-# Use latest stable Python
+# Use latest stable Python (small footprint)
 FROM python:3.12-slim
 
-# Prevent interactive prompts & improve Python output
+# Prevent interactive prompts & improve Python behavior
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Set working directory
+# Work directory inside container
 WORKDIR /app
 
-# Copy ONLY the contents of the 'File' folder into /app
-# (Ensure your requirements.txt lives inside File/)
-COPY File/ ./
+# Copy app source (Dockerfile is in File/, so copy the contents of File/)
+COPY . ./
 
 # Install dependencies
 RUN python -m pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir gunicorn
 
-# Railway injects PORT; keep a local default for dev
+# Local default; Railway injects PORT at runtime
 ENV PORT=8000
 
-# Start Gunicorn (shell-wrapped so ${PORT} expands)
-# IMPORTANT: Replace 'main:app' with your actual module:variable (e.g., app.main:app)
+# IMPORTANT: Shell-wrapped CMD so ${PORT} expands before Gunicorn starts
+# Change 'app.main:app' to match your actual module:variable (e.g., 'main:app' if your app is in main.py at root)
 CMD ["/bin/sh", "-c", "exec gunicorn app.main:app -b 0.0.0.0:${PORT} -w 2 --threads 4 --timeout 120"]
