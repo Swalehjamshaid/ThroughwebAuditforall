@@ -102,7 +102,7 @@ CATEGORY_WEIGHTS = {
 def extract_psi_details(psi_raw: dict) -> dict:
     """
     Extract Core Web Vitals & key Lighthouse metrics from PSI JSON.
-    Returns a dict with lab & field (if available).
+    Returns a dict with lab & field (when available).
     """
     out = {
         'lab': {},
@@ -128,7 +128,7 @@ def extract_psi_details(psi_raw: dict) -> dict:
             'TimeToInteractive_ms': m_val('interactive'),
         }
 
-        # Field (CrUX) metrics (when available; may be deprecated by Google in PSI endpoint)
+        # Field (CrUX) metrics (when available)
         lexp = psi_raw.get('loadingExperience') or {}
         fmetrics = lexp.get('metrics') or {}
         def field_metric(M):
@@ -666,4 +666,3 @@ def report_pdf():
     c.save()
 
     return send_file(path, mimetype='application/pdf', as_attachment=True, download_name='FFTech_Audit_Report.pdf')
-``
