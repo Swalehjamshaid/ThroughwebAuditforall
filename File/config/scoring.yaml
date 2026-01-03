@@ -1,0 +1,26 @@
+
+categories:
+  Crawlability & Indexation: 0.25
+  On-Page SEO:               0.20
+  Technical & Performance:   0.20
+  Security & HTTPS:          0.20
+  Mobile & Usability:        0.10
+  International SEO:         0.05
+penalties:
+  broken_internal_links: 2.0
+  broken_external_links: 1.0
+  redirect_chains:       1.5
+  missing_title:         2.0
+  missing_meta_description: 1.5
+  missing_h1:            1.5
+  large_images:          1.0
+  no_viewport:           2.0
+  https_false:           3.0
+  header_missing:        1.0
+  hreflang_issues:       1.0
+thresholds:
+  A+: 95
+  A:  85
+  B:  75
+  C:  65
+  D:  50
