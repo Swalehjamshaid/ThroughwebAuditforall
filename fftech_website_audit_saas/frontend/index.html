@@ -1,136 +1,102 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>FF Tech – AI Powered Website Audit SaaS</title>
-  <style>
-    :root { --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#22c55e; --warn:#f59e0b; --crit:#ef4444; --lightbg:#f8fafc; --lightpanel:#ffffff; --lighttext:#0f172a; }
-    [data-theme="dark"] body { background: var(--bg); color: var(--text);} [data-theme="dark"] .panel { background: var(--panel); color: var(--text);} 
-    [data-theme="light"] body { background: var(--lightbg); color: var(--lighttext);} [data-theme="light"] .panel { background: var(--lightpanel); color: var(--lighttext); box-shadow:0 4px 20px rgba(0,0,0,0.06);} 
-    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; }
-    header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; }
-    .brand { display:flex; align-items:center; gap:12px; }
-    .container { max-width:1100px; margin:0 auto; padding:24px; }
-    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
-    .col-6 { grid-column: span 6;} .col-12 { grid-column: span 12;} .col-4 { grid-column: span 4;} .col-8 { grid-column: span 8;}
-    .panel { border-radius:14px; padding:18px; }
-    .title { font-weight:700; font-size:18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;}
-    .progress { height:10px; background:#1f2937; border-radius:10px; overflow:hidden; }
-    .progress > div { height:100%; background: var(--accent); width: 0; transition: width 600ms; }
-    .btn { padding:10px 14px; border:0; border-radius:10px; cursor:pointer; background: var(--accent); color:#fff; font-weight:600;}
-    .btn.secondary { background:#374151; }
-    .input { padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1; width:100%; }
-    .table { width:100%; border-collapse: collapse; }
-    .table th, .table td { padding:10px; border-bottom:1px solid #e5e7eb; font-size:14px; }
-    .pill { padding:6px 10px; border-radius:999px; font-size:12px; }
-    .pill.good { background:#0ea5e9; color:#fff;} .pill.warn{background:#f59e0b;color:#fff;} .pill.crit{background:#ef4444;color:#fff;}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech | Professional AI Audit SaaS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .gradient-border { border-image: linear-gradient(to right, #2563eb, #0891b2) 1; }
+        .score-card { transition: all 0.3s ease; }
+        .score-card:hover { transform: translateY(-5px); }
+    </style>
 </head>
-<body>
-  <header>
-    <div class="brand">
-      <img src="https://via.placeholder.com/40x40.png?text=FF" alt="FF Tech"/>
-      <div>
-        <div style="font-size:20px;font-weight:800;">FF Tech</div>
-        <div style="font-size:12px;color:var(--muted);">AI Powered Website Audit SaaS</div>
-      </div>
-    </div>
-    <button class="btn secondary" id="theme-toggle">Toggle Theme</button>
-  </header>
-  <div class="container">
-    <div class="grid">
-      <div class="col-6 panel">
-        <div class="title">Register</div>
-        <input class="input" id="reg-email" placeholder="Email">
-        <input class="input" id="reg-pass" type="password" placeholder="Password">
-        <button class="btn" id="btn-register">Register</button>
-        <small>Complete registration by clicking the secure link sent via email.</small>
-      </div>
-      <div class="col-6 panel" id="login-panel">
-        <div class="title">Login</div>
-        <input class="input" id="login-email" placeholder="Email">
-        <input class="input" id="login-pass" type="password" placeholder="Password">
-        <button class="btn" id="btn-login">Login</button>
-      </div>
-      <div class="col-8 panel" id="dashboard" style="display:none;">
-        <div class="title">Site Health</div>
-        <div class="progress"><div id="overall-progress"></div></div>
-        <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-          <div style="font-size:40px;font-weight:900;" id="grade-badge">–</div>
-          <div id="score-text">0/100</div>
+<body class="bg-slate-50 text-slate-900 font-sans">
+
+    <nav class="bg-white border-b border-slate-200 px-8 py-3 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white font-bold text-xl">FF</div>
+            <span class="text-xl font-extrabold tracking-tighter">FF TECH <span class="text-blue-500 font-medium">AUDIT</span></span>
         </div>
-      </div>
-      <div class="col-4 panel">
-        <div class="title">Add Website</div>
-        <input class="input" id="audit-url" placeholder="https://example.com">
-        <button class="btn" id="btn-run-audit">Run Audit</button>
-        <button class="btn secondary" id="btn-schedule">Schedule Daily</button>
-      </div>
-      <div class="col-12 panel">
-        <div class="title">Metrics</div>
-        <table class="table" id="metrics-table"><thead><tr><th>Category</th><th>Metric</th><th>Value</th><th>Status</th></tr></thead><tbody></tbody></table>
-      </div>
-      <div class="col-8 panel">
-        <div class="title">Executive Summary (200 words)</div>
-        <p id="exec-summary">Run an audit to generate the summary.</p>
-      </div>
-      <div class="col-4 panel">
-        <div class="title">Certified Report</div>
-        <button class="btn" id="btn-download-pdf">Download PDF</button>
-      </div>
+        <div class="flex items-center gap-4">
+            <span id="audit-quota" class="text-sm font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full">Audits: 0/10</span>
+            <button class="text-sm font-bold text-slate-600 hover:text-blue-600">Admin Portal</button>
+            <div class="h-8 w-8 bg-slate-200 rounded-full"></div>
+        </div>
+    </nav>
+
+    <div class="max-w-[1400px] mx-auto grid grid-cols-12 gap-6 p-6">
+        
+        <aside class="col-span-12 lg:col-span-3 space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-lg font-bold mb-4">Launch New Audit</h3>
+                <input type="url" id="target-url" placeholder="https://example.com" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="runAudit()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">Start Deep Scan</button>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 class="text-lg font-bold mb-4">Automation</h3>
+                <label class="text-xs font-bold text-slate-400 uppercase">Schedule Delivery</label>
+                <select class="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl mb-4">
+                    <option>Daily Report</option>
+                    <option>Weekly Accumulated</option>
+                </select>
+                <input type="time" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <p class="text-[10px] text-slate-400 mt-2">Timezone: UTC (International Standard)</p>
+            </div>
+        </aside>
+
+        <main class="col-span-12 lg:col-span-9 space-y-6">
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-white p-6 rounded-2xl border-b-4 border-blue-600 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Site Grade</span>
+                    <div id="grade-val" class="text-5xl font-black text-slate-800">--</div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border-b-4 border-green-500 shadow-sm text-center">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Health Score</span>
+                    <div id="score-val" class="text-5xl font-black text-slate-800">0%</div>
+                </div>
+                <div class="md:col-span-2 bg-white p-6 rounded-2xl border-b-4 border-cyan-500 shadow-sm">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">AI Executive Summary</h4>
+                    <p id="exec-summary" class="text-sm text-slate-600 italic">Enter a URL to generate a comprehensive 200-word analysis...</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                    <h3 class="font-bold text-slate-700">Audit Deep Dive (140+ Professional Metrics)</h3>
+                    <button class="bg-white border border-slate-200 text-xs font-bold px-4 py-2 rounded-lg hover:bg-slate-50">Download Certified PDF</button>
+                </div>
+                <div class="max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-left">
+                        <thead class="sticky top-0 bg-white border-b border-slate-100">
+                            <tr>
+                                <th class="p-4 text-xs font-bold text-slate-400 uppercase">Category</th>
+                                <th class="p-4 text-xs font-bold text-slate-400 uppercase">Metric Name</th>
+                                <th class="p-4 text-xs font-bold text-slate-400 uppercase">Current Value</th>
+                                <th class="p-4 text-xs font-bold text-slate-400 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metrics-grid" class="divide-y divide-slate-50">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
     </div>
-  </div>
-  <script>
-    let token = null; let websiteId = null; let lastAuditId = null;
-    document.getElementById('theme-toggle').onclick = () => {
-      const current = document.documentElement.getAttribute('data-theme') || 'light';
-      document.documentElement.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
-    };
-    const api = (path, opts={}) => fetch(path, Object.assign({ headers: token? { 'Authorization': 'Bearer ' + token } : {} }, opts));
 
-    document.getElementById('btn-register').onclick = async () => {
-      const email = document.getElementById('reg-email').value; const password = document.getElementById('reg-pass').value;
-      const res = await api('/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, password}) });
-      alert((await res.json()).message || 'Check your email to verify.');
-    };
-
-    document.getElementById('btn-login').onclick = async () => {
-      const email = document.getElementById('login-email').value; const password = document.getElementById('login-pass').value;
-      const form = new URLSearchParams(); form.append('username', email); form.append('password', password);
-      const res = await api('/auth/login', { method:'POST', body: form }); const data = await res.json(); token = data.access_token; 
-      if(token){ document.getElementById('dashboard').style.display='block'; alert('Logged in'); }
-    };
-
-    document.getElementById('btn-run-audit').onclick = async () => {
-      const url = document.getElementById('audit-url').value; if(!url) return alert('Enter URL');
-      // Add website
-      let res = await api('/websites', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url}) });
-      const w = await res.json(); websiteId = w.id;
-      // Run audit
-      res = await api(`/audits/${websiteId}/run`, { method:'POST' }); const a = await res.json(); lastAuditId = a.audit_id;
-      document.getElementById('overall-progress').style.width = `${a.score}%`;
-      document.getElementById('grade-badge').textContent = a.grade; document.getElementById('score-text').textContent = `${a.score}/100`;
-      // Detailed metrics
-      const det = await (await api(`/audits/${lastAuditId}`)).json(); const tbody = document.querySelector('#metrics-table tbody'); tbody.innerHTML='';
-      Object.entries(det.metrics.categories).forEach(([cat, items])=>{ Object.entries(items).forEach(([k,v])=>{
-        const tr = document.createElement('tr'); const val = (typeof v.value==='object')? JSON.stringify(v.value): v.value;
-        const status = v.status||'warning'; tr.innerHTML = `<td>${cat}</td><td>${k}</td><td>${val??'-'}</td><td>${status}</td>`; tbody.appendChild(tr);
-      });});
-      document.getElementById('exec-summary').textContent = det.summary;
-    };
-
-    document.getElementById('btn-schedule').onclick = async () => {
-      if(!websiteId) return alert('Add a website first');
-      const hour = prompt('Hour (0-23)'); const min = prompt('Minute (0-59)');
-      const res = await api(`/audits/${websiteId}/schedule`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({hour_local:Number(hour), minute_local:Number(min), frequency:'daily'})});
-      alert((await res.json()).message || 'Scheduled');
-    };
-
-    document.getElementById('btn-download-pdf').onclick = async () => {
-      if(!lastAuditId) return alert('Run an audit first');
-      const res = await api(`/reports/${lastAuditId}/pdf`); const data = await res.json(); alert('PDF created at: '+data.pdf_path);
-    };
-  </script>
+    <div id="sub-lock" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[100] hidden flex items-center justify-center">
+        <div class="bg-white p-10 rounded-3xl max-w-md text-center shadow-2xl">
+            <h2 class="text-3xl font-black mb-4">Audit Limit Reached</h2>
+            <p class="text-slate-500 mb-8">You've successfully completed your 10 free professional audits. Upgrade to the Pro plan for unlimited deep-scans.</p>
+            <div class="bg-blue-50 p-6 rounded-2xl mb-8">
+                <span class="text-4xl font-black text-blue-600">$5</span>
+                <span class="text-slate-400 font-bold">/ month</span>
+            </div>
+            <button class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:scale-105 transition-transform">Unlock Professional Suite</button>
+        </div>
+    </div>
 </body>
 </html>
