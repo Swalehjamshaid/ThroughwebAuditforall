@@ -1,0 +1,8 @@
+services:
+  db:  # <--- This is the hostname
+    image: postgres
+    ...
+  web:
+    build: .
+    depends_on:
+      - db
