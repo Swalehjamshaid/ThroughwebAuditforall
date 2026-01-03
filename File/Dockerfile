@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# Copy the actual app code from File/app/
+# Copy code from File/app/ (your actual app code)
 COPY File/app/ .
 
 # Install dependencies
