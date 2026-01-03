@@ -1,0 +1,181 @@
+{
+  "categories": [
+    {
+      "name": "Overall Site Health",
+      "metrics": [
+        "Site Health Score",
+        "Total Errors",
+        "Total Warnings",
+        "Total Notices",
+        "Total Crawled Pages",
+        "Indexed Pages",
+        "Trend of Issues",
+        "Crawl Budget Efficiency",
+        "Orphan Pages %",
+        "Audit Completion Status"
+      ]
+    },
+    {
+      "name": "Crawlability & Indexation",
+      "metrics": [
+        "HTTP Status Codes",
+        "Redirect Chains",
+        "Redirect Loops",
+        "Broken Internal Links",
+        "Broken External Links",
+        "URLs Blocked by robots.txt",
+        "URLs Blocked by Meta Robots",
+        "Non-canonical Pages",
+        "Missing Canonical Tags",
+        "Incorrect Canonical Tags",
+        "Pages Not Found in Sitemap",
+        "Pages in Sitemap Not Crawled",
+        "Hreflang Errors",
+        "Hreflang Conflicts",
+        "Pagination Issues",
+        "Sitemap Size and Status",
+        "Orphan Pages",
+        "Crawl Depth",
+        "Redirected Pages",
+        "Duplicate URLs"
+      ]
+    },
+    {
+      "name": "On-Page SEO",
+      "metrics": [
+        "Missing Title Tags",
+        "Duplicate Title Tags",
+        "Title Length",
+        "Missing Meta Descriptions",
+        "Duplicate Meta Descriptions",
+        "Meta Description Length",
+        "Missing H1",
+        "Multiple H1",
+        "Missing H2-H6",
+        "Duplicate Headings",
+        "Keyword Over-optimization",
+        "Thin Content",
+        "Duplicate Content",
+        "Text-to-HTML Ratio",
+        "Missing Alt Attributes",
+        "Duplicate Alt Attributes",
+        "Large Images",
+        "No Indexed Content",
+        "Structured Data Presence",
+        "Schema Errors",
+        "Rich Snippets Warnings",
+        "Open Graph/Twitter Tags"
+      ]
+    },
+    {
+      "name": "Technical & Performance",
+      "metrics": [
+        "LCP",
+        "FCP",
+        "CLS",
+        "TBT",
+        "FID",
+        "Speed Index",
+        "TTI",
+        "DCL",
+        "Total Page Size",
+        "Requests per Page",
+        "Unminified CSS",
+        "Unminified JS",
+        "Render-blocking CSS/JS",
+        "Excessive DOM",
+        "Third-party Scripts",
+        "TTFB",
+        "Image Optimization",
+        "Lazy Loading",
+        "Browser Caching",
+        "GZIP/Brotli",
+        "Resource Load Errors"
+      ]
+    },
+    {
+      "name": "Mobile & Usability",
+      "metrics": [
+        "Mobile Friendly",
+        "Viewport Tag",
+        "Font Sizes",
+        "Tap Targets",
+        "Mobile CWV",
+        "Content Clipping",
+        "Interstitials",
+        "Touch Overlap",
+        "Mobile Navigation"
+      ]
+    },
+    {
+      "name": "Security & HTTPS",
+      "metrics": [
+        "HTTPS Implemented",
+        "SSL Validity",
+        "Expired/Invalid SSL",
+        "Mixed Content",
+        "Insecure Resources",
+        "Security Headers (CSP,HSTS,XFO)",
+        "Open Directory",
+        "Login HTTPS"
+      ]
+    },
+    {
+      "name": "International SEO",
+      "metrics": [
+        "Hreflang Missing",
+        "Incorrect Lang Codes",
+        "Conflict Pairs",
+        "Region-Specific Markup",
+        "Multi-domain/Subdomain Errors"
+      ]
+    },
+    {
+      "name": "Backlinks & Authority",
+      "metrics": [
+        "Authority Score",
+        "Referring Domains",
+        "Total Backlinks",
+        "Toxic Backlinks",
+        "NoFollow Backlinks",
+        "Anchor Text Distribution",
+        "Referring IPs",
+        "Lost/New Backlinks"
+      ]
+    },
+    {
+      "name": "Advanced/Thematic",
+      "metrics": [
+        "JS Rendering",
+        "CSS Blocking",
+        "Pages Blocked by Meta Robots",
+        "Crawl Budget Waste",
+        "AMP Status",
+        "PWA Warnings",
+        "Canonicalization across protocols",
+        "Duplicate across subdomains",
+        "Paginated Page Issues",
+        "Dynamic URL Params",
+        "Lazy Loading Conflicts",
+        "Sitemap/robots presence",
+        "Noindex/Nofollow policy",
+        "Structured Data Consistency",
+        "Redirect correctness",
+        "Broken Rich Media",
+        "Social Metadata Presence"
+      ]
+    },
+    {
+      "name": "Trend/Historical",
+      "metrics": [
+        "Issue Trend",
+        "Site Health Trend",
+        "Pages Crawled Trend",
+        "Indexed Pages Trend",
+        "Core Web Vitals Trend",
+        "Backlink Trend",
+        "Keyword Rank Changes"
+      ]
+    }
+  ]
+}

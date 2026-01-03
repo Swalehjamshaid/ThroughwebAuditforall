@@ -1,0 +1,14 @@
+
+:root{--brand:#0B5ED7;--ok:#198754;--warn:#FFC107;--bad:#DC3545;--bg:#0f1221;--card:#121633;}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:#0f1221;color:#e9ecef;}
+a{color:var(--brand);} 
+.navbar{background:#0b132e;}
+.card{background:var(--card);border:1px solid #1f244f;border-radius:12px;}
+.btn-brand{background:var(--brand);color:#fff;border:none}
+.btn-brand:hover{filter:brightness(1.1)}
+.metric-good{color:var(--ok)}.metric-warn{color:var(--warn)}.metric-bad{color:var(--bad)}
+.progress{height:10px;background:#1f244f}
+.progress-bar{background:linear-gradient(90deg,#0B5ED7,#6ea8fe)}
+.table{color:#cfe2ff}
+.footer{color:#9fb2ff}
+.light body{background:#f8f9fa;color:#212529}

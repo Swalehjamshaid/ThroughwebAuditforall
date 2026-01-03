@@ -1,0 +1,22 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <h1 class="h5">Add Website & Run Audit</h1>
+      <form method="post" action="/audit/new">
+        <div class="mb-3">
+          <label class="form-label">Website URL</label>
+          <input type="url" name="url" class="form-control" placeholder="https://example.com" required>
+        </div>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="enable_schedule" name="enable_schedule">
+          <label class="form-check-label" for="enable_schedule">Enable scheduled audits</label>
+        </div>
+        <button class="btn btn-brand">Save & Run</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
