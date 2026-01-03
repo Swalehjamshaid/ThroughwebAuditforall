@@ -1,4 +1,3 @@
-
 import os, json, smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -57,13 +56,14 @@ def send_verification_email(to_email: str, verify_link: str, name: str) -> None:
     msg["Subject"] = f"{BRAND_NAME} – Verify your email"
     msg["From"] = MAIL_FROM
     msg["To"] = to_email
-    msg.set_content(f"Hello {name},
+    # FIXED: Added triple quotes to allow multi-line string
+    msg.set_content(f"""Hello {name},
 
 Please verify your email:
 {verify_link}
 
 Regards,
-{BRAND_NAME}")
+{BRAND_NAME}""")
     try:
         with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as s:
             if MAIL_USE_TLS: s.starttls()
@@ -351,8 +351,9 @@ def cron_daily():
                     msg = EmailMessage()
                     msg["Subject"] = f"{BRAND_NAME} – Daily Audit ({site.url})"
                     msg["From"] = MAIL_FROM; msg["To"] = sc.user_email
-                    msg.set_content(f"Daily audit for {site.url}:
-Overall {overall10:.2f}/10 ({grade}).")
+                    # FIXED: Added triple quotes to allow multi-line string
+                    msg.set_content(f"""Daily audit for {site.url}:
+Overall {overall10:.2f}/10 ({grade}).""")
                     with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as smtp:
                         if MAIL_USE_TLS: smtp.starttls()
                         if MAIL_USERNAME and MAIL_PASSWORD: smtp.login(MAIL_USERNAME, MAIL_PASSWORD)
