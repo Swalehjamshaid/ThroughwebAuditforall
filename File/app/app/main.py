@@ -1,4 +1,5 @@
 
+# app/app/app/main.py
 from flask import Flask, request, jsonify, g, render_template, redirect, url_for, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from passlib.hash import bcrypt
@@ -74,7 +75,8 @@ def landing():
 def login_view():
     error = None
     if request.method == 'POST':
-        email = request.form.get('email'); password = request.form.get('password')
+        email = request.form.get('email')
+        password = request.form.get('password')
         u = db.session.query(User).filter_by(email=email).first()
         if not u or not bcrypt.verify(password, u.password_hash):
             error = 'Invalid credentials'
@@ -95,22 +97,32 @@ def logout():
 def register_view():
     message = None
     if request.method == 'POST':
-        email = request.form.get('email'); name = request.form.get('name'); password = request.form.get('password'); confirm = request.form.get('confirm')
+        email = request.form.get('email')
+        name = request.form.get('name')
+        password = request.form.get('password')
+        confirm = request.form.get('confirm')
         if not email or not name or not password or password != confirm:
             message = 'Provide name, email and matching passwords'
         elif db.session.query(User).filter_by(email=email).first():
             message = 'Email already registered'
         else:
             u = User(email=email, name=name, password_hash=bcrypt.hash(password))
-            db.session.add(u); db.session.commit()
+            db.session.add(u)
+            db.session.commit()
             token = generate_token(u.id)
             confirm_link = f"{request.host_url.rstrip('/')}/auth/confirm?token={token}"
-            send_email(email, 'Confirm your FF Tech account', f"Hello {name},
 
-Confirm your account: {confirm_link}
+            # ✅ FIX: use a triple-quoted f-string for the email body
+            email_body = f"""Hello {name},
+
+Please confirm your account by clicking the link below:
+
+{confirm_link}
 
 Thanks,
-FF Tech")
+FF Tech
+"""
+            send_email(email, 'Confirm your FF Tech account', email_body)
             return render_template('register_done.html', email=email)
     return render_template('register.html', message=message)
 
@@ -122,7 +134,8 @@ def confirm():
         return render_template('verify_success.html')
     u = db.session.get(User, uid)
     if u:
-        u.email_confirmed = True; db.session.commit()
+        u.email_confirmed = True
+        db.session.commit()
     return render_template('verify_success.html')
 
 @app.get('/dashboard')
@@ -140,7 +153,9 @@ def add_website_html():
     url = request.form.get('url')
     if not url:
         return redirect(url_for('dashboard'))
-    w = Website(user_id=u.id, url=url); db.session.add(w); db.session.commit()
+    w = Website(user_id=u.id, url=url)
+    db.session.add(w)
+    db.session.commit()
     return redirect(url_for('dashboard'))
 
 @app.post('/audits/run')
@@ -153,28 +168,45 @@ def run_audit_html():
         return redirect(url_for('dashboard'))
     if not u.subscription_active and u.free_audits_used >= FREE_AUDITS:
         return redirect(url_for('dashboard'))
-    audit = Audit(website_id=w.id, user_id=u.id); db.session.add(audit); db.session.commit()
+    audit = Audit(website_id=w.id, user_id=u.id)
+    db.session.add(audit)
+    db.session.commit()
+
     metrics = run_all(w.url)
     score = compute_score({k: v for k, v in metrics.items()})
     audit.health_score = score
+
+    # use the plain string key (not HTML entity)
     crawl = metrics.get('Crawlability & Indexation', {})
-    errors = 0; warnings = 0
+
+    errors = 0
+    warnings = 0
     for cat, vals in metrics.items():
         if isinstance(vals, dict):
             for k, v in vals.items():
                 level = 'info'
                 if k.startswith('broken_') and isinstance(v, int) and v > 0:
-                    level = 'error'; errors += v
+                    level = 'error'
+                    errors += v
                 elif isinstance(v, str) and v == 'missing':
-                    level = 'warning'; warnings += 1
+                    level = 'warning'
+                    warnings += 1
                 am = AuditMetric(audit_id=audit.id, key=f"{cat}:{k}", value=str(v), level=level)
                 db.session.add(am)
-    audit.errors = errors; audit.warnings = warnings; audit.notices = 0
+
+    audit.errors = errors
+    audit.warnings = warnings
+    audit.notices = 0
+
     pdf_path = render_pdf(audit, crawl, w.url)
-    audit.pdf_path = pdf_path; audit.completed_at = datetime.utcnow()
+    audit.pdf_path = pdf_path
+    audit.completed_at = datetime.utcnow()
     db.session.commit()
+
     if not u.subscription_active:
-        u.free_audits_used += 1; db.session.commit()
+        u.free_audits_used += 1
+        db.session.commit()
+
     return redirect(url_for('dashboard'))
 
 @app.get('/history')
@@ -200,8 +232,14 @@ def download_pdf(audit_id):
 def schedule_view():
     u = current_user()
     if request.method == 'POST':
-        time_str = request.form.get('time'); tz = request.form.get('timezone'); enabled = request.form.get('enabled') == 'on'
-        u.schedule_enabled = enabled; u.schedule_time = time_str; u.schedule_timezone = tz
+        time_str = request.form.get('time')
+        tz = request.form.get('timezone')
+        enabled = request.form.get('enabled') == 'on'
+
+        u.schedule_enabled = enabled
+        u.schedule_time = time_str
+        u.schedule_timezone = tz
+
         if enabled and time_str and tz:
             try:
                 hour, minute = map(int, time_str.split(':'))
@@ -215,9 +253,17 @@ def schedule_view():
                 u.next_run_at = None
         else:
             u.next_run_at = None
+
         db.session.commit()
         return redirect(url_for('schedule_view'))
-    return render_template('schedule.html', time=u.schedule_time, timezone=u.schedule_timezone, enabled=u.schedule_enabled, next_run_at_utc=(u.next_run_at.isoformat() if u.next_run_at else None))
+
+    return render_template(
+        'schedule.html',
+        time=u.schedule_time,
+        timezone=u.schedule_timezone,
+        enabled=u.schedule_enabled,
+        next_run_at_utc=(u.next_run_at.isoformat() if u.next_run_at else None)
+    )
 
 # Admin
 @app.get('/admin')
@@ -261,40 +307,63 @@ def scheduler_loop(app):
                     webs = db.session.query(Website).filter_by(user_id=u.id).all()
                     for w in webs:
                         audit = Audit(website_id=w.id, user_id=u.id)
-                        db.session.add(audit); db.session.commit()
+                        db.session.add(audit)
+                        db.session.commit()
+
                         metrics = run_all(w.url)
                         score = compute_score(metrics)
                         audit.health_score = score
                         crawl = metrics.get('Crawlability & Indexation', {})
-                        errors = 0; warnings = 0
+
+                        errors = 0
+                        warnings = 0
                         for cat, vals in metrics.items():
                             if isinstance(vals, dict):
                                 for k, v in vals.items():
                                     level = 'info'
                                     if k.startswith('broken_') and isinstance(v, int) and v > 0:
-                                        level = 'error'; errors += v
+                                        level = 'error'
+                                        errors += v
                                     elif isinstance(v, str) and v == 'missing':
-                                        level = 'warning'; warnings += 1
+                                        level = 'warning'
+                                        warnings += 1
                                     am = AuditMetric(audit_id=audit.id, key=f"{cat}:{k}", value=str(v), level=level)
                                     db.session.add(am)
-                        audit.errors = errors; audit.warnings = warnings; audit.notices = 0
+
+                        audit.errors = errors
+                        audit.warnings = warnings
+                        audit.notices = 0
+
                         pdf_path = render_pdf(audit, crawl, w.url)
-                        audit.pdf_path = pdf_path; audit.completed_at = datetime.utcnow()
+                        audit.pdf_path = pdf_path
+                        audit.completed_at = datetime.utcnow()
                         db.session.commit()
+
                     try:
                         zone = pytz.timezone(u.schedule_timezone or 'UTC')
                         hour, minute = map(int, (u.schedule_time or '00:00').split(':'))
-                        next_local = pytz.utc.localize(now_utc).astimezone(zone).replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=1)
+                        next_local = pytz.utc.localize(now_utc).astimezone(zone).replace(
+                            hour=hour, minute=minute, second=0, microsecond=0
+                        ) + timedelta(days=1)
                         u.next_run_at = next_local.astimezone(pytz.UTC)
                         db.session.commit()
                     except Exception:
-                        u.next_run_at = None; db.session.commit()
-                    try:
-                        send_email(u.email, 'Your FF Tech daily audit', f"Hello {u.name},
+                        u.next_run_at = None
+                        db.session.commit()
 
-Your scheduled audits have been completed.")
+                    # ✅ FIX: triple-quoted f-string for daily email
+                    try:
+                        summary_body = f"""Hello {u.name},
+
+Your scheduled audits have been completed.
+
+Regards,
+FF Tech
+"""
+                        send_email(u.email, 'Your FF Tech daily audit', summary_body)
                     except Exception:
                         pass
+
             time.sleep(60)
 
 @app.before_first_request
