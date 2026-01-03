@@ -56,7 +56,7 @@ def send_verification_email(to_email: str, verify_link: str, name: str) -> None:
     msg["Subject"] = f"{BRAND_NAME} – Verify your email"
     msg["From"] = MAIL_FROM
     msg["To"] = to_email
-    # FIXED: Added triple quotes to allow multi-line f-string
+    # FIXED: Using triple quotes to allow multi-line email body
     msg.set_content(f"""Hello {name},
 
 Please verify your email:
@@ -350,7 +350,7 @@ def cron_daily():
                     msg = EmailMessage()
                     msg["Subject"] = f"{BRAND_NAME} – Daily Audit ({site.url})"
                     msg["From"] = MAIL_FROM; msg["To"] = sc.user_email
-                    # FIXED: Added triple quotes for multi-line string
+                    # FIXED: Added triple quotes for multi-line content
                     msg.set_content(f"""Daily audit for {site.url}:
 Overall {overall10:.2f}/10 ({grade}).""")
                     with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as smtp:
