@@ -56,7 +56,7 @@ def send_verification_email(to_email: str, verify_link: str, name: str) -> None:
     msg["Subject"] = f"{BRAND_NAME} – Verify your email"
     msg["From"] = MAIL_FROM
     msg["To"] = to_email
-    # FIXED: Added triple quotes to allow multi-line string
+    # FIXED: Added triple quotes to allow multi-line f-string
     msg.set_content(f"""Hello {name},
 
 Please verify your email:
