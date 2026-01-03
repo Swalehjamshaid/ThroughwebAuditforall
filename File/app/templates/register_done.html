@@ -1,0 +1,12 @@
+
+{% extends 'base.html' %}
+{% block title %}Verify Email{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Verification Sent</h2>
+  <p>We sent a verification link to <strong>{{ email }}</strong>.</p>
+  {% if verify_link %}
+    <p>Dev-only shortcut: <a href="{{ verify_link }}">Set password</a></p>
+  {% endif %}
+</div>
+{% endblock %}

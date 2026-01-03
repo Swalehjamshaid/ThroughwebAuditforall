@@ -1,0 +1,23 @@
+
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block content %}
+<h2>Admin Dashboard</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Stats</h3>
+    <p>Users: {{ stats.users }}<br>Audits: {{ stats.audits }}</p>
+  </div>
+  <div class="card">
+    <h3>Users</h3>
+    <table class="table">
+      <thead><tr><th>Email</th><th>Name</th><th>Company</th><th>Role</th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr><td>{{ u.email }}</td><td>{{ u.name }}</td><td>{{ u.company }}</td><td>{{ u.role }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

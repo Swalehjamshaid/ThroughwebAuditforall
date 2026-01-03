@@ -1,0 +1,14 @@
+
+{% extends 'base.html' %}
+{% block title %}Landing{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Open Audit</h2>
+  <form method="post" action="/audit">
+    <label>Website URL
+      <input name="url" type="url" placeholder="https://example.com" required>
+    </label>
+    <button class="btn btn-primary" type="submit">Run Audit</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}FF Tech Audit{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header>
+  <h1>{{ BRAND_NAME }} – Audit Portal</h1>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/login">Login</a>
+    <a href="/register">Register</a>
+    <a href="/results">Audit</a>
+    <a href="/history">History</a>
+    <a href="/schedule">Schedule</a>
+    {% if session.get('role') == 'admin' %}<a href="/admin/dashboard">Admin</a>{% endif %}
+    {% if session.get('user') %}<a href="/logout">Logout</a>{% endif %}
+  </nav>
+</header>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+<main>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>
