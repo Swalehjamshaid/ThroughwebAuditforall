@@ -1,10 +1,8 @@
-
 from flask import Flask, request, jsonify, g, render_template, redirect, url_for, session, send_file
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from passlib.hash import bcrypt
 from datetime import datetime, timedelta
 import threading, time, os, pytz
-
 from .models import db, User, Website, Audit, AuditMetric
 from .audit_engine.engine import run_all, compute_score
 from .reporting import render_pdf
@@ -13,7 +11,7 @@ from .email_utils import send_email
 app = Flask(__name__, template_folder='../templates')
 
 # === Config ===
-SECRET_KEY = os.getenv('SECRET_KEY', 'change-this')
+SECRET_KEY = os.getenv('SECRET_KEY', 'change-this-in-production-please')
 app.config['SECRET_KEY'] = SECRET_KEY
 
 # DB URL from Railway
@@ -22,11 +20,13 @@ if not db_url:
     raise RuntimeError('DATABASE_URL is not set. Add a variable reference from Railway Postgres.')
 if db_url.startswith('postgres://'):
     db_url = db_url.replace('postgres://', 'postgresql://', 1)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'connect_args': {'sslmode': os.getenv('DB_SSLMODE', 'require')}}
 
 db.init_app(app)
+
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 FREE_AUDITS = 10
 
@@ -66,8 +66,7 @@ def verify_token(token: str, max_age: int = 7*24*3600):
 def landing():
     return render_template('landing.html')
 
-@app.get('/login')
-@app.post('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login_view():
     error = None
     if request.method == 'POST':
@@ -88,8 +87,7 @@ def logout():
     session.pop('uid', None)
     return redirect(url_for('landing'))
 
-@app.get('/register')
-@app.post('/register')
+@app.route('/register', methods=['GET', 'POST'])
 def register_view():
     message = None
     if request.method == 'POST':
@@ -107,12 +105,9 @@ def register_view():
             db.session.commit()
             token = generate_token(u.id)
             confirm_link = f"{request.host_url.rstrip('/')}/auth/confirm?token={token}"
-
-            # Triple-quoted f-string for multi-line email
             email_body = f"""Hello {name},
 
 Please confirm your account by clicking the link below:
-
 {confirm_link}
 
 Thanks,
@@ -167,13 +162,10 @@ def run_audit_html():
     audit = Audit(website_id=w.id, user_id=u.id)
     db.session.add(audit)
     db.session.commit()
-
     metrics = run_all(w.url)
     score = compute_score({k: v for k, v in metrics.items()})
     audit.health_score = score
-
     crawl = metrics.get('Crawlability & Indexation', {})
-
     errors = 0
     warnings = 0
     for cat, vals in metrics.items():
@@ -188,20 +180,16 @@ def run_audit_html():
                     warnings += 1
                 am = AuditMetric(audit_id=audit.id, key=f"{cat}:{k}", value=str(v), level=level)
                 db.session.add(am)
-
     audit.errors = errors
     audit.warnings = warnings
     audit.notices = 0
-
     pdf_path = render_pdf(audit, crawl, w.url)
     audit.pdf_path = pdf_path
     audit.completed_at = datetime.utcnow()
     db.session.commit()
-
     if not u.subscription_active:
         u.free_audits_used += 1
         db.session.commit()
-
     return redirect(url_for('dashboard'))
 
 @app.get('/history')
@@ -221,8 +209,7 @@ def download_pdf(audit_id):
         return redirect(url_for('dashboard'))
     return send_file(a.pdf_path, as_attachment=True)
 
-@app.get('/schedule')
-@app.post('/schedule')
+@app.route('/schedule', methods=['GET', 'POST'])
 @login_required_html
 def schedule_view():
     u = current_user()
@@ -230,11 +217,9 @@ def schedule_view():
         time_str = request.form.get('time')
         tz = request.form.get('timezone')
         enabled = request.form.get('enabled') == 'on'
-
         u.schedule_enabled = enabled
         u.schedule_time = time_str
         u.schedule_timezone = tz
-
         if enabled and time_str and tz:
             try:
                 hour, minute = map(int, time_str.split(':'))
@@ -248,10 +233,8 @@ def schedule_view():
                 u.next_run_at = None
         else:
             u.next_run_at = None
-
         db.session.commit()
         return redirect(url_for('schedule_view'))
-
     return render_template(
         'schedule.html',
         time=u.schedule_time,
@@ -275,12 +258,10 @@ def scheduler_loop(app):
                         audit = Audit(website_id=w.id, user_id=u.id)
                         db.session.add(audit)
                         db.session.commit()
-
                         metrics = run_all(w.url)
                         score = compute_score(metrics)
                         audit.health_score = score
                         crawl = metrics.get('Crawlability & Indexation', {})
-
                         errors = 0
                         warnings = 0
                         for cat, vals in metrics.items():
@@ -295,16 +276,13 @@ def scheduler_loop(app):
                                         warnings += 1
                                     am = AuditMetric(audit_id=audit.id, key=f"{cat}:{k}", value=str(v), level=level)
                                     db.session.add(am)
-
                         audit.errors = errors
                         audit.warnings = warnings
                         audit.notices = 0
-
                         pdf_path = render_pdf(audit, crawl, w.url)
                         audit.pdf_path = pdf_path
                         audit.completed_at = datetime.utcnow()
                         db.session.commit()
-
                     try:
                         zone = pytz.timezone(u.schedule_timezone or 'UTC')
                         hour, minute = map(int, (u.schedule_time or '00:00').split(':'))
@@ -316,27 +294,22 @@ def scheduler_loop(app):
                     except Exception:
                         u.next_run_at = None
                         db.session.commit()
-
                     # Daily summary email
                     try:
                         summary_body = f"""Hello {u.name},
-
 Your scheduled audits have been completed.
-
 Regards,
 FF Tech
 """
                         send_email(u.email, 'Your FF Tech daily audit', summary_body)
                     except Exception:
                         pass
-
             time.sleep(60)
 
-# ===== Flask 3.x compatible initialization (no deprecated hooks) =====
+# ===== Safe initialization — runs once per process =====
 scheduler_started = False
 
 def init_db_and_scheduler_once():
-    """Initialize DB and start scheduler once per process."""
     global scheduler_started
     if scheduler_started:
         return
@@ -346,7 +319,7 @@ def init_db_and_scheduler_once():
         t.start()
         scheduler_started = True
 
-# Initialize at import time (safe per process, works under Gunicorn)
+# Run at import time (safe for Gunicorn)
 init_db_and_scheduler_once()
 
 if __name__ == '__main__':
