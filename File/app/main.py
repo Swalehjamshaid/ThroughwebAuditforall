@@ -56,7 +56,7 @@ def send_verification_email(to_email: str, verify_link: str, name: str) -> None:
     msg["Subject"] = f"{BRAND_NAME} – Verify your email"
     msg["From"] = MAIL_FROM
     msg["To"] = to_email
-    # FIXED: Using triple quotes for multi-line f-string
+    # FIXED: Using triple quotes f""" to allow multi-line content
     msg.set_content(f"""Hello {name},
 
 Please verify your email:
@@ -79,7 +79,6 @@ def healthz(): return {"status":"ok"}, 200
 @app.route('/')
 def landing(): return render_safe('landing.html', title='Landing', BRAND_NAME=BRAND_NAME)
 
-# Registration with DB-backed verification token
 @app.route('/register', methods=['GET','POST'])
 def register():
     if request.method == 'POST':
@@ -351,7 +350,7 @@ def cron_daily():
                     msg = EmailMessage()
                     msg["Subject"] = f"{BRAND_NAME} – Daily Audit ({site.url})"
                     msg["From"] = MAIL_FROM; msg["To"] = sc.user_email
-                    # FIXED: Using triple quotes for multi-line f-string
+                    # FIXED: Using triple quotes f""" to allow multi-line content
                     msg.set_content(f"""Daily audit for {site.url}:
 Overall {overall10:.2f}/10 ({grade}).""")
                     with smtplib.SMTP(MAIL_SERVER, MAIL_PORT) as smtp:
@@ -367,6 +366,4 @@ def cron_accumulated():
     return {"detail":"Accumulated report stub"}, 200
 
 if __name__ == '__main__':
-    # It is recommended to let Gunicorn handle the port via the CMD in Dockerfile,
-    # but this is kept for local testing compatibility.
     app.run(host='0.0.0.0', port=int(os.getenv('PORT','8000')))
