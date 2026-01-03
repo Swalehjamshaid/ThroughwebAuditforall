@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FF Tech – AI Powered Website Audit SaaS</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#22c55e; --warn:#f59e0b; --crit:#ef4444; --lightbg:#f8fafc; --lightpanel:#ffffff; --lighttext:#0f172a; }
+    [data-theme="dark"] body { background: var(--bg); color: var(--text);} [data-theme="dark"] .panel { background: var(--panel); color: var(--text);} 
+    [data-theme="light"] body { background: var(--lightbg); color: var(--lighttext);} [data-theme="light"] .panel { background: var(--lightpanel); color: var(--lighttext); box-shadow:0 4px 20px rgba(0,0,0,0.06);} 
+    body { font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; }
+    header { display:flex; align-items:center; justify-content:space-between; padding:16px 24px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .container { max-width:1100px; margin:0 auto; padding:24px; }
+    .grid { display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
+    .col-6 { grid-column: span 6;} .col-12 { grid-column: span 12;} .col-4 { grid-column: span 4;} .col-8 { grid-column: span 8;}
+    .panel { border-radius:14px; padding:18px; }
+    .title { font-weight:700; font-size:18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;}
+    .progress { height:10px; background:#1f2937; border-radius:10px; overflow:hidden; }
+    .progress > div { height:100%; background: var(--accent); width: 0; transition: width 600ms; }
+    .btn { padding:10px 14px; border:0; border-radius:10px; cursor:pointer; background: var(--accent); color:#fff; font-weight:600;}
+    .btn.secondary { background:#374151; }
+    .input { padding:10px 12px; border-radius:10px; border:1px solid #cbd5e1; width:100%; }
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { padding:10px; border-bottom:1px solid #e5e7eb; font-size:14px; }
+    .pill { padding:6px 10px; border-radius:999px; font-size:12px; }
+    .pill.good { background:#0ea5e9; color:#fff;} .pill.warn{background:#f59e0b;color:#fff;} .pill.crit{background:#ef4444;color:#fff;}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="https://via.placeholder.com/40x40.png?text=FF" alt="FF Tech"/>
+      <div>
+        <div style="font-size:20px;font-weight:800;">FF Tech</div>
+        <div style="font-size:12px;color:var(--muted);">AI Powered Website Audit SaaS</div>
+      </div>
+    </div>
+    <button class="btn secondary" id="theme-toggle">Toggle Theme</button>
+  </header>
+  <div class="container">
+    <div class="grid">
+      <div class="col-6 panel">
+        <div class="title">Register</div>
+        <input class="input" id="reg-email" placeholder="Email">
+        <input class="input" id="reg-pass" type="password" placeholder="Password">
+        <button class="btn" id="btn-register">Register</button>
+        <small>Complete registration by clicking the secure link sent via email.</small>
+      </div>
+      <div class="col-6 panel" id="login-panel">
+        <div class="title">Login</div>
+        <input class="input" id="login-email" placeholder="Email">
+        <input class="input" id="login-pass" type="password" placeholder="Password">
+        <button class="btn" id="btn-login">Login</button>
+      </div>
+      <div class="col-8 panel" id="dashboard" style="display:none;">
+        <div class="title">Site Health</div>
+        <div class="progress"><div id="overall-progress"></div></div>
+        <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+          <div style="font-size:40px;font-weight:900;" id="grade-badge">–</div>
+          <div id="score-text">0/100</div>
+        </div>
+      </div>
+      <div class="col-4 panel">
+        <div class="title">Add Website</div>
+        <input class="input" id="audit-url" placeholder="https://example.com">
+        <button class="btn" id="btn-run-audit">Run Audit</button>
+        <button class="btn secondary" id="btn-schedule">Schedule Daily</button>
+      </div>
+      <div class="col-12 panel">
+        <div class="title">Metrics</div>
+        <table class="table" id="metrics-table"><thead><tr><th>Category</th><th>Metric</th><th>Value</th><th>Status</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="col-8 panel">
+        <div class="title">Executive Summary (200 words)</div>
+        <p id="exec-summary">Run an audit to generate the summary.</p>
+      </div>
+      <div class="col-4 panel">
+        <div class="title">Certified Report</div>
+        <button class="btn" id="btn-download-pdf">Download PDF</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let token = null; let websiteId = null; let lastAuditId = null;
+    document.getElementById('theme-toggle').onclick = () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
+    };
+    const api = (path, opts={}) => fetch(path, Object.assign({ headers: token? { 'Authorization': 'Bearer ' + token } : {} }, opts));
+
+    document.getElementById('btn-register').onclick = async () => {
+      const email = document.getElementById('reg-email').value; const password = document.getElementById('reg-pass').value;
+      const res = await api('/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, password}) });
+      alert((await res.json()).message || 'Check your email to verify.');
+    };
+
+    document.getElementById('btn-login').onclick = async () => {
+      const email = document.getElementById('login-email').value; const password = document.getElementById('login-pass').value;
+      const form = new URLSearchParams(); form.append('username', email); form.append('password', password);
+      const res = await api('/auth/login', { method:'POST', body: form }); const data = await res.json(); token = data.access_token; 
+      if(token){ document.getElementById('dashboard').style.display='block'; alert('Logged in'); }
+    };
+
+    document.getElementById('btn-run-audit').onclick = async () => {
+      const url = document.getElementById('audit-url').value; if(!url) return alert('Enter URL');
+      // Add website
+      let res = await api('/websites', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url}) });
+      const w = await res.json(); websiteId = w.id;
+      // Run audit
+      res = await api(`/audits/${websiteId}/run`, { method:'POST' }); const a = await res.json(); lastAuditId = a.audit_id;
+      document.getElementById('overall-progress').style.width = `${a.score}%`;
+      document.getElementById('grade-badge').textContent = a.grade; document.getElementById('score-text').textContent = `${a.score}/100`;
+      // Detailed metrics
+      const det = await (await api(`/audits/${lastAuditId}`)).json(); const tbody = document.querySelector('#metrics-table tbody'); tbody.innerHTML='';
+      Object.entries(det.metrics.categories).forEach(([cat, items])=>{ Object.entries(items).forEach(([k,v])=>{
+        const tr = document.createElement('tr'); const val = (typeof v.value==='object')? JSON.stringify(v.value): v.value;
+        const status = v.status||'warning'; tr.innerHTML = `<td>${cat}</td><td>${k}</td><td>${val??'-'}</td><td>${status}</td>`; tbody.appendChild(tr);
+      });});
+      document.getElementById('exec-summary').textContent = det.summary;
+    };
+
+    document.getElementById('btn-schedule').onclick = async () => {
+      if(!websiteId) return alert('Add a website first');
+      const hour = prompt('Hour (0-23)'); const min = prompt('Minute (0-59)');
+      const res = await api(`/audits/${websiteId}/schedule`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({hour_local:Number(hour), minute_local:Number(min), frequency:'daily'})});
+      alert((await res.json()).message || 'Scheduled');
+    };
+
+    document.getElementById('btn-download-pdf').onclick = async () => {
+      if(!lastAuditId) return alert('Run an audit first');
+      const res = await api(`/reports/${lastAuditId}/pdf`); const data = await res.json(); alert('PDF created at: '+data.pdf_path);
+    };
+  </script>
+</body>
+</html>
