@@ -1,0 +1,25 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<h2>Open Audit Result</h2>
+{% if error %}<p style="color:red">{{ error }}</p>{% endif %}
+{% if url %}<p><strong>URL:</strong> {{ url }}</p>{% endif %}
+{% if score %}<p><strong>Score:</strong> {{ score }} | <strong>Grade:</strong> {{ grade }}</p>{% endif %}
+{% if summary %}<p><em>{{ summary }}</em></p>{% endif %}
+{% if top_issues %}
+  <h3>Major Issues</h3>
+  <ul>{% for i in top_issues %}<li>{{ i }}</li>{% endfor %}</ul>
+{% endif %}
+{% if metrics %}
+  <h3>Key Metrics</h3>
+  {% for cat, vals in metrics.items() %}
+    <h4>{{ cat }}</h4>
+    <ul>
+      {% for k, v in vals.items() %}
+        <li>{{ k }}: {{ v }}</li>
+      {% endfor %}
+    </ul>
+  {% endfor %}
+{% endif %}
+<p><a href="/register">Register</a> to unlock full audits, scheduling, certified reports, and history.</p>
+{% endblock %}

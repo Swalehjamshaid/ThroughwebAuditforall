@@ -1,0 +1,26 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}FF Tech — AI Website Audit SaaS{% endblock %}</title>
+</head>
+<body>
+<nav>
+  <a href="/">Home</a> |
+  <a href="/open-audit">Open Audit</a> |
+  {% if session.get('uid') %}
+    <a href="/dashboard">Dashboard</a> |
+    <a href="/history">History</a> |
+    <a href="/schedule">Schedule</a> |
+    <a href="/logout">Logout</a>
+  {% else %}
+    <a href="/login">Login</a> |
+    <a href="/register">Register</a>
+  {% endif %}
+</nav>
+<hr>
+{% block content %}{% endblock %}
+</body>
+</html>
