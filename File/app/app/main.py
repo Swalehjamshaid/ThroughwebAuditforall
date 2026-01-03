@@ -35,13 +35,11 @@ FREE_AUDITS = 10
 def inject_year():
     return {'year': datetime.utcnow().year}
 
-
 def current_user():
     uid = session.get('uid')
     if not uid:
         return None
     return db.session.get(User, uid)
-
 
 def login_required_html(f):
     from functools import wraps
@@ -53,7 +51,6 @@ def login_required_html(f):
     return wrapper
 
 # === JSON Auth (existing) ===
-
 def generate_token(user_id: int):
     return serializer.dumps({'uid': user_id})
 
@@ -263,36 +260,7 @@ def schedule_view():
         next_run_at_utc=(u.next_run_at.isoformat() if u.next_run_at else None)
     )
 
-# Admin
-@app.get('/admin')
-@login_required_html
-def admin_dashboard():
-    u = current_user()
-    if u.role != 'admin':
-        return redirect(url_for('dashboard'))
-    users = db.session.query(User).order_by(User.id.asc()).all()
-    return render_template('admin_dashboard.html', users=users)
-
-@app.post('/admin/subscription')
-@login_required_html
-def admin_set_subscription():
-    u = current_user()
-    if u.role != 'admin':
-        return redirect(url_for('admin_dashboard'))
-    target_id = request.form.get('user_id', type=int)
-    active = request.form.get('active') == 'true'
-    t = db.session.get(User, target_id)
-    if t:
-        t.subscription_active = active
-        db.session.commit()
-    return redirect(url_for('admin_dashboard'))
-
-# === JSON API ===
-@app.get('/health')
-def health():
-    return jsonify({'status': 'ok'})
-
-# Background scheduler
+# === Background scheduler ===
 stop_flag = False
 
 def scheduler_loop(app):
@@ -305,34 +273,51 @@ def scheduler_loop(app):
                     webs = db.session.query(Website).filter_by(user_id=u.id).all()
                     for w in webs:
                         audit = Audit(website_id=w.id, user_id=u.id)
-                        db.session.add(audit); db.session.commit()
+                        db.session.add(audit)
+                        db.session.commit()
+
                         metrics = run_all(w.url)
                         score = compute_score(metrics)
                         audit.health_score = score
                         crawl = metrics.get('Crawlability & Indexation', {})
-                        errors = 0; warnings = 0
+
+                        errors = 0
+                        warnings = 0
                         for cat, vals in metrics.items():
                             if isinstance(vals, dict):
                                 for k, v in vals.items():
                                     level = 'info'
                                     if k.startswith('broken_') and isinstance(v, int) and v > 0:
-                                        level = 'error'; errors += v
+                                        level = 'error'
+                                        errors += v
                                     elif isinstance(v, str) and v == 'missing':
-                                        level = 'warning'; warnings += 1
+                                        level = 'warning'
+                                        warnings += 1
                                     am = AuditMetric(audit_id=audit.id, key=f"{cat}:{k}", value=str(v), level=level)
                                     db.session.add(am)
-                        audit.errors = errors; audit.warnings = warnings; audit.notices = 0
+
+                        audit.errors = errors
+                        audit.warnings = warnings
+                        audit.notices = 0
+
                         pdf_path = render_pdf(audit, crawl, w.url)
-                        audit.pdf_path = pdf_path; audit.completed_at = datetime.utcnow()
+                        audit.pdf_path = pdf_path
+                        audit.completed_at = datetime.utcnow()
                         db.session.commit()
+
                     try:
                         zone = pytz.timezone(u.schedule_timezone or 'UTC')
                         hour, minute = map(int, (u.schedule_time or '00:00').split(':'))
-                        next_local = pytz.utc.localize(now_utc).astimezone(zone).replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=1)
+                        next_local = pytz.utc.localize(now_utc).astimezone(zone).replace(
+                            hour=hour, minute=minute, second=0, microsecond=0
+                        ) + timedelta(days=1)
                         u.next_run_at = next_local.astimezone(pytz.UTC)
                         db.session.commit()
                     except Exception:
-                        u.next_run_at = None; db.session.commit()
+                        u.next_run_at = None
+                        db.session.commit()
+
+                    # Daily summary email
                     try:
                         summary_body = f"""Hello {u.name},
 
@@ -344,15 +329,28 @@ FF Tech
                         send_email(u.email, 'Your FF Tech daily audit', summary_body)
                     except Exception:
                         pass
+
             time.sleep(60)
 
-@app.before_first_request
-def init_db_and_scheduler():
-    db.create_all()
-    t = threading.Thread(target=scheduler_loop, args=(app,), daemon=True)
-    t.start()
+# ===== Flask 3.x compatible initialization (NO deprecated decorators) =====
+scheduler_started = False
+
+def init_db_and_scheduler_once():
+    """Initialize DB and start scheduler once per process."""
+    global scheduler_started
+    if scheduler_started:
+        return
+    with app.app_context():
+        db.create_all()
+        t = threading.Thread(target=scheduler_loop, args=(app,), daemon=True)
+        t.start()
+        scheduler_started = True
+
+# Call it at import time (safe per process, works under Gunicorn)
+init_db_and_scheduler_once()
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')))
+``
