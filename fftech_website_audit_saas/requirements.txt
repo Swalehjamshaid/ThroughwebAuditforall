@@ -1,12 +1,29 @@
+
+# Web framework & ASGI server
 fastapi
 uvicorn[standard]
+
+# Database & ORM
 sqlalchemy
 psycopg2-binary
+
+# Auth & security
 passlib[argon2]
 python-jose
-pydantic
+
+# Data validation (with email support for EmailStr)
+pydantic[email]
+
+# Scheduling & timezones
 apscheduler
+pytz
+
+# HTTP & parsing
 requests
 beautifulsoup4
+
+# Reports (PDF)
 reportlab
+
+# Forms / file uploads
 python-multipart
