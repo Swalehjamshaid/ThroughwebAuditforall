@@ -1,4 +1,4 @@
-
+email-validator
 # Web framework & ASGI server
 fastapi
 uvicorn[standard]
