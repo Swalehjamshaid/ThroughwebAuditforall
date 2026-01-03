@@ -108,7 +108,7 @@ def register_view():
             token = generate_token(u.id)
             confirm_link = f"{request.host_url.rstrip('/')}/auth/confirm?token={token}"
 
-            # Triple-quoted f-string to avoid unterminated string errors
+            # Triple-quoted f-string for multi-line email
             email_body = f"""Hello {name},
 
 Please confirm your account by clicking the link below:
@@ -332,7 +332,7 @@ FF Tech
 
             time.sleep(60)
 
-# ===== Flask 3.x compatible initialization (NO deprecated decorators) =====
+# ===== Flask 3.x compatible initialization (no deprecated hooks) =====
 scheduler_started = False
 
 def init_db_and_scheduler_once():
@@ -346,11 +346,10 @@ def init_db_and_scheduler_once():
         t.start()
         scheduler_started = True
 
-# Call it at import time (safe per process, works under Gunicorn)
+# Initialize at import time (safe per process, works under Gunicorn)
 init_db_and_scheduler_once()
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', '8080')))
-``
