@@ -1,0 +1,30 @@
+
+{% extends 'base.html' %}
+{% block title %}Admin — FF Tech{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Users</h2>
+  <table>
+    <thead><tr><th>ID</th><th>Email</th><th>Name</th><th>Confirmed</th><th>Free Audits</th><th>Subscription</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.id }}</td>
+          <td>{{ u.email }}</td>
+          <td>{{ u.name }}</td>
+          <td>{{ 'Yes' if u.email_confirmed else 'No' }}</td>
+          <td>{{ u.free_audits_used }}</td>
+          <td>{{ 'Active' if u.subscription_active else 'Inactive' }}</td>
+          <td>
+            <form method="post" action="/admin/subscription" style="display:inline">
+              <input type="hidden" name="user_id" value="{{ u.id }}">
+              <input type="hidden" name="active" value="{{ 'false' if u.subscription_active else 'true' }}">
+              <button type="submit">{{ 'Deactivate' if u.subscription_active else 'Activate' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+
+{% extends 'base.html' %}
+{% block title %}Schedule — FF Tech{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Daily audit schedule</h2>
+  <form method="post" action="/schedule">
+    <div class="grid">
+      <div><label>Time (HH:MM)</label><input type="text" name="time" value="{{ time or '' }}" placeholder="09:00" required></div>
+      <div><label>Timezone (IANA)</label><input type="text" name="timezone" value="{{ timezone or 'Asia/Karachi' }}" required></div>
+    </div>
+    <div style="margin-top:12px"><label><input type="checkbox" name="enabled" {% if enabled %}checked{% endif %}> Enabled</label></div>
+    <div style="margin-top:12px"><button type="submit">Save</button></div>
+  </form>
+  {% if next_run_at_utc %}<p class="muted">Next run (UTC): {{ next_run_at_utc }}</p>{% endif %}
+</div>
+{% endblock %}

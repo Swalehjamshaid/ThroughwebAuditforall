@@ -1,0 +1,16 @@
+
+{% extends 'base.html' %}
+{% block title %}Login — FF Tech{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Login</h2>
+  <form method="post" action="/login">
+    <div class="grid">
+      <div><label>Email</label><input type="email" name="email" required></div>
+      <div><label>Password</label><input type="password" name="password" required></div>
+    </div>
+    <div style="margin-top:12px"><button type="submit">Sign In</button></div>
+  </form>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+</div>
+{% endblock %}
