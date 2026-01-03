@@ -11,7 +11,7 @@ psycopg2-binary
 passlib[argon2]
 python-jose
 
-# Data validation (with email support for EmailStr)
+# Data validation (EmailStr support in Pydantic v2)
 pydantic[email]
 
 # Scheduling & timezones
