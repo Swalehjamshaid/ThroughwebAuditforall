@@ -1,1 +1,22 @@
-<div class="container py-5"><h3>Login</h3><form method="post" action="/login"><input name="email" placeholder="Email"><input name="password" type="password" placeholder="Password"><button>Login</button></form></div>
+
+<div class="container py-5">
+  {% if request.query_params.get('verified') == '1' %}
+    <div class="alert alert-success">Your email has been verified. Please log in now.</div>
+  {% endif %}
+  {% if request.query_params.get('check_email') == '1' %}
+    <div class="alert alert-info">We sent you a verification email. Please check your inbox.</div>
+  {% endif %}
+
+  <h3>Login</h3>
+  /login
+    <div class="col-12">
+      <input name="email" type="email" class="form-control" placeholder="Email" required>
+    </div>
+    <div class="col-12">
+      <input name="password" type="password" class="form-control" placeholder="Password" required>
+    </div>
+    <div class="col-12">
+      <button class="btn btn-primary">Login</button>
+    </div>
+  </form>
+</div>
