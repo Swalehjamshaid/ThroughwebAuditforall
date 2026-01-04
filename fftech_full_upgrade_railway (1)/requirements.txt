@@ -1,8 +1,0 @@
-
-requests
-reportlab
-matplotlib
-fastapi
-uvicorn
-sqlalchemy
-python-dotenv
