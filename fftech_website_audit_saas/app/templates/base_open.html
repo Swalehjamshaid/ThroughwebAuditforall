@@ -1,53 +1,47 @@
 
+<!-- fftech_website_audit_saas/app/templates/base_open.html -->
 {% set brand = 'One Tech' %}
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ brand }} · AI Website Audit</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <style>
-    body { font-family: 'Inter', system-ui, sans-serif; background-color: #0f172a; color: #e2e8f0; }
-    .navbar { background: linear-gradient(135deg, #4f46e5, #7c3aed); }
-    .btn-brand { background: linear-gradient(135deg, #6366f1, #a78bfa); border: none; font-weight: 600; }
-    .hero { padding: 6rem 0; text-align: center; background:
-      radial-gradient(circle at 20% 80%, rgba(79,70,229,0.4), transparent),
-      radial-gradient(circle at 80% 20%, rgba(124,58,237,0.4), transparent),
-      #0f172a; }
-    .hero-title { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 800;
-      background: linear-gradient(135deg, #fff, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .card { background-color: #1e293b; border-radius: 1rem; }
-  </style>
+  <!-- keep your existing <head> content -->
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
   <div class="container-fluid">
-    <a class="navbar-brand d-flex align-items-center" href="/"><img src="/static/img/fftech_logo.svg" alt="{{ brand }}" height="38" class="me-3"><span class="fw-bold">{{ brand }}</span></a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbars"><span class="navbar-toggler-icon"></span></button>
+    /
+      /static/img/fftech_logo.svg
+      <span class="fw-bold">{{ brand }}</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbars">
+      <span class="navbar-toggler-icon"></span>
+    </button>
     <div class="collapse navbar-collapse" id="navbars">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link" href="/audit/new">New Audit</a></li>
+        <li class="nav-item">
+          {% if user %}/dashboard{% else %}/login{% endif %}Dashboard</a>
+        </li>
+        <li class="nav-item">/audit/newNew Audit</a></li>
       </ul>
       <div class="d-flex gap-3">
         {% if user %}
           <span class="text-light opacity-75">Hello, {{ user.email }}</span>
-          <a class="btn btn-outline-light btn-sm" href="/logout">Logout</a>
+          /logoutLogout</a>
         {% else %}
-          <a class="btn btn-outline-light btn-sm" href="/login">Login</a>
-          <a class="btn btn-brand btn-sm" href="/register">Register</a>
+          /loginLogin</a>
+          /registerRegister</a>
         {% endif %}
       </div>
     </div>
   </div>
 </nav>
+
 {% block body %}{% endblock %}
-<footer class="footer py-4 text-center mt-4"><p>© {{ brand }} · AI-Powered Website Audit SaaS</p></footer>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/js/app.js"></script>
+
+<footer class="footer py-4 text-center mt-4">
+  <p>© {{ brand }} · AI-Powered Website Audit SaaS</p>
+</footer>
+https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js</script>
+/static/js/app.js</script>
 </body>
 </html>
