@@ -1,24 +1,44 @@
-
 {% extends 'base.html' %}
 {% block content %}
-<div class="row align-items-center g-4">
-  <div class="col-lg-6">
-    <h1 class="display-6 fw-bold">AI-Powered Website Audit & Compliance</h1>
-    <p class="lead">Audit 100+ metrics for SEO, performance, security, accessibility and more. Receive certified reports with strict grading — daily snapshots and accumulated trends.</p>
-    <div class="d-flex gap-2">
-      <a href="/register" class="btn btn-brand btn-lg">Get Started</a>
-      <a href="/login" class="btn btn-outline-light btn-lg">Sign In</a>
+<div class="row align-items-center g-5 py-5">
+  <div class="col-lg-7">
+    <h1 class="display-5 fw-bold lh-1 mb-4">AI-Powered Website Audit & Compliance</h1>
+    <p class="lead mb-4">
+      Instantly audit 100+ metrics covering SEO, performance, security, accessibility, best practices, and more. 
+      Get a certified report with strict grading, category breakdowns, and actionable insights.
+    </p>
+
+    <div class="d-flex flex-column flex-md-row gap-3 mb-4">
+      <!-- Primary: Guest audit - no registration needed -->
+      <a href="/audit/guest" class="btn btn-brand btn-lg px-5">
+        Try Free Audit Now<br>
+        <small class="fw-normal opacity-75">No registration required</small>
+      </a>
+
+      <!-- Secondary: Full account for ongoing use -->
+      <a href="/register" class="btn btn-outline-light btn-lg px-5">
+        Create Free Account<br>
+        <small class="fw-normal opacity-75">10 audits + scheduling & trends</small>
+      </a>
     </div>
-    <p class="mt-3 text-secondary">Free plan includes 10 audits. Continue with $5/month subscription.</p>
+
+    <p class="text-secondary">
+      <strong>Instant guest audit:</strong> One-time full report, no signup, no email needed.<br>
+      <strong>Free account:</strong> Save websites, schedule daily audits, view trends, and more. 
+      Upgrade to unlimited for just $5/month.
+    </p>
   </div>
-  <div class="col-lg-6">
-    <div class="card p-4">
-      <h2 class="h5">Highlights</h2>
-      <ul>
-        <li>Strict grading (A+ to D) with category scores</li>
-        <li>Daily & accumulated reporting with scheduling</li>
-        <li>Admin panel for oversight & security</li>
-        <li>Certified PDF — branded with FF Tech</li>
+
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm p-4">
+      <h2 class="h5 mb-3">What You'll Get</h2>
+      <ul class="list-unstyled">
+        <li class="mb-2">✅ Strict letter grading (A+ to D)</li>
+        <li class="mb-2">✅ Detailed category scores</li>
+        <li class="mb-2">✅ 100+ checked metrics with explanations</li>
+        <li class="mb-2">✅ Certified PDF report (branded by FF Tech)</li>
+        <li class="mb-2">✅ Daily scheduling & health trends (with account)</li>
+        <li class="mb-3"><strong>✅ Instant guest audit – try it right now without signing up</strong></li>
       </ul>
     </div>
   </div>
