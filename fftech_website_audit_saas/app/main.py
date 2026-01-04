@@ -1,4 +1,5 @@
 
+# fftech_website_audit_saas/app/main.py
 import os
 import json
 import asyncio
@@ -63,7 +64,29 @@ def _ensure_schedule_columns():
         # Do not block startup if schema change fails
         pass
 
+# ---- Patch old 'users' table safely (idempotent) ----
+def _ensure_user_columns():
+    """Add missing columns to 'users' if they don't exist (Postgres-friendly)."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
+            """))
+            conn.execute(text("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+            """))
+            conn.execute(text("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+            """))
+            conn.commit()
+    except Exception:
+        pass
+
 _ensure_schedule_columns()
+_ensure_user_columns()
 
 # ---------- Dependencies ----------
 def get_db():
@@ -188,26 +211,33 @@ async def register_post(
     except Exception:
         # Email failures should not block registration
         pass
-    return RedirectResponse("/login", status_code=303)
+    # Optional: show a hint on login page
+    return RedirectResponse("/login?check_email=1", status_code=303)
 
 @app.get("/verify")
 async def verify(request: Request, token: str, db: Session = Depends(get_db)):
-    success = False
+    """
+    Marks user verified when the emailed link (/verify?token=...) is clicked,
+    then redirects to /login with a success flag.
+    """
     try:
         data = decode_token(token)
         u = db.query(User).filter(User.id == data["uid"]).first()
         if u:
             u.verified = True
             db.commit()
-            success = True
+            # Redirect straight to login so user can sign in
+            return RedirectResponse("/login?verified=1", status_code=303)
     except Exception:
-        success = False
-    return templates.TemplateResponse("verify.html", {
-        "request": request,
-        "success": success,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
-        "user": current_user
-    })
+        # If token invalid/expired, show verify page with failure
+        return templates.TemplateResponse("verify.html", {
+            "request": request,
+            "success": False,
+            "UI_BRAND_NAME": UI_BRAND_NAME,
+            "user": current_user
+        })
+
+    return RedirectResponse("/login", status_code=303)
 
 @app.get("/login")
 async def login_get(request: Request):
