@@ -7,4 +7,5 @@ uvicorn
 sqlalchemy
 python-dotenv
 PyJWT
-psycopg2-binary    # for Railway Postgres (optional if using SQLite locally)
+psycopg2-binary
+jinja2
