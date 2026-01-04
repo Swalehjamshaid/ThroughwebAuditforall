@@ -4,24 +4,27 @@
 <main class="container py-5">
   <div class="row g-4">
     <div class="col-12">
-      <div class="card shadow-sm"><div class="card-body">
-        <div class="d-flex justify-content-between align-items-center flex-wrap">
-          <div>
-            <h4 class="mb-1">Audit: <span class="text-info">{{ website.url }}</span></h4>
-            <div class="small text-muted">{{ audit.created_at }}</div>
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <div>
+              <h4 class="mb-1">Audit: <span class="text-info">{{ website.url }}</span></h4>
+              <div class="small text-muted">{{ audit.created_at }}</div>
+            </div>
+            <div class="text-end">
+              <div class="display-6 fw-bold">{{ audit.health_score }}</div>
+              <span class="badge {% if audit.grade in ['A+','A'] %}bg-success{% elif audit.grade=='B' %}bg-primary{% elif audit.grade=='C' %}bg-warning text-dark{% else %}bg-danger{% endif %}">Grade: {{ audit.grade }}</span>
+            </div>
           </div>
-          <div class="text-end">
-            <div class="display-6 fw-bold">{{ audit.health_score }}</div>
-            <span class="badge {% if audit.grade in ['A+','A'] %}bg-success{% elif audit.grade=='B' %}bg-primary{% elif audit.grade=='C' %}bg-warning text-dark{% else %}bg-danger{% endif %}">Grade: {{ audit.grade }}</span>
-          </div>
+          <div class="mt-3"><canvas id="overallChart" height="80"></canvas></div>
         </div>
-        <div class="mt-3"><canvas id="overallChart" height="80"></canvas></div>
-      </div></div>
+      </div>
     </div>
   </div>
+
   <div class="row g-4 mt-1">
     {% for item in audit.category_scores %}
-    <div class="col-12 col-md-4 col-lg-4">
+    <div class="col-12 col-md-4">
       <div class="card h-100 shadow-sm"><div class="card-body">
         <div class="d-flex justify-content-between align-items-center">
           <h6 class="mb-0">{{ item.name }}</h6>
@@ -34,6 +37,7 @@
     </div>
     {% endfor %}
   </div>
+
   <div class="row g-4 mt-1">
     <div class="col-12">
       <div class="card shadow-sm"><div class="card-body">
@@ -42,43 +46,36 @@
       </div></div>
     </div>
   </div>
+
   <div class="row g-4 mt-1">
     <div class="col-12">
       <div class="card shadow-sm"><div class="card-body">
         <h6 class="mb-3">Executive Summary</h6>
         <p class="small">{{ audit.exec_summary }}</p>
-        <a class="btn btn-outline-light" href="/report/pdf/open?url={{ website.url | urlencode }}" target="_blank"><i class="bi bi-filetype-pdf"></i> Download Certified PDF</a>
-      </div></div>
-    </div>
-  </div>
-  <div class="row g-4 mt-1">
-    <div class="col-12">
-      <div class="card shadow-sm"><div class="card-body">
-        <h6 class="mb-3">Metrics (sample)</h6>
-        <div class="table-responsive">
-          <table class="table table-dark table-sm">
-            <thead><tr><th>Name</th><th>Status</th><th>Details</th></tr></thead>
-            <tbody>
-              {% for m in audit.metrics[:50] %}
-              <tr>
-                <td>{{ m.name }}</td>
-                <td><span class="badge {% if m.status=='good' %}bg-success{% elif m.status=='warn' %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ m.status|capitalize }}</span></td>
-                <td><code class="small">{{ m.details }}</code></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        /report/pdf/open?url={{ website.url | urlencode }}
+          <i class="bi bi-filetype-pdf"></i> Download Certified PDF
+        </a>
       </div></div>
     </div>
   </div>
 </main>
+
+<!-- Charts -->
+https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
 <script>
 const overallCtx = document.getElementById('overallChart');
-new Chart(overallCtx, { type:'bar', data:{ labels:['Overall'], datasets:[{ label:'Score', data:[{{ audit.health_score }}], backgroundColor:'#0d6efd'}]}, options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, max:100}} } });
+new Chart(overallCtx, {
+  type:'bar',
+  data:{ labels:['Overall'], datasets:[{ label:'Score', data:[{{ audit.health_score }}], backgroundColor:'#0d6efd'}]},
+  options:{ plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, max:100}} }
+});
 const labels   = {{ audit.category_scores|map(attribute='name')|list|tojson }};
 const dataVals = {{ audit.category_scores|map(attribute='score')|list|tojson }};
 const radarCtx = document.getElementById('radarChart');
-new Chart(radarCtx, { type:'radar', data:{ labels: labels, datasets:[{ label:'Category Scores', data:dataVals, borderColor:'#ffc107', backgroundColor:'rgba(255,193,7,.2)'}]}, options:{ scales:{ r:{ beginAtZero:true, max:100 } } } });
+new Chart(radarCtx, {
+  type:'radar',
+  data:{ labels: labels, datasets:[{ label:'Category Scores', data:dataVals, borderColor:'#ffc107', backgroundColor:'rgba(255,193,7,.2)'}]},
+  options:{ scales:{ r:{ beginAtZero:true, max:100 } } }
+});
 </script>
 {% endblock %}
