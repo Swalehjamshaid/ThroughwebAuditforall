@@ -1,64 +1,107 @@
-
 <!doctype html>
 <html lang="en" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ UI_BRAND_NAME or 'FF Tech' }}</title>
-
-  <!-- Fonts & CSS -->
-  https://fonts.googleapis.comhttps://fonts.gstatic.com
-  https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap
-
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
   <!-- Bootstrap & Icons -->
-  https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css
-  https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css
-
-  /static/css/style.css
-
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css">
+  
   <style>
-    :root { --bg-dark:#0f172a; --brand1:#0d6efd; --brand2:#6610f2; }
-    body { font-family: 'Inter', system-ui, sans-serif; background-color: var(--bg-dark); color: #e2e8f0; }
-    .navbar { background: linear-gradient(90deg,var(--brand1),var(--brand2)); box-shadow: 0 4px 30px rgba(0,0,0,0.4); }
-    .card  { background-color: #1e293b; border: 1px solid rgba(255,255,255,0.08); border-radius: 1rem; }
+    :root {
+      --bg-dark: #0f172a;
+      --brand1: #0d6efd;
+      --brand2: #6610f2;
+      --text-muted: #94a3b8;
+    }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: var(--bg-dark);
+      color: #e2e8f0;
+    }
+    .navbar {
+      background: linear-gradient(90deg, var(--brand1), var(--brand2));
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+    .navbar-brand, .nav-link {
+      font-weight: 600;
+    }
+    .nav-link {
+      transition: opacity 0.2s;
+    }
+    .nav-link:hover {
+      opacity: 0.8;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary {
+      background: linear-gradient(90deg, var(--brand1), var(--brand2));
+      border: none;
+    }
+    footer {
+      background-color: #1e293b;
+      color: var(--text-muted);
+    }
   </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
+
 <nav class="navbar navbar-expand-lg navbar-dark">
   <div class="container-fluid">
-    /{{ UI_BRAND_NAME or 'FF Tech' }}</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbars">
+    <a class="navbar-brand" href="/">{{ UI_BRAND_NAME or 'FF Tech' }}</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbars" aria-controls="navbars" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navbars">
-      <ul class="navbar-nav me-auto">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
-          {% if user %}/dashboard{% else %}/login{% endif %}Dashboard</a>
+          <a class="nav-link" href="{% if user %}/dashboard{% else %}/login{% endif %}">Dashboard</a>
         </li>
-        <li class="nav-item"><a classewNew Audit</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="/new-audit">New Audit</a>
+        </li>
         {% if user and user.is_admin %}
-        <li class="nav-item">/adminAdmin</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="/admin">Admin</a>
+        </li>
         {% endif %}
       </ul>
-      <div class="d-flex gap-2">
+      <div class="d-flex align-items-center gap-3">
         {% if user %}
-          <span class="small">Hello, {{ user.email }}</span>
-          /logoutLogout</a>
+          <span class="text-muted small">Hello, {{ user.email }}</span>
+          <a class="btn btn-outline-light btn-sm" href="/logout">Logout</a>
         {% else %}
-          /loginLogin</a>
-          /registerRegister</a>
+          <a class="btn btn-outline-light btn-sm" href="/login">Login</a>
+          <a class="btn btn-primary btn-sm" href="/register">Register</a>
         {% endif %}
       </div>
     </div>
   </div>
 </nav>
 
-<main class="container py-4">{% block content %}{% endblock %}</main>
+<main class="container py-5 flex-grow-1">
+  {% block content %}{% endblock %}
+</main>
 
-<footer class="footer text-center py-4 mt-auto">
-  <small>© {{ UI_BRAND_NAME or 'FF Tech' }} · Certified AI Website Audit</small>
+<footer class="text-center py-4 mt-auto">
+  <small class="text-muted">© {{ UI_BRAND_NAME or 'FF Tech' }} · Certified AI Website Audit</small>
 </footer>
 
-https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js</script>
-/static/js/app.js</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script src="/static/js/app.js"></script>
 </body>
 </html>
