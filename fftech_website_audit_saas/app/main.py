@@ -20,23 +20,23 @@ from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
 from .audit.report import render_pdf
 
-# For sending scheduled emails
+# For sending scheduled emails (used inside background loop)
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # ---------- Environment ----------
-UI_BRAND_NAME   = os.getenv('UI_BRAND_NAME', 'FF Tech')
-SMTP_HOST       = os.getenv('SMTP_HOST')
-SMTP_PORT       = int(os.getenv('SMTP_PORT', '587'))
-SMTP_USER       = os.getenv('SMTP_USER')
-SMTP_PASSWORD   = os.getenv('SMTP_PASSWORD')
-BASE_URL        = os.getenv('BASE_URL', 'http://localhost:8000')
+UI_BRAND_NAME   = os.getenv("UI_BRAND_NAME", "FF Tech")
+SMTP_HOST       = os.getenv("SMTP_HOST")
+SMTP_PORT       = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER       = os.getenv("SMTP_USER")
+SMTP_PASSWORD   = os.getenv("SMTP_PASSWORD")
+BASE_URL        = os.getenv("BASE_URL", "http://localhost:8000")
 
 # ---------- App & Templates ----------
 app = FastAPI()
-app.mount('/static', StaticFiles(directory='app/static'), name='static')
-templates = Jinja2Templates(directory='app/templates')
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+templates = Jinja2Templates(directory="app/templates")
 
 # Ensure DB tables exist
 Base.metadata.create_all(bind=engine)
@@ -104,71 +104,71 @@ async def session_middleware(request: Request, call_next):
 
 # ---------- Pages ----------
 
-@app.get('/')
+@app.get("/")
 async def index(request: Request):
     # Open audit landing uses base_open.html via index.html
-    return templates.TemplateResponse('index.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
 # --- Open audit (no registration required) ---
-@app.post('/audit/open')
+@app.post("/audit/open")
 async def audit_open(request: Request):
     form = await request.form()
-    url = form.get('url')
+    url = form.get("url")
     if not url:
-        return RedirectResponse('/', status_code=303)
+        return RedirectResponse("/", status_code=303)
 
     # Run an audit without saving to DB
     res = run_basic_checks(url)
-    category_scores_dict = res['category_scores']
+    category_scores_dict = res["category_scores"]
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
-    exec_summary = summarize_200_words(url, category_scores_dict, res['top_issues'])
-    category_scores_list = [{'name': k, 'score': int(v)} for k, v in category_scores_dict.items()]
+    exec_summary = summarize_200_words(url, category_scores_dict, res["top_issues"])
+    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
     data = {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user,
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user,
         # pass a lightweight website object
-        'website': {'id': None, 'url': url},
-        'audit': {
-            'created_at': datetime.utcnow(),
-            'grade': grade,
-            'health_score': int(overall),
-            'exec_summary': exec_summary,
-            'category_scores': category_scores_list,
-            'metrics': res['metrics']
+        "website": {"id": None, "url": url},
+        "audit": {
+            "created_at": datetime.utcnow(),
+            "grade": grade,
+            "health_score": int(overall),
+            "exec_summary": exec_summary,
+            "category_scores": category_scores_list,
+            "metrics": res["metrics"]
         }
     }
-    return templates.TemplateResponse('audit_detail_open.html', data)
+    return templates.TemplateResponse("audit_detail_open.html", data)
 
-@app.get('/report/pdf/open')
+@app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
     # Generate PDF directly from URL (no DB)
     res = run_basic_checks(url)
-    cs_list = [{'name': k, 'score': int(v)} for k, v in res['category_scores'].items()]
-    overall = compute_overall(res['category_scores'])
+    cs_list = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
+    overall = compute_overall(res["category_scores"])
     grade = grade_from_score(overall)
-    exec_summary = summarize_200_words(url, res['category_scores'], res['top_issues'])
+    exec_summary = summarize_200_words(url, res["category_scores"], res["top_issues"])
     path = "/tmp/certified_audit_open.pdf"
     render_pdf(path, UI_BRAND_NAME, url, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
 # --- Registration & Auth ---
-@app.get('/register')
+@app.get("/register")
 async def register_get(request: Request):
     # Registration page uses base_register.html via register.html
-    return templates.TemplateResponse('register.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+    return templates.TemplateResponse("register.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
-@app.post('/register')
+@app.post("/register")
 async def register_post(
     request: Request,
     email: str = Form(...),
@@ -177,47 +177,47 @@ async def register_post(
     db: Session = Depends(get_db)
 ):
     if password != confirm_password:
-        return RedirectResponse('/register', status_code=303)
+        return RedirectResponse("/register", status_code=303)
     if db.query(User).filter(User.email == email).first():
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
     db.add(u); db.commit(); db.refresh(u)
-    token = create_token({'uid': u.id, 'email': u.email}, expires_minutes=60*24*3)
+    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     try:
         send_verification_email(u.email, token)
     except Exception:
         # Email failures should not block registration
         pass
-    return RedirectResponse('/login', status_code=303)
+    return RedirectResponse("/login", status_code=303)
 
-@app.get('/verify')
+@app.get("/verify")
 async def verify(request: Request, token: str, db: Session = Depends(get_db)):
     success = False
     try:
         data = decode_token(token)
-        u = db.query(User).filter(User.id == data['uid']).first()
+        u = db.query(User).filter(User.id == data["uid"]).first()
         if u:
             u.verified = True
             db.commit()
             success = True
     except Exception:
         success = False
-    return templates.TemplateResponse('verify.html', {
-        'request': request,
-        'success': success,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+    return templates.TemplateResponse("verify.html", {
+        "request": request,
+        "success": success,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
-@app.get('/login')
+@app.get("/login")
 async def login_get(request: Request):
-    return templates.TemplateResponse('login.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
-@app.post('/login')
+@app.post("/login")
 async def login_post(
     request: Request,
     email: str = Form(...),
@@ -227,11 +227,11 @@ async def login_post(
     global current_user
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.verified:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     current_user = u
 
-    token = create_token({'uid': u.id, 'email': u.email}, expires_minutes=60*24*30)
-    resp = RedirectResponse('/dashboard', status_code=303)
+    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
+    resp = RedirectResponse("/dashboard", status_code=303)
     resp.set_cookie(
         key="session_token",
         value=token,
@@ -242,22 +242,22 @@ async def login_post(
     )
     return resp
 
-@app.get('/logout')
+@app.get("/logout")
 async def logout(request: Request):
     global current_user
     current_user = None
-    resp = RedirectResponse('/', status_code=303)
+    resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie("session_token")
     return resp
 
 # --- Registered audit flows ---
-@app.get('/dashboard')
+@app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     websites = db.query(Website).filter(Website.user_id == current_user.id).all()
-    trend = {'labels': ["W1","W2","W3","W4","W5"], 'values': [80, 82, 78, 85, 88]}
+    trend = {"labels": ["W1","W2","W3","W4","W5"], "values": [80, 82, 78, 85, 88]}
 
     last_audits = (
         db.query(Audit)
@@ -268,40 +268,40 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     )
     if last_audits:
         avg = round(sum(a.health_score for a in last_audits) / len(last_audits))
-        summary_grade = sorted([a.grade for a in last_audits])[0] if last_audits else 'A'
-        summary = {'grade': summary_grade, 'health_score': avg}
+        summary_grade = sorted([a.grade for a in last_audits])[0] if last_audits else "A"
+        summary = {"grade": summary_grade, "health_score": avg}
     else:
-        summary = {'grade': 'A', 'health_score': 88}
+        summary = {"grade": "A", "health_score": 88}
 
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     schedule = {
-        'daily_time': getattr(sub, 'daily_time', '09:00'),
-        'timezone': getattr(sub, 'timezone', 'UTC'),
-        'enabled': getattr(sub, 'email_schedule_enabled', False),
+        "daily_time": getattr(sub, "daily_time", "09:00"),
+        "timezone": getattr(sub, "timezone", "UTC"),
+        "enabled": getattr(sub, "email_schedule_enabled", False),
     }
 
-    return templates.TemplateResponse('dashboard.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user,
-        'websites': websites,
-        'trend': trend,
-        'summary': summary,
-        'schedule': schedule
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user,
+        "websites": websites,
+        "trend": trend,
+        "summary": summary,
+        "schedule": schedule
     })
 
-@app.get('/audit/new')
+@app.get("/audit/new")
 async def new_audit_get(request: Request):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
-    return templates.TemplateResponse('new_audit.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse("new_audit.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
-@app.post('/audit/new')
+@app.post("/audit/new")
 async def new_audit_post(
     request: Request,
     url: str = Form(...),
@@ -310,48 +310,48 @@ async def new_audit_post(
 ):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     if not sub:
-        sub = Subscription(user_id=current_user.id, plan='free', active=True, audits_used=0)
+        sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
         db.add(sub); db.commit(); db.refresh(sub)
 
     # Free plan limit: 10 audits
-    if sub.plan == 'free' and sub.audits_used >= 10:
-        return RedirectResponse('/dashboard', status_code=303)
+    if sub.plan == "free" and sub.audits_used >= 10:
+        return RedirectResponse("/dashboard", status_code=303)
 
     w = Website(user_id=current_user.id, url=url)
     db.add(w); db.commit(); db.refresh(w)
 
-    if enable_schedule and hasattr(sub, 'email_schedule_enabled'):
+    if enable_schedule and hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = True
         db.commit()
 
-    return RedirectResponse(f'/audit/run/{w.id}', status_code=303)
+    return RedirectResponse(f"/audit/run/{w.id}", status_code=303)
 
-@app.get('/audit/run/{website_id}')
+@app.get("/audit/run/{website_id}")
 async def run_audit(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     if not w:
-        return RedirectResponse('/dashboard', status_code=303)
+        return RedirectResponse("/dashboard", status_code=303)
 
     # Perform audit (PSI-enriched + base checks)
     try:
         res = run_basic_checks(w.url)
     except Exception:
-        return RedirectResponse('/dashboard', status_code=303)
+        return RedirectResponse("/dashboard", status_code=303)
 
-    category_scores_dict = res['category_scores']  # dict {name: score}
+    category_scores_dict = res["category_scores"]  # dict {name: score}
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
-    exec_summary = summarize_200_words(w.url, category_scores_dict, res['top_issues'])
+    exec_summary = summarize_200_words(w.url, category_scores_dict, res["top_issues"])
 
     # Store category scores as list of {name, score} for template convenience
-    category_scores_list = [{'name': k, 'score': int(v)} for k, v in category_scores_dict.items()]
+    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
     audit = Audit(
         user_id=current_user.id,
@@ -360,7 +360,7 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
         grade=grade,
         exec_summary=exec_summary,
         category_scores_json=json.dumps(category_scores_list),
-        metrics_json=json.dumps(res['metrics'])
+        metrics_json=json.dumps(res["metrics"])
     )
     db.add(audit); db.commit(); db.refresh(audit)
 
@@ -373,47 +373,47 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
         sub.audits_used += 1
         db.commit()
 
-    return RedirectResponse(f'/audit/{w.id}', status_code=303)
+    return RedirectResponse(f"/audit/{w.id}", status_code=303)
 
-@app.get('/audit/{website_id}')
+@app.get("/audit/{website_id}")
 async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
     if not w or not a:
-        return RedirectResponse('/dashboard', status_code=303)
+        return RedirectResponse("/dashboard", status_code=303)
 
     # Use JSON (safer than ast.literal_eval)
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     metrics = json.loads(a.metrics_json) if a.metrics_json else []
 
     data = {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user,
-        'website': w,
-        'audit': {
-            'created_at': a.created_at,
-            'grade': a.grade,
-            'health_score': a.health_score,
-            'exec_summary': a.exec_summary,
-            'category_scores': category_scores,  # list of {name, score}
-            'metrics': metrics
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user,
+        "website": w,
+        "audit": {
+            "created_at": a.created_at,
+            "grade": a.grade,
+            "health_score": a.health_score,
+            "exec_summary": a.exec_summary,
+            "category_scores": category_scores,  # list of {name, score}
+            "metrics": metrics
         }
     }
-    return templates.TemplateResponse('audit_detail.html', data)
+    return templates.TemplateResponse("audit_detail.html", data)
 
-@app.get('/report/pdf/{website_id}')
+@app.get("/report/pdf/{website_id}")
 async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
     if not w or not a:
-        return RedirectResponse('/dashboard', status_code=303)
+        return RedirectResponse("/dashboard", status_code=303)
 
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     path = f"/tmp/certified_audit_{website_id}.pdf"
@@ -423,28 +423,28 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
 # ---------- Scheduling UI ----------
-@app.get('/schedule')
+@app.get("/schedule")
 async def schedule_get(request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     schedule = {
-        'daily_time': getattr(sub, 'daily_time', '09:00'),
-        'timezone': getattr(sub, 'timezone', 'UTC'),
-        'enabled': getattr(sub, 'email_schedule_enabled', False),
+        "daily_time": getattr(sub, "daily_time", "09:00"),
+        "timezone": getattr(sub, "timezone", "UTC"),
+        "enabled": getattr(sub, "email_schedule_enabled", False),
     }
-    return templates.TemplateResponse('dashboard.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user,
-        'websites': db.query(Website).filter(Website.user_id == current_user.id).all(),
-        'trend': {'labels': [], 'values': []},
-        'summary': {'grade': 'A', 'health_score': 88},
-        'schedule': schedule
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user,
+        "websites": db.query(Website).filter(Website.user_id == current_user.id).all(),
+        "trend": {"labels": [], "values": []},
+        "summary": {"grade": "A", "health_score": 88},
+        "schedule": schedule
     })
 
-@app.post('/schedule')
+@app.post("/schedule")
 async def schedule_post(
     request: Request,
     daily_time: str = Form(...),      # "HH:MM"
@@ -454,34 +454,34 @@ async def schedule_post(
 ):
     global current_user
     if not current_user:
-        return RedirectResponse('/login', status_code=303)
+        return RedirectResponse("/login", status_code=303)
 
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     if not sub:
-        sub = Subscription(user_id=current_user.id, plan='free', active=True, audits_used=0)
+        sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
         db.add(sub); db.commit(); db.refresh(sub)
 
     # Update schedule columns
-    if hasattr(sub, 'daily_time'):
+    if hasattr(sub, "daily_time"):
         sub.daily_time = daily_time
-    if hasattr(sub, 'timezone'):
+    if hasattr(sub, "timezone"):
         sub.timezone = timezone
-    if hasattr(sub, 'email_schedule_enabled'):
+    if hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = bool(enabled)
 
     db.commit()
-    return RedirectResponse('/dashboard', status_code=303)
+    return RedirectResponse("/dashboard", status_code=303)
 
 # ---------- Admin (optional) ----------
-@app.get('/admin/login')
+@app.get("/admin/login")
 async def admin_login_get(request: Request):
-    return templates.TemplateResponse('login.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user
+    return templates.TemplateResponse("login.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
     })
 
-@app.post('/admin/login')
+@app.post("/admin/login")
 async def admin_login_post(
     request: Request,
     email: str = Form(...),
@@ -491,10 +491,10 @@ async def admin_login_post(
     global current_user
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.is_admin:
-        return RedirectResponse('/admin/login', status_code=303)
+        return RedirectResponse("/admin/login", status_code=303)
     current_user = u
-    token = create_token({'uid': u.id, 'email': u.email, 'admin': True}, expires_minutes=60*24*30)
-    resp = RedirectResponse('/admin', status_code=303)
+    token = create_token({"uid": u.id, "email": u.email, "admin": True}, expires_minutes=60*24*30)
+    resp = RedirectResponse("/admin", status_code=303)
     resp.set_cookie(
         key="session_token",
         value=token,
@@ -505,24 +505,24 @@ async def admin_login_post(
     )
     return resp
 
-@app.get('/admin')
+@app.get("/admin")
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user or not current_user.is_admin:
-        return RedirectResponse('/admin/login', status_code=303)
+        return RedirectResponse("/admin/login", status_code=303)
     users = db.query(User).order_by(User.created_at.desc()).limit(100).all()
     audits = db.query(Audit).order_by(Audit.created_at.desc()).limit(100).all()
     websites = db.query(Website).order_by(Website.created_at.desc()).limit(100).all()
-    return templates.TemplateResponse('dashboard.html', {
-        'request': request,
-        'UI_BRAND_NAME': UI_BRAND_NAME,
-        'user': current_user,
-        'websites': websites,
-        'trend': {'labels': [], 'values': []},
-        'summary': {'grade': 'A', 'health_score': 88},
-        'schedule': {'daily_time': '09:00', 'timezone': 'UTC', 'enabled': False},
-        'admin_users': users,
-        'admin_audits': audits
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user,
+        "websites": websites,
+        "trend": {"labels": [], "values": []},
+        "summary": {"grade": "A", "health_score": 88},
+        "schedule": {"daily_time": "09:00", "timezone": "UTC", "enabled": False},
+        "admin_users": users,
+        "admin_audits": audits
     })
 
 # ---------- Background Scheduler for Daily Emails ----------
@@ -530,11 +530,11 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     """Simple SMTP email sender for scheduled reports."""
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = SMTP_USER
-    msg['To'] = to_email
-    msg.attach(MIMEText(html_body, 'html'))
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = SMTP_USER
+    msg["To"]      = to_email
+    msg.attach(MIMEText(html_body, "html"))
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
@@ -557,18 +557,18 @@ async def _daily_scheduler_loop():
 
             for sub in subs:
                 # Ensure scheduling is enabled
-                if not getattr(sub, 'email_schedule_enabled', False):
+                if not getattr(sub, "email_schedule_enabled", False):
                     continue
 
-                tz_name   = getattr(sub, 'timezone', 'UTC') or 'UTC'
-                daily_time = getattr(sub, 'daily_time', '09:00') or '09:00'
+                tz_name   = getattr(sub, "timezone", "UTC") or "UTC"
+                daily_time = getattr(sub, "daily_time", "09:00") or "09:00"
 
                 try:
                     tz = ZoneInfo(tz_name)
                 except Exception:
-                    tz = ZoneInfo('UTC')
+                    tz = ZoneInfo("UTC")
 
-                local_now = now_utc.replace(tzinfo=ZoneInfo('UTC')).astimezone(tz)
+                local_now = now_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
                 hhmm_now  = local_now.strftime("%H:%M")
                 if hhmm_now != daily_time:
                     continue
@@ -579,7 +579,7 @@ async def _daily_scheduler_loop():
                     continue
                 websites = db.query(Website).filter(Website.user_id == user.id).all()
 
-                # Build HTML email safely
+                # Build HTML email safely (no unterminated string literals)
                 lines = [
                     f"<h3>Daily Website Audit Summary – {UI_BRAND_NAME}</h3>",
                     f"<p>Hello, {user.email}!</p>",
@@ -617,7 +617,7 @@ async def _daily_scheduler_loop():
                     lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
 
                 # Plan reminder if free and at limit
-                if getattr(sub, 'plan', 'free') == 'free' and getattr(sub, 'audits_used', 0) >= 10:
+                if getattr(sub, "plan", "free") == "free" and getattr(sub, "audits_used", 0) >= 10:
                     lines.append("<p><i>You've reached the free limit of 10 audits. Upgrade for $5/month to continue unlimited audits.</i></p>")
 
                 html = "\n".join(lines)
