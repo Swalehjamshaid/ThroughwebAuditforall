@@ -1,7 +1,0 @@
-{% extends 'base_register.html' %}
-{% block inner %}
-<div class='card hover-rise'><div class='card-body text-center'>
-  {% if success %}<h4>Verification Successful</h4><p>Your email is verified. Please <a href='/auth/login'>login</a>.</p>
-  {% else %}<h4 class='text-danger'>Verification Failed</h4><p>The link may be expired. Please <a href='/auth/register'>register again</a>.</p>{% endif %}
-</div></div>
-{% endblock %}
