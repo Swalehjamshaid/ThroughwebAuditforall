@@ -1,5 +1,4 @@
 
-# fftech_website_audit_saas/app/main.py
 import os
 import json
 import asyncio
