@@ -1,4 +1,3 @@
-
 import os
 import json
 import asyncio
@@ -66,6 +65,7 @@ def _ensure_schedule_columns():
         # Do not block startup if schema change fails
         pass
 
+
 def _ensure_user_columns():
     """Adds verified, is_admin, created_at to users if missing."""
     try:
@@ -90,6 +90,7 @@ _ensure_schedule_columns()
 _ensure_user_columns()
 
 # ---------- DB dependency ----------
+
 def get_db():
     db = SessionLocal()
     try:
@@ -99,6 +100,7 @@ def get_db():
 
 # ---------- Session handling (JWT cookie) ----------
 current_user = None
+
 
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
@@ -129,6 +131,7 @@ async def session_middleware(request: Request, call_next):
 
 # ---------- Pages ----------
 
+
 @app.get("/")
 async def index(request: Request):
     # Landing page (open audit) -> index.html extends base_open.html
@@ -139,6 +142,8 @@ async def index(request: Request):
     })
 
 # --- Open audit (no registration required) ---
+
+
 @app.post("/audit/open")
 async def audit_open(request: Request):
     form = await request.form()
@@ -170,6 +175,7 @@ async def audit_open(request: Request):
         }
     })
 
+
 @app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
     # Generate PDF directly from URL (no DB)
@@ -183,6 +189,8 @@ async def report_pdf_open(url: str):
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
 # --- Registration & Auth ---
+
+
 @app.get("/register")
 async def register_get(request: Request):
     return templates.TemplateResponse("register.html", {
@@ -190,6 +198,7 @@ async def register_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/register")
 async def register_post(
@@ -199,14 +208,17 @@ async def register_post(
     confirm_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    # Basic validation
     if password != confirm_password:
         return RedirectResponse("/register", status_code=303)
     if db.query(User).filter(User.email == email).first():
         return RedirectResponse("/login", status_code=303)
 
+    # Create user as unverified
     u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
     db.add(u); db.commit(); db.refresh(u)
 
+    # Create email verification token valid for 3 days
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     try:
         # Uses SMTP_* and BASE_URL (inside app/email_utils.py)
@@ -216,6 +228,7 @@ async def register_post(
         pass
 
     return RedirectResponse("/login?check_email=1", status_code=303)
+
 
 @app.get("/verify")
 async def verify(request: Request, token: str, db: Session = Depends(get_db)):
@@ -241,6 +254,7 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
 
     return RedirectResponse("/login", status_code=303)
 
+
 @app.get("/login")
 async def login_get(request: Request):
     return templates.TemplateResponse("login.html", {
@@ -248,6 +262,7 @@ async def login_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/login")
 async def login_post(
@@ -275,6 +290,7 @@ async def login_post(
     )
     return resp
 
+
 @app.get("/logout")
 async def logout(request: Request):
     global current_user
@@ -284,6 +300,8 @@ async def logout(request: Request):
     return resp
 
 # --- Registered audit flows ---
+
+
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -325,6 +343,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "schedule": schedule
     })
 
+
 @app.get("/audit/new")
 async def new_audit_get(request: Request):
     global current_user
@@ -335,6 +354,7 @@ async def new_audit_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/audit/new")
 async def new_audit_post(
@@ -364,6 +384,7 @@ async def new_audit_post(
         db.commit()
 
     return RedirectResponse(f"/audit/run/{w.id}", status_code=303)
+
 
 @app.get("/audit/run/{website_id}")
 async def run_audit(website_id: int, request: Request, db: Session = Depends(get_db)):
@@ -414,6 +435,7 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
 
     return RedirectResponse(f"/audit/{w.id}", status_code=303)
 
+
 @app.get("/audit/{website_id}")
 async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -446,6 +468,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
         }
     })
 
+
 @app.get("/report/pdf/{website_id}")
 async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -468,6 +491,8 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
 # ---------- Scheduling UI ----------
+
+
 @app.get("/schedule")
 async def schedule_get(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -490,6 +515,7 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
         "summary": {"grade": "A", "health_score": 88},
         "schedule": schedule
     })
+
 
 @app.post("/schedule")
 async def schedule_post(
@@ -520,6 +546,8 @@ async def schedule_post(
     return RedirectResponse("/dashboard", status_code=303)
 
 # ---------- Admin (optional) ----------
+
+
 @app.get("/admin/login")
 async def admin_login_get(request: Request):
     return templates.TemplateResponse("login.html", {
@@ -527,6 +555,7 @@ async def admin_login_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/admin/login")
 async def admin_login_post(
@@ -554,6 +583,7 @@ async def admin_login_post(
     )
     return resp
 
+
 @app.get("/admin")
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -574,6 +604,8 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 # ---------- Background Daily Email Scheduler ----------
+
+
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     """Simple SMTP email sender for scheduled reports (uses SMTP_* env attrs)."""
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
@@ -593,6 +625,7 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
         return True
     except Exception:
         return False
+
 
 async def _daily_scheduler_loop():
     """
@@ -680,6 +713,7 @@ async def _daily_scheduler_loop():
             pass
 
         await asyncio.sleep(60)
+
 
 @app.on_event("startup")
 async def _start_scheduler():
