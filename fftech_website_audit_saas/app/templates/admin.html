@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<h4 class="mb-3">Admin Panel</h4>
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card"><div class="card-body">
+      <h5 class="card-title">Recent Users</h5>
+      {% if admin_users %}
+      <ul class="list-group">
+        {% for u in admin_users %}
+          <li class="list-group-item d-flex justify-content-between"><span>{{ u.email }}</span><span>{% if u.verified %}✔{% else %}✖{% endif %}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="text-muted">No data.</p>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card"><div class="card-body">
+      <h5 class="card-title">Recent Audits</h5>
+      {% if admin_audits %}
+      <ul class="list-group">
+        {% for a in admin_audits %}
+          <li class="list-group-item">{{ a.grade }} · {{ a.health_score }}/100</li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="text-muted">No data.</p>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card"><div class="card-body">
+      <h5 class="card-title">Recent Websites</h5>
+      {% if websites %}
+      <ul class="list-group">
+        {% for w in websites %}
+          <li class="list-group-item">{{ w.url }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="text-muted">No data.</p>{% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

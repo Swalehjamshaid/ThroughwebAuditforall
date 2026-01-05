@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h5 class="card-title">Summary</h5>
+      <p class="metric">Latest Grade: <b>{{ summary.grade }}</b></p>
+      <p class="metric">Health Score: <b>{{ summary.health_score }}/100</b></p>
+      <canvas id="healthChart" height="160"></canvas>
+    </div></div>
+  </div>
+  <div class="col-md-8">
+    <div class="card h-100"><div class="card-body">
+      <h5 class="card-title">Health Trend (Last Audits)</h5>
+      <canvas id="trendChart" height="120"></canvas>
+    </div></div>
+  </div>
+</div>
+<div class="row g-4 mt-1">
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h5 class="card-title">Websites</h5>
+      {% if websites %}
+      <ul class="list-group">{% for w in websites %}<li class="list-group-item d-flex justify-content-between align-items-center"><span>{{ w.url }}</span><a class="btn btn-sm btn-outline-primary" href="/auth/audit/{{ w.id }}">Details</a></li>{% endfor %}</ul>
+      {% else %}<p>No websites yet. <a href="/auth/audit/new">Add one</a>.</p>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h5 class="card-title">Daily Email Schedule</h5>
+      <form method="post" action="/auth/schedule" class="row g-3">
+        <div class="col-md-4"><label class="form-label">Time (HH:MM)</label><input name="daily_time" class="form-control" value="{{ schedule.daily_time }}" required></div>
+        <div class="col-md-5"><label class="form-label">Timezone</label><input name="timezone" class="form-control" value="{{ schedule.timezone }}" required></div>
+        <div class="col-md-3 form-check mt-4"><input class="form-check-input" type="checkbox" name="enabled" id="enabled" {% if schedule.enabled %}checked{% endif %}><label class="form-check-label" for="enabled">Enable</label></div>
+        <div class="col-12"><button class="btn btn-primary">Save Schedule</button></div>
+      </form>
+      <small class="text-muted">Daily email includes recent grades and PDF download links.</small>
+    </div></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script>
+const healthValue = {{ summary.health_score or 0 }};
+new Chart(document.getElementById('healthChart'), { type:'doughnut', data:{ labels:['Health','Remaining'], datasets:[{ data:[healthValue,100-healthValue], backgroundColor:['#0057D9','#ECF0F1'] }] }, options:{ plugins:{ legend:{ position:'bottom' } } } });
+const trendLabels = {{ trend.labels | tojson }};
+const trendValues = {{ trend.values | tojson }};
+new Chart(document.getElementById('trendChart'), { type:'line', data:{ labels:trendLabels, datasets:[{ label:'Health', data:trendValues, borderColor:'#1ABC9C', backgroundColor:'rgba(26,188,156,.15)', tension:.3 }] }, options:{ scales:{ y:{ min:0, max:100 } } } });
+</script>
+{% endblock %}
