@@ -23,7 +23,7 @@ def send_verification_email(to_email: str, token: str) -> bool:
 
     verify_link = f"{BASE_URL}/verify?token={token}"
 
-    # Build HTML safely (no triple-quoted f-strings)
+    # Build HTML body
     html_lines = [
         "<h3>Verify your account</h3>",
         "<p>Please click the link below to verify your email:</p>",
@@ -32,14 +32,24 @@ def send_verification_email(to_email: str, token: str) -> bool:
     ]
     html_body = "\n".join(html_lines)
 
+    # (Optional) Plain-text version for clients that don't support HTML
+    text_body = (
+        "Verify your account\n\n"
+        "Please open the following link to verify your email:\n"
+        f"{verify_link}\n\n"
+        "If you didn't request this, you can ignore this message."
+    )
+
     msg = MIMEMultipart('alternative')
     msg['Subject'] = "Verify your FF Tech account"
     msg['From']    = SMTP_USER
     msg['To']      = to_email
+    msg.attach(MIMEText(text_body, 'plain'))
     msg.attach(MIMEText(html_body, 'html'))
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            # Use STARTTLS on port 587; for SMTPS (465), you'd use SMTP_SSL
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
