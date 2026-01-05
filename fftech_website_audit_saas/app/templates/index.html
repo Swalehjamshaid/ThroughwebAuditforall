@@ -1,0 +1,21 @@
+
+{% extends "base_open.html" %}
+{% block body %}
+<section class="hero">
+  <div class="container text-center">
+    <h1 class="hero-title mb-3">Audit Your Website Instantly</h1>
+    <p class="lead text-muted mx-auto" style="max-width: 720px;">
+      Analyze SEO, performance, security, and more with AI-powered insights.
+    </p>
+
+    <form method="post" action="/audit/open" class="row g-3 justify-content-center mt-4">
+      <div class="col-md-6">
+        <input type="url" name="url" class="form-control form-control-lg" placeholder="Enter website URL (https://...)" required>
+      </div>
+      <div class="col-md-auto">
+        <button class="btn btn-brand btn-lg px-4" type="submit"><i class="bi bi-search"></i> Run Audit</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}
