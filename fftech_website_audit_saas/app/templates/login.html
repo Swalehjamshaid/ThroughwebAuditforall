@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card glass narrow" role="form">
+  <h2>Login</h2>
+  {% if request.query_params.get('error') %}
+    <div class="alert" role="alert">Invalid credentials or account not verified.</div>
+  {% endif %}
+  <form method="post" action="/auth/login" class="form-vertical">
+    <label for="email">Email</label>
+    <input id="email" type="email" name="email" required />
+    <label for="password">Password</label>
+    <input id="password" type="password" name="password" required />
+    <button type="submit" class="btn btn-primary">Login</button>
+  </form>
+  <p class="muted">No account? <a href="/auth/register">Register</a></p>
+</div>
+{% endblock %}

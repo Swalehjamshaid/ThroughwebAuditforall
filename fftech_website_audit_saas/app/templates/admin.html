@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card glass" aria-label="Admin dashboard">
+  <h2>Admin</h2>
+  <h3>Websites</h3>
+  <ul class="list">
+    {% for w in websites %}
+      <li>{{ w.url }} — user #{{ w.user_id }}</li>
+    {% endfor %}
+  </ul>
+  <h3>Users</h3>
+  <ul class="list">
+    {% for u in admin_users %}
+      <li>{{ u.email }} — verified: {{ u.verified }} — admin: {{ u.is_admin }}</li>
+    {% endfor %}
+  </ul>
+  <h3>Audits</h3>
+  <ul class="list">
+    {% for a in admin_audits %}
+      <li>{{ a.website_id }} — {{ a.grade }} — {{ a.health_score }}/100 — {{ a.created_at }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
