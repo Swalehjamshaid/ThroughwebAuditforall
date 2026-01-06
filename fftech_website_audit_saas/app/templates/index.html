@@ -1,9 +1,0 @@
-{% extends 'base.html' %}
-{% block content %}
-<h1>Run a quick open audit</h1>
-<form method="post" action="/audit/open" class="card">
-  <label>Website URL</label>
-  <input type="url" name="url" placeholder="https://example.com" required />
-  <button type="submit">Audit</button>
-</form>
-{% endblock %}
