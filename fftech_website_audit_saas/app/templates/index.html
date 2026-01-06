@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero card glass">
+  <h1>Audit your website in seconds</h1>
+  <p>Enter a URL and get a certified report with grades and actionable insights.</p>
+  <form method="post" action="/audit/open" class="form-grid">
+    <input type="url" name="url" placeholder="https://example.com" required />
+    <button type="submit" class="btn btn-primary">Run audit</button>
+  </form>
+</section>
+<section class="features grid-3">
+  <div class="card glass"><h3>Performance</h3><p>Payload, caching and compression hints.</p></div>
+  <div class="card glass"><h3>Accessibility</h3><p>Alt text, semantic structure checks.</p></div>
+  <div class="card glass"><h3>SEO</h3><p>Canonical, titles and metadata basics.</p></div>
+</section>
+{% endblock %}

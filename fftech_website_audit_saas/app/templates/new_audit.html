@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card glass narrow">
+  <h2>New Audit</h2>
+  <form method="post" action="/auth/audit/new" class="form-vertical">
+    <label>Website URL</label>
+    <input type="url" name="url" placeholder="https://example.com" required />
+    <label class="inline"><input type="checkbox" name="enable_schedule" value="1" /> Enable daily email schedule</label>
+    <button type="submit" class="btn btn-primary">Create</button>
+  </form>
+</div>
+{% endblock %}
