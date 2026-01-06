@@ -103,6 +103,7 @@ METRIC_LABELS = {
     "title": "HTML <title>",
     "title_length": "Title Length",
     "meta_description_length": "Meta Description Length",
+    "meta_robots": "Meta Robots",
     "canonical_present": "Canonical Link Present",
     "has_https": "Uses HTTPS",
     "robots_allowed": "Robots Allowed",
@@ -117,7 +118,6 @@ METRIC_LABELS = {
 }
 
 def _present_metrics(metrics: dict) -> dict:
-    """Convert raw metric keys into friendly labels and yes/no for booleans."""
     out = {}
     for k, v in (metrics or {}).items():
         label = METRIC_LABELS.get(k, k.replace("_", " ").title())
@@ -128,7 +128,6 @@ def _present_metrics(metrics: dict) -> dict:
 
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
-    """Make sure the URL has a scheme and netloc; keep path, drop fragment."""
     if not raw:
         return raw
     s = raw.strip()
@@ -139,39 +138,29 @@ def _normalize_url(raw: str) -> str:
         s = "https://" + s
         p = urlparse(s)
     if not p.netloc and p.path:
-        # Handle bare domain like 'example.com'
         s = f"{p.scheme}://{p.path}"
         p = urlparse(s)
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
 
 def _url_variants(u: str) -> list:
-    """Try https/http, with/without www, and trailing-slash variants."""
     p = urlparse(u)
     host = p.netloc
     path = p.path or "/"
     scheme = p.scheme
 
     candidates = [f"{scheme}://{host}{path}"]
-
-    # with/without www
     if host.startswith("www."):
         candidates.append(f"{scheme}://{host[4:]}{path}")
     else:
         candidates.append(f"{scheme}://www.{host}{path}")
-
-    # http variants
     candidates.append(f"http://{host}{path}")
     if host.startswith("www."):
         candidates.append(f"http://{host[4:]}{path}")
     else:
         candidates.append(f"http://www.{host}{path}")
-
-    # trailing slash
     if not path.endswith("/"):
         candidates.append(f"{scheme}://{host}{path}/")
-
-    # de-duplicate preserving order
     seen, ordered = set(), []
     for c in candidates:
         if c not in seen:
@@ -179,10 +168,9 @@ def _url_variants(u: str) -> list:
     return ordered
 
 def _fallback_result(url: str) -> dict:
-    """Baseline scores so UI never shows zeros when fetch fails."""
     return {
         "category_scores": {
-            "Performance": 65,           # slightly friendlier baseline
+            "Performance": 65,
             "Accessibility": 72,
             "SEO": 68,
             "Security": 70,
@@ -199,7 +187,6 @@ def _fallback_result(url: str) -> dict:
     }
 
 def _robust_audit(url: str) -> tuple[str, dict]:
-    """Normalize URL, try multiple variants, return first good result or fallback."""
     base = _normalize_url(url)
     for candidate in _url_variants(base):
         try:
@@ -344,6 +331,94 @@ async def login_get(request: Request):
         "user": current_user
     })
 
+# ---------- Magic Login (Passwordless) ----------
+def _send_magic_login_email(to_email: str, token: str) -> bool:
+    """
+    Send the magic login link via email using the same SMTP settings.
+    Clicking this link will log the user in and redirect to the dashboard.
+    """
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        return False
+
+    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
+
+    html_body = f"""
+    <h3>{UI_BRAND_NAME} — Magic Login</h3>
+    <p>Hello!</p>
+    <p>Click the secure link below to log in:</p>
+    <p>{login_link}{login_link}</a></p>
+    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
+    msg["From"] = SMTP_USER
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        return True
+    except Exception:
+        return False
+
+@app.post("/auth/magic/request")
+async def magic_request(
+    request: Request,
+    email: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Request a passwordless magic login link.
+    - Requires that the user already exists and is verified.
+    - Sends a short-lived token to the user's email.
+    """
+    u = db.query(User).filter(User.email == email).first()
+    if not u or not getattr(u, "verified", False):
+        # Do not reveal whether account exists or verified (privacy)
+        return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
+    # Short expiry for security (e.g., 15 minutes)
+    token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
+    _send_magic_login_email(u.email, token)
+
+    return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
+@app.get("/auth/magic")
+async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
+    """
+    Consume the magic login link: decode token, set session cookie, redirect to dashboard.
+    """
+    global current_user
+    try:
+        data = decode_token(token)
+        uid = data.get("uid")
+        if not uid or data.get("type") != "magic":
+            return RedirectResponse("/auth/login?error=1", status_code=303)
+
+        u = db.query(User).filter(User.id == uid).first()
+        if not u or not getattr(u, "verified", False):
+            return RedirectResponse("/auth/login?error=1", status_code=303)
+
+        current_user = u
+        session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
+        resp = RedirectResponse("/auth/dashboard", status_code=303)
+        resp.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=BASE_URL.startswith("https://"),
+            samesite="Lax",
+            max_age=60*60*24*30
+        )
+        return resp
+    except Exception:
+        return RedirectResponse("/auth/login?error=1", status_code=303)
+
+# ---------- Password login remains available ----------
 @app.post("/auth/login")
 async def login_post(
     request: Request,
@@ -528,8 +603,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "health_score": a.health_score,
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
-            "metrics": metrics,
-            # 'top_issues' not persisted for saved audits in DB; included only for open audits
+            "metrics": metrics
         }
     })
 
