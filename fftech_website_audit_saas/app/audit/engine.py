@@ -1,4 +1,5 @@
 
+# engine.py — updated with one-page competitor analysis
 from typing import Dict, Any, List, Tuple
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
@@ -34,6 +35,7 @@ class TagCollector(HTMLParser):
 # ----------------------------
 # Network helpers
 # ----------------------------
+
 def _fetch(url: str) -> Tuple[int, bytes, Dict[str, str]]:
     """
     Fetch URL with realistic headers and a safe TLS context.
@@ -77,6 +79,7 @@ def _get_text(data: bytes) -> str:
 # ----------------------------
 # Robots & sitemap
 # ----------------------------
+
 def _robots_allowed(base: str) -> bool:
     """
     Check robots.txt for a full block: 'User-agent: *' + 'Disallow: /'.
@@ -107,13 +110,30 @@ def _sitemap_present(base: str) -> bool:
 # ----------------------------
 # Scoring helpers
 # ----------------------------
+
 def _score_bounds(val: int) -> int:
     return max(0, min(100, val))
+
+
+def _total_score(cats: Dict[str, int]) -> int:
+    """Simple aggregate across categories for coarse ranking."""
+    return sum(int(v or 0) for v in cats.values())
+
+
+def _normalize_url(url: str) -> str:
+    """Ensure the URL has a scheme; default to https."""
+    if not url:
+        return url
+    p = urlparse(url)
+    if not p.scheme:
+        return "https://" + url.lstrip("/")
+    return url
 
 
 # ----------------------------
 # Main audit function
 # ----------------------------
+
 def run_basic_checks(url: str) -> Dict[str, Any]:
     """
     Dependency-free heuristics for Performance, Accessibility, SEO, Security, BestPractices.
@@ -125,6 +145,8 @@ def run_basic_checks(url: str) -> Dict[str, Any]:
             "top_issues": [ ... ]      # concise text items shown in the UI list
         }
     """
+    url = _normalize_url(url)
+
     metrics: Dict[str, Any] = {}
     issues: List[str] = []
     cats: Dict[str, int] = {
@@ -341,3 +363,127 @@ def run_basic_checks(url: str) -> Dict[str, Any]:
         "metrics": metrics,
         "top_issues": issues,
     }
+
+
+# ----------------------------
+# One-page competitor analysis
+# ----------------------------
+
+def run_competitor_analysis_one_page(target_url: str, competitor_urls: List[str]) -> Dict[str, Any]:
+    """
+    Compare the target URL against a list of competitor URLs using a single-page audit
+    (homepage or provided page only). Returns a structured comparative report.
+
+    Args:
+        target_url: The site/page to benchmark.
+        competitor_urls: List of competitor sites/pages to compare.
+
+    Returns:
+        {
+            "target": { "url": str, "scores": {...}, "metrics": {...}, "issues": [...] , "total": int },
+            "competitors": [ { "url": str, "scores": {...}, "metrics": {...}, "issues": [...], "total": int }, ... ],
+            "comparison_table": [ { "url": str, "Performance": int, "Accessibility": int, "SEO": int, "Security": int, "BestPractices": int, "Total": int }, ... ],
+            "winners_by_category": { category: url },
+            "deltas_vs_target": { competitor_url: { category: int (competitor - target) } },
+            "key_findings": { "target_strengths": [str], "target_gaps": [str] }
+        }
+    """
+    target_url = _normalize_url(target_url)
+    competitor_urls = [_normalize_url(u) for u in competitor_urls if u]
+
+    # Audit target
+    target_res = run_basic_checks(target_url)
+    target_entry = {
+        "url": target_url,
+        "scores": target_res["category_scores"],
+        "metrics": target_res["metrics"],
+        "issues": target_res["top_issues"],
+        "total": _total_score(target_res["category_scores"]),
+    }
+
+    # Audit competitors
+    competitors: List[Dict[str, Any]] = []
+    for cu in competitor_urls:
+        res = run_basic_checks(cu)
+        competitors.append({
+            "url": cu,
+            "scores": res["category_scores"],
+            "metrics": res["metrics"],
+            "issues": res["top_issues"],
+            "total": _total_score(res["category_scores"]),
+        })
+
+    # Build comparison table
+    comparison_table: List[Dict[str, Any]] = []
+    for entry in [target_entry] + competitors:
+        row = {
+            "url": entry["url"],
+            "Performance": entry["scores"].get("Performance", 0),
+            "Accessibility": entry["scores"].get("Accessibility", 0),
+            "SEO": entry["scores"].get("SEO", 0),
+            "Security": entry["scores"].get("Security", 0),
+            "BestPractices": entry["scores"].get("BestPractices", 0),
+            "Total": entry["total"],
+        }
+        comparison_table.append(row)
+
+    # Determine winners by category
+    categories = ["Performance", "Accessibility", "SEO", "Security", "BestPractices"]
+    winners_by_category: Dict[str, str] = {}
+    for cat in categories:
+        best_url = None
+        best_score = -1
+        for entry in [target_entry] + competitors:
+            score = entry["scores"].get(cat, 0)
+            if score > best_score:
+                best_score = score
+                best_url = entry["url"]
+        winners_by_category[cat] = best_url or ""
+
+    # Deltas vs target for each competitor
+    deltas_vs_target: Dict[str, Dict[str, int]] = {}
+    for comp in competitors:
+        comp_url = comp["url"]
+        deltas: Dict[str, int] = {}
+        for cat in categories:
+            deltas[cat] = comp["scores"].get(cat, 0) - target_entry["scores"].get(cat, 0)
+        deltas_vs_target[comp_url] = deltas
+
+    # Key findings: strengths and gaps for the target
+    strengths: List[str] = []
+    gaps: List[str] = []
+    for cat in categories:
+        winner = winners_by_category.get(cat)
+        target_score = target_entry["scores"].get(cat, 0)
+        # Strength: target is winner (or tied for max)
+        max_score = max(row[cat] for row in comparison_table)
+        if target_score == max_score:
+            strengths.append(f"Strong {cat} ({target_score}) relative to peer set.")
+        else:
+            # Gap: nearest competitor ahead by at least 5 points
+            ahead_by = max(0, max(row[cat] for row in comparison_table[1:]) - target_score)
+            if ahead_by >= 5:
+                gaps.append(f"Improve {cat}: competitors lead by ~{ahead_by} points.")
+
+    return {
+        "target": target_entry,
+        "competitors": competitors,
+        "comparison_table": comparison_table,
+        "winners_by_category": winners_by_category,
+        "deltas_vs_target": deltas_vs_target,
+        "key_findings": {
+            "target_strengths": strengths,
+            "target_gaps": gaps,
+        },
+    }
+
+
+if __name__ == "__main__":
+    # Example quick run (manually):
+    # python engine.py
+    target = "example.com"  # will be normalized to https://example.com
+    rivals = ["iana.org", "ietf.org"]
+    report = run_competitor_analysis_one_page(target, rivals)
+    # Minimal printout for sanity check
+    from pprint import pprint
+    pprint(report["comparison_table"])
