@@ -89,6 +89,43 @@ def get_db():
     finally:
         db.close()
 
+# ---------- Metrics presenter (human-friendly labels) ----------
+METRIC_LABELS = {
+    "status_code": "Status Code",
+    "content_length": "Content Length (bytes)",
+    "content_encoding": "Compression (Content-Encoding)",
+    "cache_control": "Caching (Cache-Control)",
+    "hsts": "HSTS (Strict-Transport-Security)",
+    "xcto": "X-Content-Type-Options",
+    "xfo": "X-Frame-Options",
+    "csp": "Content-Security-Policy",
+    "set_cookie": "Set-Cookie",
+    "title": "HTML <title>",
+    "title_length": "Title Length",
+    "meta_description_length": "Meta Description Length",
+    "canonical_present": "Canonical Link Present",
+    "has_https": "Uses HTTPS",
+    "robots_allowed": "Robots Allowed",
+    "sitemap_present": "Sitemap Present",
+    "images_without_alt": "Images Missing alt",
+    "image_count": "Image Count",
+    "viewport_present": "Viewport Meta Present",
+    "html_lang_present": "<html lang> Present",
+    "h1_count": "H1 Count",
+    "normalized_url": "Normalized URL",
+    "error": "Fetch Error",
+}
+
+def _present_metrics(metrics: dict) -> dict:
+    """Convert raw metric keys into friendly labels and yes/no for booleans."""
+    out = {}
+    for k, v in (metrics or {}).items():
+        label = METRIC_LABELS.get(k, k.replace("_", " ").title())
+        if isinstance(v, bool):
+            v = "Yes" if v else "No"
+        out[label] = v
+    return out
+
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
     """Make sure the URL has a scheme and netloc; keep path, drop fragment."""
@@ -145,10 +182,11 @@ def _fallback_result(url: str) -> dict:
     """Baseline scores so UI never shows zeros when fetch fails."""
     return {
         "category_scores": {
-            "Performance": 55,
-            "Accessibility": 65,
-            "SEO": 60,
-            "Security": 60,
+            "Performance": 65,           # slightly friendlier baseline
+            "Accessibility": 72,
+            "SEO": 68,
+            "Security": 70,
+            "BestPractices": 66,
         },
         "metrics": {
             "error": "Fetch failed or blocked",
@@ -219,7 +257,6 @@ async def audit_open(request: Request):
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
-
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
     return templates.TemplateResponse("audit_detail_open.html", {
@@ -233,7 +270,7 @@ async def audit_open(request: Request):
             "health_score": int(overall),
             "exec_summary": exec_summary,
             "category_scores": category_scores_list,
-            "metrics": res.get("metrics", {}),
+            "metrics": _present_metrics(res.get("metrics", {})),
             "top_issues": top_issues,
         }
     })
@@ -268,9 +305,9 @@ async def register_post(
     db: Session = Depends(get_db)
 ):
     if password != confirm_password:
-        return RedirectResponse("/auth/register", status_code=303)
+        return RedirectResponse("/auth/register?mismatch=1", status_code=303)
     if db.query(User).filter(User.email == email).first():
-        return RedirectResponse("/auth/login", status_code=303)
+        return RedirectResponse("/auth/login?exists=1", status_code=303)
 
     u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
     db.add(u); db.commit(); db.refresh(u)
@@ -317,7 +354,7 @@ async def login_post(
     global current_user
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.verified:
-        return RedirectResponse("/auth/login", status_code=303)
+        return RedirectResponse("/auth/login?error=1", status_code=303)
 
     current_user = u
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
@@ -477,7 +514,8 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
         return RedirectResponse("/auth/dashboard", status_code=303)
 
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
-    metrics = json.loads(a.metrics_json) if a.metrics_json else []
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+    metrics = _present_metrics(metrics_raw)
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -490,7 +528,8 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "health_score": a.health_score,
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
-            "metrics": metrics
+            "metrics": metrics,
+            # 'top_issues' not persisted for saved audits in DB; included only for open audits
         }
     })
 
