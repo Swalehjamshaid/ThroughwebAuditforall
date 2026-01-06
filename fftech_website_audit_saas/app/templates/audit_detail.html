@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Audit — {{ website.url }}</h2>
+  <p>Grade: <span class="pill">{{ audit.grade }}</span> · Health: <span class="pill">{{ audit.health_score }}/100</span></p>
+  <div class="grid-2">
+    <div>
+      <h3>Category Scores</h3>
+      <canvas id="catChart" height="200"></canvas>
+      <script>
+        const cn={{ [c.name for c in audit.category_scores] | tojson }};
+        const cv={{ [c.score for c in audit.category_scores] | tojson }};
+        window.renderBarChart('catChart',cn,cv);
+      </script>
+      <p class="muted">Certified report includes executive summary and all metrics.</p>
+      <p><a class="btn btn-primary" href="/auth/report/pdf/{{ website.id }}">Download Certified PDF</a></p>
+    </div>
+    <div>
+      <h3>Metrics</h3>
+      <div class="table">
+        {% for k, v in audit.metrics.items() %}
+        <div class="row"><div class="cell key">{{ k }}</div><div class="cell">{{ v }}</div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
