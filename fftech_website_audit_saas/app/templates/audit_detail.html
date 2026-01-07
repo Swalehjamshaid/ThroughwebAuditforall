@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card glass">
+  <h2>Audit — {{ website.url }}</h2>
+  <p>Grade: <b class="pill">{{ audit.grade }}</b> • Health: <b class="pill">{{ audit.health_score }}/100</b></p>
+  <h3>Category Scores</h3>
+  <ul class="grid-2">
+    {% for c in audit.category_scores %}
+      <li>{{ c.name }} — <b>{{ c.score }}</b></li>
+    {% endfor %}
+  </ul>
+  <h3>Metrics</h3>
+  <ul class="list">
+    {% for k, v in audit.metrics.items() %}
+      <li>{{ k }} — {{ v }}</li>
+    {% endfor %}
+  </ul>
+  <p><a class="btn" href="/auth/report/pdf/{{ website.id }}">Download Certified PDF</a></p>
+</div>
+{% endblock %}
