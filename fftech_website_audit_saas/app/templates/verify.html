@@ -1,0 +1,21 @@
+
+{% extends "base.html" %}
+{% block title %}Verify{% endblock %}
+{% block content %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h1 class="h5 mb-3">Email Verification</h1>
+      {% if token_sent %}
+        <p class="mb-3">We have sent a verification link to <strong>{{ email }}</strong>. Please check your inbox.</p>
+      {% else %}
+        {% if email %}
+          <p class="mb-3">Your account <strong>{{ email }}</strong> has been verified. You are now logged in.</p>
+          <a class="btn btn-primary" href="{% url 'dashboard' %}">Go to Dashboard</a>
+        {% else %}
+          <p class="text-danger">Activation link is invalid or expired.</p>
+          <a class="btn btn-outline-secondary" href="{% url 'register' %}">Try registering again</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
