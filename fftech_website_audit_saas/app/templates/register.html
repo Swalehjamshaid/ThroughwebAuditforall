@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:16px auto">
+  <h2>Create your account</h2>
+  {% if request.query_params.get('mismatch') %}<div class="alert">Passwords do not match.</div>{% endif %}
+  {% if request.query_params.get('exists') %}<div class="alert">Account exists. Please login.</div>{% endif %}
+  <form method="post" action="/auth/register" class="form-vertical">
+    <label>Email</label><input type="email" name="email" required />
+    <label>Password</label><input type="password" name="password" required />
+    <label>Confirm Password</label><input type="password" name="confirm_password" required />
+    <button type="submit" class="btn btn-primary" style="margin-top:10px">Create account</button>
+  </form>
+</div>
+{% endblock %}
