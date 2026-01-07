@@ -1,20 +1,21 @@
 
-{% extends 'base.html' %}
-{% block content %}
-<div class="card glass narrow" style="text-align:center; padding:24px;">
-  <h2>Email Verification</h2>
-  {% if success %}
-    <p style="font-size:1.1rem; margin-top:12px;">
-      A verification link has been sent to <b>{{ email }}</b>.
-    </p>
-    <p class="muted" style="margin-top:8px;">
-      Please check your inbox and click the link to activate your account.
-    </p>
-    <div style="margin-top:20px;">
-      /auth/loginGo to Login</a>
-    </div>
-  {% else %}
-    <p>Verification failed or token expired. Please try again.</p>
-  {% endif %}
-</div>
-{% endblock %}
+<!-- app/templates/verify.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ UI_BRAND_NAME }} – Verify</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <main class="verify">
+    {% if success %}
+      <h1>Verified</h1>
+      <p>Your email is verified. You can now /auth/loginlog in</a>.</p>
+    {% else %}
+      <h1>Verification Failed</h1>
+      <p>The link is invalid or expired. Please request a new verification email by registering again or contact support.</p>
+    {% endif %}
+  </main>
+</body>
+</html>
