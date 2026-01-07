@@ -350,7 +350,7 @@ async def magic_request(
     if not u:
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
-    # If not verified, don't send magic link; help by re-sending verification
+    # If not verified, re-send verification and show a clear message
     if not getattr(u, "verified", False):
         vtoken = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24)
         send_verification_email(u.email, vtoken)
