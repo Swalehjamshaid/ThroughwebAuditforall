@@ -1,33 +1,33 @@
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>{{ UI_BRAND_NAME }} – Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Make sure app/static/style.css exists -->
-  /static/style.css
+  
+  <link rel="stylesheet" href="/static/style.css">
+  
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
     main.login { max-width: 640px; margin: 0 auto; }
     form { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 12px 0; }
-    input[type="email"], input[type="password"] { padding: 8px; font-size: 14px; }
-    button { padding: 8px 12px; font-size: 14px; cursor: pointer; }
-    .notice { padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
-    .notice.info { background: #eef4ff; color: #0b3d91; }
-    .notice.success { background: #e6ffed; color: #046c4e; }
-    .notice.error { background: #ffecec; color: #8b0000; }
-    .notice.warning { background: #fff8e1; color: #8a6d3b; }
-    hr { margin: 18px 0; }
+    input[type="email"], input[type="password"] { padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 8px 12px; font-size: 14px; cursor: pointer; background: #5B8CFF; color: white; border: none; border-radius: 4px; }
+    button:hover { background: #4a7be6; }
+    .notice { padding: 8px 12px; border-radius: 6px; margin: 10px 0; border: 1px solid transparent; }
+    .notice.info { background: #eef4ff; color: #0b3d91; border-color: #d0e1ff; }
+    .notice.success { background: #e6ffed; color: #046c4e; border-color: #c6efd1; }
+    .notice.error { background: #ffecec; color: #8b0000; border-color: #f5c6cb; }
+    .notice.warning { background: #fff8e1; color: #8a6d3b; border-color: #ffeeba; }
+    hr { margin: 18px 0; border: 0; border-top: 1px solid #eee; }
     .foot { margin-top: 16px; }
   </style>
 </head>
 <body>
   <main class="login">
-    <h1>FF Tech – Secure sign‑in</h1>
+    <h1>{{ UI_BRAND_NAME }} – Secure sign‑in</h1>
 
-    <!-- Password login -->
-    /auth/login
+    <form action="/auth/login" method="post">
       <label for="login_email">Email</label>
       <input type="email" id="login_email" name="email" placeholder="you@example.com" required />
       <label for="login_password">Password</label>
@@ -37,17 +37,14 @@
 
     <hr />
 
-    <!-- Magic link request (passwordless) -->
     <h2>Passwordless Login</h2>
     <p>We’ll email you a short‑lived secure link.</p>
-    /auth/magic/request
+    <form action="/auth/magic/request" method="post">
       <label for="magic_email">Email</label>
-      <!-- IMPORTANT: name="email" (FastAPI expects this) -->
       <input type="email" id="magic_email" name="email" placeholder="you@example.com" required />
       <button type="submit">Send Magic Link</button>
     </form>
 
-    <!-- Status messages -->
     {% if request.query_params.get('check_email') %}
       <div class="notice info">Check your email for a verification link.</div>
     {% endif %}
@@ -57,24 +54,18 @@
     {% if request.query_params.get('exists') %}
       <div class="notice info">Account already exists — please log in.</div>
     {% endif %}
-    {% if request.query_params.get('mismatch') %}
-      <div class="notice error">Passwords do not match.</div>
-    {% endif %}
     {% if request.query_params.get('error') %}
-      <div class="notice error">Login failed. Check email, password, or verification status.</div>
+      <div class="notice error">Login failed. Check credentials or verification status.</div>
     {% endif %}
     {% if request.query_params.get('magic_sent') %}
       <div class="notice success">Magic link sent — check your inbox.</div>
     {% endif %}
-    {% if request.query_params.get('magic_failed') %}
-      <div class="notice error">Failed to send magic link. Please try again or contact support.</div>
-    {% endif %}
     {% if request.query_params.get('verify_required') %}
-      <div class="notice warning">Please verify your email first. We’ve sent you a verification link.</div>
+      <div class="notice warning">Please verify your email first. We’ve sent a new link.</div>
     {% endif %}
 
     <p class="foot">
-      No account? /auth/registerCreate one</a>
+      No account? <a href="/auth/register">Create one</a>
     </p>
   </main>
 </body>
