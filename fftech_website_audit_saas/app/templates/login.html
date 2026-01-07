@@ -1,225 +1,81 @@
 
-<!-- app/templates/login.html -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>{{ UI_BRAND_NAME }} – Login</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Primary stylesheet (ensure you have app/static/style.css) -->
+  <!-- Make sure app/static/style.css exists -->
   /static/style.css
-
-  <!-- Minimal fallback styles in case style.css is missing -->
   <style>
-    :root {
-      --bg: #0b1020;
-      --card: #151c33;
-      --muted: #98a2b3;
-      --text: #e6e8ee;
-      --accent: #5B8CFF;
-      --accent-2: #19C37D;
-      --danger: #FF6B6B;
-      --warning: #FFB020;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(1200px 400px at 20% -50%, #27418a60, transparent 70%),
-        radial-gradient(1200px 400px at 80% -50%, #3b7aaf5e, transparent 65%),
-        linear-gradient(180deg, #0b1020 0%, #0e1428 100%);
-    }
-    .wrap {
-      min-height: 100%;
-      display: grid;
-      align-items: center;
-      padding: 24px;
-    }
-    .card {
-      width: 100%;
-      max-width: 880px;
-      margin: 0 auto;
-      background: color-mix(in oklab, var(--card) 92%, black 8%);
-      border: 1px solid #24304d;
-      border-radius: 18px;
-      box-shadow: 0 30px 60px rgba(0,0,0,0.35);
-      overflow: hidden;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-    @media (max-width: 900px) {
-      .card { grid-template-columns: 1fr; }
-    }
-    .left {
-      padding: 28px 28px 16px;
-      border-right: 1px solid #24304d;
-    }
-    @media (max-width: 900px) { .left { border-right: 0; } }
-    .right {
-      padding: 28px 28px 16px;
-      background:
-        radial-gradient(800px 300px at 100% 0%, #254a8e44, transparent 60%),
-        linear-gradient(180deg, #121a33 0%, #11162e 100%);
-    }
-    header.brand {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
-    }
-    header.brand .logo {
-      height: 36px; width: 36px; border-radius: 8px; display: grid; place-items: center;
-      background: linear-gradient(135deg, var(--accent), #7ea7ff);
-      color: #fff; font-weight: 800; letter-spacing: 0.2px;
-      text-shadow: 0 1px 0 rgba(0,0,0,0.25);
-    }
-    h1 {
-      font-size: 24px; margin: 0 0 6px; line-height: 1.25;
-    }
-    p.sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
-    form {
-      display: grid; gap: 10px; margin: 10px 0 18px;
-    }
-    label { font-size: 13px; color: #c9d0dd; }
-    input[type="email"], input[type="password"] {
-      padding: 12px 14px; border-radius: 10px; border: 1px solid #2b3a5e;
-      background: #11172e; color: var(--text); font-size: 14px;
-      outline: none;
-    }
-    input[type="email"]:focus, input[type="password"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
-    }
-    .actions { display: flex; gap: 10px; align-items: center; }
-    button {
-      all: unset; display: inline-block; padding: 10px 16px; border-radius: 10px;
-      background: var(--accent); color: #fff; font-weight: 600; cursor: pointer;
-      transition: .15s ease;
-    }
-    button:hover { filter: brightness(1.08); transform: translateY(-1px); }
-    .secondary {
-      background: transparent; color: var(--text); border: 1px solid #2b3a5e;
-    }
-    .notice { padding: 10px 12px; border-radius: 12px; font-size: 13px; margin: 8px 0; border: 1px solid transparent; }
-    .notice.info { background: #162347; border-color: #263a6d; color: #bcd1ff; }
-    .notice.success { background: #0f2b20; border-color: #195a41; color: #aef3d1; }
-    .notice.error { background: #2a1718; border-color: #5e2a2d; color: #ffc1c4; }
-    .notice.warning { background: #2b2720; border-color: #5e563b; color: #ffe2aa; }
-    .muted { color: var(--muted); font-size: 12px; }
-    .divider { margin: 18px 0; height: 1px; background: #24304d; border: none; }
-    .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-    a { color: #bcd1ff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .tips { font-size: 13px; color: var(--muted); }
-    .list { margin: 0; padding-left: 18px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+    main.login { max-width: 640px; margin: 0 auto; }
+    form { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 12px 0; }
+    input[type="email"], input[type="password"] { padding: 8px; font-size: 14px; }
+    button { padding: 8px 12px; font-size: 14px; cursor: pointer; }
+    .notice { padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
+    .notice.info { background: #eef4ff; color: #0b3d91; }
+    .notice.success { background: #e6ffed; color: #046c4e; }
+    .notice.error { background: #ffecec; color: #8b0000; }
+    .notice.warning { background: #fff8e1; color: #8a6d3b; }
+    hr { margin: 18px 0; }
+    .foot { margin-top: 16px; }
   </style>
 </head>
-
 <body>
-  <div class="wrap">
-    <section class="card">
+  <main class="login">
+    <h1>FF Tech – Secure sign‑in</h1>
 
-      <!-- LEFT: Password login -->
-      <div class="left">
-        <header class="brand">
-          <div class="logo">FT</div>
-          <div>
-            <h1>{{ UI_BRAND_NAME }}</h1>
-            <p class="sub">Secure sign-in</p>
-          </div>
-        </header>
+    <!-- Password login -->
+    /auth/login
+      <label for="login_email">Email</label>
+      <input type="email" id="login_email" name="email" placeholder="you@example.com" required />
+      <label for="login_password">Password</label>
+      <input type="password" id="login_password" name="password" required />
+      <button type="submit">Login</button>
+    </form>
 
-        /auth/login
-          <label for="login_email">Email</label>
-          <input type="email" id="login_email" name="email" placeholder="you@example.com" required />
+    <hr />
 
-          <label for="login_password">Password</label>
-          <input type="password" id="login_password" name="password" placeholder="••••••••" required />
+    <!-- Magic link request (passwordless) -->
+    <h2>Passwordless Login</h2>
+    <p>We’ll email you a short‑lived secure link.</p>
+    /auth/magic/request
+      <label for="magic_email">Email</label>
+      <!-- IMPORTANT: name="email" (FastAPI expects this) -->
+      <input type="email" id="magic_email" name="email" placeholder="you@example.com" required />
+      <button type="submit">Send Magic Link</button>
+    </form>
 
-          <div class="actions">
-            <button type="submit">Login</button>
-            <a class="secondary" href="/auth/register" style="padding:10px 16
+    <!-- Status messages -->
+    {% if request.query_params.get('check_email') %}
+      <div class="notice info">Check your email for a verification link.</div>
+    {% endif %}
+    {% if request.query_params.get('verified') %}
+      <div class="notice success">Email verified — you can log in now.</div>
+    {% endif %}
+    {% if request.query_params.get('exists') %}
+      <div class="notice info">Account already exists — please log in.</div>
+    {% endif %}
+    {% if request.query_params.get('mismatch') %}
+      <div class="notice error">Passwords do not match.</div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+      <div class="notice error">Login failed. Check email, password, or verification status.</div>
+    {% endif %}
+    {% if request.query_params.get('magic_sent') %}
+      <div class="notice success">Magic link sent — check your inbox.</div>
+    {% endif %}
+    {% if request.query_params.get('magic_failed') %}
+      <div class="notice error">Failed to send magic link. Please try again or contact support.</div>
+    {% endif %}
+    {% if request.query_params.get('verify_required') %}
+      <div class="notice warning">Please verify your email first. We’ve sent you a verification link.</div>
+    {% endif %}
 
-        <!-- Status messages driven by query params (FastAPI/Jinja) -->
-        {% if request.query_params.get('error') %}
-          <div class="notice error">Login failed. Check email, password, or verification status.</div>
-        {% endif %}
-        {% if request.query_params.get('verified') %}
-          <div class="notice success">Email verified — you can log in now.</div>
-        {% endif %}
-        {% if request.query_params.get('exists') %}
-          <div class="notice info">Account already exists — please log in.</div>
-        {% endif %}
-        {% if request.query_params.get('mismatch') %}
-          <div class="notice error">Passwords do not match.</div>
-        {% endif %}
-        {% if request.query_params.get('check_email') %}
-          <div class="notice info">Check your email for a verification link.</div>
-        {% endif %}
-
-        <hr class="divider" />
-
-        <p class="tips">
-          Tip: If you forgot your password, use the <b>Passwordless Login</b> on the right to receive a secure magic link.
-        </p>
-      </div>
-
-      <!-- RIGHT: Passwordless / Magic link -->
-      <div class="right">
-        <header class="brand" style="margin-bottom:6px;">
-          <div class="logo" style="background: linear-gradient(135deg, var(--accent-2), #23dda1);">ML</div>
-          <div>
-            <h1>Passwordless Login</h1>
-            <p class="sub">We’ll email you a short‑lived secure link</p>
-          </div>
-        </header>
-
-        /auth/magic/request
-          <label for="magic_email">Email</label>
-          <input type="email" id="magic_email" name="email" placeholder="you@example.com" required />
-
-          <div class="actions">
-            <button type="submit" title="Send a secure login link to your inbox">Send Magic Link</button>
-            <button type="button" class="secondary"TP Test
-            </button>
-          </div>
-        </form>
-
-        <!-- Magic link status -->
-        {% if request.query_params.get('magic_sent') %}
-          <div class="notice success">Magic link sent — check your inbox.</div>
-        {% endif %}
-        {% if request.query_params.get('magic_failed') %}
-          <div class="notice error">
-            Failed to send magic link. Try again or contact support.
-            <div class="muted">If this keeps happening, ask admin to check SMTP settings and domain (BASE_URL).</div>
-          </div>
-        {% endif %}
-        {% if request.query_params.get('verify_required') %}
-          <div class="notice warning">
-            Please verify your email first — we’ve just sent a verification link.
-          </div>
-        {% endif %}
-
-        <hr class="divider" />
-
-        <p class="tips">
-          Why verification? It keeps your account safe and prevents unauthorised access. Once verified, magic links work instantly.
-        </p>
-        <ul class="list tips">
-          <li>Links expire quickly for your security.</li>
-          <li>Always check spam/junk if you don’t see the email.</li>
-          <li>Ensure the email is the same as the one you registered.</li>
-        </ul>
-
-        <div class="footer">
-          <span class="muted">Need help? <a href="mailto:stech.exampleContact support</a></span>
-          <span class="muted">© {{ UI_BRAND_NAME }}</span>
-        </div>
-      </div>
-
-    </section>
-  </div>
+    <p class="foot">
+      No account? /auth/registerCreate one</a>
+    </p>
+  </main>
 </body>
 </html>
