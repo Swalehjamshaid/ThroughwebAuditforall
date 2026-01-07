@@ -1,0 +1,20 @@
+
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h1 class="h5 mb-3">Administration</h1>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          Manage Users
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'admin:index' %}">Open</a>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          System Settings
+          <a class="btn btn-sm btn-outline-primary" href="#">Open</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+{% endblock %}
