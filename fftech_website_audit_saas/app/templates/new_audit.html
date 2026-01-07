@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>New Audit</h2>
+<form action='/auth/audit/new' method='post' class='row'>
+  <input type='url' name='url' placeholder='https://example.com' required/>
+  <label><input type='checkbox' name='enable_schedule'/> Enable daily email schedule</label>
+  <button type='submit'>Run</button>
+</form>
+{% endblock %}
