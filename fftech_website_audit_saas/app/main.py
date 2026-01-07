@@ -1,4 +1,5 @@
 
+# app/main.py
 import os
 import json
 import asyncio
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from .db import Base, engine, SessionLocal
 from .models import User, Website, Audit, Subscription
 from .auth import hash_password, verify_password, create_token, decode_token
-from .email_utils import send_verification_email
+from .email_utils import send_verification_email, send_magic_login_email
 from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
 from .audit.report import render_pdf
@@ -302,7 +303,7 @@ async def register_post(
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     ok = send_verification_email(u.email, token)
     if not ok:
-        print(f"[auth] Failed to send email to {u.email}. Check SMTP settings.")
+        print(f"[auth] Failed to send verification email to {u.email}. Check SMTP settings.")
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
 @app.get("/auth/verify")
@@ -332,39 +333,6 @@ async def login_get(request: Request):
     })
 
 # ---------- Magic Login (Passwordless) ----------
-def _send_magic_login_email(to_email: str, token: str) -> bool:
-    """
-    Send the magic login link via email using the same SMTP settings.
-    Clicking this link will log the user in and redirect to the dashboard.
-    """
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        return False
-
-    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-
-    html_body = f"""
-    <h3>{UI_BRAND_NAME} — Magic Login</h3>
-    <p>Hello!</p>
-    <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
-    """
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
-    msg["From"] = SMTP_USER
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
-        return True
-    except Exception:
-        return False
-
 @app.post("/auth/magic/request")
 async def magic_request(
     request: Request,
@@ -377,15 +345,22 @@ async def magic_request(
     - Sends a short-lived token to the user's email.
     """
     u = db.query(User).filter(User.email == email).first()
-    if not u or not getattr(u, "verified", False):
-        # Do not reveal whether account exists or verified (privacy)
+
+    # Privacy-preserving behavior if account doesn't exist
+    if not u:
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
+    # If not verified, don't send magic link; help by re-sending verification
+    if not getattr(u, "verified", False):
+        vtoken = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24)
+        send_verification_email(u.email, vtoken)
+        return RedirectResponse("/auth/login?verify_required=1", status_code=303)
 
     # Short expiry for security (e.g., 15 minutes)
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-    _send_magic_login_email(u.email, token)
+    sent  = send_magic_login_email(u.email, token)
 
-    return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+    return RedirectResponse(f"/auth/login?{'magic_sent=1' if sent else 'magic_failed=1'}", status_code=303)
 
 @app.get("/auth/magic")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
@@ -729,19 +704,31 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
 # ---------- Daily Email Scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        print("[smtp] Missing SMTP configuration for scheduler.")
         return False
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = SMTP_USER
     msg["To"]      = to_email
+    msg.attach(MIMEText("Daily summary", "plain"))
     msg.attach(MIMEText(html_body, "html"))
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        if SMTP_PORT == 465:
+            import ssl
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=25) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=25) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, [to_email], msg.as_string())
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[smtp] Scheduler email error: {e}")
         return False
 
 async def _daily_scheduler_loop():
@@ -782,7 +769,7 @@ async def _daily_scheduler_loop():
                     if not last:
                         lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
                         continue
-                    pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
+                    pdf_link = f"{BASE_URL.rstrip('/')}/auth/report/pdf/{w.id}"
                     lines.append(
                         f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
                         f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Download Certified Report</a>)</p>"
@@ -803,6 +790,35 @@ async def _daily_scheduler_loop():
         except Exception:
             pass
         await asyncio.sleep(60)
+
+# ---------- Optional: SMTP test route ----------
+@app.get("/auth/smtp-test")
+async def smtp_test(email: str):
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{UI_BRAND_NAME} — SMTP Test"
+    msg["From"]    = SMTP_USER
+    msg["To"]      = email
+    msg.attach(MIMEText("SMTP test plain", "plain"))
+    msg.attach(MIMEText("<p>This is an SMTP test email.</p>", "html"))
+    try:
+        if SMTP_PORT == 465:
+            import ssl
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=25) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, [email], msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=25) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, [email], msg.as_string())
+        print(f"[smtp] SMTP test sent to {email}")
+        return {"ok": True}
+    except Exception as e:
+        print(f"[smtp] SMTP test failed: {e}")
+        return {"ok": False, "error": str(e)}
 
 @app.on_event("startup")
 async def _start_scheduler():
