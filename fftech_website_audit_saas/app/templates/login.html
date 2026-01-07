@@ -1,29 +1,65 @@
 
-{% extends 'base.html' %}
-{% block content %}
-<div class="card glass narrow" style="max-width:480px;margin:40px auto;padding:28px;text-align:center;">
-  <h2 style="margin-bottom:16px;">Welcome Back</h2>
-  <p class="muted" style="margin-bottom:20px;">Sign in to access your dashboard and audits</p>
+<!-- app/templates/login.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ UI_BRAND_NAME }} – Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  /static/styles.css
+</head>
+<body>
+  <main class="login">
+    <h1>Welcome Back</h1>
 
-  {% if request.query_params.get('error') %}
-    <div class="alert" role="alert" style="margin-bottom:16px;">
-      Invalid credentials or account not verified.
-    </div>
-  {% endif %}
+    <!-- Password login -->
+    /auth/login
+      <label>Email</label>
+      <input type="email" name="email" required />
+      <label>Password</label>
+      <input type="password" name="password" required />
+      <button type="submit">Login</button>
+    </form>
 
-  <form method="post" action="/auth/login" class="form-vertical" styleabel>
-    <input id="email" type="email" name="email" placeholder="you@example.com" required />
+    <hr />
 
-    <label for="password" style="text-align:left;">Password</label>
-    <input id="password" type="password" name="password" placeholder="••••••••" required />
+    <!-- Magic link request -->
+    <h2>Passwordless Login</h2>
+    /auth/magic/request
+      <label>Email</label>
+      <input type="email" name="email" required />
+      <button type="submit">Send Magic Link</button>
+    </form>
 
-    <button type="submit" class="btn btn-primary" style="margin-top:10px;width:100%;font-weight:600;">
-      Login
-    </button>
-  </form>
+    <!-- Messages -->
+    {% if request.query_params.get('check_email') %}
+      <div class="notice info">Check your email for a verification link.</div>
+    {% endif %}
+    {% if request.query_params.get('verified') %}
+      <div class="notice success">Email verified — you can log in now.</div>
+    {% endif %}
+    {% if request.query_params.get('exists') %}
+      <div class="notice info">Account already exists — please log in.</div>
+    {% endif %}
+    {% if request.query_params.get('mismatch') %}
+      <div class="notice error">Passwords do not match.</div>
+    {% endif %}
+    {% if request.query_params.get('error') %}
+      <div class="notice error">Login failed. Check email, password, or verification status.</div>
+    {% endif %}
+    {% if request.query_params.get('magic_sent') %}
+      <div class="notice success">Magic link sent — check your inbox.</div>
+    {% endif %}
+    {% if request.query_params.get('magic_failed') %}
+      <div class="notice error">Failed to send magic link. Please try again or contact support.</div>
+    {% endif %}
+    {% if request.query_params.get('verify_required') %}
+      <div class="notice warning">Please verify your email first. We’ve sent you a verification link.</div>
+    {% endif %}
 
-  <p class="muted" style="margin-top:18px;">
-    No account? /auth/registerCreate one</a>
-  </p>
-</div>
-{% endblock %}
+    <p class="foot">
+      No account? /auth/registerCreate one</a>
+    </p>
+  </main>
+</body>
+</html>
