@@ -1,0 +1,42 @@
+/* FF Tech — Modern UI */
+:root{
+  --bg: #0f1424;        /* deep indigo */
+  --card: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.12);
+  --text: #e9eef8;
+  --muted: #a6b0c3;
+  --primary: #5B8CFF;   /* accent blue */
+  --primary-2: #7aa2ff;
+  --pill: #1f2a44;
+  --shadow: 0 12px 40px rgba(0,0,0,0.35);
+}
+
+html[data-theme="light"]{ --bg:#f7f8fc; --card:#fff; --border:#e4e6ef; --text:#1a2138; --muted:#59617a; --pill:#e9edfb; }
+
+*{box-sizing:border-box}
+body{margin:0;font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+
+.wrap{max-width:1120px;margin:0 auto;padding:20px}
+.site-header{position:sticky;top:0;background:linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0));backdrop-filter:saturate(140%) blur(8px);z-index:50}
+.logo{font-weight:800;letter-spacing:.2px;text-decoration:none;color:var(--text)}
+.nav a{color:var(--text);text-decoration:none;margin-left:16px}
+.btn{border:1px solid var(--border);color:var(--text);background:transparent;border-radius:10px;padding:.6rem 1rem;cursor:pointer}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff;box-shadow:0 8px 24px rgba(91,140,255,.35)}
+.btn-ghost{background:transparent;color:var(--text)}
+
+.hero{padding:28px;background:radial-gradient(1200px 400px at 10% 0%, rgba(91,140,255,.25), transparent 70%),radial-gradient(900px 300px at 90% 10%, rgba(140,91,255,.25), transparent 60%)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;box-shadow:var(--shadow)}
+.glass{backdrop-filter:saturate(160%) blur(12px)}
+.narrow{max-width:520px;margin:24px auto}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:20px}
+.list{list-style:none;padding:0;margin:0}
+.list li{padding:8px 0;border-bottom:1px dashed var(--border)}
+.pill{background:var(--pill);padding:6px 10px;border-radius:999px;border:1px solid var(--border)}
+.form-grid{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:16px}
+.form-vertical label{margin:.6rem 0 .2rem;color:var(--muted)}
+.form-vertical input{width:100%;padding:.7rem;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text)}
+.alert{background:#ffebea;border:1px solid #ffa9a0;color:#9c2c1c;border-radius:12px;padding:.6rem;margin:.6rem 0}
+.site-footer{margin-top:40px;border-top:1px solid var(--border);}
+
+@media (max-width:900px){ .grid-2{grid-template-columns:1fr} .grid-3{grid-template-columns:1fr} .form-grid{grid-template-columns:1fr} }
