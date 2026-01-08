@@ -1,27 +1,79 @@
-/* Add this to your style.css */
+/* ===== Main Login Container ===== */
 main.login {
-    max-width: 450px;
-    margin: 50px auto;
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    max-width: 450px;                /* Limit width */
+    margin: 50px auto;               /* Center horizontally */
+    background: white;               /* Background color */
+    padding: 30px;                   /* Inner padding */
+    border-radius: 12px;             /* Rounded corners */
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* Soft shadow */
+    font-family: Arial, sans-serif;  /* Clean font */
 }
 
+/* ===== Notice Messages ===== */
 .notice {
     margin-bottom: 15px;
     padding: 12px;
     font-size: 0.9rem;
     border-radius: 8px;
+    background-color: #f8f9fa;       /* Light gray background */
+    color: #333;                     /* Dark text for contrast */
 }
 
+/* ===== Form Labels ===== */
 form label {
     font-weight: 500;
     margin-top: 10px;
     display: block;
 }
 
+/* ===== Input Fields ===== */
 input {
     width: 100%;
     margin-bottom: 15px;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+input:focus {
+    outline: none;
+    border-color: #007BFF; /* Focus border color */
+    box-shadow: 0 0 5px rgba(0,123,255,0.2);
+}
+
+/* ===== Buttons ===== */
+button {
+    width: 100%;
+    padding: 12px;
+    background: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+/* ===== Links Inside Login Form ===== */
+main.login a {
+    color: #007BFF;       /* Keep links blue */
+    text-decoration: none; /* No underline by default */
+}
+
+main.login a:hover {
+    text-decoration: underline; /* Add underline on hover */
+}
+
+/* ===== Responsive for Small Screens ===== */
+@media (max-width: 500px) {
+    main.login {
+        margin: 20px;
+        padding: 20px;
+    }
 }
