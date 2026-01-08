@@ -127,8 +127,7 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# ---------- Robust URL helpers ----------
-from urllib.parse import urlparse
+# ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
     if not raw:
         return raw
@@ -394,7 +393,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
 
-# ---------- Password login ----------
+# ---------- Password login remains available ----------
 @app.post("/auth/login")
 async def login_post(
     request: Request,
@@ -824,3 +823,4 @@ async def smtp_test(email: str):
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
+``
