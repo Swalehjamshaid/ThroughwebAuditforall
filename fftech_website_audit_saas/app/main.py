@@ -1,11 +1,11 @@
 
-# app/main.py
 import os
 import json
 import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
+from typing import Tuple, Dict, Any, List
 
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import RedirectResponse, FileResponse
@@ -26,22 +26,26 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# ---- Branding & Base URL ----
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
 
+# ---- SMTP (used by scheduler test route) ----
 SMTP_HOST     = os.getenv("SMTP_HOST")
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
+# ---- FastAPI & Templates ----
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
+# ---- Ensure DB tables exist ----
 Base.metadata.create_all(bind=engine)
 
-# ---- Startup schema patches ----
-def _ensure_schedule_columns():
+# ---- Startup schema patches (safe ALTERs) ----
+def _ensure_schedule_columns() -> None:
     try:
         with engine.connect() as conn:
             conn.execute(text("""
@@ -58,9 +62,10 @@ def _ensure_schedule_columns():
             """))
             conn.commit()
     except Exception:
+        # Swallow errors to avoid breaking startup on hosted DBs
         pass
 
-def _ensure_user_columns():
+def _ensure_user_columns() -> None:
     try:
         with engine.connect() as conn:
             conn.execute(text("""
@@ -90,8 +95,8 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Metrics presenter ----------
-METRIC_LABELS = {
+# ---------- Metrics presenter (human-friendly labels) ----------
+METRIC_LABELS: Dict[str, str] = {
     "status_code": "Status Code",
     "content_length": "Content Length (bytes)",
     "content_encoding": "Compression (Content-Encoding)",
@@ -118,8 +123,8 @@ METRIC_LABELS = {
     "error": "Fetch Error",
 }
 
-def _present_metrics(metrics: dict) -> dict:
-    out = {}
+def _present_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
     for k, v in (metrics or {}).items():
         label = METRIC_LABELS.get(k, k.replace("_", " ").title())
         if isinstance(v, bool):
@@ -144,7 +149,7 @@ def _normalize_url(raw: str) -> str:
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
 
-def _url_variants(u: str) -> list:
+def _url_variants(u: str) -> List[str]:
     p = urlparse(u)
     host = p.netloc
     path = p.path or "/"
@@ -165,10 +170,11 @@ def _url_variants(u: str) -> list:
     seen, ordered = set(), []
     for c in candidates:
         if c not in seen:
-            ordered.append(c); seen.add(c)
+            ordered.append(c)
+            seen.add(c)
     return ordered
 
-def _fallback_result(url: str) -> dict:
+def _fallback_result(url: str) -> Dict[str, Any]:
     return {
         "category_scores": {
             "Performance": 65,
@@ -187,7 +193,7 @@ def _fallback_result(url: str) -> dict:
         ],
     }
 
-def _robust_audit(url: str) -> tuple[str, dict]:
+def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
     base = _normalize_url(url)
     for candidate in _url_variants(base):
         try:
@@ -219,6 +225,7 @@ async def session_middleware(request: Request, call_next):
                 finally:
                     db.close()
     except Exception:
+        # Don't break requests if cookie decode fails
         pass
     response = await call_next(request)
     return response
@@ -298,7 +305,9 @@ async def register_post(
         return RedirectResponse("/auth/login?exists=1", status_code=303)
 
     u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
-    db.add(u); db.commit(); db.refresh(u)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     ok = send_verification_email(u.email, token)
@@ -496,14 +505,18 @@ async def new_audit_post(
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     if not sub:
         sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
-        db.add(sub); db.commit(); db.refresh(sub)
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
 
     if enable_schedule and hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = True
         db.commit()
 
     w = Website(user_id=current_user.id, url=url)
-    db.add(w); db.commit(); db.refresh(w)
+    db.add(w)
+    db.commit()
+    db.refresh(w)
 
     return RedirectResponse(f"/auth/audit/run/{w.id}", status_code=303)
 
@@ -539,7 +552,9 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
         category_scores_json=json.dumps(category_scores_list),
         metrics_json=json.dumps(res.get("metrics", {}))
     )
-    db.add(audit); db.commit(); db.refresh(audit)
+    db.add(audit)
+    db.commit()
+    db.refresh(audit)
 
     w.last_audit_at = audit.created_at
     w.last_grade = grade
@@ -638,7 +653,9 @@ async def schedule_post(
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     if not sub:
         sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
-        db.add(sub); db.commit(); db.refresh(sub)
+        db.add(sub)
+        db.commit()
+        db.refresh(sub)
 
     if hasattr(sub, "daily_time"):
         sub.daily_time = daily_time
@@ -788,12 +805,17 @@ async def _daily_scheduler_loop():
                 _send_report_email(user.email, f"{UI_BRAND_NAME} – Daily Website Audit Summary", html)
             db.close()
         except Exception:
+            # Keep the scheduler resilient
             pass
         await asyncio.sleep(60)
 
 # ---------- Optional: SMTP test route ----------
 @app.get("/auth/smtp-test")
 async def smtp_test(email: str):
+    """
+    Sends a small test email to the provided address to validate SMTP configuration.
+    Check Railway logs for lines starting with [smtp].
+    """
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — SMTP Test"
     msg["From"]    = SMTP_USER
@@ -823,4 +845,3 @@ async def smtp_test(email: str):
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
-``
