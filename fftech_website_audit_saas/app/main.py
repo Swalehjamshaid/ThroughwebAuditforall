@@ -1,4 +1,3 @@
-
 # app/main.py
 import os
 import json
@@ -6,40 +5,29 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
-
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
 from .db import Base, engine, SessionLocal
 from .models import User, Website, Audit, Subscription
 from .auth import hash_password, verify_password, create_token, decode_token
-from .email_utils import send_verification_email, send_magic_login_email
 from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
 from .audit.report import render_pdf
+import resend  # Added for Resend email integration
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+# Initialize Resend with API key from environment
+resend.api_key = os.getenv("RESEND_API_KEY")
 
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
-BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
-
-SMTP_HOST     = os.getenv("SMTP_HOST")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
-
 Base.metadata.create_all(bind=engine)
-
 # ---- Startup schema patches ----
 def _ensure_schedule_columns():
     try:
@@ -59,7 +47,6 @@ def _ensure_schedule_columns():
             conn.commit()
     except Exception:
         pass
-
 def _ensure_user_columns():
     try:
         with engine.connect() as conn:
@@ -78,10 +65,8 @@ def _ensure_user_columns():
             conn.commit()
     except Exception:
         pass
-
 _ensure_schedule_columns()
 _ensure_user_columns()
-
 # ---------- DB dependency ----------
 def get_db():
     db = SessionLocal()
@@ -89,7 +74,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
 # ---------- Current user helper (NO global state) ----------
 def get_current_user_obj(request: Request, db: Session) -> User | None:
     """Safely get the current user for THIS request from the session cookie."""
@@ -107,7 +91,6 @@ def get_current_user_obj(request: Request, db: Session) -> User | None:
         return None
     except Exception:
         return None
-
 # ---------- Metrics presenter ----------
 METRIC_LABELS = {
     "status_code": "Status Code",
@@ -135,7 +118,6 @@ METRIC_LABELS = {
     "normalized_url": "Normalized URL",
     "error": "Fetch Error",
 }
-
 def _present_metrics(metrics: dict) -> dict:
     out = {}
     for k, v in (metrics or {}).items():
@@ -144,10 +126,8 @@ def _present_metrics(metrics: dict) -> dict:
             v = "Yes" if v else "No"
         out[label] = v
     return out
-
 # ---------- Robust URL & audit helpers ----------
 from urllib.parse import urlparse as _urlparse
-
 def _normalize_url(raw: str) -> str:
     if not raw:
         return raw
@@ -163,13 +143,11 @@ def _normalize_url(raw: str) -> str:
         p = _urlparse(s)
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
-
 def _url_variants(u: str) -> list:
     p = _urlparse(u)
     host = p.netloc
     path = p.path or "/"
     scheme = p.scheme
-
     candidates = [f"{scheme}://{host}{path}"]
     if host.startswith("www."):
         candidates.append(f"{scheme}://{host[4:]}{path}")
@@ -187,7 +165,6 @@ def _url_variants(u: str) -> list:
         if c not in seen:
             ordered.append(c); seen.add(c)
     return ordered
-
 def _fallback_result(url: str) -> dict:
     return {
         "category_scores": {
@@ -206,7 +183,6 @@ def _fallback_result(url: str) -> dict:
             "Verify URL is publicly accessible and not blocked by WAF/robots.",
         ],
     }
-
 def _robust_audit(url: str) -> tuple[str, dict]:
     base = _normalize_url(url)
     for candidate in _url_variants(base):
@@ -218,7 +194,6 @@ def _robust_audit(url: str) -> tuple[str, dict]:
         except Exception:
             continue
     return base, _fallback_result(base)
-
 # ---------- Public ----------
 @app.get("/")
 async def index(request: Request, db: Session = Depends(get_db)):
@@ -228,7 +203,6 @@ async def index(request: Request, db: Session = Depends(get_db)):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": user
     })
-
 @app.post("/audit/open")
 async def audit_open(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
@@ -236,7 +210,6 @@ async def audit_open(request: Request, db: Session = Depends(get_db)):
     url = form.get("url")
     if not url:
         return RedirectResponse("/", status_code=303)
-
     normalized, res = _robust_audit(url)
     category_scores_dict = res["category_scores"]
     overall = compute_overall(category_scores_dict)
@@ -244,7 +217,6 @@ async def audit_open(request: Request, db: Session = Depends(get_db)):
     top_issues = res.get("top_issues", [])
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
-
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -260,7 +232,6 @@ async def audit_open(request: Request, db: Session = Depends(get_db)):
             "top_issues": top_issues,
         }
     })
-
 @app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
     normalized, res = _robust_audit(url)
@@ -272,7 +243,6 @@ async def report_pdf_open(url: str):
     path = "/tmp/certified_audit_open.pdf"
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
-
 # ---------- Registration & Auth ----------
 @app.get("/auth/register")
 async def register_get(request: Request, db: Session = Depends(get_db)):
@@ -282,7 +252,6 @@ async def register_get(request: Request, db: Session = Depends(get_db)):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": user
     })
-
 @app.post("/auth/register")
 async def register_post(
     request: Request,
@@ -295,16 +264,13 @@ async def register_post(
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
     if db.query(User).filter(User.email == email).first():
         return RedirectResponse("/auth/login?exists=1", status_code=303)
-
     u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
     db.add(u); db.commit(); db.refresh(u)
-
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     ok = send_verification_email(u.email, token)
     if not ok:
-        print(f"[auth] Failed to send verification email to {u.email}. Check SMTP settings.")
+        print(f"[auth] Failed to send verification email to {u.email}. Check Resend settings.")
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
-
 @app.get("/auth/verify")
 async def verify(request: Request, token: str, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
@@ -323,7 +289,6 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
             "user": user
         })
     return RedirectResponse("/auth/login", status_code=303)
-
 @app.get("/auth/login")
 async def login_get(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
@@ -332,7 +297,6 @@ async def login_get(request: Request, db: Session = Depends(get_db)):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": user
     })
-
 # ---------- Magic Login (Passwordless) ----------
 @app.post("/auth/magic/request")
 async def magic_request(
@@ -341,21 +305,17 @@ async def magic_request(
     db: Session = Depends(get_db)
 ):
     u = db.query(User).filter(User.email == email).first()
-
     # Privacy-preserving behavior if account doesn't exist
     if not u:
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
-
     # If not verified, re-send verification and show a clear message
     if not getattr(u, "verified", False):
         vtoken = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24)
         send_verification_email(u.email, vtoken)
         return RedirectResponse("/auth/login?verify_required=1", status_code=303)
-
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-    sent  = send_magic_login_email(u.email, token)
+    sent = send_magic_login_email(u.email, token)
     return RedirectResponse(f"/auth/login?{'magic_sent=1' if sent else 'magic_failed=1'}", status_code=303)
-
 @app.get("/auth/magic")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
     try:
@@ -363,11 +323,9 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
         uid = data.get("uid")
         if not uid or data.get("type") != "magic":
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         u = db.query(User).filter(User.id == uid).first()
         if not u or not getattr(u, "verified", False):
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         # Set session cookie for this user
         session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
         resp = RedirectResponse("/auth/dashboard", status_code=303)
@@ -382,7 +340,6 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
         return resp
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
-
 # ---------- Password login ----------
 @app.post("/auth/login")
 async def login_post(
@@ -394,7 +351,6 @@ async def login_post(
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.verified:
         return RedirectResponse("/auth/login?error=1", status_code=303)
-
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
     resp = RedirectResponse("/auth/dashboard", status_code=303)
     resp.set_cookie(
@@ -406,20 +362,17 @@ async def login_post(
         max_age=60*60*24*30
     )
     return resp
-
 @app.get("/auth/logout")
 async def logout(request: Request):
     resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie("session_token")
     return resp
-
 # ---------- Registered audit flows ----------
 @app.get("/auth/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     websites = db.query(Website).filter(Website.user_id == user.id).all()
     last_audits = (
         db.query(Audit)
@@ -429,22 +382,18 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     avg = round(sum(a.health_score for a in last_audits)/len(last_audits), 1) if last_audits else 0
-
     trend_labels = [a.created_at.strftime('%d %b') for a in reversed(last_audits)]
     trend_values = [a.health_score for a in reversed(last_audits)]
-
     summary = {
         "grade": (last_audits[0].grade if last_audits else "A"),
         "health_score": (last_audits[0].health_score if last_audits else 88)
     }
-
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
         "enabled": getattr(sub, "email_schedule_enabled", False),
     }
-
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -454,7 +403,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "summary": summary,
         "schedule": schedule
     })
-
 @app.get("/auth/audit/new")
 async def new_audit_get(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
@@ -465,7 +413,6 @@ async def new_audit_get(request: Request, db: Session = Depends(get_db)):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": user
     })
-
 @app.post("/auth/audit/new")
 async def new_audit_post(
     request: Request,
@@ -476,43 +423,34 @@ async def new_audit_post(
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     if not sub:
         sub = Subscription(user_id=user.id, plan="free", active=True, audits_used=0)
         db.add(sub); db.commit(); db.refresh(sub)
-
     if enable_schedule and hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = True
         db.commit()
-
     w = Website(user_id=user.id, url=url)
     db.add(w); db.commit(); db.refresh(w)
-
     return RedirectResponse(f"/auth/audit/run/{w.id}", status_code=303)
-
 @app.get("/auth/audit/run/{website_id}")
 async def run_audit(website_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
     if not w:
         return RedirectResponse("/auth/dashboard", status_code=303)
-
     try:
         normalized, res = _robust_audit(w.url)
     except Exception:
         return RedirectResponse("/auth/dashboard", status_code=303)
-
     category_scores_dict = res["category_scores"]
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
-
     audit = Audit(
         user_id=user.id,
         website_id=w.id,
@@ -523,33 +461,26 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
         metrics_json=json.dumps(res.get("metrics", {}))
     )
     db.add(audit); db.commit(); db.refresh(audit)
-
     w.last_audit_at = audit.created_at
     w.last_grade = grade
     db.commit()
-
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     if sub:
         sub.audits_used = (sub.audits_used or 0) + 1
         db.commit()
-
     return RedirectResponse(f"/auth/audit/{w.id}", status_code=303)
-
 @app.get("/auth/audit/{website_id}")
 async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
     if not w or not a:
         return RedirectResponse("/auth/dashboard", status_code=303)
-
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
-
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -564,38 +495,31 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "metrics": metrics
         }
     })
-
 @app.get("/auth/report/pdf/{website_id}")
 async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
     if not w or not a:
         return RedirectResponse("/auth/dashboard", status_code=303)
-
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     path = f"/tmp/certified_audit_{website_id}.pdf"
-
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
-
 # ---------- Scheduling UI ----------
 @app.get("/auth/schedule")
 async def schedule_get(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
         "enabled": getattr(sub, "email_schedule_enabled", False),
     }
-
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -605,7 +529,6 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
         "summary": {"grade": "A", "health_score": 88},
         "schedule": schedule
     })
-
 @app.post("/auth/schedule")
 async def schedule_post(
     request: Request,
@@ -617,12 +540,10 @@ async def schedule_post(
     user = get_current_user_obj(request, db)
     if not user:
         return RedirectResponse("/auth/login", status_code=303)
-
     sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
     if not sub:
         sub = Subscription(user_id=user.id, plan="free", active=True, audits_used=0)
         db.add(sub); db.commit(); db.refresh(sub)
-
     if hasattr(sub, "daily_time"):
         sub.daily_time = daily_time
     if hasattr(sub, "timezone"):
@@ -630,9 +551,7 @@ async def schedule_post(
     if hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = bool(enabled)
     db.commit()
-
     return RedirectResponse("/auth/dashboard", status_code=303)
-
 # ---------- Admin ----------
 @app.get("/auth/admin/login")
 async def admin_login_get(request: Request, db: Session = Depends(get_db)):
@@ -642,7 +561,6 @@ async def admin_login_get(request: Request, db: Session = Depends(get_db)):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": user
     })
-
 @app.post("/auth/admin/login")
 async def admin_login_post(
     request: Request,
@@ -653,7 +571,6 @@ async def admin_login_post(
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.is_admin:
         return RedirectResponse("/auth/admin/login", status_code=303)
-
     token = create_token({"uid": u.id, "email": u.email, "admin": True}, expires_minutes=60*24*30)
     resp = RedirectResponse("/auth/admin", status_code=303)
     resp.set_cookie(
@@ -662,17 +579,14 @@ async def admin_login_post(
         samesite="Lax", max_age=60*60*24*30
     )
     return resp
-
 @app.get("/auth/admin")
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     user = get_current_user_obj(request, db)
     if not user or not user.is_admin:
         return RedirectResponse("/auth/admin/login", status_code=303)
-
     users = db.query(User).order_by(User.created_at.desc()).limit(100).all()
     audits = db.query(Audit).order_by(Audit.created_at.desc()).limit(100).all()
     websites = db.query(Website).order_by(Website.created_at.desc()).limit(100).all()
-
     return templates.TemplateResponse("admin.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -681,37 +595,51 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "admin_users": users,
         "admin_audits": audits
     })
+# ---------- Email Functions using Resend ----------
+def send_verification_email(to_email: str, token: str) -> bool:
+    link = f"{BASE_URL.rstrip('/')}/auth/verify?token={token}"
+    try:
+        params = {
+            "from": "no-reply@yourdomain.com",  # Replace with your verified domain
+            "to": [to_email],
+            "subject": f"{UI_BRAND_NAME} - Verify Your Account",
+            "html": f"<p>Click <a href='{link}'>here</a> to verify your email. Link expires in 3 days.</p>",
+        }
+        resend.Emails.send(params)
+        return True
+    except Exception as e:
+        print(f"[resend] Verification email error: {e}")
+        return False
+
+def send_magic_login_email(to_email: str, token: str) -> bool:
+    link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
+    try:
+        params = {
+            "from": "no-reply@yourdomain.com",  # Replace with your verified domain
+            "to": [to_email],
+            "subject": f"{UI_BRAND_NAME} - Magic Login Link",
+            "html": f"<p>Click <a href='{link}'>here</a> to log in. Link expires in 15 minutes.</p>",
+        }
+        resend.Emails.send(params)
+        return True
+    except Exception as e:
+        print(f"[resend] Magic login email error: {e}")
+        return False
 
 # ---------- Daily Email Scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        print("[smtp] Missing SMTP configuration for scheduler.")
-        return False
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"]    = SMTP_USER
-    msg["To"]      = to_email
-    msg.attach(MIMEText("Daily summary", "plain"))
-    msg.attach(MIMEText(html_body, "html"))
     try:
-        if SMTP_PORT == 465:
-            import ssl
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=25) as server:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_USER, [to_email], msg.as_string())
-        else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=25) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_USER, [to_email], msg.as_string())
+        params = {
+            "from": "no-reply@yourdomain.com",  # Replace with your verified domain
+            "to": [to_email],
+            "subject": subject,
+            "html": html_body,
+        }
+        resend.Emails.send(params)
         return True
     except Exception as e:
-        print(f"[smtp] Scheduler email error: {e}")
+        print(f"[resend] Scheduler email error: {e}")
         return False
-
 async def _daily_scheduler_loop():
     while True:
         try:
@@ -721,14 +649,14 @@ async def _daily_scheduler_loop():
             for sub in subs:
                 if not getattr(sub, "email_schedule_enabled", False):
                     continue
-                tz_name    = getattr(sub, "timezone", "UTC") or "UTC"
+                tz_name = getattr(sub, "timezone", "UTC") or "UTC"
                 daily_time = getattr(sub, "daily_time", "09:00") or "09:00"
                 try:
                     tz = ZoneInfo(tz_name)
                 except Exception:
                     tz = ZoneInfo("UTC")
                 local_now = now_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-                hhmm_now  = local_now.strftime("%H:%M")
+                hhmm_now = local_now.strftime("%H:%M")
                 if hhmm_now != daily_time:
                     continue
                 user = db.query(User).filter(User.id == sub.user_id).first()
@@ -771,36 +699,22 @@ async def _daily_scheduler_loop():
         except Exception:
             pass
         await asyncio.sleep(60)
-
-# ---------- Optional: SMTP test route ----------
-@app.get("/auth/smtp-test")
-async def smtp_test(email: str):
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{UI_BRAND_NAME} — SMTP Test"
-    msg["From"]    = SMTP_USER
-    msg["To"]      = email
-    msg.attach(MIMEText("SMTP test plain", "plain"))
-    msg.attach(MIMEText("<p>This is an SMTP test email.</p>", "html"))
+# ---------- Optional: Resend test route (replaced SMTP test) ----------
+@app.get("/auth/resend-test")
+async def resend_test(email: str):
     try:
-        if SMTP_PORT == 465:
-            import ssl
-            context = ssl.create_default_context()
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context, timeout=25) as server:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_USER, [email], msg.as_string())
-        else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=25) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_USER, [email], msg.as_string())
-        print(f"[smtp] SMTP test sent to {email}")
+        params = {
+            "from": "no-reply@yourdomain.com",
+            "to": [email],
+            "subject": f"{UI_BRAND_NAME} — Resend Test",
+            "html": "<p>This is a Resend test email.</p>",
+        }
+        resend.Emails.send(params)
+        print(f"[resend] Test email sent to {email}")
         return {"ok": True}
     except Exception as e:
-        print(f"[smtp] SMTP test failed: {e}")
+        print(f"[resend] Test failed: {e}")
         return {"ok": False, "error": str(e)}
-
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
