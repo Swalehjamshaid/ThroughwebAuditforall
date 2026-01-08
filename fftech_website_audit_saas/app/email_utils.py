@@ -44,9 +44,7 @@ def _send_email(to_email: str, subject: str, text_body: str, html_body: str) -> 
         else:
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=25) as s:
                 if DEBUG_SMTP: s.set_debuglevel(1)
-                s.ehlo()
-                s.starttls()
-                s.ehlo()
+                s.ehlo(); s.starttls(); s.ehlo()
                 s.login(SMTP_USER, SMTP_PASSWORD)
                 s.sendmail(SMTP_USER, [to_email], msg.as_string())
         return True
@@ -80,11 +78,14 @@ def send_verification_email(to_email: str, token: str) -> bool:
       <h2 style="margin:0 0 8px">{UI_BRAND_NAME}</h2>
       <p>Thanks for signing up! Please verify your account:</p>
       <p>
-        <a href="{verify_link}" target="_blank" rel="noopener noreferrer"
-           style="display:inline-block;background:#5B8CFF;color:#fff;padding:10px 16px;border-radius:6px      <p><code style="word-break:break-all">{verify_link}</code></p>
+        {verify_link}
+          Verify Email
+        </a>
+      </p>
+      <p style="color:#666;margin-top:12px">If the button doesn’t work, paste this link in your browser:</p>
+      <p><code style="word-break:break-all">{verify_link}</code></p>
     </div>
     """
-
     ok = _send_email(to_email, subject, text_body, html_body)
     print(f"[email] Verification email {'SENT' if ok else 'FAILED'} to {to_email} | link={verify_link}")
     return ok
@@ -107,7 +108,6 @@ def send_magic_login_email(to_email: str, token: str) -> bool:
     <p>{login_link}{login_link}</a></p>
     <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
-
     ok = _send_email(to_email, subject, text_body, html_body)
     print(f"[email] Magic link {'SENT' if ok else 'FAILED'} to {to_email} | link={login_link}")
     return ok
