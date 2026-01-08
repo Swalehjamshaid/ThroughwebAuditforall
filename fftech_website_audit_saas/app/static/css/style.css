@@ -1,79 +1,20 @@
-/* ===== Main Login Container ===== */
-main.login {
-    max-width: 450px;                /* Limit width */
-    margin: 50px auto;               /* Center horizontally */
-    background: white;               /* Background color */
-    padding: 30px;                   /* Inner padding */
-    border-radius: 12px;             /* Rounded corners */
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* Soft shadow */
-    font-family: Arial, sans-serif;  /* Clean font */
-}
 
-/* ===== Notice Messages ===== */
-.notice {
-    margin-bottom: 15px;
-    padding: 12px;
-    font-size: 0.9rem;
-    border-radius: 8px;
-    background-color: #f8f9fa;       /* Light gray background */
-    color: #333;                     /* Dark text for contrast */
-}
-
-/* ===== Form Labels ===== */
-form label {
-    font-weight: 500;
-    margin-top: 10px;
-    display: block;
-}
-
-/* ===== Input Fields ===== */
-input {
-    width: 100%;
-    margin-bottom: 15px;
-    padding: 10px;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-}
-
-input:focus {
-    outline: none;
-    border-color: #007BFF; /* Focus border color */
-    box-shadow: 0 0 5px rgba(0,123,255,0.2);
-}
-
-/* ===== Buttons ===== */
-button {
-    width: 100%;
-    padding: 12px;
-    background: #007BFF;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-button:hover {
-    background: #0056b3;
-}
-
-/* ===== Links Inside Login Form ===== */
-main.login a {
-    color: #007BFF;       /* Keep links blue */
-    text-decoration: none; /* No underline by default */
-}
-
-main.login a:hover {
-    text-decoration: underline; /* Add underline on hover */
-}
-
-/* ===== Responsive for Small Screens ===== */
-@media (max-width: 500px) {
-    main.login {
-        margin: 20px;
-        padding: 20px;
-    }
-}
+/* app/static/style.css */
+* { box-sizing: border-box; }
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #111; }
+h1, h2 { margin: 0 0 12px; }
+main.login { max-width: 640px; margin: 0 auto; }
+form { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 12px 0; }
+label { font-weight: 600; }
+input[type="email"], input[type="password"] { padding: 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; }
+button { background: #0b57d0; color: #fff; border: 0; border-radius: 6px; padding: 10px 14px; font-size: 14px; cursor: pointer; }
+button:hover { background: #0846a6; }
+.notice { padding: 10px 14px; border-radius: 6px; margin: 10px 0; }
+.notice.info { background: #eef4ff; color: #0b3d91; }
+.notice.success { background: #e6ffed; color: #046c4e; }
+.notice.error { background: #ffecec; color: #8b0000; }
+.notice.warning { background: #fff8e1; color: #8a6d3b; }
+hr { margin: 18px 0; border: 0; border-top: 1px solid #eee; }
+.foot { margin-top: 16px; color: #444; }
+.foot a { color: #0b57d0; text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
