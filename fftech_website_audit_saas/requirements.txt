@@ -3,10 +3,11 @@ requests
 reportlab
 matplotlib
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 python-dotenv
 PyJWT
 psycopg2-binary
 jinja2
 python-multipart
+resend
