@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,15 +5,11 @@
     <title>{% block title %}{{ UI_BRAND_NAME }} | Professional AI Website Audit{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Bootstrap & Icons -->
-    https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css
-    https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-    <!-- Chart.js for dynamic graphs -->
-    https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js</script>
-
-    <!-- Custom CSS -->
-    /static/fftech.css
+    <link rel="stylesheet" href="/static/fftech.css">
 
     {% block head_extra %}{% endblock %}
 
@@ -32,9 +27,11 @@
             color: #e6ecf3;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Glassmorphism UI */
+        /* Glassmorphism UI Components */
         .glass {
             background: var(--glass);
             backdrop-filter: blur(12px);
@@ -48,10 +45,11 @@
             backdrop-filter: blur(10px);
             border-bottom: 1px solid var(--glass-border);
             padding: 0.8rem 0;
+            background: rgba(12, 18, 32, 0.8);
         }
 
         .navbar.bg-primary {
-            background: rgba(0, 87, 217, 0.9) !important;
+            background: rgba(0, 87, 217, 0.95) !important;
         }
 
         .nav-link-custom {
@@ -65,15 +63,10 @@
             color: #fff;
         }
 
-        .card {
-            border: none;
-            background: transparent;
-        }
-
         .metric-label { color: #93a4b8; font-size: .85rem; text-transform: uppercase; letter-spacing: 0.5px; }
         .metric-value { color: #fff; font-weight: 700; font-size: 1.25rem; }
 
-        /* Progress Bars */
+        /* Progress Bar Styling */
         .progress {
             height: 10px;
             background: rgba(255,255,255,0.1);
@@ -86,6 +79,7 @@
             border-radius: 20px;
         }
 
+        /* Interactive Elements */
         .btn-primary {
             background: var(--primary);
             border: none;
@@ -106,11 +100,6 @@
             border-radius: 8px;
         }
 
-        .btn-outline-primary:hover {
-            background: var(--primary);
-            color: #fff;
-        }
-
         .footer-text {
             color: #64748b;
             font-size: 0.9rem;
@@ -118,10 +107,9 @@
     </style>
 </head>
 <body>
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top mb-5">
         <div class="container">
-            /
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
                 <i class="fa-solid fa-magnifying-glass-chart me-2"></i>
                 {{ UI_BRAND_NAME }}
             </a>
@@ -134,25 +122,26 @@
                 <div class="ms-auto d-flex align-items-center">
                     {% if user %}
                         <div class="d-none d-md-block me-4">
-                            <small class="metric-label d-block">Account</small>
+                            <small class="metric-label d-block text-end">Active Account</small>
                             <span class="fw-medium">{{ user.email }}</span>
                         </div>
-                        /auth/dashboard<i class="fa-solid fa-chart-line me-1"></i> Dashboard</a>
-                        /auth/logoutLogout</a>
-                    class="btn btn-sm btn-light px-4 fw-bold">Login</a>
+                        <a href="/auth/dashboard" class="nav-link-custom me-3">
+                            <i class="fa-solid fa-chart-line me-1"></i> Dashboard
+                        </a>
+                        <a href="/auth/logout" class="btn btn-sm btn-outline-light px-3">Logout</a>
+                    {% else %}
+                        <a href="/auth/login" class="btn btn-sm btn-light px-4 fw-bold">Login</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main class="container pb-5">
         {% block content %}{% endblock %}
         {% block body %}{% endblock %}
     </main>
 
-    <!-- Footer -->
     <footer class="container text-center py-4 mt-auto">
         <hr class="border-secondary opacity-25">
         <p class="footer-text">
@@ -162,6 +151,6 @@
     </footer>
 
     {% block scripts_extra %}{% endblock %}
-    https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js</script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
