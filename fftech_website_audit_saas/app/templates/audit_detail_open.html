@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Open Audit — {{ website.url }}</h2>
+  <p>Grade: <span class="pill">{{ audit.grade }}</span> · Health: <span class="pill">{{ audit.health_score }}/100</span></p>
+  <div class="grid-2">
+    <div>
+      <h3>Category Scores</h3>
+      {% set cat_names  = audit.category_scores | map(attribute='name')  | list %}
+      {% set cat_values = audit.category_scores | map(attribute='score') | list %}
+      <canvas id="catChart" height="200"></canvas>
+      <script>
+        const catNames  = {{ cat_names  | tojson }};
+        const catValues = {{ cat_values | tojson }};
+        window.renderBarChart('catChart', catNames, catValues);
+      </script>
+      {% if audit.top_issues %}
+      <h3>Top Issues</h3>
+      <ul class="list">
+        {% for i in audit.top_issues %}<li>{{ i }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+      <p><a class="btn btn-primary" href="/report/pdf/open?url={{ website.url }}">Download Certified PDF</a></p>
+    </div>
+    <div>
+      <h3>Metrics</h3>
+      <div class="table">
+        {% for k, v in audit.metrics.items() %}
+          <div class="row"><div class="cell key">{{ k }}</div><div class="cell">{{ v }}</div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
