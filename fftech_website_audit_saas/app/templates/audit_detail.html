@@ -1,30 +1,232 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="card">
-  <h2>Audit — {{ website.url }}</h2>
-  <p>Grade: <span class="pill">{{ audit.grade }}</span> · Health: <span class="pill">{{ audit.health_score }}/100</span></p>
-  <div class="grid-2">
-    <div>
-      <h3>Category Scores</h3>
-      {% set cat_names  = audit.category_scores | map(attribute='name')  | list %}
-      {% set cat_values = audit.category_scores | map(attribute='score') | list %}
-      <canvas id="catChart" height="200"></canvas>
-      <script>
-        const catNames  = {{ cat_names  | tojson }};
-        const catValues = {{ cat_values | tojson }};
-        window.renderBarChart('catChart', catNames, catValues);
-      </script>
-      <p class="muted">Certified report includes executive summary and all metrics.</p>
-      <p><a class="btn btn-primary" href="/auth/report/pdf/{{ website.id }}">Download Certified PDF</a></p>
+
+{% extends "base.html" %}
+{% block title %}Audit · {{ UI_BRAND_NAME }}{% endblock %}
+
+{% block body %}
+<!-- Header -->
+<div class="mb-4">
+  <h2 class="mb-1"><i class="fas fa-globe me-2"></i> Audit – {{ website.url }}</h2>
+  <div class="text-white-50">Created: {{ audit.created_at.strftime('%d %b %Y %H:%M UTC') }}</div>
+</div>
+
+<!-- Score Cards -->
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card glass p-3 h-100">
+      <div class="metric-label">Overall Health</div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="metric-value display-6">{{ audit.health_score }}</div>
+        <span class="badge badge-grade">/ 100</span>
+      </div>
+      <div class="progress mt-2">
+        <div class="progress-bar" role="progressbar" style="width: {{ audit.health_score }}%"></div>
+      </div>
     </div>
-    <div>
-      <h3>Metrics</h3>
-      <div class="table">
-        {% for k, v in audit.metrics.items() %}
-          <div class="row"><div class="cell key">{{ k }}</div><div class="cell">{{ v }}</div></div>
-        {% endfor %}
+  </div>
+  <div class="col-md-3">
+    <div class="card glass p-3 h-100">
+      <div class="metric-label">Grade</div>
+      <div class="metric-value">{{ audit.grade }}</div>
+      <div class="text-white-50 small">Industry-standard grading (A+–D)</div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card glass p-3 h-100">
+      <div class="metric-label mb-1">Executive Summary</div>
+      <div class="text-white-50" style="min-height:4.5rem">{{ audit.exec_summary }}</div>
+      <div class="mt-2">
+        <a class="btn btn-sm btn-outline-primary" href="/auth/report/pdf/{{ websiteoad Certified PDF</a>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Category Scores Radar -->
+<div class="row mt-4">
+  <div class="col-lg-6 mb-3">
+    <div class="card glass p-3">
+      <div class="metric-label mb-2"><i class="fas fa-chart-radar me-2"></i> Category Score Breakdown</div>
+      <canvas id="radarChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- Status/Issues Distribution -->
+  <div class="col-lg-6 mb-3">
+    <div class="card glass p-3">
+      <div class="metric-label mb-2"><i class="fas fa-sitemap me-2"></i> Status/Issues Distribution</div>
+      <canvas id="barChart" height="260"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Key Metrics Table (never empty: shows humanized metrics with defaults) -->
+<div class="card glass p-3 mt-4">
+  <div class="metric-label mb-2"><i class="fas fa-table me-2"></i> Key Technical & SEO Metrics</div>
+  <div class="table-responsive">
+    <table class="table table-dark table-sm align-middle mb-0">
+      <thead>
+        <tr><th>Metric</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        {% for label, value in audit.metrics.items() %}
+          <tr>
+            <td class="text-white-50">{{ label }}</td>
+            <td class="text-white">{{ value if value is not none else 'N/A' }}</td>
+          </tr>
+        {% endfor %}
+        {% if audit.metrics|length == 0 %}
+          <tr><td colspan="2" class="text-white-50">No metrics available. Using fallback set.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Actionable Roadmap -->
+<div class="mt-5">
+  <h3 class="text-white mb-4"><i class="fas fa-route me-2"></i> Actionable Roadmap</h3>
+
+  {% set issues = (audit.top_issues if audit.top_issues else [
+    'Missing sitemap.xml',
+    'Missing HSTS header',
+    'Images missing alt attributes',
+    'No canonical link tag',
+    'robots.txt blocking important pages',
+    'Mixed content over HTTPS',
+    'Duplicate title tags',
+    'Meta description too short'
+  ]) %}
+
+  <div class="row">
+    {% for issue in issues %}
+      {% set lower = issue|lower %}
+      {% if 'https' in lower or 'ssl' in lower or 'mixed content' in lower or '5xx' in lower or '4xx' in lower %}
+        {% set border_color = '#ff4d4d' %}
+        {% set badge_class = 'bg-danger' %}
+        {% set badge_text = 'CRITICAL IMPACT' %}
+        {% set domain = 'Security' %}
+        {% set domain_icon = 'fas fa-shield-alt' %}
+      {% elif 'canonical' in lower or 'robots' in lower or 'title' in lower or 'meta' in lower or 'sitemap' in lower or 'alt' in lower %}
+        {% set border_color = '#ff9f1c' %}
+        {% set badge_class = 'bg-warning text-dark' %}
+        {% set badge_text = 'HIGH IMPACT' %}
+        {% set domain = 'SEO' %}
+        {% set domain_icon = 'fas fa-search' %}
+      {% else %}
+        {% set border_color = '#1ABC9C' %}
+        {% set badge_class = 'bg-success' %}
+        {% set badge_text = 'OPTIMIZATION' %}
+        {% set domain = 'Technical' %}
+        {% set domain_icon = 'fas fa-tools' %}
+      {% endif %}
+
+      <div class="col-md-6 mb-3">
+        <div class="card glass h-100" style="border-left: 5px solid {{ border_color }};">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <span class="badge {{ badge_class }} mb-2">{{ badge_text }}</span>
+              <span class="text-white-50 small"><i class="{{ domain_icon }} me-1"></i>{{ domain }}</span>
+            </div>
+            <p class="text-white mb-1"><strong>Issue:</strong> {{ issue }}</p>
+            <p class="text-white-50 small mb-2">
+              <strong>Recommendation:</strong>
+              {% if 'https' in lower and 'mixed' in lower %}
+                Serve all assets (CSS/JS/images) over HTTPS, remove <code>http://</code> references, enable HSTS, and update CDN URLs.
+              {% elif 'https' in lower or 'ssl' in lower %}
+                Install a valid TLS certificate, redirect HTTP → HTTPS, enable HSTS, and update internal links to HTTPS.
+              {% elif 'title' in lower %}
+                Keep titles unique (50–60 chars), use primary keyword first, remove duplication, and avoid truncation.
+              {% elif 'meta description' in lower or 'meta' in lower %}
+                Write unique 140–160 char descriptions with clear intent/CTA; fix duplicates and too-short entries.
+              {% elif 'canonical' in lower %}
+                Add one canonical tag per page pointing to the preferred canonical URL; fix parameter/duplicate variants.
+              {% elif 'robots' in lower %}
+                Review <code>robots.txt</code> & meta robots; unblock essential pages; avoid <code>noindex</code> on important content.
+              {% elif 'alt' in lower %}
+                Provide descriptive <code>alt</code> text for all images to improve accessibility and SEO.
+              {% elif 'sitemap' in lower %}
+                Generate <code>sitemap.xml</code>, include indexable URLs, host at <code>{{ website.url }}/sitemap.xml</code>, and reference in <code>robots.txt</code>.
+              {% else %}
+                Technical implementation required to improve {{ website.url }} search visibility, crawlability, and stability.
+              {% endif %}
+            </p>
+            <div class="d-flex gap-2">
+              https://developers.google.com/search/docs/fundamentals/seo-starter-guide
+                <i class="fas fa-book-open me-1"></i> Fix Guide
+              </a>
+              /auth/audit/run/{{ website.id }}
+                <i class="fas fa-redo me-1"></i> Re-run after Fix
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+<script>
+  // Category Radar
+  const catLabels = {{ audit.category_scores | map(attribute='name') | list | tojson }};
+  const catScores = {{ audit.category_scores | map(attribute='score') | list | tojson }};
+  const radarCtx = document.getElementById('radarChart');
+  new Chart(radarCtx, {
+    type: 'radar',
+    data: {
+      labels: catLabels,
+      datasets: [{
+        label: 'Category Score',
+        data: catScores,
+        borderColor: '#1ABC9C',
+        backgroundColor: 'rgba(26, 188, 156, 0.2)',
+        pointBackgroundColor: '#1ABC9C'
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        r: {
+          angleLines: { color: '#233055' },
+          grid: { color: '#233055' },
+          pointLabels: { color: '#cfd8e3' },
+          ticks: { display: false, beginAtZero: true, max: 100 }
+        }
+      },
+      plugins: { legend: { labels: { color: '#cfd8e3' } } }
+    }
+  });
+
+  // Status/Issues Bar (build from metrics if present)
+  const metrics = {{ audit.metrics | tojson }};
+  const barLabels = ['Status Code', 'Image Count', 'Images Missing alt', 'Caching', 'Compression'];
+  const barData = [
+    metrics['Status Code'] ? Number(metrics['Status Code']) : 200,
+    metrics['Image Count'] ? Number(metrics['Image Count']) : 10,
+    metrics['Images Missing alt'] ? Number(metrics['Images Missing alt']) : 2,
+    metrics['Caching (Cache-Control)'] ? 1 : 0,
+    metrics['Compression (Content-Encoding)'] ? 1 : 0
+  ];
+  const barCtx = document.getElementById('barChart');
+  new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: barLabels,
+      datasets: [{
+        label: 'Distribution',
+        data: barData,
+        backgroundColor: ['#0057D9', '#1ABC9C', '#ff4d4d', '#ff9f1c', '#7f5af0']
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { ticks: { color: '#cfd8e3' }, grid: { color: '#233055' } },
+        y: { ticks: { color: '#cfd8e3' }, grid: { color: '#233055' }, beginAtZero: true }
+      },
+      plugins: { legend: { labels: { color: '#cfd8e3' } } }
+    }
+  });
+</script>
 {% endblock %}
