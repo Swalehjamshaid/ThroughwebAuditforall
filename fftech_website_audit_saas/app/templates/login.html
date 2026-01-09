@@ -1,37 +1,36 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% block content %}
-<div class="card" style="max-width:480px; margin:40px auto; padding:28px; text-align:center;">
-    <h2 style="margin-bottom:16px;">Welcome Back</h2>
-    <p class="muted" style="margin-bottom:20px;">Sign in to access your dashboard and audits</p>
+<div class="row justify-content-center py-5">
+    <div class="col-md-5">
+        <div class="card glass p-4 shadow">
+            <h3 class="text-center mb-4">Login</h3>
+            
+            {% if request.query_params.get('magic_sent') %}
+            <div class="alert alert-success">If your account is verified, a magic login link has been sent!</div>
+            {% endif %}
 
-    {% if request.query_params.get('error') %}
-        <div class="alert alert-info" style="margin-bottom:16px; color:#ff4d4d;">
-            Invalid credentials or account not verified.
+            <form action="/auth/login" method="post">
+                <div class="mb-3">
+                    <label class="metric-label">Email Address</label>
+                    <input type="email" name="email" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+                <div class="mb-4">
+                    <label class="metric-label">Password</label>
+                    <input type="password" name="password" class="form-control bg-dark text-white border-secondary" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mb-3">Login with Password</button>
+            </form>
+
+            <hr class="border-secondary my-4">
+            
+            <form action="/auth/magic/request" method="post">
+                <p class="text-center text-secondary small">Forgot password? Enter email for a Magic Link</p>
+                <div class="input-group">
+                    <input type="email" name="email" class="form-control bg-dark text-white border-secondary" placeholder="Your Email">
+                    <button class="btn btn-outline-primary" type="submit">Send Link</button>
+                </div>
+            </form>
         </div>
-    {% endif %}
-    {% if request.query_params.get('magic_sent') %}
-        <div class="alert alert-success" style="margin-bottom:16px;">
-            If your account is verified, a magic login link has been sent!
-        </div>
-    {% endif %}
-
-    <form method="post" action="/auth/login" class="form-vertical">
-        <input type="email" name="email" placeholder="you@example.com" required style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:4px;" />
-        <input type="password" name="password" placeholder="Password" required style="width:100%; padding:10px; margin-bottom:16px; border:1px solid #ddd; border-radius:4px;" />
-        <button type="submit" class="btn btn-primary" style="width:100%; font-weight:600;">Login with Password</button>
-    </form>
-
-    <div style="margin:20px 0; color:#999; font-size:14px;">— OR —</div>
-
-    <h4 style="margin-bottom:8px;">Request Magic Link</h4>
-    <p class="muted" style="font-size:13px; margin-bottom:12px;">We'll email you a secure link to log in instantly.</p>
-    <form method="post" action="/auth/magic/request">
-        <input type="email" name="email" placeholder="you@example.com" required style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:4px;" />
-        <button type="submit" class="btn btn-outline-primary" style="width:100%;">Send Magic Link</button>
-    </form>
-
-    <p style="margin-top:24px;" class="muted">
-        No account? <a href="/auth/register" style="color:var(--primary); text-decoration:none;">Create one</a>
-    </p>
+    </div>
 </div>
 {% endblock %}
