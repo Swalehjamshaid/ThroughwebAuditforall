@@ -1,29 +1,37 @@
-
 {% extends 'base.html' %}
 {% block content %}
-<div class="card glass narrow" style="max-width:480px;margin:40px auto;padding:28px;text-align:center;">
-  <h2 style="margin-bottom:16px;">Welcome Back</h2>
-  <p class="muted" style="margin-bottom:20px;">Sign in to access your dashboard and audits</p>
+<div class="card" style="max-width:480px; margin:40px auto; padding:28px; text-align:center;">
+    <h2 style="margin-bottom:16px;">Welcome Back</h2>
+    <p class="muted" style="margin-bottom:20px;">Sign in to access your dashboard and audits</p>
 
-  {% if request.query_params.get('error') %}
-    <div class="alert" role="alert" style="margin-bottom:16px;">
-      Invalid credentials or account not verified.
-    </div>
-  {% endif %}
+    {% if request.query_params.get('error') %}
+        <div class="alert alert-info" style="margin-bottom:16px; color:#ff4d4d;">
+            Invalid credentials or account not verified.
+        </div>
+    {% endif %}
+    {% if request.query_params.get('magic_sent') %}
+        <div class="alert alert-success" style="margin-bottom:16px;">
+            If your account is verified, a magic login link has been sent!
+        </div>
+    {% endif %}
 
-  <form method="post" action="/auth/login" class="form-vertical" styleabel>
-    <input id="email" type="email" name="email" placeholder="you@example.com" required />
+    <form method="post" action="/auth/login" class="form-vertical">
+        <input type="email" name="email" placeholder="you@example.com" required style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:4px;" />
+        <input type="password" name="password" placeholder="Password" required style="width:100%; padding:10px; margin-bottom:16px; border:1px solid #ddd; border-radius:4px;" />
+        <button type="submit" class="btn btn-primary" style="width:100%; font-weight:600;">Login with Password</button>
+    </form>
 
-    <label for="password" style="text-align:left;">Password</label>
-    <input id="password" type="password" name="password" placeholder="••••••••" required />
+    <div style="margin:20px 0; color:#999; font-size:14px;">— OR —</div>
 
-    <button type="submit" class="btn btn-primary" style="margin-top:10px;width:100%;font-weight:600;">
-      Login
-    </button>
-  </form>
+    <h4 style="margin-bottom:8px;">Request Magic Link</h4>
+    <p class="muted" style="font-size:13px; margin-bottom:12px;">We'll email you a secure link to log in instantly.</p>
+    <form method="post" action="/auth/magic/request">
+        <input type="email" name="email" placeholder="you@example.com" required style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:4px;" />
+        <button type="submit" class="btn btn-outline-primary" style="width:100%;">Send Magic Link</button>
+    </form>
 
-  <p class="muted" style="margin-top:18px;">
-    No account? /auth/registerCreate one</a>
-  </p>
+    <p style="margin-top:24px;" class="muted">
+        No account? <a href="/auth/register" style="color:var(--primary); text-decoration:none;">Create one</a>
+    </p>
 </div>
 {% endblock %}
