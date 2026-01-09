@@ -1,0 +1,119 @@
+{% extends 'base_register.html' %}
+{% block reg_body %}
+<h2 class="mb-3">Audit Results</h2>
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card glass p-3 text-center">
+      <div class="radial" style="background:conic-gradient(var(--accent) 0% {{ audit.health_score|default(0) }}%, rgba(255,255,255,.08) 0%)"><span>{{ audit.health_score|default(0) }}</span></div>
+      <div class="small-muted">Overall Health</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card glass p-3 text-center"><div class="display-6">{{ audit.grade|default('A') }}</div><div class="small-muted">Grade</div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card glass p-3"><h6>Executive Summary</h6><p class="small-muted">{{ audit.exec_summary|default('Summary not available.') }}</p></div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mt-2">
+  <a class="btn btn-primary" href="/auth/report/pdf/{{ website.id }}"><i class="fas fa-file-pdf me-1"></i> Download Certified PDF</a>
+  <a class="btn btn-outline-light" href="/auth/audit/run/{{ website.id }}"><i class="fas fa-redo me-1"></i> Re-run Audit</a>
+</div>
+
+<div class="card glass p-4 mt-3">
+  <h5 class="mb-3"><i class="fas fa-gauge-high me-2"></i> Category Breakdown</h5>
+  <div class="row">
+    {% for c in audit.category_scores %}
+      <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card glass p-3">
+          <div class="d-flex justify-content-between"><span class="fw-bold">{{ c.name }}</span><span>{{ c.score }}/100</span></div>
+          <div class="progress mt-2"><div class="progress-bar" role="progressbar" style="width: {{ c.score }}%"></div></div>
+        </div>
+      </div>
+    {% endfor %}
+    {% if audit.category_scores|length == 0 %}
+      <div class="small-muted">No category data.</div>
+    {% endif %}
+  </div>
+  <canvas id="catChart" height="140" class="mt-3"></canvas>
+</div>
+
+<div class="card glass p-4 mt-3">
+  <h5 class="mb-3"><i class="fas fa-list-check me-2"></i> Key Metrics</h5>
+  <div class="row">
+    {% for k,v in audit.metrics.items() %}
+      <div class="col-md-6 col-lg-4 mb-2">
+        <div class="card glass p-3"><div class="fw-bold">{{ k }}</div><div class="small-muted">{{ v|default('—') }}</div></div>
+      </div>
+    {% endfor %}
+    {% if audit.metrics|length == 0 %}
+      <div class="small-muted">No metrics available.</div>
+    {% endif %}
+  </div>
+</div>
+<div class="mt-5">
+  <h3 class="text-white mb-4"><i class="fas fa-route me-2"></i> Actionable Roadmap</h3>
+  {% set issues = (audit.top_issues if audit.top_issues else ['Missing sitemap.xml','Missing HSTS header','Images missing alt attributes','No canonical link tag','robots.txt blocking important pages','Mixed content over HTTPS','Duplicate title tags','Meta description too short']) %}
+  <div class="row">
+    {% for issue in issues %}
+      {% set lower = issue|lower %}
+      {% if 'https' in lower or 'ssl' in lower or 'mixed content' in lower or '5xx' in lower or '4xx' in lower %}
+        {% set border_color = '#ff4d4d' %}
+        {% set badge_class = 'bg-danger' %}
+        {% set badge_text = 'CRITICAL IMPACT' %}
+        {% set domain = 'Security' %}
+        {% set domain_icon = 'fas fa-shield-alt' %}
+      {% elif 'canonical' in lower or 'robots' in lower or 'title' in lower or 'meta' in lower or 'sitemap' in lower or 'alt' in lower %}
+        {% set border_color = '#ff9f1c' %}
+        {% set badge_class = 'bg-warning text-dark' %}
+        {% set badge_text = 'HIGH IMPACT' %}
+        {% set domain = 'SEO' %}
+        {% set domain_icon = 'fas fa-search' %}
+      {% else %}
+        {% set border_color = '#1ABC9C' %}
+        {% set badge_class = 'bg-success' %}
+        {% set badge_text = 'OPTIMIZATION' %}
+        {% set domain = 'Technical' %}
+        {% set domain_icon = 'fas fa-tools' %}
+      {% endif %}
+      <div class="col-md-6 mb-3">
+        <div class="card glass h-100" style="border-left:5px solid {{ border_color }};">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <span class="badge {{ badge_class }} mb-2">{{ badge_text }}</span>
+              <span class="text-white-50 small"><i class="{{ domain_icon }} me-1"></i>{{ domain }}</span>
+            </div>
+            <p class="text-white mb-1"><strong>Issue:</strong> {{ issue }}</p>
+            <p class="text-white-50 small mb-2"><strong>Recommendation:</strong>
+              {% if 'mixed' in lower %}Serve all assets over HTTPS, remove http references, enable HSTS, update CDN URLs.
+              {% elif 'https' in lower or 'ssl' in lower %}Install valid TLS, redirect HTTP→HTTPS, enable HSTS, update internal links.
+              {% elif 'title' in lower %}Keep unique 50–60 char titles with primary keyword first and no duplication.
+              {% elif 'meta' in lower %}Write unique 140–160 char meta descriptions with intent and CTA.
+              {% elif 'canonical' in lower %}Add one canonical per page pointing to the preferred URL.
+              {% elif 'robots' in lower %}Review robots.txt & meta robots to unblock essential pages.
+              {% elif 'alt' in lower %}Provide descriptive alt text for all images.
+              {% elif 'sitemap' in lower %}Generate sitemap.xml, include indexable URLs, reference in robots.txt.
+              {% else %}Technical implementation required to improve {{ website.url }} visibility, crawlability, and stability.
+              {% endif %}
+            </p>
+            <div class="d-flex gap-2">
+              <a class="btn btn-sm btn-outline-primary" href="https://developers.google.com/search/docs/fundamentals/seo-starter-guide" target="_blank" rel="noopener"><i class="fas fa-book-open me-1"></i> Fix Guide</a>
+              {% if website and website.id %}<a class="btn btn-sm btn-outline-light" href="/auth/audit/run/{{ website.id }}"><i class="fas fa-redo me-1"></i> Re-run after Fix</a>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+(function(){
+  const labels = {{ audit.category_scores|map(attribute='name')|list|default([])|tojson }};
+  const scores = {{ audit.category_scores|map(attribute='score')|list|default([])|tojson }};
+  const ctx = document.getElementById('catChart');
+  if (ctx) {
+    new Chart(ctx, { type:'radar', data:{ labels, datasets:[{ label:'Category Scores', data:scores, borderColor:'#1ABC9C', backgroundColor:'rgba(26,188,156,.2)' }] }, options:{ scales:{ r:{ suggestedMin:0, suggestedMax:100 } } } });
+  }
+})();
+</script>

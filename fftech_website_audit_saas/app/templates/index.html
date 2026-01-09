@@ -1,0 +1,25 @@
+{% extends 'base_open.html' %}
+{% block open_body %}
+<div class="row align-items-center">
+  <div class="col-lg-6">
+    <h1 class="mb-3">AI Website Audit</h1>
+    <p class="small-muted mb-4">Run a quick, professional audit with executive-grade visuals. No signup required.</p>
+    <form action="/audit/open" method="post" class="card glass p-3">
+      <label class="form-label">Website URL</label>
+      <input type="url" name="url" class="form-control" placeholder="https://example.com" required>
+      <button class="btn btn-primary mt-3"><i class="fas fa-play me-1"></i> Run Audit</button>
+    </form>
+  </div>
+  <div class="col-lg-6">
+    <div class="card glass p-4">
+      <h5>What you'll see</h5>
+      <ul class="small-muted">
+        <li>Overall health score and grade</li>
+        <li>Category breakdown with progress bars</li>
+        <li>Charts: Radar, Donut, Trend</li>
+        <li>Actionable roadmap of fixes</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
