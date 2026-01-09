@@ -1,4 +1,3 @@
-
 import os
 import json
 import asyncio
@@ -431,19 +430,25 @@ async def login_get(request: Request):
 def _send_magic_login_email(to_email: str, token: str) -> bool:
     """
     Send the magic login link via email using the same SMTP settings.
-    Clicking this link will log the user in and redirect to the dashboard.
     """
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        print("[auth] SMTP configuration missing. Cannot send magic link.")
         return False
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
     html_body = f"""
-    <h3>{UI_BRAND_NAME} — Magic Login</h3>
-    <p>Hello!</p>
-    <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
+        <h3 style="color: #4F46E5;">{UI_BRAND_NAME} — Magic Login</h3>
+        <p>Hello!</p>
+        <p>Click the button below to log into your account securely:</p>
+        <p style="text-align: center;">
+            <a href="{login_link}" style="display: inline-block; padding: 12px 24px; background-color: #4F46E5; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In Now</a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #666;">{login_link}</p>
+        <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
+    </div>
     """
 
     msg = MIMEMultipart("alternative")
@@ -458,7 +463,8 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, [to_email], msg.as_string())
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[auth] SMTP Error sending magic link: {e}")
         return False
 
 @app.post("/auth/magic/request")
@@ -469,12 +475,10 @@ async def magic_request(
 ):
     """
     Request a passwordless magic login link.
-    - Requires that the user already exists and is verified.
-    - Sends a short-lived token to the user's email.
     """
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
-        # Do not reveal whether account exists or verified (privacy)
+        # Still return magic_sent=1 to avoid user enumeration
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
     # Short expiry for security (e.g., 15 minutes)
