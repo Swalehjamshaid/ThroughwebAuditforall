@@ -1,43 +1,20 @@
-{% extends "base.html" %}
-{% block title %}Open Audit — {{ website.url }}{% endblock %}
-
-{% block content %}
-<!-- Your beautiful layout here -->
-
-<!-- Safe extraction of category data -->
-{% set category_scores = audit.category_scores or [] %}
-
-{% set cat_names = category_scores | map(attribute='name') | list | default([]) %}
-{% set cat_values = category_scores | map(attribute='score') | list | default([]) %}
-
-<!-- Rest of your stunning design -->
-
-<script>
-// Safe JavaScript variables
-const catNames = {{ cat_names | tojson | safe }};
-const catValues = {{ cat_values | tojson | safe }};
-
-// Only render chart if we have data
-if (catNames.length > 0) {
-  const catCtx = document.getElementById('catChart').getContext('2d');
-  new Chart(catCtx, {
-    type: 'bar',
-    data: {
-      labels: catNames,
-      datasets: [{
-        data: catValues,
-        backgroundColor: 'rgba(139, 92, 246, 0.8)',
-        borderRadius: 12,
-      }]
-    },
-    options: {
-      responsive: true,
-      scales: { y: { beginAtZero: true, max: 100 } },
-      plugins: { legend: { display: false } }
-    }
-  });
-}
-</script>
-
-<!-- Rest of page -->
-{% endblock %}
+<div class="mt-5">
+    <h3 class="text-white mb-4"><i class="fas fa-route me-2"></i> Actionable Roadmap</h3>
+    <div class="row">
+        {% for issue in report.target.top_issues %}
+        <div class="col-md-6 mb-3">
+            <div class="card glass h-100" style="border-left: 5px solid {% if 'HTTPS' in issue or 'title' in issue %}#ff4d4d{% else %}#1ABC9C{% endif %};">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="badge {% if 'HTTPS' in issue or 'title' in issue %}bg-danger{% else %}bg-success{% endif %} mb-2">
+                            {% if "HTTPS" in issue or "title" in issue %}CRITICAL IMPACT{% else %}OPTIMIZATION{% endif %}
+                        </span>
+                    </div>
+                    <p class="text-white mb-1"><strong>Issue:</strong> {{ issue }}</p>
+                    <p class="text-white-50 small"><strong>Recommendation:</strong> Technical implementation required to improve {{ report.target.url }} search visibility.</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
