@@ -1,126 +1,128 @@
 {% extends "base.html" %}
-{% block title %}Audit Report — {{ website.url }}{% endblock %}
+{% block title %}Open Audit — {{ website.url }}{% endblock %}
 
 {% block content %}
-<div class="relative min-h-screen">
-  <!-- Subtle background gradient -->
-  <div class="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-accent/20 -z-10"></div>
+<div class="relative min-h-screen overflow-hidden">
+  <!-- Subtle animated background gradient -->
+  <div class="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-accent/30 -z-10 animate-pulse slow"></div>
 
-  <!-- Main Glassmorphism Card -->
-  <div class="glass max-w-6xl mx-auto mt-12 rounded-3xl shadow-2xl overflow-hidden animate-fade-in">
-    <!-- Header with Grade Gauge -->
-    <div class="bg-gradient-to-r from-primary to-accent p-8 text-white">
-      <h1 class="text-4xl font-extrabold mb-4">Open Audit Report</h1>
-      <p class="text-2xl opacity-90">{{ website.url }}</p>
-      <div class="flex items-center justify-center mt-8 gap-12">
-        <!-- Radial Gauge -->
-        <div class="relative">
-          <canvas id="overallGauge" width="250" height="250"></canvas>
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="text-center">
-              <p class="text-5xl font-bold">{{ audit.grade }}</p>
-              <p class="text-xl">{{ audit.health_score }}/100</p>
-            </div>
-          </div>
+  <!-- Central Floating Glass Card -->
+  <div class="glass max-w-7xl mx-auto mt-10 rounded-3xl shadow-2xl border border-white/20 backdrop-blur-xl animate-fade-in">
+    <!-- Hero Header with Gauge -->
+    <div class="bg-gradient-to-r from-primary to-accent p-10 rounded-t-3xl text-white text-center">
+      <h1 class="text-5xl font-extrabold mb-4">Open Audit Report</h1>
+      <p class="text-2xl opacity-90 mb-8">{{ website.url }}</p>
+      
+      <!-- Central Radial Gauge -->
+      <div class="relative inline-block">
+        <canvas id="overallGauge" width="300" height="300"></canvas>
+        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <p class="text-7xl font-black">{{ audit.grade }}</p>
+          <p class="text-3xl">{{ audit.health_score }}/100</p>
         </div>
       </div>
     </div>
 
-    <div class="p-8 lg:p-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
-      <!-- Left: Category Scores + Top Issues -->
-      <div class="space-y-12">
-        <!-- Category Bar Chart -->
-        <div class="glass rounded-2xl p-8">
-          <h3 class="text-2xl font-bold mb-6 text-primary">Category Scores</h3>
-          <canvas id="catChart" height="300"></canvas>
-        </div>
+    <div class="p-10 lg:p-16 grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <!-- Category Scores Chart -->
+      <div class="glass rounded-2xl p-8 shadow-inner lg:col-span-1">
+        <h3 class="text-3xl font-bold mb-8 text-primary">Category Scores</h3>
+        <canvas id="catChart" height="400"></canvas>
+      </div>
 
-        <!-- Top Issues -->
+      <!-- Top Issues -->
+      <div class="glass rounded-2xl p-8 shadow-inner">
+        <h3 class="text-3xl font-bold mb-8 text-red-400">Top Issues</h3>
         {% if audit.top_issues %}
-        <div class="glass rounded-2xl p-8">
-          <h3 class="text-2xl font-bold mb-6 text-red-400">Top Issues</h3>
-          <ul class="space-y-4">
-            {% for i in audit.top_issues %}
-            <li class="flex items-start gap-3 bg-red-500/10 p-4 rounded-xl hover:bg-red-500/20 transition">
-              <span class="text-red-400 mt-1">⚠</span>
-              <span>{{ i }}</span>
-            </li>
-            {% endfor %}
-          </ul>
-        </div>
+        <ul class="space-y-4">
+          {% for i in audit.top_issues %}
+          <li class="bg-red-900/30 p-5 rounded-xl hover:bg-red-900/50 transition-all transform hover:-translate-y-1">
+            <span class="text-red-300 font-medium">{{ i }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-green-400 text-xl">No major issues detected! 🎉</p>
         {% endif %}
       </div>
 
-      <!-- Right: Metrics Table -->
-      <div class="glass rounded-2xl p-8">
-        <h3 class="text-2xl font-bold mb-6 text-primary">Technical Metrics</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Metrics Grid -->
+      <div class="glass rounded-2xl p-8 shadow-inner">
+        <h3 class="text-3xl font-bold mb-8 text-primary">Technical Metrics</h3>
+        <div class="grid grid-cols-1 gap-4">
           {% for k, v in audit.metrics.items() %}
-          <div class="bg-white/10 dark:bg-gray-800/50 p-4 rounded-xl hover:scale-105 transition transform">
-            <p class="text-sm text-gray-400">{{ k }}</p>
-            <p class="text-lg font-semibold truncate">{{ v }}</p>
+          <div class="bg-white/10 dark:bg-gray-800/60 p-5 rounded-xl hover:scale-105 transition-all">
+            <p class="text-sm opacity-75">{{ k }}</p>
+            <p class="text-xl font-bold truncate">{{ v }}</p>
           </div>
           {% endfor %}
         </div>
       </div>
     </div>
 
-    <!-- Download Button -->
-    <div class="p-8 text-center">
-      <a href="/report/pdf/open?url={{ website.url }}" 
-         class="inline-block bg-gradient-to-r from-primary to-accent text-white px-10 py-5 rounded-full text-xl font-bold shadow-lg hover:shadow-2xl hover:scale-105 transition transform">
-        Download Certified PDF Report
+    <!-- Glowing Download CTA -->
+    <div class="p-10 text-center">
+      <a href="/report/pdf/open?url={{ website.url | urlencode }}" 
+         class="inline-block bg-gradient-to-r from-primary to-accent text-white px-12 py-6 rounded-full text-2xl font-bold shadow-2xl hover:shadow-accent/50 hover:scale-110 transition-all transform glow-button">
+        Download Certified PDF Report ✨
       </a>
     </div>
   </div>
 </div>
 
 <script>
-// Radial Overall Gauge (Doughnut with gradient)
+// Super Smooth Radial Gauge with Glow
 const gaugeCtx = document.getElementById('overallGauge').getContext('2d');
+const gaugeGradient = gaugeCtx.createLinearGradient(0, 0, 300, 300);
+gaugeGradient.addColorStop(0, '#8B5CF6');
+gaugeGradient.addColorStop(1, '#4F46E5');
+
 new Chart(gaugeCtx, {
   type: 'doughnut',
   data: {
     datasets: [{
       data: [{{ audit.health_score }}, 100 - {{ audit.health_score }}],
-      backgroundColor: ['#8B5CF6', '#374151'],
+      backgroundColor: [gaugeGradient, '#1E293B'],
       borderWidth: 0,
-      borderRadius: 20,
-      cutout: '75%'
+      borderRadius: 30,
+      cutout: '80%'
     }]
   },
-  options: {
-    responsive: true,
-    plugins: { legend: { display: false } }
-  }
+  options: { plugins: { legend: { display: false } } }
 });
 
-// Gradient Bar Chart for Categories
+// Stunning Gradient Bar Chart
 const catCtx = document.getElementById('catChart').getContext('2d');
-const gradient = catCtx.createLinearGradient(0, 0, 0, 300);
-gradient.addColorStop(0, '#8B5CF6');
-gradient.addColorStop(1, '#4F46E5');
+const barGradient = catCtx.createLinearGradient(0, 0, 0, 400);
+barGradient.addColorStop(0, '#8B5CF6');
+barGradient.addColorStop(1, '#EC4899');
 
 new Chart(catCtx, {
   type: 'bar',
   data: {
     labels: {{ cat_names | tojson }},
     datasets: [{
-      label: 'Score',
       data: {{ cat_values | tojson }},
-      backgroundColor: gradient,
-      borderRadius: 12,
+      backgroundColor: barGradient,
+      borderRadius: 16,
       borderSkipped: false,
+      barThickness: 40
     }]
   },
   options: {
     responsive: true,
     scales: {
-      y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.1)' } },
-      x: { grid: { display: false } }
+      y: { beginAtZero: true, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
+      x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
     },
     plugins: { legend: { display: false } }
   }
 });
 </script>
+
+<style>
+.glow-button { box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
+.glow-button:hover { box-shadow: 0 0 50px rgba(139, 92, 246, 0.8); }
+.slow { animation-duration: 20s; }
+</style>
 {% endblock %}
