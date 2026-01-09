@@ -5,13 +5,16 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
+from typing import Tuple
 
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 
 from .db import Base, engine, SessionLocal
 from .models import User, Website, Audit, Subscription
@@ -25,6 +28,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# ---------- Config ----------
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
 
@@ -33,16 +37,22 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
+# Optional admin seeding
+ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")       # e.g., admin@fftech.com
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")    # plain text; will be hashed
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-Base.metadata.create_all(bind=engine)
-
 # ---- Startup schema patches ----
 def _ensure_schedule_columns():
+    """
+    Safely add scheduling-related columns to subscriptions table.
+    Uses a transactional connection to avoid commit issues.
+    """
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("""
                 ALTER TABLE subscriptions
                 ADD COLUMN IF NOT EXISTS daily_time VARCHAR(8) DEFAULT '09:00';
@@ -55,13 +65,17 @@ def _ensure_schedule_columns():
                 ALTER TABLE subscriptions
                 ADD COLUMN IF NOT EXISTS email_schedule_enabled BOOLEAN DEFAULT FALSE;
             """))
-            conn.commit()
     except Exception:
+        # Silently ignore if table doesn't exist yet (create_all will handle)
         pass
 
 def _ensure_user_columns():
+    """
+    Safely add verification/admin columns to users table.
+    Uses a transactional connection to avoid commit issues.
+    """
     try:
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             conn.execute(text("""
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
@@ -74,12 +88,85 @@ def _ensure_user_columns():
                 ALTER TABLE users
                 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
             """))
-            conn.commit()
     except Exception:
+        # Silently ignore if table doesn't exist yet (create_all will handle)
         pass
 
-_ensure_schedule_columns()
-_ensure_user_columns()
+# ---------- DB init helpers ----------
+def _db_ping_ok() -> bool:
+    """Check if DB is reachable."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except OperationalError:
+        return False
+    except Exception:
+        return False
+
+def _seed_admin_if_needed(db: Session):
+    """
+    Seed a default admin when ADMIN_EMAIL/ADMIN_PASSWORD are provided.
+    Will not overwrite existing passwords; ensures is_admin and verified flags.
+    """
+    if not (ADMIN_EMAIL and ADMIN_PASSWORD):
+        return
+
+    existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+    if existing:
+        updated = False
+        if not getattr(existing, "is_admin", False):
+            existing.is_admin = True
+            updated = True
+        if not getattr(existing, "verified", False):
+            existing.verified = True
+            updated = True
+        if updated:
+            db.commit()
+        return
+
+    admin = User(
+        email=ADMIN_EMAIL,
+        password_hash=hash_password(ADMIN_PASSWORD),
+        verified=True,
+        is_admin=True
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+def init_db() -> bool:
+    """
+    Initialize database:
+      - Ping DB
+      - Create tables from ORM models
+      - Apply safe schema patches
+      - Seed admin if configured
+    """
+    if not _db_ping_ok():
+        print("[startup] Database ping failed. Check DATABASE_URL and connectivity.")
+        return False
+
+    try:
+        # Create tables if missing
+        Base.metadata.create_all(bind=engine)
+
+        # Apply patches (safe ALTER TABLE)
+        _ensure_schedule_columns()
+        _ensure_user_columns()
+
+        # Seed admin
+        db = SessionLocal()
+        try:
+            _seed_admin_if_needed(db)
+        finally:
+            db.close()
+
+        print("[startup] Database initialized successfully.")
+        return True
+    except Exception as e:
+        print(f"[startup] Database initialization error: {e}")
+        return False
 
 # ---------- DB dependency ----------
 def get_db():
@@ -164,7 +251,8 @@ def _url_variants(u: str) -> list:
     seen, ordered = set(), []
     for c in candidates:
         if c not in seen:
-            ordered.append(c); seen.add(c)
+            ordered.append(c)
+            seen.add(c)
     return ordered
 
 def _fallback_result(url: str) -> dict:
@@ -186,7 +274,7 @@ def _fallback_result(url: str) -> dict:
         ],
     }
 
-def _robust_audit(url: str) -> tuple[str, dict]:
+def _robust_audit(url: str) -> Tuple[str, dict]:
     base = _normalize_url(url)
     for candidate in _url_variants(base):
         try:
@@ -221,6 +309,12 @@ async def session_middleware(request: Request, call_next):
         pass
     response = await call_next(request)
     return response
+
+# ---------- Health check ----------
+@app.get("/healthz")
+async def healthz():
+    ok = _db_ping_ok()
+    return {"ok": ok, "brand": UI_BRAND_NAME}
 
 # ---------- Public ----------
 @app.get("/")
@@ -726,6 +820,18 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "admin_audits": audits
     })
 
+@app.post("/auth/admin/db/init")
+async def admin_db_init(request: Request, db: Session = Depends(get_db)):
+    global current_user
+    if not current_user or not getattr(current_user, "is_admin", False):
+        return RedirectResponse("/auth/admin/login", status_code=303)
+
+    success = init_db()
+    if success:
+        return RedirectResponse("/auth/admin?db_init=1", status_code=303)
+    else:
+        return RedirectResponse("/auth/admin?db_init_error=1", status_code=303)
+
 # ---------- Daily Email Scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
@@ -782,10 +888,10 @@ async def _daily_scheduler_loop():
                     if not last:
                         lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
                         continue
-                    pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
+                    pdf_link = f"{BASE_URL.rstrip('/')}/auth/report/pdf/{w.id}"
                     lines.append(
-                        f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
-                        f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Download Certified Report</a>)</p>"
+                        f'<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 '
+                        f'({pdf_link}Download Certified Report</a>)</p>'
                     )
                 thirty_days_ago = datetime.utcnow() - timedelta(days=30)
                 audits_30 = db.query(Audit).filter(
@@ -797,13 +903,3 @@ async def _daily_scheduler_loop():
                     lines.append(f"<hr><p><b>30-day accumulated score:</b> {avg_score}/100</p>")
                 else:
                     lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
-                html = "\n".join(lines)
-                _send_report_email(user.email, f"{UI_BRAND_NAME} – Daily Website Audit Summary", html)
-            db.close()
-        except Exception:
-            pass
-        await asyncio.sleep(60)
-
-@app.on_event("startup")
-async def _start_scheduler():
-    asyncio.create_task(_daily_scheduler_loop())
