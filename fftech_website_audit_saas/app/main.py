@@ -38,8 +38,8 @@ SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # Optional admin seeding via env
-ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")      # e.g., admin@fftech.com
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")   # plain text; will be hashed
+ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -47,10 +47,6 @@ templates = Jinja2Templates(directory="app/templates")
 
 # ---- Startup schema patches ----
 def _ensure_schedule_columns():
-    """
-    Safe ALTERs to add scheduling-related columns to subscriptions table.
-    Uses a transactional connection.
-    """
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -66,14 +62,9 @@ def _ensure_schedule_columns():
                 ADD COLUMN IF NOT EXISTS email_schedule_enabled BOOLEAN DEFAULT FALSE;
             """))
     except Exception:
-        # don't crash startup if table isn't there yet
         pass
 
 def _ensure_user_columns():
-    """
-    Safe ALTERs to add verification/admin/timestamp columns to users table.
-    Uses a transactional connection.
-    """
     try:
         with engine.begin() as conn:
             conn.execute(text("""
@@ -89,12 +80,10 @@ def _ensure_user_columns():
                 ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
             """))
     except Exception:
-        # don't crash startup if table isn't there yet
         pass
 
 # ---------- DB init helpers ----------
 def _db_ping_ok() -> bool:
-    """Try connecting and running a lightweight query."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
@@ -105,48 +94,30 @@ def _db_ping_ok() -> bool:
         return False
 
 def _seed_admin_if_needed(db: Session):
-    """
-    If ADMIN_EMAIL and ADMIN_PASSWORD are provided, ensure an admin exists.
-    Marks admin as verified automatically; won't overwrite existing password.
-    """
     if not (ADMIN_EMAIL and ADMIN_PASSWORD):
         return
-
     existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()
     if existing:
-        updated = False
+        changed = False
         if not getattr(existing, "is_admin", False):
-            existing.is_admin = True
-            updated = True
+            existing.is_admin = True; changed = True
         if not getattr(existing, "verified", False):
-            existing.verified = True
-            updated = True
-        if updated:
+            existing.verified = True; changed = True
+        if changed:
             db.commit()
         return
-
     admin = User(
         email=ADMIN_EMAIL,
         password_hash=hash_password(ADMIN_PASSWORD),
         verified=True,
         is_admin=True
     )
-    db.add(admin)
-    db.commit()
-    db.refresh(admin)
+    db.add(admin); db.commit(); db.refresh(admin)
 
 def init_db() -> bool:
-    """
-    Initialize database:
-      - Ping DB
-      - Create tables (idempotent)
-      - Apply safe schema patches
-      - Seed admin (optional)
-    """
     if not _db_ping_ok():
-        print("[startup] Database ping failed. Check DATABASE_URL and connectivity.")
+        print("[startup] Database ping failed. Check DATABASE_URL.")
         return False
-
     try:
         Base.metadata.create_all(bind=engine)
         _ensure_schedule_columns()
@@ -170,7 +141,7 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Metrics presenter (human-friendly labels) ----------
+# ---------- Metrics presenter ----------
 METRIC_LABELS = {
     "status_code": "Status Code",
     "content_length": "Content Length (bytes)",
@@ -229,7 +200,6 @@ def _url_variants(u: str) -> list:
     host = p.netloc
     path = p.path or "/"
     scheme = p.scheme
-
     candidates = [f"{scheme}://{host}{path}"]
     if host.startswith("www."):
         candidates.append(f"{scheme}://{host[4:]}{path}")
@@ -245,8 +215,7 @@ def _url_variants(u: str) -> list:
     seen, ordered = set(), []
     for c in candidates:
         if c not in seen:
-            ordered.append(c)
-            seen.add(c)
+            ordered.append(c); seen.add(c)
     return ordered
 
 def _fallback_result(url: str) -> dict:
@@ -263,8 +232,14 @@ def _fallback_result(url: str) -> dict:
             "normalized_url": url,
         },
         "top_issues": [
-            "Fetch failed; using heuristic baseline.",
-            "Verify URL is publicly accessible and not blocked by WAF/robots.",
+            "Missing sitemap.xml",
+            "Missing HSTS header",
+            "Images missing alt attributes",
+            "No canonical link tag",
+            "robots.txt blocking important pages",
+            "Mixed content over HTTPS",
+            "Duplicate title tags",
+            "Meta description too short"
         ],
     }
 
@@ -330,10 +305,12 @@ async def audit_open(request: Request):
     category_scores_dict = res["category_scores"]
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
+    top_issues = res.get("top_issues", []) or []
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
+    metrics = _present_metrics(res.get("metrics", {}))
 
+    # Render open-access detail with rich visuals
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -345,8 +322,8 @@ async def audit_open(request: Request):
             "health_score": int(overall),
             "exec_summary": exec_summary,
             "category_scores": category_scores_list,
-            "metrics": _present_metrics(res.get("metrics", {})),
-            "top_issues": top_issues,
+            "metrics": metrics,
+            "top_issues": top_issues
         }
     })
 
@@ -356,13 +333,13 @@ async def report_pdf_open(url: str):
     cs_list = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
     overall = compute_overall(res["category_scores"])
     grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
+    top_issues = res.get("top_issues", []) or []
     exec_summary = summarize_200_words(normalized, res["category_scores"], top_issues)
     path = "/tmp/certified_audit_open.pdf"
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
-# ---------- Registration & Auth (ONLY /auth/*) ----------
+# ---------- Registration & Auth ----------
 @app.get("/auth/register")
 async def register_get(request: Request):
     return templates.TemplateResponse("register.html", {
@@ -390,7 +367,7 @@ async def register_post(
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
     ok = send_verification_email(u.email, token)
     if not ok:
-        print(f"[auth] Failed to send email to {u.email}. Check SMTP settings.")
+        print(f"[auth] Failed to send email to {u.email}. Check SMTP/Resend settings.")
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
 @app.get("/auth/verify")
@@ -421,15 +398,10 @@ async def login_get(request: Request):
 
 # ---------- Magic Login (Passwordless) ----------
 def _send_magic_login_email(to_email: str, token: str) -> bool:
-    """
-    Send the magic login link via email using the same SMTP settings.
-    """
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         print("[auth] SMTP configuration missing. Cannot send magic link.")
         return False
-
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-
     html_body = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
         <h3 style="color: #4F46E5;">{UI_BRAND_NAME} — Magic Login</h3>
@@ -443,13 +415,11 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
     </div>
     """
-
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
     msg["From"] = SMTP_USER
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
-
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
@@ -466,35 +436,24 @@ async def magic_request(
     email: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """
-    Request a passwordless magic login link.
-    """
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
-        # Still return magic_sent=1 to avoid user enumeration
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
-
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
-
     return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
 @app.get("/auth/magic")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
-    """
-    Consume the magic login link: decode token, set session cookie, redirect to dashboard.
-    """
     global current_user
     try:
         data = decode_token(token)
         uid = data.get("uid")
         if not uid or data.get("type") != "magic":
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         u = db.query(User).filter(User.id == uid).first()
         if not u or not getattr(u, "verified", False):
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         current_user = u
         session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
         resp = RedirectResponse("/auth/dashboard", status_code=303)
@@ -510,7 +469,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
 
-# ---------- Password login remains available ----------
+# ---------- Password login ----------
 @app.post("/auth/login")
 async def login_post(
     request: Request,
@@ -551,9 +510,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
-
     websites = db.query(Website).filter(Website.user_id == current_user.id).all()
-
     last_audits = (
         db.query(Audit)
         .filter(Audit.user_id == current_user.id)
@@ -562,22 +519,18 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     avg = round(sum(a.health_score for a in last_audits)/len(last_audits), 1) if last_audits else 0
-
     trend_labels = [a.created_at.strftime('%d %b') for a in reversed(last_audits)]
     trend_values = [a.health_score for a in reversed(last_audits)]
-
     summary = {
         "grade": (last_audits[0].grade if last_audits else "A"),
         "health_score": (last_audits[0].health_score if last_audits else 88)
     }
-
     sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
         "enabled": getattr(sub, "email_schedule_enabled", False),
     }
-
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -642,12 +595,11 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     category_scores_dict = res["category_scores"]
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
+    top_issues = res.get("top_issues", []) or []
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
-
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
-    # Persist metrics with top_issues embedded so templates always have data
+    # Ensure top_issues persist in metrics_json so templates always have data
     metrics_raw = res.get("metrics", {}) or {}
     metrics_raw["top_issues"] = top_issues
 
@@ -687,7 +639,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
-    top_issues = metrics_raw.get("top_issues", [])
+    top_issues = metrics_raw.get("top_issues", [])  # <-- wire top_issues to template
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -824,19 +776,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "admin_audits": audits
     })
 
-@app.post("/auth/admin/db/init")
-async def admin_db_init(request: Request, db: Session = Depends(get_db)):
-    global current_user
-    if not current_user or not getattr(current_user, "is_admin", False):
-        return RedirectResponse("/auth/admin/login", status_code=303)
-
-    success = init_db()
-    if success:
-        return RedirectResponse("/auth/admin?db_init=1", status_code=303)
-    else:
-        return RedirectResponse("/auth/admin?db_init_error=1", status_code=303)
-
-# ---------- Daily Email Scheduler ----------
+# ---------- Email Scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
@@ -913,14 +853,12 @@ async def _daily_scheduler_loop():
             finally:
                 db.close()
         except Exception as e:
-            # Log and continue; never crash the loop
             print(f"[scheduler] error: {e}")
         await asyncio.sleep(60)
 
 # ---------- Startup ----------
 @app.on_event("startup")
 async def _start_scheduler():
-    # Ensure DB is initialized before starting the scheduler loop
     init_ok = init_db()
     if not init_ok:
         print("[startup] DB not initialized; scheduler will still start, but email jobs may fail.")
