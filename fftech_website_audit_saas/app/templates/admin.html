@@ -1,0 +1,52 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<h4 class="brand mb-3">Admin Dashboard</h4>
+<div class="row g-4">
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Recent Users</h5>
+        <ul class="list-group list-group-flush">
+          {% for u in admin_users %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>{{ u.email }}</span>
+              <small class="text-muted">{{ u.created_at }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Recent Websites</h5>
+        <ul class="list-group list-group-flush">
+          {% for w in websites %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>{{ w.url }}</span>
+              <small class="text-muted">{{ w.created_at }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Recent Audits</h5>
+        <ul class="list-group list-group-flush">
+          {% for a in admin_audits %}
+            <li class="list-group-item d-flex justify-content-between">
+              <span>Score: {{ a.health_score }} | Grade: {{ a.grade }}</span>
+              <small class="text-muted">{{ a.created_at }}</small>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

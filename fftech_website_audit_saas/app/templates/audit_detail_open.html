@@ -1,0 +1,96 @@
+
+{% extends 'base_open.html' %}
+{% block left %}
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center">
+      <h4 class="mb-0">Audit Results — <span class="text-primary">{{ website.url }}</span></h4>
+      <a class="btn btn-outline-secondary btn-sm" href="/report/pdf/open?url={{ website.url }}">Download PDF</a>
+    </div>
+    <hr>
+    <div class="row text-center">
+      <div class="col-6 col-md-3">
+        <div class="p-3 bg-light rounded-3">
+          <div class="display-6">{{ audit.health_score }}</div>
+          <div class="text-muted">Health</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="p-3 bg-light rounded-3">
+          <div class="display-6">{{ audit.grade }}</div>
+          <div class="text-muted">Grade</div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="p-3 bg-light rounded-3 h-100">
+          <div class="fw-bold">Executive Summary</div>
+          <p class="mb-0">{{ audit.exec_summary }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Category Scores</h5>
+        <canvas id="catChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Top Issues</h5>
+        {% if audit.top_issues %}
+          <ul class="list-group list-group-flush">
+            {% for issue in audit.top_issues %}
+              <li class="list-group-item">{{ issue }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted">No major issues detected.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card my-4">
+  <div class="card-body">
+    <h5>Key Metrics</h5>
+    <div class="row">
+      {% for label, value in audit.metrics.items() %}
+        <div class="col-12 col-md-6 col-lg-4 mb-2">
+          <div class="border rounded p-2 bg-white d-flex justify-content-between">
+            <span class="text-muted">{{ label }}</span>
+            <span class="fw-semibold">{{ value }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+const cs = {{ audit.category_scores | tojson }};
+const catCtx = document.getElementById('catChart');
+new Chart(catCtx, {
+  type: 'bar',
+  data: {
+    labels: cs.map(x => x.name),
+    datasets: [{
+      label: 'Score',
+      data: cs.map(x => x.score),
+      backgroundColor: '#4F46E5'
+    }]
+  },
+  options: {
+    scales: { y: { beginAtZero: true, max: 100 } },
+    plugins: { legend: { display: false } }
+  }
+});
+</script>
+{% endblock %}
