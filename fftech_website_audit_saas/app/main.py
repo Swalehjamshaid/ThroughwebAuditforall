@@ -24,7 +24,7 @@ from .auth import hash_password, verify_password, create_token, decode_token
 from .email_utils import send_verification_email
 from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
-from .audit.report import render_pdf
+from .audit.report import render_pdf, render_pdf_10p   # NEW: 10p builder
 
 import smtplib
 from email.mime.text import MIMEText
@@ -190,6 +190,7 @@ METRIC_LABELS = {
 
     # Perf / CWV (optional)
     "lcp": "Largest Contentful Paint (LCP)",
+    "inp": "Interaction to Next Paint (INP)",
     "fcp": "First Contentful Paint (FCP)",
     "cls": "Cumulative Layout Shift (CLS)",
     "tbt": "Total Blocking Time",
@@ -245,7 +246,6 @@ def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list)
     As a last resort, returns a safe deterministic summary to keep UI/PDF stable.
     """
     try:
-        # Preferred: if summarize_200_words already supports (url, category_scores, top_issues)
         return summarize_200_words(url, category_scores, top_issues)
     except TypeError:
         payload = {
@@ -367,6 +367,52 @@ def _maybe_competitor(raw_url: str):
     return None, None
 
 
+# ---------- Converters for PDF payload ----------
+
+def _to_category_list(category_scores_dict: dict):
+    # Convert dict {"Perf":82,...} -> list[{"name":..,"score":..}]
+    return [{"name": k, "score": int(v)} for k, v in (category_scores_dict or {}).items()]
+
+def _extract_cwv(metrics: dict) -> dict:
+    m = metrics or {}
+    return {
+        "LCP": float(m.get("lcp") or 0),
+        "INP": float(m.get("inp") or 0),
+        "CLS": float(m.get("cls") or 0),
+        "TBT": float(m.get("tbt") or 0),
+    }
+
+def _extract_security(metrics: dict) -> dict:
+    m = metrics or {}
+    def truthy(key):
+        v = m.get(key)
+        if isinstance(v, bool): return v
+        if isinstance(v, str): return v.lower() in ("yes","enabled","valid","pass")
+        return bool(v)
+    return {
+        "HSTS": truthy("hsts"),
+        "CSP": truthy("csp"),
+        "XFO": truthy("xfo"),
+        "XCTO": truthy("xcto"),
+        "SSL_Valid": truthy("ssl_valid"),
+        "MixedContent": (str(m.get("mixed_content","no")).lower() in ("yes","true","1","present")),
+    }
+
+def _extract_indexation(metrics: dict) -> dict:
+    m = metrics or {}
+    return {
+        "canonical_ok": truthy_str(m.get("canonical_present")),
+        "robots_txt": "Robots allowed" if truthy_str(m.get("robots_allowed")) else "Robots blocked",
+        "sitemap_urls": int(m.get("sitemap_urls") or 0),
+        "sitemap_size_mb": float(m.get("sitemap_size_mb") or 0)
+    }
+
+def truthy_str(v) -> bool:
+    if isinstance(v, bool): return v
+    if isinstance(v, str): return v.lower() in ("yes","true","1","present","enabled")
+    return bool(v)
+
+
 # ---------- Session handling ----------
 current_user = None
 
@@ -374,7 +420,6 @@ current_user = None
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
     global current_user
-    # reset per-request to avoid leakage
     current_user = None
     try:
         token = request.cookies.get("session_token")
@@ -427,14 +472,12 @@ async def audit_open(request: Request):
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
     exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
+    category_scores_list = _to_category_list(category_scores_dict)
     metrics = _present_metrics(res.get("metrics", {}))
 
     # Optional competitor overlay
     comp_norm, comp_res = _maybe_competitor(competitor_url)
-    comp_cs_list = []
-    if comp_res:
-        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
+    comp_cs_list = _to_category_list(comp_res.get("category_scores", {})) if comp_res else []
 
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
@@ -454,17 +497,101 @@ async def audit_open(request: Request):
     })
 
 
+# ---------- Reports (Open & Registered) ----------
 @app.get("/report/pdf/open")
-async def report_pdf_open(url: str):
+async def report_pdf_open(request: Request, url: str, competitor_url: str | None = None):
     normalized, res = _robust_audit(url)
-    cs_list = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
+    cats_list = _to_category_list(res["category_scores"])
     overall = compute_overall(res["category_scores"])
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
     exec_summary = _summarize_exec_200_words(normalized, res["category_scores"], top_issues)
-    path = "/tmp/certified_audit_open.pdf"
-    render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
+
+    # Optional competitor overlay
+    comp_norm, comp_res = _maybe_competitor(competitor_url)
+    competitor_payload = None
+    if comp_res:
+        competitor_payload = {"url": comp_norm, "category_scores": _to_category_list(comp_res.get("category_scores", {}))}
+
+    # Build extended payloads
+    metrics_raw = res.get("metrics", {}) or {}
+    cwv = _extract_cwv(metrics_raw)
+    security = _extract_security(metrics_raw)
+    indexation = {
+        "canonical_ok": truthy_str(metrics_raw.get("canonical_present")),
+        "robots_txt": "Robots allowed" if truthy_str(metrics_raw.get("robots_allowed")) else "Robots blocked",
+        "sitemap_urls": int(metrics_raw.get("sitemap_urls") or 0),
+        "sitemap_size_mb": float(metrics_raw.get("sitemap_size_mb") or 0)
+    }
+    trend = {"labels": ["Audit"], "values": [int(overall)]}
+
+    path = "/tmp/certified_audit_open_10p.pdf"
+    render_pdf_10p(
+        file_path=path,
+        brand=UI_BRAND_NAME,
+        site_url=normalized,
+        grade=grade,
+        health_score=int(overall),
+        category_scores=cats_list,
+        executive_summary=exec_summary,
+        cwv=cwv,
+        top_issues=top_issues,
+        security=security,
+        indexation=indexation,
+        competitor=competitor_payload,
+        trend=trend
+    )
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
+
+
+@app.get("/auth/report/pdf/{website_id}")
+async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db), competitor_url: str | None = None):
+    global current_user
+    if not current_user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return RedirectResponse("/auth/dashboard", status_code=303)
+
+    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+    cats_list = category_scores
+    top_issues = metrics_raw.get("top_issues", [])
+    cwv = _extract_cwv(metrics_raw)
+    security = _extract_security(metrics_raw)
+    indexation = {
+        "canonical_ok": truthy_str(metrics_raw.get("canonical_present")),
+        "robots_txt": "Robots allowed" if truthy_str(metrics_raw.get("robots_allowed")) else "Robots blocked",
+        "sitemap_urls": int(metrics_raw.get("sitemap_urls") or 0),
+        "sitemap_size_mb": float(metrics_raw.get("sitemap_size_mb") or 0)
+    }
+    trend = {"labels": [a.created_at.strftime('%d %b')], "values": [int(a.health_score)]}
+
+    # Optional competitor overlay
+    comp_norm, comp_res = _maybe_competitor(competitor_url)
+    competitor_payload = None
+    if comp_res:
+        competitor_payload = {"url": comp_norm, "category_scores": _to_category_list(comp_res.get("category_scores", {}))}
+
+    path = f"/tmp/certified_audit_{website_id}_10p.pdf"
+    render_pdf_10p(
+        file_path=path,
+        brand=UI_BRAND_NAME,
+        site_url=w.url,
+        grade=a.grade,
+        health_score=a.health_score,
+        category_scores=cats_list,
+        executive_summary=a.exec_summary,
+        cwv=cwv,
+        top_issues=top_issues,
+        security=security,
+        indexation=indexation,
+        competitor=competitor_payload,
+        trend=trend
+    )
+    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
 
 # ---------- Registration & Auth ----------
@@ -764,7 +891,7 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
     exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
+    category_scores_list = _to_category_list(category_scores_dict)
 
     metrics_raw = res.get("metrics", {}) or {}
     metrics_raw["top_issues"] = top_issues
@@ -823,9 +950,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
 
     # Optional competitor overlay
     comp_norm, comp_res = _maybe_competitor(competitor_url)
-    comp_cs_list = []
-    if comp_res:
-        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
+    comp_cs_list = _to_category_list(comp_res.get("category_scores", {})) if comp_res else []
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -843,23 +968,6 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
         }
     })
-
-
-@app.get("/auth/report/pdf/{website_id}")
-async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
-    global current_user
-    if not current_user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
-    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
-    if not w or not a:
-        return RedirectResponse("/auth/dashboard", status_code=303)
-
-    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
-    path = f"/tmp/certified_audit_{website_id}.pdf"
-    render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
 
 # ---------- Scheduling UI ----------
