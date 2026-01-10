@@ -1,400 +1,546 @@
-# app/main.py
-# -*- coding: utf-8 -*-
 
-import os
-import json
+#!/usr/bin/env python3
+"""
+CLI-only main for generating graphical outputs from report data and optional modules.
+- No website/ASGI attributes (do NOT run with uvicorn).
+- Safe imports from app.audit.report (render_pdf_10p may be absent).
+- Reads JSON/CSV/XLSX reports, optionally integrates grader.py/extra module.
+- Generates histograms, bar charts, and line charts (headless matplotlib).
+
+Author: Updated for Khan Roy Jamshaid (Comp_HPK)
+"""
+
+from __future__ import annotations
+
+import argparse
 import asyncio
-import smtplib
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from urllib.parse import urlparse
-from typing import Tuple, Optional, Dict, Any, List
+import csv
+import importlib.util
+import json
+import logging
+import os
+import signal
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, Request, Form, Depends
-from fastapi.responses import RedirectResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+# Headless plotting
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import OperationalError
+APP_NAME = "project-main"
+DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_LOG_DIR = "logs"
+DEFAULT_CONFIG = "config.json"
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
 
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+# ------------------------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------------------------
 
-from .db import Base, engine, SessionLocal
-from .models import User, Website, Audit, Subscription
-from .auth import hash_password, verify_password, create_token, decode_token
-from .email_utils import send_verification_email
-from .audit.engine import run_basic_checks
-from .audit.grader import compute_overall, grade_from_score, summarize_200_words
-from .audit.report import render_pdf_10p, render_pdf  # render_pdf kept for backward comp
+def _resolve_path(p: str | Path) -> Path:
+    return Path(p).expanduser().resolve()
 
-# ---------- Config ----------
-UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
-BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
+def ensure_working_dir(base: Optional[str] = None) -> Path:
+    if base:
+        wd = _resolve_path(base)
+        os.makedirs(wd, exist_ok=True)
+        os.chdir(wd)
+        return wd
+    wd = _resolve_path(Path(__file__).parent)
+    os.chdir(wd)
+    return wd
 
-SMTP_HOST     = os.getenv("SMTP_HOST")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER     = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+def setup_logging(level: str = DEFAULT_LOG_LEVEL, log_dir: str = DEFAULT_LOG_DIR) -> Tuple[logging.Logger, Path]:
+    lvl = getattr(logging, level.upper(), logging.INFO)
+    log_path = _resolve_path(log_dir)
+    os.makedirs(log_path, exist_ok=True)
 
-ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+    logger = logging.getLogger(APP_NAME)
+    logger.setLevel(lvl)
+    logger.handlers.clear()
+    logger.propagate = False
 
-FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDIT_LIMIT", "10"))
-FREE_HISTORY_WINDOW_DAYS = int(os.getenv("FREE_HISTORY_WINDOW_DAYS", "30"))
-
-app = FastAPI(title=f"{UI_BRAND_NAME} AI Website Audit SaaS")
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
-
-# ---- Startup schema patches ----
-def _ensure_schedule_columns():
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("""
-                ALTER TABLE subscriptions
-                ADD COLUMN IF NOT EXISTS daily_time VARCHAR(8) DEFAULT '09:00';
-            """))
-            conn.execute(text("""
-                ALTER TABLE subscriptions
-                ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) DEFAULT 'UTC';
-            """))
-            conn.execute(text("""
-                ALTER TABLE subscriptions
-                ADD COLUMN IF NOT EXISTS email_schedule_enabled BOOLEAN DEFAULT FALSE;
-            """))
-    except Exception as e:
-        print(f"[schema] Schedule columns error: {e}")
-
-def _ensure_user_columns():
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
-            """))
-            conn.execute(text("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
-            """))
-            conn.execute(text("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-            """))
-    except Exception as e:
-        print(f"[schema] User columns error: {e}")
-
-# ---------- DB init helpers ----------
-def _db_ping_ok() -> bool:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except (OperationalError, Exception):
-        return False
-
-def _seed_admin_if_needed(db: Session):
-    if not (ADMIN_EMAIL and ADMIN_PASSWORD):
-        return
-    existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()
-    if existing:
-        changed = False
-        if not getattr(existing, "is_admin", False):
-            existing.is_admin = True; changed = True
-        if not getattr(existing, "verified", False):
-            existing.verified = True; changed = True
-        if changed:
-            db.commit()
-        return
-    admin = User(
-        email=ADMIN_EMAIL,
-        password_hash=hash_password(ADMIN_PASSWORD),
-        verified=True,
-        is_admin=True
+    formatter = logging.Formatter(
+        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    db.add(admin); db.commit(); db.refresh(admin)
 
-def init_db() -> bool:
-    if not _db_ping_ok():
-        print("[startup] Database ping failed.")
-        return False
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(lvl)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    fh = logging.FileHandler(log_path / f"{APP_NAME}.log", encoding="utf-8")
+    fh.setLevel(lvl)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    return logger, log_path
+
+def load_config(config_path: Optional[str], logger: logging.Logger) -> Dict[str, Any]:
+    config: Dict[str, Any] = {}
+    if config_path:
+        path = _resolve_path(config_path)
+        if path.exists() and path.suffix.lower() == ".json":
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                logger.error("Failed to parse config JSON: %s", e, exc_info=True)
+                raise
+        elif not path.exists():
+            logger.warning("Config file not found at %s; proceeding with defaults.", path)
+        else:
+            logger.warning("Unsupported config extension '%s'. Only JSON supported.", path.suffix)
+
+    # Environment overrides
+    for k in ("LOG_LEVEL", "OUTPUT_DIR"):
+        v = os.getenv(k)
+        if v:
+            config[k.lower()] = v
+    return config
+
+def install_signal_handlers(logger: logging.Logger) -> None:
+    def _handler(signum, frame):
+        logger.info("Received signal %s. Shutting down gracefully...", signum)
+        sys.exit(EXIT_SUCCESS)
+    signal.signal(signal.SIGINT, _handler)
+    signal.signal(signal.SIGTERM, _handler)
+
+@dataclass
+class AppContext:
+    logger: logging.Logger
+    workdir: Path
+    config: Dict[str, Any]
+    start_time: float
+
+# ------------------------------------------------------------------------------
+# Safe imports for report/grader
+# ------------------------------------------------------------------------------
+
+def _safe_import_audit_report(logger: logging.Logger):
+    """
+    Import app.audit.report safely, without crashing if symbols are missing.
+    Returns (module, render_pdf_10p, render_pdf).
+    """
     try:
-        Base.metadata.create_all(bind=engine)
-        _ensure_schedule_columns()
-        _ensure_user_columns()
-        db = SessionLocal()
-        try:
-            _seed_admin_if_needed(db)
-        finally:
-            db.close()
-        print("[startup] Database initialized successfully.")
-        return True
+        from app.audit import report as audit_report  # absolute import within package
+        rp10 = getattr(audit_report, "render_pdf_10p", None)
+        rp = getattr(audit_report, "render_pdf", None)
+        if rp10 is None and rp is None:
+            logger.info("app.audit.report loaded but has no render_pdf_10p/render_pdf.")
+        return audit_report, rp10, rp
     except Exception as e:
-        print(f"[startup] Database initialization error: {e}")
-        return False
+        logger.info("app.audit.report not available: %s", e)
+        return None, None, None
 
-# ---------- DB dependency ----------
-def get_db():
-    db = SessionLocal()
+def _safe_import_grader(logger: logging.Logger):
+    """
+    Import app.grader.grade_all if available.
+    """
     try:
-        yield db
-    finally:
-        db.close()
+        from app import grader as grader_mod
+        grade_all = getattr(grader_mod, "grade_all", None)
+        if grade_all is None:
+            logger.info("app.grader found but grade_all() is missing.")
+        return grade_all
+    except Exception as e:
+        logger.info("app.grader not available: %s", e)
+        return None
 
-# ---------- Metrics presenter ----------
-METRIC_LABELS = {
-    "status_code": "Status Code",
-    "content_length": "Content Length (bytes)",
-    "content_encoding": "Compression (Content-Encoding)",
-    "cache_control": "Caching (Cache-Control)",
-    "hsts": "HSTS (Strict-Transport-Security)",
-    "xcto": "X-Content-Type-Options",
-    "xfo": "X-Frame-Options",
-    "csp": "Content-Security-Policy",
-    "set_cookie": "Set-Cookie",
-    "title": "HTML <title>",
-    "title_length": "Title Length",
-    "meta_description_length": "Meta Description Length",
-    "meta_robots": "Meta Robots",
-    "canonical_present": "Canonical Link Present",
-    "has_https": "Uses HTTPS",
-    "robots_allowed": "Robots Allowed",
-    "sitemap_present": "Sitemap Present",
-    "images_without_alt": "Images Missing alt",
-    "image_count": "Image Count",
-    "viewport_present": "Viewport Meta Present",
-    "html_lang_present": "<html lang> Present",
-    "h1_count": "H1 Count",
-    "lcp": "Largest Contentful Paint (LCP)",
-    "fcp": "First Contentful Paint (FCP)",
-    "cls": "Cumulative Layout Shift (CLS)",
-    "tbt": "Total Blocking Time",
-    "fid": "First Input Delay",
-    "speed_index": "Speed Index",
-    "tti": "Time to Interactive",
-    "dom_content_loaded": "DOM Content Loaded",
-    "total_page_size": "Total Page Size",
-    "requests_per_page": "Requests Per Page",
-    "unminified_css": "Unminified CSS",
-    "unminified_js": "Unminified JavaScript",
-    "render_blocking": "Render Blocking Resources",
-    "excessive_dom": "Excessive DOM Size",
-    "third_party_load": "Third-Party Script Load",
-    "server_response_time": "Server Response Time",
-    "image_optimization": "Image Optimization",
-    "lazy_loading_issues": "Lazy Loading Issues",
-    "browser_caching": "Browser Caching Issues",
-    "missing_gzip_brotli": "Missing GZIP / Brotli",
-    "resource_load_errors": "Resource Load Errors",
-    "ssl_valid": "SSL Certificate Validity",
-    "ssl_expired": "Expired SSL",
-    "mixed_content": "Mixed Content",
-    "insecure_resources": "Insecure Resources",
-    "security_headers_missing": "Missing Security Headers",
-    "open_directory_listing": "Open Directory Listing",
-    "login_http": "Login Pages Without HTTPS",
-    "normalized_url": "Normalized URL",
-    "error": "Fetch Error",
-}
-
-def _present_metrics(metrics: dict) -> dict:
-    out = {}
-    for k, v in (metrics or {}).items():
-        label = METRIC_LABELS.get(k, k.replace("_", " ").title())
-        if isinstance(v, bool):
-            v = "Yes" if v else "No"
-        out[label] = v
-    return out
-
-# ---------- Summary adapter ----------
-def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list) -> str:
+def _import_module_from_path(path: str, name_hint: str = "extra_module") -> Optional[Any]:
     try:
-        return summarize_200_words(url, category_scores, top_issues)
-    except TypeError:
-        payload = {"url": url, "category_scores": category_scores or {}, "top_issues": top_issues or []}
-        try:
-            return summarize_200_words(payload)
-        except Exception:
-            cats = category_scores or {}
-            strengths = ", ".join(sorted([k for k, v in cats.items() if int(v) >= 75])) or "Core areas performing well"
-            weaknesses = ", ".join(sorted([k for k, v in cats.items() if int(v) < 60])) or "Some categories need improvement"
-            issues_preview = ", ".join((top_issues or [])[:5]) or "No critical issues reported"
-            return (
-                f"This website shows a balanced technical profile. Strengths include {strengths}. "
-                f"Weaknesses include {weaknesses}. Priority areas: {issues_preview}. "
-                f"Focus on performance and security headers to raise the overall health score."
-            )
+        full_path = _resolve_path(path)
+        if not full_path.exists():
+            return None
+        spec = importlib.util.spec_from_file_location(name_hint, str(full_path))
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+        return None
+    except Exception:
+        return None
 
-# ---------- Robust URL & audit helpers ----------
-def _normalize_url(raw: str) -> str:
-    if not raw: return raw
-    s = raw.strip()
-    p = urlparse(s if "://" in s else "https://" + s)
-    return f"{p.scheme}://{p.netloc}{p.path or '/'}"
+# ------------------------------------------------------------------------------
+# Report ingestion
+# ------------------------------------------------------------------------------
 
-def _url_variants(u: str) -> list:
-    p = urlparse(u)
-    host, scheme, path = p.netloc, p.scheme, p.path or "/"
-    candidates = [f"{scheme}://{host}{path}"]
-    if host.startswith("www."):
-        candidates.append(f"{scheme}://{host[4:]}{path}")
+def _discover_report_path(report_arg: Optional[str], output_dir: Path, logger: logging.Logger) -> Optional[Path]:
+    if report_arg:
+        rp = _resolve_path(report_arg)
+        if rp.exists():
+            return rp
+        logger.warning("--report path not found: %s", rp)
+    for c in [output_dir / "report.json", output_dir / "report.csv", output_dir / "report.xlsx", output_dir / "report.xls"]:
+        if c.exists():
+            return c
+    logger.info("No report file discovered in %s.", output_dir)
+    return None
+
+def _read_csv_dicts(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    return rows
+
+def _read_json(path: Path) -> Any:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def _read_xlsx(path: Path, logger: logging.Logger) -> List[Dict[str, Any]]:
+    try:
+        import pandas as pd
+        if path.suffix.lower() == ".xlsx":
+            df = pd.read_excel(path, engine="openpyxl")
+        else:
+            df = pd.read_excel(path, engine="xlrd")
+        return df.to_dict(orient="records")  # type: ignore
+    except Exception as e:
+        logger.error("Failed to read Excel file: %s", e, exc_info=True)
+        raise
+
+def load_report_data(report_path: Path, logger: logging.Logger) -> List[Dict[str, Any]]:
+    ext = report_path.suffix.lower()
+    if ext == ".json":
+        payload = _read_json(report_path)
+        if isinstance(payload, list):
+            return payload
+        if isinstance(payload, dict):
+            for key in ("rows", "data", "results"):
+                if key in payload and isinstance(payload[key], list):
+                    return payload[key]
+            return [payload]
+        raise ValueError("Unsupported JSON structure for report.")
+    elif ext == ".csv":
+        return _read_csv_dicts(report_path)
+    elif ext in (".xlsx", ".xls"):
+        return _read_xlsx(report_path, logger)
     else:
-        candidates.append(f"{scheme}://www.{host}{path}")
-    candidates.append(f"http://{host}{path}")
-    if not path.endswith("/"):
-        candidates.append(f"{scheme}://{host}{path}/")
-    seen, ordered = set(), []
-    for c in candidates:
-        if c not in seen:
-            ordered.append(c); seen.add(c)
-    return ordered
+        raise ValueError(f"Unsupported report extension: {ext}")
 
-def _fallback_result(url: str) -> dict:
-    return {
-        "category_scores": {"Performance": 65, "Accessibility": 72, "SEO": 68, "Security": 70, "BestPractices": 66},
-        "metrics": {"error": "Fetch failed", "normalized_url": url},
-        "top_issues": ["Missing sitemap.xml", "Missing HSTS header", "Images missing alt attributes"]
-    }
+# ------------------------------------------------------------------------------
+# Graphs
+# ------------------------------------------------------------------------------
 
-def _robust_audit(url: str):
-    base = _normalize_url(url)
-    for candidate in _url_variants(base):
+def _safe_float(v: Any) -> Optional[float]:
+    try:
+        return float(v)
+    except Exception:
+        return None
+
+def _column_types(rows: List[Dict[str, Any]]) -> Dict[str, str]:
+    types: Dict[str, str] = {}
+    if not rows:
+        return types
+    keys = rows[0].keys()
+    for k in keys:
+        values = [r.get(k) for r in rows]
+        if any(_safe_float(v) is not None for v in values):
+            types[k] = "numeric"
+        else:
+            types[k] = "categorical"
+    return types
+
+def _ensure_graph_dir(output_dir: Path) -> Path:
+    gdir = output_dir / "graphs"
+    os.makedirs(gdir, exist_ok=True)
+    return gdir
+
+def plot_histograms(rows: List[Dict[str, Any]], gdir: Path, logger: logging.Logger) -> List[Path]:
+    paths: List[Path] = []
+    types = _column_types(rows)
+    numeric_cols = [k for k, t in types.items() if t == "numeric"]
+    if not numeric_cols:
+        logger.info("No numeric columns found for histograms.")
+        return paths
+
+    for col in numeric_cols:
+        values = [_safe_float(r.get(col)) for r in rows]
+        values = [v for v in values if v is not None]
+        if not values:
+            continue
+        plt.figure(figsize=(8, 5))
+        plt.hist(values, bins=10, color="#1f77b4", alpha=0.85)
+        plt.title(f"Histogram: {col}")
+        plt.xlabel(col)
+        plt.ylabel("Frequency")
+        out = gdir / f"hist_{col}.png"
+        plt.tight_layout()
+        plt.savefig(out)
+        plt.close()
+        paths.append(out)
+        logger.debug("Saved histogram: %s", out)
+    return paths
+
+def plot_bar_counts(rows: List[Dict[str, Any]], gdir: Path, logger: logging.Logger) -> List[Path]:
+    paths: List[Path] = []
+    types = _column_types(rows)
+    cat_cols = [k for k, t in types.items() if t == "categorical"]
+    if not cat_cols:
+        logger.info("No categorical columns found for bar charts.")
+        return paths
+
+    for col in cat_cols:
+        counts: Dict[str, int] = {}
+        for r in rows:
+            key = str(r.get(col))
+            counts[key] = counts.get(key, 0) + 1
+        if len(counts) > max(50, len(rows) // 2):
+            continue
+        labels = list(counts.keys())
+        values = list(counts.values())
+        plt.figure(figsize=(10, 5))
+        plt.bar(labels, values, color="#ff7f0e")
+        plt.xticks(rotation=45, ha="right")
+        plt.title(f"Counts by {col}")
+        plt.xlabel(col)
+        plt.ylabel("Count")
+        out = gdir / f"bar_{col}.png"
+        plt.tight_layout()
+        plt.savefig(out)
+        plt.close()
+        paths.append(out)
+        logger.debug("Saved bar chart: %s", out)
+    return paths
+
+def plot_lines(rows: List[Dict[str, Any]], gdir: Path, logger: logging.Logger) -> List[Path]:
+    paths: List[Path] = []
+    if not rows:
+        return paths
+
+    types = _column_types(rows)
+    numeric_cols = [k for k, t in types.items() if t == "numeric"]
+    date_key = None
+    for candidate in ("date", "timestamp", "time"):
+        if candidate in rows[0]:
+            date_key = candidate
+            break
+
+    index_labels = [str(r.get(date_key, i)) for i, r in enumerate(rows)]
+    for col in numeric_cols:
+        values = [_safe_float(r.get(col)) for r in rows]
+        values = [v if v is not None else float("nan") for v in values]
+        plt.figure(figsize=(9, 5))
+        plt.plot(index_labels, values, marker="o", color="#2ca02c")
+        plt.title(f"Line: {col} over index{' (' + date_key + ')' if date_key else ''}")
+        plt.xlabel(date_key or "index")
+        plt.ylabel(col)
+        plt.xticks(rotation=45, ha="right")
+        out = gdir / f"line_{col}.png"
+        plt.tight_layout()
+        plt.savefig(out)
+        plt.close()
+        paths.append(out)
+        logger.debug("Saved line chart: %s", out)
+    return paths
+
+def generate_graphs(rows: List[Dict[str, Any]], output_dir: Path, graph_types: List[str], logger: logging.Logger) -> List[Path]:
+    gdir = _ensure_graph_dir(output_dir)
+    generated: List[Path] = []
+
+    types_norm = [g.strip().lower() for g in graph_types]
+    auto = ("auto" in types_norm) or (not types_norm)
+    if auto or "histogram" in types_norm:
+        generated += plot_histograms(rows, gdir, logger)
+    if auto or "bar" in types_norm:
+        generated += plot_bar_counts(rows, gdir, logger)
+    if auto or "line" in types_norm:
+        generated += plot_lines(rows, gdir, logger)
+
+    if not generated:
+        logger.warning("No graphs generated. Check data shape or graph types.")
+    else:
+        logger.info("Generated %d graphs in %s", len(generated), gdir)
+    return generated
+
+# ------------------------------------------------------------------------------
+# Optional PDF generation if report module provides it
+# ------------------------------------------------------------------------------
+
+def maybe_generate_pdf(rows: List[Dict[str, Any]], output_dir: Path, logger: logging.Logger) -> Optional[Path]:
+    audit_report, rp10, rp = _safe_import_audit_report(logger)
+    if audit_report is None:
+        return None
+    try:
+        # Prefer 10p if present; else fallback to render_pdf
+        if callable(rp10):
+            logger.info("Generating PDF via render_pdf_10p...")
+            pdf_path = rp10(rows, output_dir=output_dir, logger=logger)  # type: ignore
+            return _resolve_path(pdf_path) if pdf_path else None
+        elif callable(rp):
+            logger.info("Generating PDF via render_pdf...")
+            pdf_path = rp(rows, output_dir=output_dir, logger=logger)  # type: ignore
+            return _resolve_path(pdf_path) if pdf_path else None
+        else:
+            logger.info("No PDF renderers available in app.audit.report.")
+            return None
+    except Exception as e:
+        logger.error("PDF generation failed: %s", e, exc_info=True)
+        return None
+
+# ------------------------------------------------------------------------------
+# Pipeline: grader -> report -> extra module -> graphs
+# ------------------------------------------------------------------------------
+
+def run_pipeline(ctx: AppContext, args: argparse.Namespace) -> Tuple[Optional[Path], List[Dict[str, Any]]]:
+    logger = ctx.logger
+    output_dir = _resolve_path(args.output_dir or ctx.config.get("output_dir", "artifacts"))
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Optional grading
+    grade_all = _safe_import_grader(logger)
+    results: Any = None
+    if callable(grade_all) and args.input:
         try:
-            res = run_basic_checks(candidate)
-            cats = res.get("category_scores") or {}
-            if cats and sum(int(v) for v in cats.values()) > 0:
-                return candidate, res
-        except Exception: continue
-    return base, _fallback_result(base)
+            logger.info("Running app.grader.grade_all on input: %s", args.input)
+            results = grade_all(input_path=args.input, config=ctx.config, logger=logger)  # type: ignore
+        except Exception as e:
+            logger.error("Grade step failed: %s", e, exc_info=True)
 
-def _maybe_competitor(raw_url: str):
-    if not raw_url: return None, None
+    # Report path: use explicit arg or discover
+    report_path: Optional[Path] = _discover_report_path(args.report, output_dir, logger)
+
+    rows: List[Dict[str, Any]] = []
+    if report_path:
+        try:
+            rows = load_report_data(report_path, logger)
+            logger.info("Loaded %d rows from report: %s", len(rows), report_path)
+        except Exception as e:
+            logger.error("Failed to load report data: %s", e, exc_info=True)
+    else:
+        logger.warning("No report path available. Proceeding with extra module (if provided).")
+
+    # Optional extra module data
+    if args.extra_module:
+        mod = _import_module_from_path(args.extra_module, "extra_module")
+        if mod:
+            try:
+                if hasattr(mod, "compute_metrics"):
+                    extra_rows = mod.compute_metrics(results, ctx.config)  # type: ignore
+                    if isinstance(extra_rows, list):
+                        rows += extra_rows
+                        logger.info("Appended %d rows from extra module compute_metrics.", len(extra_rows))
+                elif hasattr(mod, "get_data"):
+                    extra_rows = mod.get_data()  # type: ignore
+                    if isinstance(extra_rows, list):
+                        rows += extra_rows
+                        logger.info("Appended %d rows from extra module get_data.", len(extra_rows))
+                else:
+                    logger.info("Extra module has no compute_metrics/get_data; skipped.")
+            except Exception as e:
+                logger.error("Extra module invocation failed: %s", e, exc_info=True)
+        else:
+            logger.warning("Could not import extra module from path: %s", args.extra_module)
+
+    return report_path, rows
+
+# ------------------------------------------------------------------------------
+# CLI & runners
+# ------------------------------------------------------------------------------
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=APP_NAME,
+        description="CLI tool to generate graphical outputs from report data (no website attributes)."
+    )
+    parser.add_argument("-c", "--config", default=DEFAULT_CONFIG,
+                        help=f"Path to config JSON (default: {DEFAULT_CONFIG}).")
+    parser.add_argument("-o", "--output-dir", default=None,
+                        help="Output directory for artifacts (graphs, logs, PDFs).")
+    parser.add_argument("-l", "--log-level", default=DEFAULT_LOG_LEVEL,
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                        help=f"Logging level (default: {DEFAULT_LOG_LEVEL}).")
+    parser.add_argument("-w", "--workdir", default=None,
+                        help="Optional working directory to chdir into before running.")
+    parser.add_argument("-i", "--input", default=None,
+                        help="Input path (file or directory) used by grader.py if available.")
+    parser.add_argument("-r", "--report", default=None,
+                        help="Path to existing report file or directory (JSON/CSV/XLSX).")
+    parser.add_argument("-g", "--graph-types", default="auto",
+                        help="Comma-separated graph types: auto, histogram, bar, line (default: auto).")
+    parser.add_argument("-e", "--extra-module", default=None,
+                        help="Path to an extra Python file providing compute_metrics(results, config) or get_data().")
+    parser.add_argument("--pdf", action="store_true",
+                        help="Generate a PDF using app.audit.report if available.")
+    parser.add_argument("-a", "--async", dest="use_async", action="store_true",
+                        help="Run in async mode (delegates to sync; present for parity).")
+    return parser
+
+def run_sync(ctx: AppContext, args: argparse.Namespace) -> int:
+    logger = ctx.logger
+    logger.info("Starting synchronous run.")
+    logger.debug("Arguments: %s", vars(args))
+    logger.debug("Config: %s", ctx.config)
+
     try:
-        comp_norm, comp_res = _robust_audit(raw_url)
-        cats = comp_res.get("category_scores") or {}
-        if cats and sum(int(v) for v in cats.values()) > 0:
-            return comp_norm, comp_res
-    except Exception: pass
-    return None, None
+        report_path, rows = run_pipeline(ctx, args)
+        output_dir = _resolve_path(args.output_dir or ctx.config.get("output_dir", "artifacts"))
+        graphs = generate_graphs(rows, output_dir, args.graph_types.split(","), logger)
 
-# ---------- Session handling ----------
-current_user = None
+        pdf_path = None
+        if args.pdf:
+            pdf_path = maybe_generate_pdf(rows, output_dir, logger)
 
-@app.middleware("http")
-async def session_middleware(request: Request, call_next):
-    global current_user
-    current_user = None
+        if graphs:
+            logger.info("Run completed. Generated graphs:")
+            for g in graphs:
+                logger.info(" - %s", g)
+        else:
+            logger.warning("Run completed with no graphs generated.")
+
+        if pdf_path:
+            logger.info("PDF generated at: %s", pdf_path)
+        elif args.pdf:
+            logger.info("PDF generation requested but skipped (renderer unavailable or failed).")
+
+        return EXIT_SUCCESS
+    except Exception as e:
+        logger.error("Unhandled exception in run_sync: %s", e, exc_info=True)
+        return EXIT_FAILURE
+
+async def run_async(ctx: AppContext, args: argparse.Namespace) -> int:
+    ctx.logger.info("Starting asynchronous run (delegating to sync).")
+    return run_sync(ctx, args)
+
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    # Important: This file is **not** an ASGI app; do not run via uvicorn.
+    workdir = ensure_working_dir(args.workdir)
+    logger, _ = setup_logging(level=args.log_level, log_dir=DEFAULT_LOG_DIR)
+    install_signal_handlers(logger)
+
     try:
-        token = request.cookies.get("session_token")
-        if token:
-            data = decode_token(token)
-            uid = data.get("uid")
-            if uid:
-                db = SessionLocal()
-                try:
-                    u = db.query(User).filter(User.id == uid).first()
-                    if u and getattr(u, "verified", False): current_user = u
-                finally: db.close()
-    except Exception: pass
-    return await call_next(request)
+        config = load_config(args.config, logger)
+    except Exception:
+        return EXIT_FAILURE
 
-# ---------- Health & Index ----------
-@app.get("/healthz")
-async def healthz():
-    return {"ok": _db_ping_ok(), "brand": UI_BRAND_NAME}
+    ctx = AppContext(logger=logger, workdir=workdir, config=config, start_time=time.time())
 
-@app.get("/")
-async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": current_user})
+    if args.use_async:
+        try:
+            return asyncio.run(run_async(ctx, args))
+        except RuntimeError as e:
+            logger.warning("Existing event loop detected; using fallback. %s", e)
+            try:
+                import nest_asyncio  # optional
+                nest_asyncio.apply()
+                loop = asyncio.get_event_loop()
+                return loop.run_until_complete(run_async(ctx, args))
+            except Exception as ee:
+                logger.error("Async fallback failed: %s", ee, exc_info=True)
+                return EXIT_FAILURE
+    else:
+        return run_sync(ctx, args)
 
-# ---------- Audit Routes ----------
-@app.post("/audit/open")
-async def audit_open(request: Request):
-    form = await request.form()
-    url, comp_url = form.get("url"), form.get("competitor_url")
-    if not url: return RedirectResponse("/", status_code=303)
-
-    norm, res = _robust_audit(url)
-    overall = compute_overall(res["category_scores"])
-    exec_summary = _summarize_exec_200_words(norm, res["category_scores"], res.get("top_issues", []))
-
-    comp_norm, comp_res = _maybe_competitor(comp_url)
-    comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()] if comp_res else []
-
-    return templates.TemplateResponse("audit_detail_open.html", {
-        "request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": current_user,
-        "website": {"id": None, "url": norm},
-        "audit": {
-            "created_at": datetime.utcnow(), "grade": grade_from_score(overall), "health_score": int(overall),
-            "exec_summary": exec_summary, "category_scores": [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()],
-            "metrics": _present_metrics(res.get("metrics", {})), "top_issues": res.get("top_issues", []),
-            "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
-        }
-    })
-
-@app.get("/report/pdf/open")
-async def report_pdf_open(url: str):
-    norm, res = _robust_audit(url)
-    overall = int(compute_overall(res["category_scores"]))
-    cats = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
-    path = "/tmp/certified_audit_open.pdf"
-    render_pdf(path, UI_BRAND_NAME, norm, grade_from_score(overall), overall, cats, "Audit Report")
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Audit.pdf")
-
-# ---------- Auth Flows ----------
-@app.post("/auth/login")
-async def login_post(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    global current_user
-    u = db.query(User).filter(User.email == email).first()
-    if not u or not verify_password(password, u.password_hash) or not u.verified:
-        return RedirectResponse("/auth/login?error=1", status_code=303)
-    current_user = u
-    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=43200)
-    resp = RedirectResponse("/auth/dashboard", status_code=303)
-    resp.set_cookie(key="session_token", value=token, httponly=True, max_age=2592000)
-    return resp
-
-# ---------- Dashboard & Subscription ----------
-def _get_or_create_subscription(db, uid):
-    sub = db.query(Subscription).filter(Subscription.user_id == uid).first()
-    if not sub:
-        sub = Subscription(user_id=uid, plan="free", audits_used=0)
-        db.add(sub); db.commit(); db.refresh(sub)
-    return sub
-
-@app.get("/auth/dashboard")
-async def dashboard(request: Request, db: Session = Depends(get_db)):
-    if not current_user: return RedirectResponse("/auth/login")
-    websites = db.query(Website).filter(Website.user_id == current_user.id).all()
-    last_audits = db.query(Audit).filter(Audit.user_id == current_user.id).order_by(Audit.created_at.desc()).limit(10).all()
-    sub = _get_or_create_subscription(db, current_user.id)
-    
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": current_user, "websites": websites,
-        "trend": {"labels": [a.created_at.strftime('%d %b') for a in reversed(last_audits)], "values": [a.health_score for a in reversed(last_audits)]},
-        "summary": {"grade": (last_audits[0].grade if last_audits else "A"), "health_score": (last_audits[0].health_score if last_audits else 0)},
-        "schedule": {"plan": sub.plan, "audits_used": sub.audits_used, "free_limit": FREE_AUDIT_LIMIT}
-    })
-
-@app.get("/auth/audit/{website_id}")
-async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
-    if not current_user: return RedirectResponse("/auth/login")
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
-    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
-    metrics = _present_metrics(json.loads(a.metrics_json) if a.metrics_json else {})
-    return templates.TemplateResponse("audit_detail.html", {
-        "request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": current_user, "website": w,
-        "audit": {"grade": a.grade, "health_score": a.health_score, "exec_summary": a.exec_summary, "category_scores": json.loads(a.category_scores_json), "metrics": metrics}
-    })
-
-# ---------- Startup ----------
-@app.on_event("startup")
-async def _startup():
-    if init_db():
-        asyncio.create_task(_daily_scheduler_loop())
-
-async def _daily_scheduler_loop():
-    while True:
-        await asyncio.sleep(3600)
+if __name__ == "__main__":
+    sys.exit(main())
