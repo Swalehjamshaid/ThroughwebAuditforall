@@ -1,0 +1,12 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Audit Detail</h2>
+  {% if data %}
+    <pre style="white-space:pre-wrap">{{ data.rows|tojson(indent=2) }}</pre>
+  {% else %}
+    <p>No audit data available.</p>
+  {% endif %}
+</div>
+{% endblock %}

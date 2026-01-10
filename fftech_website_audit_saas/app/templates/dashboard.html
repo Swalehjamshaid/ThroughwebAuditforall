@@ -1,0 +1,60 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid cols-3">
+  <div class="card"><h3>Latest Run</h3>
+    {% if latest %}
+      <p><strong>Duration:</strong> {{ latest.duration }}s</p>
+      <p><strong>Report:</strong> {{ latest.report_path }}</p>
+      <p><strong>Graphs:</strong> {{ latest.graphs|length }}</p>
+    {% else %}
+      <p>No runs yet. Use the form on the home page.</p>
+    {% endif %}
+  </div>
+  <div class="card"><h3>KPIs</h3>
+    <ul>
+      <li>Performance Score</li>
+      <li>Accessibility</li>
+      <li>SEO</li>
+      <li>Best Practices</li>
+    </ul>
+  </div>
+  <div class="card"><h3>Export</h3>
+    <p>PDF export available from the run result page.</p>
+  </div>
+</div>
+
+{% if latest and latest.rows %}
+<div class="grid cols-2" style="margin-top:1rem">
+  <div class="card">
+    <h3>Interactive Overview</h3>
+    <canvas id="overviewChart" height="140"></canvas>
+  </div>
+  <div class="card">
+    <h3>Top Metrics</h3>
+    <canvas id="topChart" height="140"></canvas>
+  </div>
+</div>
+<script>
+  (function(){
+    try {
+      const rows = {{ latest.rows|tojson }};
+      const keys = Object.keys(rows[0]||{});
+      const numeric = keys.filter(k=>rows.some(r=>!isNaN(parseFloat(r[k]))));
+      const labels = rows.map((_,i)=>i+1);
+      const ds = numeric.slice(0,3).map(k=>({label:k,data:rows.map(r=>parseFloat(r[k])||0)}));
+      new Chart(document.getElementById('overviewChart'),{
+        type:'line',
+        data:{labels, datasets: ds.map((d,i)=>({label:d.label,borderColor:['#66fcf1','#ff7f0e','#2ca02c'][i%3],data:d.data}))},
+        options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+      });
+      new Chart(document.getElementById('topChart'),{
+        type:'bar',
+        data:{labels:numeric.slice(0,5), datasets:[{label:'Mean', backgroundColor:'#45a29e', data:numeric.slice(0,5).map(k=>rows.reduce((a,b)=>a+(parseFloat(b[k])||0),0)/rows.length)}]},
+        options:{responsive:true, plugins:{legend:{display:false}}}
+      });
+    } catch (e) { console.warn('Chart init failed', e); }
+  })();
+</script>
+{% endif %}
+{% endblock %}

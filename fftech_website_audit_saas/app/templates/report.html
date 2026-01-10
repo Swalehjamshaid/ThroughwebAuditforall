@@ -1,0 +1,50 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="grid cols-2">
+  <div class="card">
+    <h2 style="margin-top:0">Audit Output</h2>
+    <p><strong>Duration:</strong> {{ data.duration }}s</p>
+    <p><strong>Report file:</strong> {{ data.report_path or 'N/A' }}</p>
+    {% if data.pdf_path %}
+      <p><a class="btn" href="{{ data.pdf_path }}" target="_blank">Download PDF</a></p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h3>Interactive Snapshot</h3>
+    <canvas id="snapshotChart" height="140"></canvas>
+  </div>
+</div>
+
+<h3 style="margin-top:1rem">Graphs</h3>
+<div class="grid cols-3">
+  {% if data.graphs %}
+    {% for g in data.graphs %}
+      {% set rel = g.split('/static/')[-1] if '/static/' in g else 'img/graphs/' + g.split('graphs/')[-1] %}
+      <figure class="card">
+        <img src="/static/{{ rel }}" alt="{{ g }}" />
+        <figcaption>{{ g.split('/')[-1] }}</figcaption>
+      </figure>
+    {% endfor %}
+  {% else %}
+    <p>No graphs generated.</p>
+  {% endif %}
+</div>
+
+<script>
+  (function(){
+    try {
+      const rows = {{ data.rows|tojson }};
+      const keys = Object.keys(rows[0]||{});
+      const numeric = keys.filter(k=>rows.some(r=>!isNaN(parseFloat(r[k]))));
+      const labels = rows.map((_,i)=>i+1);
+      const ds = numeric.slice(0,3).map(k=>({label:k,data:rows.map(r=>parseFloat(r[k])||0)}));
+      new Chart(document.getElementById('snapshotChart'),{
+        type:'line',
+        data:{labels, datasets: ds.map((d,i)=>({label:d.label,borderColor:['#66fcf1','#ff7f0e','#2ca02c'][i%3],data:d.data}))},
+        options:{responsive:true, plugins:{legend:{position:'bottom'}}}
+      });
+    } catch (e) { console.warn('Chart init failed', e); }
+  })();
+</script>
+{% endblock %}

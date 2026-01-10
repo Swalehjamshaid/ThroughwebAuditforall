@@ -1,0 +1,38 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div class="card">
+    <h1 style="margin-top:0">Run a Website Audit</h1>
+    <p>Provide a report file (JSON/CSV/XLSX) and select the chart types. We will generate beautiful visualizations and an optional PDF.</p>
+    <form method="post" action="/run" class="grid">
+      <label>Report path
+        <input type="text" name="report" placeholder="/path/to/report.json" />
+      </label>
+      <label>Graph types
+        <input type="text" name="graph_types" value="auto" placeholder="auto, histogram, bar, line" />
+      </label>
+      <label>Input path (optional)
+        <input type="text" name="input_path" placeholder="/path/to/input" />
+      </label>
+      <div>
+        <label><input type="checkbox" name="pdf" value="true" /> Generate PDF</label>
+      </div>
+      <div>
+        <button class="btn" type="submit">Run Audit</button>
+      </div>
+    </form>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>Fast, Accurate, Visual</h3>
+      <p>All charts are rendered server-side for reliability, with interactive Chart.js as an enhancement.</p>
+      <p><kbd>uvicorn app.main:app</kbd> to start.</p>
+    </div>
+    <div class="card">
+      <h3>Export</h3>
+      <p>Download a polished PDF report that includes key metrics and selected figures.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}
