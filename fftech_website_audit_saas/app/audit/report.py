@@ -31,7 +31,8 @@ def _save_gauge(score: int, path: str, title: str = "Overall Health"):
     """Donut gauge for overall health."""
     fig, ax = plt.subplots(figsize=(4, 4))
     ax.set_aspect('equal')
-    wedges = [max(0, min(100, int(score))), 100 - max(0, min(100, int(score)))]
+    val = max(0, min(100, int(score)))
+    wedges = [val, 100 - val]
     ax.pie(
         wedges,
         colors=['#10B981', '#EEEEEE'],
@@ -39,7 +40,7 @@ def _save_gauge(score: int, path: str, title: str = "Overall Health"):
         counterclock=False,
         wedgeprops=dict(width=0.35, edgecolor='white')
     )
-    ax.text(0, 0.02, f"{int(score)}", ha='center', va='center',
+    ax.text(0, 0.02, f"{val}", ha='center', va='center',
             fontsize=20, fontweight='bold', color='#333')
     ax.text(0, -0.25, title, ha='center', va='center', fontsize=10, color='#666')
     plt.tight_layout()
@@ -80,7 +81,7 @@ def _save_radar(labels, values, labels2, values2, path: str):
     values = list(values or [])
     N = len(labels)
     if N == 0:
-        labels = ["Perf", "Acc", "SEO", "Sec", "BP"]
+        labels = ["Performance", "Accessibility", "SEO", "Security", "BestPractices"]
         values = [0, 0, 0, 0, 0]
         N = 5
 
@@ -385,7 +386,6 @@ def render_pdf(file_path: str, brand: str, site_url: str, grade: str,
     Backward‑compatible function your existing main.py calls.
     Internally delegates to the 10‑page builder, passing minimal data plus placeholders.
     """
-    # Minimal radar data from category_scores, rest as placeholders:
     render_pdf_10p(
         file_path=file_path,
         brand=brand,
@@ -394,10 +394,11 @@ def render_pdf(file_path: str, brand: str, site_url: str, grade: str,
         health_score=health_score,
         category_scores=category_scores,
         executive_summary=executive_summary,
-        cwv={},                     # no CWV provided by current main.py
+        cwv={},                     # no CWV provided by current call
         top_issues=[],              # placeholder
         security={},                # placeholder
         indexation={},              # placeholder
         competitor=None,            # placeholder (overlay will be skipped)
         trend={"labels": ["Run"], "values": [int(health_score)]}  # simple single‑point trend
     )
+``
