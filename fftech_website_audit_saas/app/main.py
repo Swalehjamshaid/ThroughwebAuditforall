@@ -41,7 +41,11 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-app = FastAPI()
+# Plans & limits
+FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDIT_LIMIT", "10"))  # free users can run up to 10 audits
+FREE_HISTORY_WINDOW_DAYS = int(os.getenv("FREE_HISTORY_WINDOW_DAYS", "30"))  # optional pruning window
+
+app = FastAPI(title=f"{UI_BRAND_NAME} AI Website Audit SaaS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
@@ -142,7 +146,10 @@ def get_db():
         db.close()
 
 # ---------- Metrics presenter ----------
+# Extended labels to cover common technical, SEO, and security metrics.
+# The backend remains agnostic: only keys returned by run_basic_checks will be shown.
 METRIC_LABELS = {
+    # Basic fetch/headers
     "status_code": "Status Code",
     "content_length": "Content Length (bytes)",
     "content_encoding": "Compression (Content-Encoding)",
@@ -152,19 +159,59 @@ METRIC_LABELS = {
     "xfo": "X-Frame-Options",
     "csp": "Content-Security-Policy",
     "set_cookie": "Set-Cookie",
+
+    # HTML structure
     "title": "HTML <title>",
     "title_length": "Title Length",
     "meta_description_length": "Meta Description Length",
     "meta_robots": "Meta Robots",
     "canonical_present": "Canonical Link Present",
+
+    # Protocols & crawling
     "has_https": "Uses HTTPS",
     "robots_allowed": "Robots Allowed",
     "sitemap_present": "Sitemap Present",
+
+    # Accessibility & content
     "images_without_alt": "Images Missing alt",
     "image_count": "Image Count",
     "viewport_present": "Viewport Meta Present",
     "html_lang_present": "<html lang> Present",
     "h1_count": "H1 Count",
+
+    # Core vitals / perf (if provided by engine)
+    "lcp": "Largest Contentful Paint (LCP)",
+    "fcp": "First Contentful Paint (FCP)",
+    "cls": "Cumulative Layout Shift (CLS)",
+    "tbt": "Total Blocking Time",
+    "fid": "First Input Delay",
+    "speed_index": "Speed Index",
+    "tti": "Time to Interactive",
+    "dom_content_loaded": "DOM Content Loaded",
+    "total_page_size": "Total Page Size",
+    "requests_per_page": "Requests Per Page",
+    "unminified_css": "Unminified CSS",
+    "unminified_js": "Unminified JavaScript",
+    "render_blocking": "Render Blocking Resources",
+    "excessive_dom": "Excessive DOM Size",
+    "third_party_load": "Third-Party Script Load",
+    "server_response_time": "Server Response Time",
+    "image_optimization": "Image Optimization",
+    "lazy_loading_issues": "Lazy Loading Issues",
+    "browser_caching": "Browser Caching Issues",
+    "missing_gzip_brotli": "Missing GZIP / Brotli",
+    "resource_load_errors": "Resource Load Errors",
+
+    # Security
+    "ssl_valid": "SSL Certificate Validity",
+    "ssl_expired": "Expired SSL",
+    "mixed_content": "Mixed Content",
+    "insecure_resources": "Insecure Resources",
+    "security_headers_missing": "Missing Security Headers",
+    "open_directory_listing": "Open Directory Listing",
+    "login_http": "Login Pages Without HTTPS",
+
+    # Meta
     "normalized_url": "Normalized URL",
     "error": "Fetch Error",
 }
@@ -219,6 +266,7 @@ def _url_variants(u: str) -> list:
     return ordered
 
 def _fallback_result(url: str) -> dict:
+    # Basic fallback ensures the UI renders – replace with real checks in engine
     return {
         "category_scores": {
             "Performance": 65,
@@ -261,6 +309,8 @@ current_user = None
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
     global current_user
+    # Reset current_user at the start of each request to avoid leakage across requests
+    current_user = None
     try:
         token = request.cookies.get("session_token")
         if token:
@@ -336,6 +386,7 @@ async def report_pdf_open(url: str):
     top_issues = res.get("top_issues", []) or []
     exec_summary = summarize_200_words(normalized, res["category_scores"], top_issues)
     path = "/tmp/certified_audit_open.pdf"
+    # NOTE: Ensure report.py generates a 5-page, executive-ready PDF as per spec.
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
@@ -408,11 +459,15 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         <p>Hello!</p>
         <p>Click the button below to log into your account securely:</p>
         <p style="text-align: center;">
-            {login_link}Log In Now</a>
+            {login_link}
+                Log In Now
+            </a>
         </p>
         <p>Or copy and paste this link into your browser:</p>
         <p style="word-break: break-all; color: #666;">{login_link}</p>
-        <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
+        <p style="font-size: 12px; color: #999; margin-top: 30px;">
+            This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.
+        </p>
     </div>
     """
     msg = MIMEMultipart("alternative")
@@ -438,6 +493,7 @@ async def magic_request(
 ):
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
+        # We do not disclose account existence; always return success
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
@@ -504,12 +560,24 @@ async def logout(request: Request):
     resp.delete_cookie("session_token")
     return resp
 
+# ---------- Helper: plan gating ----------
+def _get_or_create_subscription(db: Session, user_id: int) -> Subscription:
+    sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+    if not sub:
+        sub = Subscription(user_id=user_id, plan="free", active=True, audits_used=0)
+        db.add(sub); db.commit(); db.refresh(sub)
+    return sub
+
+def _is_free_plan(sub: Subscription) -> bool:
+    return (getattr(sub, "plan", "free") or "free").lower() == "free"
+
 # ---------- Registered audit flows ----------
 @app.get("/auth/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
+
     websites = db.query(Website).filter(Website.user_id == current_user.id).all()
     last_audits = (
         db.query(Audit)
@@ -525,11 +593,14 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "grade": (last_audits[0].grade if last_audits else "A"),
         "health_score": (last_audits[0].health_score if last_audits else 88)
     }
-    sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
+    sub = _get_or_create_subscription(db, current_user.id)
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
-        "enabled": getattr(sub, "email_schedule_enabled", False),
+        "enabled": getattr(sub, "email_schedule_enabled", False) and not _is_free_plan(sub),
+        "plan": getattr(sub, "plan", "free"),
+        "audits_used": getattr(sub, "audits_used", 0),
+        "free_limit": FREE_AUDIT_LIMIT
     }
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -563,14 +634,19 @@ async def new_audit_post(
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
 
-    sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
-    if not sub:
-        sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
-        db.add(sub); db.commit(); db.refresh(sub)
+    sub = _get_or_create_subscription(db, current_user.id)
 
-    if enable_schedule and hasattr(sub, "email_schedule_enabled"):
+    # Enforce free limit before creating websites (storage hygiene)
+    if _is_free_plan(sub) and (sub.audits_used or 0) >= FREE_AUDIT_LIMIT:
+        return RedirectResponse("/auth/upgrade?limit=1", status_code=303)
+
+    # Enforce schedule gating: free users cannot enable schedules
+    if enable_schedule and not _is_free_plan(sub) and hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = True
         db.commit()
+    elif enable_schedule and _is_free_plan(sub):
+        # Redirect to upgrade if they attempted scheduling
+        return RedirectResponse("/auth/upgrade?schedule=1", status_code=303)
 
     w = Website(user_id=current_user.id, url=url)
     db.add(w); db.commit(); db.refresh(w)
@@ -586,6 +662,11 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     if not w:
         return RedirectResponse("/auth/dashboard", status_code=303)
+
+    sub = _get_or_create_subscription(db, current_user.id)
+    # Enforce free plan audit limit
+    if _is_free_plan(sub) and (sub.audits_used or 0) >= FREE_AUDIT_LIMIT:
+        return RedirectResponse("/auth/upgrade?limit=1", status_code=303)
 
     try:
         normalized, res = _robust_audit(w.url)
@@ -618,9 +699,22 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     w.last_grade = grade
     db.commit()
 
-    sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
-    if sub:
-        sub.audits_used = (sub.audits_used or 0) + 1
+    # Increment usage counter
+    sub.audits_used = (sub.audits_used or 0) + 1
+    db.commit()
+
+    # Optional: prune history for free plans
+    if _is_free_plan(sub):
+        window = datetime.utcnow() - timedelta(days=FREE_HISTORY_WINDOW_DAYS)
+        old_audits = db.query(Audit).filter(
+            Audit.user_id == current_user.id,
+            Audit.created_at < window
+        ).all()
+        for a_old in old_audits:
+            try:
+                db.delete(a_old)
+            except Exception:
+                pass
         db.commit()
 
     return RedirectResponse(f"/auth/audit/{w.id}", status_code=303)
@@ -639,7 +733,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
-    top_issues = metrics_raw.get("top_issues", [])  # <-- wire top_issues to template
+    top_issues = metrics_raw.get("top_issues", [])  # wire top_issues to template
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -670,7 +764,7 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
 
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     path = f"/tmp/certified_audit_{website_id}.pdf"
-
+    # Ensure report.py implements 5 pages with visuals, conclusions, branding.
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
@@ -681,11 +775,15 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
 
-    sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
+    sub = _get_or_create_subscription(db, current_user.id)
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
-        "enabled": getattr(sub, "email_schedule_enabled", False),
+        # show enabled only if not free plan
+        "enabled": getattr(sub, "email_schedule_enabled", False) and not _is_free_plan(sub),
+        "plan": getattr(sub, "plan", "free"),
+        "audits_used": getattr(sub, "audits_used", 0),
+        "free_limit": FREE_AUDIT_LIMIT
     }
 
     return templates.TemplateResponse("dashboard.html", {
@@ -710,20 +808,34 @@ async def schedule_post(
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
 
-    sub = db.query(Subscription).filter(Subscription.user_id == current_user.id).first()
-    if not sub:
-        sub = Subscription(user_id=current_user.id, plan="free", active=True, audits_used=0)
-        db.add(sub); db.commit(); db.refresh(sub)
+    sub = _get_or_create_subscription(db, current_user.id)
 
     if hasattr(sub, "daily_time"):
         sub.daily_time = daily_time
     if hasattr(sub, "timezone"):
         sub.timezone = timezone
-    if hasattr(sub, "email_schedule_enabled"):
-        sub.email_schedule_enabled = bool(enabled)
-    db.commit()
 
+    # Gating: free plan cannot enable schedules
+    if hasattr(sub, "email_schedule_enabled"):
+        if _is_free_plan(sub):
+            sub.email_schedule_enabled = False
+            db.commit()
+            return RedirectResponse("/auth/upgrade?schedule=1", status_code=303)
+        else:
+            sub.email_schedule_enabled = bool(enabled)
+
+    db.commit()
     return RedirectResponse("/auth/dashboard", status_code=303)
+
+# ---------- Upgrade (Plan gating landing) ----------
+@app.get("/auth/upgrade")
+async def upgrade(request: Request):
+    # Simple upgrade landing – template should show plan benefits
+    return templates.TemplateResponse("upgrade.html", {
+        "request": request,
+        "UI_BRAND_NAME": UI_BRAND_NAME,
+        "user": current_user
+    })
 
 # ---------- Admin ----------
 @app.get("/auth/admin/login")
@@ -802,7 +914,8 @@ async def _daily_scheduler_loop():
                 subs = db.query(Subscription).filter(Subscription.active == True).all()
                 now_utc = datetime.utcnow()
                 for sub in subs:
-                    if not getattr(sub, "email_schedule_enabled", False):
+                    # Gating: only non-free plans with schedule enabled
+                    if _is_free_plan(sub) or not getattr(sub, "email_schedule_enabled", False):
                         continue
                     tz_name    = getattr(sub, "timezone", "UTC") or "UTC"
                     daily_time = getattr(sub, "daily_time", "09:00") or "09:00"
