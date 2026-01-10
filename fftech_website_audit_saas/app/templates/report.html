@@ -1,0 +1,27 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Pipeline Result</h2>
+  <p><strong>Duration:</strong> {{ data.duration }}s</p>
+  <p><strong>Report file:</strong> {{ data.report_path or 'N/A' }}</p>
+  {% if data.pdf_path %}
+    <p><a href="{{ data.pdf_path }}" target="_blank">Download PDF</a></p>
+  {% endif %}
+
+  <h3>Graphs</h3>
+  {% if data.graphs %}
+    <div class="grid">
+    {% for g in data.graphs %}
+      {% set rel = g.split('/static/')[-1] if '/static/' in g else 'img/graphs/' + g.split('graphs/')[-1] %}
+      <figure>
+        <img src="/static/{{ rel }}" alt="{{ g }}" />
+        <figcaption>{{ g.split('/')[-1] }}</figcaption>
+      </figure>
+    {% endfor %}
+    </div>
+  {% else %}
+    <p>No graphs generated.</p>
+  {% endif %}
+</section>
+{% endblock %}

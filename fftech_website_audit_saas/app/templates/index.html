@@ -1,0 +1,22 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Run Audit</h2>
+  <form method="post" action="/run" class="form">
+    <label>Report path (JSON/CSV/XLSX):
+      <input type="text" name="report" placeholder="/path/to/report.json" />
+    </label>
+    <label>Graph types:
+      <input type="text" name="graph_types" value="auto" placeholder="auto, histogram, bar, line" />
+    </label>
+    <label>Input path (optional, for grader):
+      <input type="text" name="input_path" placeholder="/path/to/input" />
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="pdf" value="true" /> Generate PDF
+    </label>
+    <button type="submit">Open Audit</button>
+  </form>
+</section>
+{% endblock %}
