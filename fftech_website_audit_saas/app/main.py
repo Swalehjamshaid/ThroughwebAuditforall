@@ -30,6 +30,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+
 # ---------- Config ----------
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
@@ -47,9 +48,11 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDIT_LIMIT", "10"))  # free users can run up to 10 audits
 FREE_HISTORY_WINDOW_DAYS = int(os.getenv("FREE_HISTORY_WINDOW_DAYS", "30"))  # optional pruning window
 
+
 app = FastAPI(title=f"{UI_BRAND_NAME} AI Website Audit SaaS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
+
 
 # ---- Startup schema patches ----
 def _ensure_schedule_columns():
@@ -70,6 +73,7 @@ def _ensure_schedule_columns():
     except Exception:
         pass
 
+
 def _ensure_user_columns():
     try:
         with engine.begin() as conn:
@@ -88,6 +92,7 @@ def _ensure_user_columns():
     except Exception:
         pass
 
+
 # ---------- DB init helpers ----------
 def _db_ping_ok() -> bool:
     try:
@@ -98,6 +103,7 @@ def _db_ping_ok() -> bool:
         return False
     except Exception:
         return False
+
 
 def _seed_admin_if_needed(db: Session):
     if not (ADMIN_EMAIL and ADMIN_PASSWORD):
@@ -120,6 +126,7 @@ def _seed_admin_if_needed(db: Session):
     )
     db.add(admin); db.commit(); db.refresh(admin)
 
+
 def init_db() -> bool:
     if not _db_ping_ok():
         print("[startup] Database ping failed. Check DATABASE_URL.")
@@ -139,6 +146,7 @@ def init_db() -> bool:
         print(f"[startup] Database initialization error: {e}")
         return False
 
+
 # ---------- DB dependency ----------
 def get_db():
     db = SessionLocal()
@@ -146,6 +154,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 # ---------- Metrics presenter ----------
 METRIC_LABELS = {
@@ -216,6 +225,7 @@ METRIC_LABELS = {
     "error": "Fetch Error",
 }
 
+
 def _present_metrics(metrics: dict) -> dict:
     out = {}
     for k, v in (metrics or {}).items():
@@ -225,7 +235,8 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# ---------- Summary adapter ----------
+
+# ---------- Summary adapter (fixes TypeError on summarize_200_words) ----------
 def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list) -> str:
     """
     Backwards-compatible adapter for summarize_200_words().
@@ -256,6 +267,7 @@ def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list)
                 f"raise the overall health score while reducing potential risks and boosting indexation quality."
             )
 
+
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
     if not raw:
@@ -272,6 +284,7 @@ def _normalize_url(raw: str) -> str:
         p = urlparse(s)
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
+
 
 def _url_variants(u: str) -> list:
     p = urlparse(u)
@@ -295,6 +308,7 @@ def _url_variants(u: str) -> list:
         if c not in seen:
             ordered.append(c); seen.add(c)
     return ordered
+
 
 def _fallback_result(url: str) -> dict:
     return {
@@ -321,6 +335,7 @@ def _fallback_result(url: str) -> dict:
         ],
     }
 
+
 def _robust_audit(url: str) -> Tuple[str, dict]:
     base = _normalize_url(url)
     for candidate in _url_variants(base):
@@ -333,8 +348,28 @@ def _robust_audit(url: str) -> Tuple[str, dict]:
             continue
     return base, _fallback_result(base)
 
+
+# ---------- Competitor helper ----------
+def _maybe_competitor(raw_url: str):
+    """
+    Return (normalized_url, result_dict) for competitor if provided; else (None, None).
+    Uses the same robust audit engine as the primary site.
+    """
+    if not raw_url:
+        return None, None
+    try:
+        comp_norm, comp_res = _robust_audit(raw_url)
+        cats = comp_res.get("category_scores") or {}
+        if cats and sum(int(v) for v in cats.values()) > 0:
+            return comp_norm, comp_res
+    except Exception:
+        pass
+    return None, None
+
+
 # ---------- Session handling ----------
 current_user = None
+
 
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
@@ -359,11 +394,13 @@ async def session_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
+
 # ---------- Health check ----------
 @app.get("/healthz")
 async def healthz():
     ok = _db_ping_ok()
     return {"ok": ok, "brand": UI_BRAND_NAME}
+
 
 # ---------- Public ----------
 @app.get("/")
@@ -374,10 +411,13 @@ async def index(request: Request):
         "user": current_user
     })
 
+
 @app.post("/audit/open")
 async def audit_open(request: Request):
     form = await request.form()
     url = form.get("url")
+    competitor_url = form.get("competitor_url")  # optional
+
     if not url:
         return RedirectResponse("/", status_code=303)
 
@@ -389,6 +429,12 @@ async def audit_open(request: Request):
     exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
     metrics = _present_metrics(res.get("metrics", {}))
+
+    # Optional competitor overlay
+    comp_norm, comp_res = _maybe_competitor(competitor_url)
+    comp_cs_list = []
+    if comp_res:
+        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
 
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
@@ -402,9 +448,11 @@ async def audit_open(request: Request):
             "exec_summary": exec_summary,
             "category_scores": category_scores_list,
             "metrics": metrics,
-            "top_issues": top_issues
+            "top_issues": top_issues,
+            "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
         }
     })
+
 
 @app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
@@ -418,6 +466,7 @@ async def report_pdf_open(url: str):
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
+
 # ---------- Registration & Auth ----------
 @app.get("/auth/register")
 async def register_get(request: Request):
@@ -426,6 +475,7 @@ async def register_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/auth/register")
 async def register_post(
@@ -449,6 +499,7 @@ async def register_post(
         print(f"[auth] Failed to send email to {u.email}. Check SMTP/Resend settings.")
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
+
 @app.get("/auth/verify")
 async def verify(request: Request, token: str, db: Session = Depends(get_db)):
     try:
@@ -467,6 +518,7 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
         })
     return RedirectResponse("/auth/login", status_code=303)
 
+
 @app.get("/auth/login")
 async def login_get(request: Request):
     return templates.TemplateResponse("login.html", {
@@ -474,6 +526,7 @@ async def login_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 # ---------- Magic Login (Passwordless) ----------
 def _send_magic_login_email(to_email: str, token: str) -> bool:
@@ -487,7 +540,11 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         <p>Hello!</p>
         <p>Click the button below to log into your account securely:</p>
         <p style="text-align: center;">
-            <a href="{login_link}" style="background:#4F46E5;color:#fff;padding:10px 16px;border-radius: paste this link into your browser:</p>
+            {login_link}
+                Log In Now
+            </a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
         <p style="word-break: break-all; color: #666;">{login_link}</p>
         <p style="font-size: 12px; color: #999; margin-top: 30px;">
             This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.
@@ -509,6 +566,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         print(f"[auth] SMTP Error sending magic link: {e}")
         return False
 
+
 @app.post("/auth/magic/request")
 async def magic_request(
     request: Request,
@@ -521,6 +579,7 @@ async def magic_request(
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
     return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
 
 @app.get("/auth/magic")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
@@ -547,6 +606,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
         return resp
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
+
 
 # ---------- Password login ----------
 @app.post("/auth/login")
@@ -575,6 +635,7 @@ async def login_post(
     )
     return resp
 
+
 @app.get("/auth/logout")
 async def logout(request: Request):
     global current_user
@@ -582,6 +643,7 @@ async def logout(request: Request):
     resp = RedirectResponse("/", status_code=303)
     resp.delete_cookie("session_token")
     return resp
+
 
 # ---------- Helper: plan gating ----------
 def _get_or_create_subscription(db: Session, user_id: int) -> Subscription:
@@ -591,8 +653,10 @@ def _get_or_create_subscription(db: Session, user_id: int) -> Subscription:
         db.add(sub); db.commit(); db.refresh(sub)
     return sub
 
+
 def _is_free_plan(sub: Subscription) -> bool:
     return (getattr(sub, "plan", "free") or "free").lower() == "free"
+
 
 # ---------- Registered audit flows ----------
 @app.get("/auth/dashboard")
@@ -635,6 +699,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "schedule": schedule
     })
 
+
 @app.get("/auth/audit/new")
 async def new_audit_get(request: Request):
     global current_user
@@ -645,6 +710,7 @@ async def new_audit_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/auth/audit/new")
 async def new_audit_post(
@@ -672,6 +738,7 @@ async def new_audit_post(
     db.add(w); db.commit(); db.refresh(w)
 
     return RedirectResponse(f"/auth/audit/run/{w.id}", status_code=303)
+
 
 @app.get("/auth/audit/run/{website_id}")
 async def run_audit(website_id: int, request: Request, db: Session = Depends(get_db)):
@@ -735,11 +802,14 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
 
     return RedirectResponse(f"/auth/audit/{w.id}", status_code=303)
 
+
 @app.get("/auth/audit/{website_id}")
 async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
+
+    competitor_url = request.query_params.get("competitor_url")  # optional
 
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
@@ -750,6 +820,12 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
     top_issues = metrics_raw.get("top_issues", [])
+
+    # Optional competitor overlay
+    comp_norm, comp_res = _maybe_competitor(competitor_url)
+    comp_cs_list = []
+    if comp_res:
+        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -763,9 +839,11 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
             "metrics": metrics,
-            "top_issues": top_issues
+            "top_issues": top_issues,
+            "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
         }
     })
+
 
 @app.get("/auth/report/pdf/{website_id}")
 async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
@@ -782,6 +860,7 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
     path = f"/tmp/certified_audit_{website_id}.pdf"
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
+
 
 # ---------- Scheduling UI ----------
 @app.get("/auth/schedule")
@@ -809,6 +888,7 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
         "summary": {"grade": "A", "health_score": 88},
         "schedule": schedule
     })
+
 
 @app.post("/auth/schedule")
 async def schedule_post(
@@ -840,6 +920,7 @@ async def schedule_post(
     db.commit()
     return RedirectResponse("/auth/dashboard", status_code=303)
 
+
 # ---------- Upgrade ----------
 @app.get("/auth/upgrade")
 async def upgrade(request: Request):
@@ -849,6 +930,7 @@ async def upgrade(request: Request):
         "user": current_user
     })
 
+
 # ---------- Admin ----------
 @app.get("/auth/admin/login")
 async def admin_login_get(request: Request):
@@ -857,6 +939,7 @@ async def admin_login_get(request: Request):
         "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
+
 
 @app.post("/auth/admin/login")
 async def admin_login_post(
@@ -881,6 +964,7 @@ async def admin_login_post(
     )
     return resp
 
+
 @app.get("/auth/admin")
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -900,7 +984,8 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "admin_audits": audits
     })
 
-# ---------- Email Scheduler ----------
+
+# ---------- Email Sender ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
@@ -918,6 +1003,8 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     except Exception:
         return False
 
+
+# ---------- Email Scheduler ----------
 async def _daily_scheduler_loop():
     while True:
         try:
@@ -979,6 +1066,7 @@ async def _daily_scheduler_loop():
         except Exception as e:
             print(f"[scheduler] error: {e}")
         await asyncio.sleep(60)
+
 
 # ---------- Startup ----------
 @app.on_event("startup")
