@@ -1,0 +1,20 @@
+{% extends 'base_open.html' %}
+{% block open_body %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card glass p-5 text-center">
+      {% if success %}
+        <div class="radial" style="background:conic-gradient(var(--accent) 0% 100%, rgba(255,255,255,.08) 0%)"><span><i class="fas fa-check"></i></span></div>
+        <h3 class="mt-3">Email Verified</h3>
+        <p class="small-muted">You can now log in.</p>
+        <a class="btn btn-primary mt-2" href="/auth/login">Go to Login</a>
+      {% else %}
+        <div class="radial" style="background:conic-gradient(#ff4d4d 0% 100%, rgba(255,255,255,.08) 0%)"><span><i class="fas fa-times"></i></span></div>
+        <h3 class="mt-3">Verification Failed</h3>
+        <p class="small-muted">The link may have expired. Request another verification email.</p>
+        <a class="btn btn-outline-primary mt-2" href="/auth/login">Back to Login</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
