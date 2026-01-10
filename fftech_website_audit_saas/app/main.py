@@ -146,8 +146,6 @@ def get_db():
         db.close()
 
 # ---------- Metrics presenter ----------
-# Extended labels to cover common technical, SEO, and security metrics.
-# The backend remains agnostic: only keys returned by run_basic_checks will be shown.
 METRIC_LABELS = {
     # Basic fetch/headers
     "status_code": "Status Code",
@@ -179,7 +177,7 @@ METRIC_LABELS = {
     "html_lang_present": "<html lang> Present",
     "h1_count": "H1 Count",
 
-    # Core vitals / perf (if provided by engine)
+    # Perf / CWV (optional)
     "lcp": "Largest Contentful Paint (LCP)",
     "fcp": "First Contentful Paint (FCP)",
     "cls": "Cumulative Layout Shift (CLS)",
@@ -225,6 +223,37 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
+# ---------- Summary adapter ----------
+def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list) -> str:
+    """
+    Backwards-compatible adapter for summarize_200_words().
+
+    Tries the 3-arg call first; if a TypeError occurs, falls back to a single-arg payload.
+    As a last resort, returns a safe deterministic summary to keep UI/PDF stable.
+    """
+    try:
+        # Preferred: if summarize_200_words already supports (url, category_scores, top_issues)
+        return summarize_200_words(url, category_scores, top_issues)
+    except TypeError:
+        payload = {
+            "url": url,
+            "category_scores": category_scores or {},
+            "top_issues": top_issues or [],
+        }
+        try:
+            return summarize_200_words(payload)
+        except Exception:
+            cats = category_scores or {}
+            strengths = ", ".join(sorted([k for k, v in cats.items() if int(v) >= 75])) or "Core areas performing well"
+            weaknesses = ", ".join(sorted([k for k, v in cats.items() if int(v) < 60])) or "Some categories need improvement"
+            issues_preview = ", ".join((top_issues or [])[:5]) or "No critical issues reported"
+            return (
+                f"This website shows a balanced technical and SEO profile. Strengths include {strengths}. "
+                f"Weaknesses include {weaknesses}. Priority areas involve addressing: {issues_preview}. "
+                f"Focus on incremental improvements in performance, accessibility, and security headers to "
+                f"raise the overall health score while reducing potential risks and boosting indexation quality."
+            )
+
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
     if not raw:
@@ -266,7 +295,6 @@ def _url_variants(u: str) -> list:
     return ordered
 
 def _fallback_result(url: str) -> dict:
-    # Basic fallback ensures the UI renders – replace with real checks in engine
     return {
         "category_scores": {
             "Performance": 65,
@@ -309,7 +337,7 @@ current_user = None
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
     global current_user
-    # Reset current_user at the start of each request to avoid leakage across requests
+    # reset per-request to avoid leakage
     current_user = None
     try:
         token = request.cookies.get("session_token")
@@ -356,11 +384,10 @@ async def audit_open(request: Request):
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
-    exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
+    exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
     metrics = _present_metrics(res.get("metrics", {}))
 
-    # Render open-access detail with rich visuals
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -384,9 +411,8 @@ async def report_pdf_open(url: str):
     overall = compute_overall(res["category_scores"])
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
-    exec_summary = summarize_200_words(normalized, res["category_scores"], top_issues)
+    exec_summary = _summarize_exec_200_words(normalized, res["category_scores"], top_issues)
     path = "/tmp/certified_audit_open.pdf"
-    # NOTE: Ensure report.py generates a 5-page, executive-ready PDF as per spec.
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
@@ -459,11 +485,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         <p>Hello!</p>
         <p>Click the button below to log into your account securely:</p>
         <p style="text-align: center;">
-            {login_link}
-                Log In Now
-            </a>
-        </p>
-        <p>Or copy and paste this link into your browser:</p>
+            <a href="{login_link}" style="background:#4F46E5;color:#fff;padding:10px 16px;border-radius:6paste this link into your browser:</p>
         <p style="word-break: break-all; color: #666;">{login_link}</p>
         <p style="font-size: 12px; color: #999; margin-top: 30px;">
             This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.
@@ -493,7 +515,6 @@ async def magic_request(
 ):
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
-        # We do not disclose account existence; always return success
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
@@ -636,16 +657,13 @@ async def new_audit_post(
 
     sub = _get_or_create_subscription(db, current_user.id)
 
-    # Enforce free limit before creating websites (storage hygiene)
     if _is_free_plan(sub) and (sub.audits_used or 0) >= FREE_AUDIT_LIMIT:
         return RedirectResponse("/auth/upgrade?limit=1", status_code=303)
 
-    # Enforce schedule gating: free users cannot enable schedules
     if enable_schedule and not _is_free_plan(sub) and hasattr(sub, "email_schedule_enabled"):
         sub.email_schedule_enabled = True
         db.commit()
     elif enable_schedule and _is_free_plan(sub):
-        # Redirect to upgrade if they attempted scheduling
         return RedirectResponse("/auth/upgrade?schedule=1", status_code=303)
 
     w = Website(user_id=current_user.id, url=url)
@@ -664,7 +682,6 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
         return RedirectResponse("/auth/dashboard", status_code=303)
 
     sub = _get_or_create_subscription(db, current_user.id)
-    # Enforce free plan audit limit
     if _is_free_plan(sub) and (sub.audits_used or 0) >= FREE_AUDIT_LIMIT:
         return RedirectResponse("/auth/upgrade?limit=1", status_code=303)
 
@@ -677,10 +694,9 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
-    exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
+    exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
-    # Ensure top_issues persist in metrics_json so templates always have data
     metrics_raw = res.get("metrics", {}) or {}
     metrics_raw["top_issues"] = top_issues
 
@@ -699,11 +715,9 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     w.last_grade = grade
     db.commit()
 
-    # Increment usage counter
     sub.audits_used = (sub.audits_used or 0) + 1
     db.commit()
 
-    # Optional: prune history for free plans
     if _is_free_plan(sub):
         window = datetime.utcnow() - timedelta(days=FREE_HISTORY_WINDOW_DAYS)
         old_audits = db.query(Audit).filter(
@@ -733,7 +747,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
-    top_issues = metrics_raw.get("top_issues", [])  # wire top_issues to template
+    top_issues = metrics_raw.get("top_issues", [])
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -764,7 +778,6 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
 
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
     path = f"/tmp/certified_audit_{website_id}.pdf"
-    # Ensure report.py implements 5 pages with visuals, conclusions, branding.
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
@@ -779,7 +792,6 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
     schedule = {
         "daily_time": getattr(sub, "daily_time", "09:00"),
         "timezone": getattr(sub, "timezone", "UTC"),
-        # show enabled only if not free plan
         "enabled": getattr(sub, "email_schedule_enabled", False) and not _is_free_plan(sub),
         "plan": getattr(sub, "plan", "free"),
         "audits_used": getattr(sub, "audits_used", 0),
@@ -815,7 +827,6 @@ async def schedule_post(
     if hasattr(sub, "timezone"):
         sub.timezone = timezone
 
-    # Gating: free plan cannot enable schedules
     if hasattr(sub, "email_schedule_enabled"):
         if _is_free_plan(sub):
             sub.email_schedule_enabled = False
@@ -827,10 +838,9 @@ async def schedule_post(
     db.commit()
     return RedirectResponse("/auth/dashboard", status_code=303)
 
-# ---------- Upgrade (Plan gating landing) ----------
+# ---------- Upgrade ----------
 @app.get("/auth/upgrade")
 async def upgrade(request: Request):
-    # Simple upgrade landing – template should show plan benefits
     return templates.TemplateResponse("upgrade.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -914,7 +924,6 @@ async def _daily_scheduler_loop():
                 subs = db.query(Subscription).filter(Subscription.active == True).all()
                 now_utc = datetime.utcnow()
                 for sub in subs:
-                    # Gating: only non-free plans with schedule enabled
                     if _is_free_plan(sub) or not getattr(sub, "email_schedule_enabled", False):
                         continue
                     tz_name    = getattr(sub, "timezone", "UTC") or "UTC"
