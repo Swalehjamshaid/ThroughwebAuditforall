@@ -124,4 +124,3 @@ async def report_page(request: Request, run_id: str):
 @app.get('/health')
 async def health():
     return {'status': 'ok'}
-
