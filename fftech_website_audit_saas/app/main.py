@@ -1,5 +1,6 @@
 
 # app/main.py
+# -*- coding: utf-8 -*-
 
 import os
 import json
@@ -7,7 +8,7 @@ import asyncio
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
-from typing import Tuple
+from typing import Tuple, List, Dict, Any
 
 from fastapi import FastAPI, Request, Form, Depends
 from fastapi.responses import RedirectResponse, FileResponse
@@ -24,7 +25,7 @@ from .auth import hash_password, verify_password, create_token, decode_token
 from .email_utils import send_verification_email
 from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
-from .audit.report import render_pdf, render_pdf_10p   # NEW: 10p builder
+from .audit.report import render_pdf_10p  # NEW: 10-page PDF builder
 
 import smtplib
 from email.mime.text import MIMEText
@@ -40,21 +41,18 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
-# Optional admin seeding via env
 ADMIN_EMAIL    = os.getenv("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-# Plans & limits
-FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDIT_LIMIT", "10"))  # free users can run up to 10 audits
-FREE_HISTORY_WINDOW_DAYS = int(os.getenv("FREE_HISTORY_WINDOW_DAYS", "30"))  # optional pruning window
-
+FREE_AUDIT_LIMIT = int(os.getenv("FREE_AUDIT_LIMIT", "10"))
+FREE_HISTORY_WINDOW_DAYS = int(os.getenv("FREE_HISTORY_WINDOW_DAYS", "30"))
 
 app = FastAPI(title=f"{UI_BRAND_NAME} AI Website Audit SaaS")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 
-# ---- Startup schema patches ----
+# ---------- Startup schema patches ----------
 def _ensure_schedule_columns():
     try:
         with engine.begin() as conn:
@@ -72,7 +70,6 @@ def _ensure_schedule_columns():
             """))
     except Exception:
         pass
-
 
 def _ensure_user_columns():
     try:
@@ -104,7 +101,6 @@ def _db_ping_ok() -> bool:
     except Exception:
         return False
 
-
 def _seed_admin_if_needed(db: Session):
     if not (ADMIN_EMAIL and ADMIN_PASSWORD):
         return
@@ -126,10 +122,9 @@ def _seed_admin_if_needed(db: Session):
     )
     db.add(admin); db.commit(); db.refresh(admin)
 
-
 def init_db() -> bool:
     if not _db_ping_ok():
-        print("[startup] Database ping failed. Check DATABASE_URL.")
+        print("[startup] Database ping failed.")
         return False
     try:
         Base.metadata.create_all(bind=engine)
@@ -156,103 +151,12 @@ def get_db():
         db.close()
 
 
-# ---------- Metrics presenter ----------
-METRIC_LABELS = {
-    # Basic fetch/headers
-    "status_code": "Status Code",
-    "content_length": "Content Length (bytes)",
-    "content_encoding": "Compression (Content-Encoding)",
-    "cache_control": "Caching (Cache-Control)",
-    "hsts": "HSTS (Strict-Transport-Security)",
-    "xcto": "X-Content-Type-Options",
-    "xfo": "X-Frame-Options",
-    "csp": "Content-Security-Policy",
-    "set_cookie": "Set-Cookie",
-
-    # HTML structure
-    "title": "HTML <title>",
-    "title_length": "Title Length",
-    "meta_description_length": "Meta Description Length",
-    "meta_robots": "Meta Robots",
-    "canonical_present": "Canonical Link Present",
-
-    # Protocols & crawling
-    "has_https": "Uses HTTPS",
-    "robots_allowed": "Robots Allowed",
-    "sitemap_present": "Sitemap Present",
-
-    # Accessibility & content
-    "images_without_alt": "Images Missing alt",
-    "image_count": "Image Count",
-    "viewport_present": "Viewport Meta Present",
-    "html_lang_present": "<html lang> Present",
-    "h1_count": "H1 Count",
-
-    # Perf / CWV (optional)
-    "lcp": "Largest Contentful Paint (LCP)",
-    "inp": "Interaction to Next Paint (INP)",
-    "fcp": "First Contentful Paint (FCP)",
-    "cls": "Cumulative Layout Shift (CLS)",
-    "tbt": "Total Blocking Time",
-    "fid": "First Input Delay",
-    "speed_index": "Speed Index",
-    "tti": "Time to Interactive",
-    "dom_content_loaded": "DOM Content Loaded",
-    "total_page_size": "Total Page Size",
-    "requests_per_page": "Requests Per Page",
-    "unminified_css": "Unminified CSS",
-    "unminified_js": "Unminified JavaScript",
-    "render_blocking": "Render Blocking Resources",
-    "excessive_dom": "Excessive DOM Size",
-    "third_party_load": "Third-Party Script Load",
-    "server_response_time": "Server Response Time",
-    "image_optimization": "Image Optimization",
-    "lazy_loading_issues": "Lazy Loading Issues",
-    "browser_caching": "Browser Caching Issues",
-    "missing_gzip_brotli": "Missing GZIP / Brotli",
-    "resource_load_errors": "Resource Load Errors",
-
-    # Security
-    "ssl_valid": "SSL Certificate Validity",
-    "ssl_expired": "Expired SSL",
-    "mixed_content": "Mixed Content",
-    "insecure_resources": "Insecure Resources",
-    "security_headers_missing": "Missing Security Headers",
-    "open_directory_listing": "Open Directory Listing",
-    "login_http": "Login Pages Without HTTPS",
-
-    # Meta
-    "normalized_url": "Normalized URL",
-    "error": "Fetch Error",
-}
-
-
-def _present_metrics(metrics: dict) -> dict:
-    out = {}
-    for k, v in (metrics or {}).items():
-        label = METRIC_LABELS.get(k, k.replace("_", " ").title())
-        if isinstance(v, bool):
-            v = "Yes" if v else "No"
-        out[label] = v
-    return out
-
-
 # ---------- Summary adapter (fixes TypeError on summarize_200_words) ----------
 def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list) -> str:
-    """
-    Backwards-compatible adapter for summarize_200_words().
-
-    Tries the 3-arg call first; if a TypeError occurs, falls back to a single-arg payload.
-    As a last resort, returns a safe deterministic summary to keep UI/PDF stable.
-    """
     try:
         return summarize_200_words(url, category_scores, top_issues)
     except TypeError:
-        payload = {
-            "url": url,
-            "category_scores": category_scores or {},
-            "top_issues": top_issues or [],
-        }
+        payload = {"url": url, "category_scores": category_scores or {}, "top_issues": top_issues or []}
         try:
             return summarize_200_words(payload)
         except Exception:
@@ -263,44 +167,28 @@ def _summarize_exec_200_words(url: str, category_scores: dict, top_issues: list)
             return (
                 f"This website shows a balanced technical and SEO profile. Strengths include {strengths}. "
                 f"Weaknesses include {weaknesses}. Priority areas involve addressing: {issues_preview}. "
-                f"Focus on incremental improvements in performance, accessibility, and security headers to "
-                f"raise the overall health score while reducing potential risks and boosting indexation quality."
+                f"Focus on improvements in performance, accessibility, and security headers to raise the overall score."
             )
 
 
-# ---------- Robust URL & audit helpers ----------
+# ---------- URL helpers ----------
 def _normalize_url(raw: str) -> str:
     if not raw:
         return raw
     s = raw.strip()
-    if not s:
-        return s
-    p = urlparse(s)
-    if not p.scheme:
-        s = "https://" + s
-        p = urlparse(s)
-    if not p.netloc and p.path:
-        s = f"{p.scheme}://{p.path}"
-        p = urlparse(s)
+    p = urlparse(s if "://" in s else "https://" + s)
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
 
-
-def _url_variants(u: str) -> list:
+def _url_variants(u: str) -> List[str]:
     p = urlparse(u)
     host = p.netloc
     path = p.path or "/"
     scheme = p.scheme
     candidates = [f"{scheme}://{host}{path}"]
-    if host.startswith("www."):
-        candidates.append(f"{scheme}://{host[4:]}{path}")
-    else:
-        candidates.append(f"{scheme}://www.{host}{path}")
+    candidates.append(f"{scheme}://{host[4:]}{path}" if host.startswith("www.") else f"{scheme}://www.{host}{path}")
     candidates.append(f"http://{host}{path}")
-    if host.startswith("www."):
-        candidates.append(f"http://{host[4:]}{path}")
-    else:
-        candidates.append(f"http://www.{host}{path}")
+    candidates.append(f"http://{host[4:]}{path}" if host.startswith("www.") else f"http://www.{host}{path}")
     if not path.endswith("/"):
         candidates.append(f"{scheme}://{host}{path}/")
     seen, ordered = set(), []
@@ -310,6 +198,7 @@ def _url_variants(u: str) -> list:
     return ordered
 
 
+# ---------- Engine audit ----------
 def _fallback_result(url: str) -> dict:
     return {
         "category_scores": {
@@ -319,22 +208,16 @@ def _fallback_result(url: str) -> dict:
             "Security": 70,
             "BestPractices": 66,
         },
-        "metrics": {
-            "error": "Fetch failed or blocked",
-            "normalized_url": url,
-        },
+        "metrics": {"normalized_url": url},
         "top_issues": [
             "Missing sitemap.xml",
             "Missing HSTS header",
-            "Images missing alt attributes",
-            "No canonical link tag",
+            "Images missing alt",
+            "No canonical link",
             "robots.txt blocking important pages",
-            "Mixed content over HTTPS",
-            "Duplicate title tags",
-            "Meta description too short"
+            "Mixed content over HTTPS"
         ],
     }
-
 
 def _robust_audit(url: str) -> Tuple[str, dict]:
     base = _normalize_url(url)
@@ -351,10 +234,6 @@ def _robust_audit(url: str) -> Tuple[str, dict]:
 
 # ---------- Competitor helper ----------
 def _maybe_competitor(raw_url: str):
-    """
-    Return (normalized_url, result_dict) for competitor if provided; else (None, None).
-    Uses the same robust audit engine as the primary site.
-    """
     if not raw_url:
         return None, None
     try:
@@ -367,55 +246,8 @@ def _maybe_competitor(raw_url: str):
     return None, None
 
 
-# ---------- Converters for PDF payload ----------
-
-def _to_category_list(category_scores_dict: dict):
-    # Convert dict {"Perf":82,...} -> list[{"name":..,"score":..}]
-    return [{"name": k, "score": int(v)} for k, v in (category_scores_dict or {}).items()]
-
-def _extract_cwv(metrics: dict) -> dict:
-    m = metrics or {}
-    return {
-        "LCP": float(m.get("lcp") or 0),
-        "INP": float(m.get("inp") or 0),
-        "CLS": float(m.get("cls") or 0),
-        "TBT": float(m.get("tbt") or 0),
-    }
-
-def _extract_security(metrics: dict) -> dict:
-    m = metrics or {}
-    def truthy(key):
-        v = m.get(key)
-        if isinstance(v, bool): return v
-        if isinstance(v, str): return v.lower() in ("yes","enabled","valid","pass")
-        return bool(v)
-    return {
-        "HSTS": truthy("hsts"),
-        "CSP": truthy("csp"),
-        "XFO": truthy("xfo"),
-        "XCTO": truthy("xcto"),
-        "SSL_Valid": truthy("ssl_valid"),
-        "MixedContent": (str(m.get("mixed_content","no")).lower() in ("yes","true","1","present")),
-    }
-
-def _extract_indexation(metrics: dict) -> dict:
-    m = metrics or {}
-    return {
-        "canonical_ok": truthy_str(m.get("canonical_present")),
-        "robots_txt": "Robots allowed" if truthy_str(m.get("robots_allowed")) else "Robots blocked",
-        "sitemap_urls": int(m.get("sitemap_urls") or 0),
-        "sitemap_size_mb": float(m.get("sitemap_size_mb") or 0)
-    }
-
-def truthy_str(v) -> bool:
-    if isinstance(v, bool): return v
-    if isinstance(v, str): return v.lower() in ("yes","true","1","present","enabled")
-    return bool(v)
-
-
 # ---------- Session handling ----------
 current_user = None
-
 
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
@@ -440,7 +272,7 @@ async def session_middleware(request: Request, call_next):
     return response
 
 
-# ---------- Health check ----------
+# ---------- Health ----------
 @app.get("/healthz")
 async def healthz():
     ok = _db_ping_ok()
@@ -457,11 +289,92 @@ async def index(request: Request):
     })
 
 
+# ---------- Utility: metrics mappers for PDF ----------
+def _metric_value(m: Dict[str, Any], keys: List[str], default=None):
+    """Fetch a value from metrics dict across multiple possible keys/labels."""
+    for k in keys:
+        if k in m: return m[k]
+    # Try normalized label space (we sometimes store human-readable labels)
+    for k in m.keys():
+        if k.lower() in [kk.lower() for kk in keys]:
+            return m[k]
+    return default
+
+def _security_from_metrics(m: Dict[str, Any]) -> Dict[str, Any]:
+    # Booleans or pass/fail strings accepted
+    hsts = _metric_value(m, ['hsts', 'HSTS (Strict-Transport-Security)'])
+    csp  = _metric_value(m, ['csp', 'Content-Security-Policy'])
+    xfo  = _metric_value(m, ['xfo', 'X-Frame-Options'])
+    xcto = _metric_value(m, ['xcto', 'X-Content-Type-Options'])
+    ssl  = _metric_value(m, ['ssl_valid', 'SSL Certificate Validity'])
+    mixed= _metric_value(m, ['mixed_content', 'Mixed Content'])
+
+    def to_bool_yes(v):
+        if isinstance(v, bool): return v
+        if isinstance(v, str): return v.strip().lower() in ('yes','enabled','pass','valid','true')
+        return False
+
+    def no_mixed(v):
+        if isinstance(v, bool): return not v  # if True means mixed content present, pass=False
+        if isinstance(v, str): return v.strip().lower() in ('no','false','none')
+        return True  # assume no mixed content if unknown
+
+    return {
+        "HSTS": to_bool_yes(hsts),
+        "CSP": to_bool_yes(csp),
+        "XFO": to_bool_yes(xfo),
+        "XCTO": to_bool_yes(xcto),
+        "SSL_Valid": to_bool_yes(ssl),
+        "MixedContent": no_mixed(mixed),
+    }
+
+def _cwv_from_metrics(m: Dict[str, Any]) -> Dict[str, Any]:
+    lcp = _metric_value(m, ['lcp', 'Largest Contentful Paint (LCP)'], 0)
+    inp = _metric_value(m, ['inp', 'First Input Delay', 'Interaction to Next Paint (INP)'], 0)
+    cls = _metric_value(m, ['cls', 'Cumulative Layout Shift (CLS)'], 0)
+    tbt = _metric_value(m, ['tbt', 'Total Blocking Time'], 0)
+
+    # Convert to numeric, stripping units if needed
+    def num(val):
+        try:
+            if isinstance(val, str):
+                for suffix in ['ms','s']:
+                    val = val.lower().replace(suffix, '')
+            return float(val)
+        except:
+            return 0.0
+
+    # LCP in seconds; INP/TBT in ms
+    lcp = num(lcp)
+    inp = num(inp)
+    cls = num(cls)
+    tbt = num(tbt)
+    # If INP not present but FID present, map FID->INP best-effort
+    if inp == 0:
+        fid = _metric_value(m, ['fid', 'First Input Delay'], 0)
+        inp = num(fid)
+
+    return {"LCP": lcp, "INP": inp, "CLS": cls, "TBT": tbt}
+
+def _indexation_from_metrics(m: Dict[str, Any]) -> Dict[str, Any]:
+    canonical_ok = _metric_value(m, ['canonical_present', 'Canonical Link Present'], False)
+    robots_txt = _metric_value(m, ['robots_allowed', 'Robots Allowed'], '')
+    sitemap_present = _metric_value(m, ['sitemap_present', 'Sitemap Present'], '')
+    # We may not have counts; placeholders OK
+    return {
+        "canonical_ok": bool(canonical_ok) if isinstance(canonical_ok, bool) else str(canonical_ok).lower() in ('yes','true'),
+        "robots_txt": str(robots_txt) if robots_txt is not None else '',
+        "sitemap_urls": _metric_value(m, ['sitemap_count','Sitemap URLs'], 'N/A'),
+        "sitemap_size_mb": _metric_value(m, ['sitemap_size_mb','Sitemap Size (MB)'], 'N/A')
+    }
+
+
+# ---------- Open audit ----------
 @app.post("/audit/open")
 async def audit_open(request: Request):
     form = await request.form()
     url = form.get("url")
-    competitor_url = form.get("competitor_url")  # optional
+    competitor_url = form.get("competitor_url")
 
     if not url:
         return RedirectResponse("/", status_code=303)
@@ -472,12 +385,14 @@ async def audit_open(request: Request):
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
     exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = _to_category_list(category_scores_dict)
-    metrics = _present_metrics(res.get("metrics", {}))
+    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
+    metrics_raw = res.get("metrics", {}) or {}
 
     # Optional competitor overlay
     comp_norm, comp_res = _maybe_competitor(competitor_url)
-    comp_cs_list = _to_category_list(comp_res.get("category_scores", {})) if comp_res else []
+    comp_cs_list = []
+    if comp_res:
+        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
 
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
@@ -490,40 +405,41 @@ async def audit_open(request: Request):
             "health_score": int(overall),
             "exec_summary": exec_summary,
             "category_scores": category_scores_list,
-            "metrics": metrics,
+            "metrics": _present_metrics(metrics_raw),
             "top_issues": top_issues,
             "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
         }
     })
 
 
-# ---------- Reports (Open & Registered) ----------
+# ---------- Open report (PDF) ----------
 @app.get("/report/pdf/open")
-async def report_pdf_open(request: Request, url: str, competitor_url: str | None = None):
+async def report_pdf_open(request: Request, url: str, competitor_url: str = None):
     normalized, res = _robust_audit(url)
-    cats_list = _to_category_list(res["category_scores"])
-    overall = compute_overall(res["category_scores"])
-    grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", []) or []
-    exec_summary = _summarize_exec_200_words(normalized, res["category_scores"], top_issues)
 
-    # Optional competitor overlay
+    # Core data
+    cats = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
+    health = int(compute_overall(res["category_scores"]))
+    grade = grade_from_score(health)
+    issues = res.get("top_issues", []) or []
+    metrics_raw = res.get("metrics", {}) or {}
+
+    # Mapped sections
+    cwv = _cwv_from_metrics(metrics_raw)
+    security = _security_from_metrics(metrics_raw)
+    indexation = _indexation_from_metrics(metrics_raw)
+
+    # Competitor overlay
     comp_norm, comp_res = _maybe_competitor(competitor_url)
     competitor_payload = None
     if comp_res:
-        competitor_payload = {"url": comp_norm, "category_scores": _to_category_list(comp_res.get("category_scores", {}))}
+        competitor_payload = {
+            "url": comp_norm,
+            "category_scores": [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
+        }
 
-    # Build extended payloads
-    metrics_raw = res.get("metrics", {}) or {}
-    cwv = _extract_cwv(metrics_raw)
-    security = _extract_security(metrics_raw)
-    indexation = {
-        "canonical_ok": truthy_str(metrics_raw.get("canonical_present")),
-        "robots_txt": "Robots allowed" if truthy_str(metrics_raw.get("robots_allowed")) else "Robots blocked",
-        "sitemap_urls": int(metrics_raw.get("sitemap_urls") or 0),
-        "sitemap_size_mb": float(metrics_raw.get("sitemap_size_mb") or 0)
-    }
-    trend = {"labels": ["Audit"], "values": [int(overall)]}
+    # Trend (single run in open context)
+    trend = {"labels": ["Run"], "values": [health]}
 
     path = "/tmp/certified_audit_open_10p.pdf"
     render_pdf_10p(
@@ -531,248 +447,20 @@ async def report_pdf_open(request: Request, url: str, competitor_url: str | None
         brand=UI_BRAND_NAME,
         site_url=normalized,
         grade=grade,
-        health_score=int(overall),
-        category_scores=cats_list,
-        executive_summary=exec_summary,
+        health_score=health,
+        category_scores=cats,
+        executive_summary=_summarize_exec_200_words(normalized, res["category_scores"], issues),
         cwv=cwv,
-        top_issues=top_issues,
+        top_issues=issues,
         security=security,
         indexation=indexation,
         competitor=competitor_payload,
         trend=trend
     )
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
+    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Executive_Audit_Open_10p.pdf")
 
 
-@app.get("/auth/report/pdf/{website_id}")
-async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db), competitor_url: str | None = None):
-    global current_user
-    if not current_user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
-    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
-    if not w or not a:
-        return RedirectResponse("/auth/dashboard", status_code=303)
-
-    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
-    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
-    cats_list = category_scores
-    top_issues = metrics_raw.get("top_issues", [])
-    cwv = _extract_cwv(metrics_raw)
-    security = _extract_security(metrics_raw)
-    indexation = {
-        "canonical_ok": truthy_str(metrics_raw.get("canonical_present")),
-        "robots_txt": "Robots allowed" if truthy_str(metrics_raw.get("robots_allowed")) else "Robots blocked",
-        "sitemap_urls": int(metrics_raw.get("sitemap_urls") or 0),
-        "sitemap_size_mb": float(metrics_raw.get("sitemap_size_mb") or 0)
-    }
-    trend = {"labels": [a.created_at.strftime('%d %b')], "values": [int(a.health_score)]}
-
-    # Optional competitor overlay
-    comp_norm, comp_res = _maybe_competitor(competitor_url)
-    competitor_payload = None
-    if comp_res:
-        competitor_payload = {"url": comp_norm, "category_scores": _to_category_list(comp_res.get("category_scores", {}))}
-
-    path = f"/tmp/certified_audit_{website_id}_10p.pdf"
-    render_pdf_10p(
-        file_path=path,
-        brand=UI_BRAND_NAME,
-        site_url=w.url,
-        grade=a.grade,
-        health_score=a.health_score,
-        category_scores=cats_list,
-        executive_summary=a.exec_summary,
-        cwv=cwv,
-        top_issues=top_issues,
-        security=security,
-        indexation=indexation,
-        competitor=competitor_payload,
-        trend=trend
-    )
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
-
-
-# ---------- Registration & Auth ----------
-@app.get("/auth/register")
-async def register_get(request: Request):
-    return templates.TemplateResponse("register.html", {
-        "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
-        "user": current_user
-    })
-
-
-@app.post("/auth/register")
-async def register_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    if password != confirm_password:
-        return RedirectResponse("/auth/register?mismatch=1", status_code=303)
-    if db.query(User).filter(User.email == email).first():
-        return RedirectResponse("/auth/login?exists=1", status_code=303)
-
-    u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
-    db.add(u); db.commit(); db.refresh(u)
-
-    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*3)
-    ok = send_verification_email(u.email, token)
-    if not ok:
-        print(f"[auth] Failed to send email to {u.email}. Check SMTP/Resend settings.")
-    return RedirectResponse("/auth/login?check_email=1", status_code=303)
-
-
-@app.get("/auth/verify")
-async def verify(request: Request, token: str, db: Session = Depends(get_db)):
-    try:
-        data = decode_token(token)
-        u = db.query(User).filter(User.id == data["uid"]).first()
-        if u:
-            u.verified = True
-            db.commit()
-            return RedirectResponse("/auth/login?verified=1", status_code=303)
-    except Exception:
-        return templates.TemplateResponse("verify.html", {
-            "request": request,
-            "success": False,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-            "user": current_user
-        })
-    return RedirectResponse("/auth/login", status_code=303)
-
-
-@app.get("/auth/login")
-async def login_get(request: Request):
-    return templates.TemplateResponse("login.html", {
-        "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
-        "user": current_user
-    })
-
-
-# ---------- Magic Login (Passwordless) ----------
-def _send_magic_login_email(to_email: str, token: str) -> bool:
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        print("[auth] SMTP configuration missing. Cannot send magic link.")
-        return False
-    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-    html_body = f"""
-    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
-        <h3 style="color: #4F46E5;">{UI_BRAND_NAME} — Magic Login</h3>
-        <p>Hello!</p>
-        <p>Click the button below to log into your account securely:</p>
-        <p style="text-align: center;">
-            {login_link}
-                Log In Now
-            </a>
-        </p>
-        <p>Or copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; color: #666;">{login_link}</p>
-        <p style="font-size: 12px; color: #999; margin-top: 30px;">
-            This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.
-        </p>
-    </div>
-    """
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
-    msg["From"] = SMTP_USER
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, [to_email], msg.as_string())
-        return True
-    except Exception as e:
-        print(f"[auth] SMTP Error sending magic link: {e}")
-        return False
-
-
-@app.post("/auth/magic/request")
-async def magic_request(
-    request: Request,
-    email: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    u = db.query(User).filter(User.email == email).first()
-    if not u or not getattr(u, "verified", False):
-        return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
-    token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-    _send_magic_login_email(u.email, token)
-    return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
-
-
-@app.get("/auth/magic")
-async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
-    global current_user
-    try:
-        data = decode_token(token)
-        uid = data.get("uid")
-        if not uid or data.get("type") != "magic":
-            return RedirectResponse("/auth/login?error=1", status_code=303)
-        u = db.query(User).filter(User.id == uid).first()
-        if not u or not getattr(u, "verified", False):
-            return RedirectResponse("/auth/login?error=1", status_code=303)
-        current_user = u
-        session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
-        resp = RedirectResponse("/auth/dashboard", status_code=303)
-        resp.set_cookie(
-            key="session_token",
-            value=session_token,
-            httponly=True,
-            secure=BASE_URL.startswith("https://"),
-            samesite="Lax",
-            max_age=60*60*24*30
-        )
-        return resp
-    except Exception:
-        return RedirectResponse("/auth/login?error=1", status_code=303)
-
-
-# ---------- Password login ----------
-@app.post("/auth/login")
-async def login_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    global current_user
-    u = db.query(User).filter(User.email == email).first()
-    if not u or not verify_password(password, u.password_hash) or not u.verified:
-        return RedirectResponse("/auth/login?error=1", status_code=303)
-
-    current_user = u
-    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
-
-    resp = RedirectResponse("/auth/dashboard", status_code=303)
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60*60*24*30
-    )
-    return resp
-
-
-@app.get("/auth/logout")
-async def logout(request: Request):
-    global current_user
-    current_user = None
-    resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie("session_token")
-    return resp
-
-
-# ---------- Helper: plan gating ----------
+# ---------- Registered flows ----------
 def _get_or_create_subscription(db: Session, user_id: int) -> Subscription:
     sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
     if not sub:
@@ -780,12 +468,9 @@ def _get_or_create_subscription(db: Session, user_id: int) -> Subscription:
         db.add(sub); db.commit(); db.refresh(sub)
     return sub
 
-
 def _is_free_plan(sub: Subscription) -> bool:
     return (getattr(sub, "plan", "free") or "free").lower() == "free"
 
-
-# ---------- Registered audit flows ----------
 @app.get("/auth/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -891,7 +576,7 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", []) or []
     exec_summary = _summarize_exec_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = _to_category_list(category_scores_dict)
+    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
     metrics_raw = res.get("metrics", {}) or {}
     metrics_raw["top_issues"] = top_issues
@@ -931,12 +616,10 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
 
 
 @app.get("/auth/audit/{website_id}")
-async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
+async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db), competitor_url: str = None):
     global current_user
     if not current_user:
         return RedirectResponse("/auth/login", status_code=303)
-
-    competitor_url = request.query_params.get("competitor_url")  # optional
 
     w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
     a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
@@ -948,9 +631,11 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     metrics = _present_metrics(metrics_raw)
     top_issues = metrics_raw.get("top_issues", [])
 
-    # Optional competitor overlay
+    # Optional competitor overlay for web charts
     comp_norm, comp_res = _maybe_competitor(competitor_url)
-    comp_cs_list = _to_category_list(comp_res.get("category_scores", {})) if comp_res else []
+    comp_cs_list = []
+    if comp_res:
+        comp_cs_list = [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -968,6 +653,70 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "competitor": ({"url": comp_norm, "category_scores": comp_cs_list} if comp_cs_list else None)
         }
     })
+
+
+# ---------- Registered report (PDF) ----------
+@app.get("/auth/report/pdf/{website_id}")
+async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db), competitor_url: str = None):
+    global current_user
+    if not current_user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return RedirectResponse("/auth/dashboard", status_code=303)
+
+    # Core data
+    cats = json.loads(a.category_scores_json) if a.category_scores_json else []
+    health = int(a.health_score)
+    grade = a.grade
+    issues = (json.loads(a.metrics_json).get("top_issues", []) if a.metrics_json else [])
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+
+    # Mapped sections
+    cwv = _cwv_from_metrics(metrics_raw)
+    security = _security_from_metrics(metrics_raw)
+    indexation = _indexation_from_metrics(metrics_raw)
+
+    # Competitor overlay
+    comp_norm, comp_res = _maybe_competitor(competitor_url)
+    competitor_payload = None
+    if comp_res:
+        competitor_payload = {
+            "url": comp_norm,
+            "category_scores": [{"name": k, "score": int(v)} for k, v in comp_res.get("category_scores", {}).items()]
+        }
+
+    # Trend from last 10 audits
+    last_audits = (
+        db.query(Audit)
+        .filter(Audit.user_id == current_user.id, Audit.website_id == website_id)
+        .order_by(Audit.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    trend_labels = [a.created_at.strftime('%d %b') for a in reversed(last_audits)]
+    trend_values = [a.health_score for a in reversed(last_audits)]
+    trend = {"labels": trend_labels, "values": trend_values}
+
+    path = f"/tmp/certified_audit_{website_id}_10p.pdf"
+    render_pdf_10p(
+        file_path=path,
+        brand=UI_BRAND_NAME,
+        site_url=w.url,
+        grade=grade,
+        health_score=health,
+        category_scores=cats,
+        executive_summary=a.exec_summary,
+        cwv=cwv,
+        top_issues=issues,
+        security=security,
+        indexation=indexation,
+        competitor=competitor_payload,
+        trend=trend
+    )
+    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Executive_Audit_{website_id}_10p.pdf")
 
 
 # ---------- Scheduling UI ----------
@@ -1048,7 +797,6 @@ async def admin_login_get(request: Request):
         "user": current_user
     })
 
-
 @app.post("/auth/admin/login")
 async def admin_login_post(
     request: Request,
@@ -1072,7 +820,6 @@ async def admin_login_post(
     )
     return resp
 
-
 @app.get("/auth/admin")
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -1093,7 +840,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 
-# ---------- Email Sender ----------
+# ---------- Email sender & scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
@@ -1111,8 +858,6 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     except Exception:
         return False
 
-
-# ---------- Email Scheduler ----------
 async def _daily_scheduler_loop():
     while True:
         try:
