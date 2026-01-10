@@ -1,4 +1,6 @@
 
+# app/main.py
+
 import os
 import json
 import asyncio
@@ -485,7 +487,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
         <p>Hello!</p>
         <p>Click the button below to log into your account securely:</p>
         <p style="text-align: center;">
-            <a href="{login_link}" style="background:#4F46E5;color:#fff;padding:10px 16px;border-radius:6paste this link into your browser:</p>
+            <a href="{login_link}" style="background:#4F46E5;color:#fff;padding:10px 16px;border-radius: paste this link into your browser:</p>
         <p style="word-break: break-all; color: #666;">{login_link}</p>
         <p style="font-size: 12px; color: #999; margin-top: 30px;">
             This link will expire in 15 minutes. If you didn't request this, you can safely ignore this email.
