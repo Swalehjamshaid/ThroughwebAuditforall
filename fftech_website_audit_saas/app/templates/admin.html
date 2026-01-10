@@ -1,0 +1,18 @@
+{% extends 'base_register.html' %}
+{% block reg_body %}
+<h2>Admin</h2>
+<div class="card glass p-4">
+  <h5>Users</h5>
+  <ul>
+    {% for u in admin_users %}<li>{{ u.email }} · verified: {{ u.verified }}</li>{% endfor %}
+  </ul>
+  <h5>Websites</h5>
+  <ul>
+    {% for w in websites %}<li>{{ w.url }} · last: {{ w.last_grade|default('—') }}</li>{% endfor %}
+  </ul>
+  <h5>Audits</h5>
+  <ul>
+    {% for a in admin_audits %}<li>{{ a.website_id }} · {{ a.health_score }}/100 · {{ a.grade }}</li>{% endfor %}
+  </ul>
+</div>
+{% endblock %}
