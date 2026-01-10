@@ -1,0 +1,19 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Open Access Audit</h2>
+  <form method="post" action="/open-audit">
+    <label>Website URL
+      <input type="text" name="url" placeholder="https://example.com" required />
+    </label>
+    <label>Graph types
+      <input type="text" name="graph_types" value="auto" />
+    </label>
+    <label>
+      <input type="checkbox" name="pdf" value="true" /> Generate PDF
+    </label>
+    <button type="submit">Run Audit</button>
+  </form>
+</section>
+{% endblock %}
