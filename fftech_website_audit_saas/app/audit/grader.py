@@ -1,117 +1,94 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>{% block title %}{{ UI_BRAND_NAME }} | Professional AI Website Audit{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+"""
+grader.py
+Backend grading and summary logic for AI Website Audit
+"""
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+from typing import Dict, Tuple
 
-    <link rel="stylesheet" href="{{ url_for('static', path='/fftech.css') }}">
 
-    {% block head_extra %}{% endblock %}
+def compute_overall(metrics: Dict[str, float]) -> float:
+    """
+    Compute overall score from metric dictionary
+    """
+    if not metrics:
+        return 0.0
 
-    <style>
-        :root {
-            --primary: #0057D9;
-            --accent: #1ABC9C;
-            --dark: #0c1220;
-            --glass: rgba(255, 255, 255, 0.04);
-            --glass-border: rgba(255, 255, 255, 0.08);
-        }
+    valid_scores = [v for v in metrics.values() if isinstance(v, (int, float))]
+    if not valid_scores:
+        return 0.0
 
-        body {
-            background: var(--dark);
-            color: #e6ecf3;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+    return round(sum(valid_scores) / len(valid_scores), 2)
 
-        /* Modern UI Components */
-        .glass-card {
-            background: var(--glass);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-        }
 
-        .navbar {
-            backdrop-filter: blur(10px);
-            background: rgba(12, 18, 32, 0.85) !important;
-            border-bottom: 1px solid var(--glass-border);
-        }
+def grade_from_score(score: float) -> str:
+    """
+    Convert numeric score into grade
+    """
+    if score >= 90:
+        return "A+"
+    elif score >= 85:
+        return "A"
+    elif score >= 75:
+        return "B+"
+    elif score >= 65:
+        return "B"
+    elif score >= 55:
+        return "C"
+    elif score >= 45:
+        return "D"
+    else:
+        return "F"
 
-        .btn-ai-primary {
-            background: linear-gradient(135deg, var(--primary), #0072ff);
-            border: none;
-            color: white;
-            padding: 8px 20px;
-            border-radius: 8px;
-            transition: 0.3s;
-        }
 
-        .btn-ai-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 87, 217, 0.4);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark sticky-top mb-5">
-        <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
-                <i class="fa-solid fa-microchip me-2 text-info"></i>
-                {{ UI_BRAND_NAME }}
-            </a>
+def score_breakdown(metrics: Dict[str, float]) -> Dict[str, str]:
+    """
+    Return grade per metric
+    """
+    return {k: grade_from_score(v) for k, v in metrics.items()}
 
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
 
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    {% if user %}
-                        <li class="nav-item me-3">
-                            <span class="text-secondary small d-block">Logged in as</span>
-                            <span class="fw-medium text-info">{{ user.email }}</span>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/auth/dashboard" class="nav-link">Dashboard</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/auth/logout" class="btn btn-sm btn-outline-danger ms-2">Logout</a>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a href="/auth/login" class="nav-link">Login</a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="/auth/register" class="btn-ai-primary ms-2">Get Started</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-    </nav>
+def compute_weighted_score(
+    metrics: Dict[str, float],
+    weights: Dict[str, float]
+) -> float:
+    """
+    Compute weighted score
+    """
+    total_weight = sum(weights.values())
+    if total_weight == 0:
+        return 0.0
 
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+    score = 0.0
+    for key, value in metrics.items():
+        weight = weights.get(key, 0)
+        score += value * weight
 
-    <footer class="container text-center py-5 mt-auto">
-        <hr class="border-secondary opacity-25">
-        <p class="text-secondary small">
-            &copy; 2026 {{ UI_BRAND_NAME }} AI Diagnostics. <br>
-            Powered by Automated SEO Engine v2.4.0
-        </p>
-    </footer>
+    return round(score / total_weight, 2)
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    {% block scripts_extra %}{% endblock %}
-</body>
-</html>
+
+def summarize_200_words(report: Dict[str, float]) -> str:
+    """
+    Generate executive audit summary (approx 200 words)
+    """
+    overall = compute_overall(report)
+    grade = grade_from_score(overall)
+
+    summary = (
+        f"This AI-powered website audit presents a comprehensive technical "
+        f"and performance-based evaluation of the analyzed platform. "
+        f"The overall score achieved is {overall}, corresponding to a grade of {grade}. "
+        f"The assessment covers critical areas including SEO health, performance "
+        f"efficiency, accessibility compliance, security posture, and adherence "
+        f"to modern best practices.\n\n"
+        f"Strong scores indicate effective optimization, stable architecture, "
+        f"and readiness for scale, while lower scores highlight opportunities "
+        f"for improvement in technical structure or content strategy. "
+        f"This audit enables data-driven decision-making by identifying "
+        f"optimization gaps, prioritizing corrective actions, and improving "
+        f"user experience and search visibility.\n\n"
+        f"By addressing the highlighted issues and maintaining best practices, "
+        f"the website can significantly enhance reliability, engagement, "
+        f"and long-term digital performance."
+    )
+
+    return summary
