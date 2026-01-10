@@ -1,0 +1,17 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Dashboard</h2>
+  <p>Welcome, {{ email }}!</p>
+  <form method="post" action="/audit">
+    <label>Website URL:
+      <input type="url" name="url" placeholder="https://example.com" required />
+    </label>
+    <label>
+      <input type="checkbox" name="pdf" value="true" /> Generate PDF
+    </label>
+    <button type="submit">Run Audit</button>
+  </form>
+</section>
+{% endblock %}
