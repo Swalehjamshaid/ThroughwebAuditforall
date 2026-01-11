@@ -1,9 +1,0 @@
-{% extends 'base.html' %}
-{% block content %}
-<h2>Email Verification</h2>
-{% if success %}
-<p class='success'>Your email is verified. You can now <a href='/auth/login'>login</a>.</p>
-{% else %}
-<p class='error'>Verification failed or token expired. Please re-register or request a new link.</p>
-{% endif %}
-{% endblock %}
