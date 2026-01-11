@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Admin</h2>
+<section>
+  <h3>Users</h3>
+  <ul>{% for u in admin_users %}<li>{{ u.email }} — verified: {{ u.verified }}</li>{% endfor %}</ul>
+</section>
+<section>
+  <h3>Websites</h3>
+  <ul>{% for w in websites %}<li>{{ w.url }}</li>{% endfor %}</ul>
+</section>
+<section>
+  <h3>Audits</h3>
+  <ul>{% for a in admin_audits %}<li>{{ a.website_id }} — {{ a.grade }} ({{ a.health_score }})</li>{% endfor %}</ul>
+</section>
+{% endblock %}
