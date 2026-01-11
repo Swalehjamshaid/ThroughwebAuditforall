@@ -1,118 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ UI_BRAND_NAME | default('Audit Dashboard') }}</title>
 
-{% extends "base.html" %}
-{% block content %}
-<div class="grid">
-  <!-- Left: Summary + Charts -->
-  <div class="panel" style="grid-column: span 7;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-      <div>
-        <div class="card-title">Open Audit</div>
-        <div class="mono">{{ website.url }}</div>
-      </div>
-      <div>
-        <span class="badge">Health: {{ audit.health_score }}/100</span>
-        <span class="badge" style="margin-left:6px;">Grade: {{ audit.grade }}</span>
-      </div>
-    </div>
+  <!-- Modern font: Inter + optional variable font support -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- Charts grid -->
-    <div class="grid">
-      <div class="panel" style="grid-column: span 6;">
-        <div class="card-title">Health Gauge</div>
-        <div class="chart-wrap"><canvas id="gaugeChart"></canvas></div>
-        <div class="chart-actions">
-          <button class="btn" data-export="gaugeChart">Download PNG</button>
-        </div>
-      </div>
+  <!-- Latest Chart.js (as of 2026) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
-      <div class="panel" style="grid-column: span 6;">
-        <div class="card-title">Category Scores (Bar)</div>
-        <div class="chart-wrap"><canvas id="categoryBarChart"></canvas></div>
-        <div class="chart-actions">
-          <button class="btn" data-export="categoryBarChart">Download PNG</button>
-        </div>
-      </div>
+  <style>
+    :root {
+      --bg-primary: #0a0a14;
+      --bg-secondary: #11111a;
+      --bg-glass: rgba(20, 20, 35, 0.45);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent: #6366f1;
+      --accent-dark: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.18);
+      --border: rgba(50, 60, 90, 0.6);
+      --radius: 16px;
+      --shadow-sm: 0 4px 30px rgba(0,0,0,0.35);
+      --transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
-      <div class="panel" style="grid-column: span 6;">
-        <div class="card-title">Category Radar</div>
-        <div class="chart-wrap"><canvas id="categoryRadarChart"></canvas></div>
-        <div class="chart-actions">
-          <button class="btn" data-export="categoryRadarChart">Download PNG</button>
-        </div>
-      </div>
+    [data-theme="light"] {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-glass: rgba(255, 255, 255, 0.65);
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --accent: #6366f1;
+      --accent-dark: #4f46e5;
+      --accent-glow: rgba(99, 102, 241, 0.12);
+      --border: rgba(226, 232, 240, 0.8);
+      --shadow-sm: 0 6px 32px rgba(0,0,0,0.08);
+    }
 
-      <div class="panel" style="grid-column: span 6;">
-        <div class="card-title">Policy Checks (Pass vs Fail)</div>
-        <div class="chart-wrap"><canvas id="booleanPieChart"></canvas></div>
-        <div class="chart-actions">
-          <button class="btn" data-export="booleanPieChart">Download PNG</button>
-        </div>
-      </div>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-      <div class="panel" style="grid-column: span 12;">
-        <div class="card-title">Numeric Metrics</div>
-        <div class="chart-wrap tall"><canvas id="numericBarChart"></canvas></div>
-        <div class="chart-actions">
-          <button class="btn" data-export="numericBarChart">Download PNG</button>
-        </div>
-      </div>
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.6;
+      transition: background-color var(--transition);
+    }
+
+    header {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    .logo {
+      font-size: 1.75rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--accent), #8b5cf6, #ec4899);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.8px;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      transition: var(--transition);
+    }
+
+    .nav-link:hover,
+    .nav-link:focus-visible {
+      color: var(--text-primary);
+      background: var(--accent-glow);
+      outline: none;
+    }
+
+    .btn {
+      padding: 0.65rem 1.5rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: var(--transition);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px var(--accent-glow);
+    }
+
+    .btn-outline {
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      background: transparent;
+    }
+
+    .btn-outline:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    main {
+      padding: 2.5rem 0 4rem;
+    }
+
+    /* Glass card example (use in content blocks) */
+    .glass-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      padding: 1.75rem;
+      transition: var(--transition);
+    }
+
+    .glass-card:hover {
+      transform: translateY(-4px);
+    }
+
+    /* Focus states for accessibility */
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    /* Scrollbar styling (modern & subtle) */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 0;">
+      <div class="logo">{{ UI_BRAND_NAME | default('Audit') }}</div>
+
+      <nav>
+        <a href="/" class="nav-link">Home</a>
+
+        {% if user %}
+          <a href="/dashboard" class="nav-link">Dashboard</a>
+          <a href="/auth/logout" class="btn btn-outline">Logout</a>
+        {% else %}
+          <a href="/auth/login" class="nav-link">Login</a>
+          <a href="/auth/register" class="btn btn-primary">Get Started</a>
+        {% endif %}
+      </nav>
     </div>
   </div>
+</header>
 
-  <!-- Right: Executive Summary + Metrics -->
-  <div class="panel" style="grid-column: span 5;">
-    <div class="card-title">Executive Summary</div>
-    <div class="muted" style="margin-bottom:12px;">Generated by {{ UI_BRAND_NAME }}</div>
-    <div style="white-space:pre-wrap; line-height:1.4;">{{ audit.exec_summary }}</div>
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
 
-    <hr class="divider">
-
-    <div class="card-title">Top Issues</div>
-    {% if audit.top_issues and audit.top_issues|length > 0 %}
-      <ul class="issues">
-        {% for issue in audit.top_issues %}
-          <li>{{ issue }}</li>
-        {% endfor %}
-      </ul>
-      <div style="margin-top:8px;">
-        <button class="btn" id="copyIssuesBtn">Copy Issues</button>
-      </div>
-    {% else %}
-      <div class="muted">No explicit issues reported.</div>
-    {% endif %}
-
-    <hr class="divider">
-
-    <div style="display:flex; align-items:center; justify-content:space-between;">
-      <div class="card-title">Metrics</div>
-      <input id="metricFilter" class="btn input-like" placeholder="Filter metrics…" />
-    </div>
-    <div class="panel" style="max-height: 420px; overflow:auto;">
-      <table class="metric-table" id="metricTable">
-        <thead class="sticky-head">
-          <tr>
-            <th style="width:40%;">Metric</th>
-            <th style="width:60%;">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for k, v in audit.metrics.items() %}
-          <tr>
-            <td class="mono">{{ k }}</td>
-            <td class="mono">{{ v }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
+<!-- Improved theme toggle with system preference support -->
 <script>
-  // Pass server data to our JS initializer
-  window.__AUDIT__ = {{ audit | tojson }};
-  window.addEventListener('DOMContentLoaded', () => {
-    initAuditCharts(window.__AUDIT__);
+  document.addEventListener('DOMContentLoaded', () => {
+    const html = document.documentElement;
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    // Initial theme
+    if (savedTheme) {
+      html.setAttribute('data-theme', savedTheme);
+    } else {
+      html.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+    }
+
+    // Toggle button
+    const toggle = document.createElement('button');
+    toggle.innerHTML = html.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+    toggle.style.cssText = `
+      position: fixed; bottom: 1.8rem; right: 1.8rem; 
+      padding: 0.9rem; border-radius: 50%; 
+      background: var(--bg-glass); border: 1px solid var(--border); 
+      backdrop-filter: blur(10px); cursor: pointer; z-index: 9999; 
+      font-size: 1.3rem; box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+    `;
+
+    toggle.addEventListener('click', () => {
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      toggle.innerHTML = next === 'dark' ? '☀️' : '🌙';
+    });
+
+    document.body.appendChild(toggle);
+
+    // Listen for system changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      if (!localStorage.getItem('theme')) {
+        html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        toggle.innerHTML = e.matches ? '☀️' : '🌙';
+      }
+    });
   });
 </script>
-{% endblock %}
+
+</body>
+</html>
