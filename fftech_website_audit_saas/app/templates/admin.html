@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Admin</h2>
+  <p>Total users: {{ admin_users|length }}</p>
+  <p>Total audits: {{ admin_audits|length }}</p>
+</div>
+{% endblock %}
