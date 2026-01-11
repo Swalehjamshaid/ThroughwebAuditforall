@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, Form, Depends
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
@@ -126,6 +126,107 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
+# ---------- Chart helpers (NEW) ----------
+def _to_category_scores_dict(cs_list_or_dict):
+    """
+    Accepts either a dict like {'SEO': 70, ...} or a list like
+    [{'name':'SEO','score':70}, ...] and returns a normalized dict of ints.
+    """
+    if isinstance(cs_list_or_dict, dict):
+        try:
+            return {str(k): int(v) for k, v in cs_list_or_dict.items()}
+        except Exception:
+            return {str(k): int(v) for k, v in cs_list_or_dict.items() if isinstance(v, (int, float))}
+    out = {}
+    for item in (cs_list_or_dict or []):
+        try:
+            out[str(item["name"])] = int(item["score"])
+        except Exception:
+            continue
+    return out
+
+def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: int, grade: str) -> dict:
+    """
+    Return Chart.js-ready datasets for:
+    - Category Scores (bar)
+    - Boolean Summary (pie)
+    - Numeric Metrics (bar)
+    - Health Gauge (number for any gauge plugin)
+    """
+    # Category scores bar dataset
+    cat_labels = list(category_scores_dict.keys())
+    cat_values = [int(category_scores_dict.get(k, 0)) for k in cat_labels]
+
+    # Boolean metrics summary (pass/fail)
+    boolean_candidates = [
+        "has_https", "robots_allowed", "sitemap_present",
+        "canonical_present", "viewport_present", "html_lang_present",
+        "hsts", "xcto", "xfo", "csp"
+    ]
+    passed = 0
+    failed = 0
+    boolean_items = []
+    for key in boolean_candidates:
+        val = metrics_raw.get(key, None)
+        if isinstance(val, bool):
+            label = METRIC_LABELS.get(key, key.replace("_", " ").title())
+            boolean_items.append({"label": label, "value": val})
+            if val:
+                passed += 1
+            else:
+                failed += 1
+
+    # Numeric metrics (counts and lengths)
+    numeric_candidates = [
+        "image_count", "images_without_alt",
+        "title_length", "meta_description_length",
+        "h1_count", "content_length"
+    ]
+    numeric_labels = []
+    numeric_values = []
+    for key in numeric_candidates:
+        val = metrics_raw.get(key, None)
+        if isinstance(val, (int, float)) and val is not None:
+            numeric_labels.append(METRIC_LABELS.get(key, key.replace("_", " ").title()))
+            numeric_values.append(int(val))
+
+    charts = {
+        "category_scores": {
+            "labels": cat_labels,
+            "datasets": [{
+                "label": "Category Scores",
+                "data": cat_values,
+                "backgroundColor": ["#7c4dff"] * len(cat_values),
+                "borderColor": ["#b39ddb"] * len(cat_values),
+                "borderWidth": 1
+            }]
+        },
+        "boolean_summary": {
+            "labels": ["Passed", "Failed"],
+            "datasets": [{
+                "label": "Policy Checks",
+                "data": [passed, failed],
+                "backgroundColor": ["#00c853", "#ff5252"]
+            }],
+            "items": boolean_items  # optional per-item legend/list
+        },
+        "numeric_metrics": {
+            "labels": numeric_labels,
+            "datasets": [{
+                "label": "Metrics",
+                "data": numeric_values,
+                "backgroundColor": ["#40c4ff"] * len(numeric_values),
+                "borderColor": ["#80d8ff"] * len(numeric_values),
+                "borderWidth": 1
+            }]
+        },
+        "health_gauge": {
+            "value": int(overall),
+            "grade": grade
+        }
+    }
+    return charts
+
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
     if not raw:
@@ -192,7 +293,7 @@ def _robust_audit(url: str) -> tuple[str, dict]:
         try:
             res = run_basic_checks(candidate)
             cats = res.get("category_scores") or {}
-            if cats and sum(int(v) for v in cats.values()) > 0:
+            if cats and sum(int(v) for v in _to_category_scores_dict(cats).values()) > 0:
                 return candidate, res
         except Exception:
             continue
@@ -239,12 +340,14 @@ async def audit_open(request: Request):
         return RedirectResponse("/", status_code=303)
 
     normalized, res = _robust_audit(url)
-    category_scores_dict = res["category_scores"]
+    category_scores_dict = _to_category_scores_dict(res["category_scores"])
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
+
+    charts = _build_chart_data(category_scores_dict, res.get("metrics", {}), int(overall), grade)
 
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
@@ -259,17 +362,18 @@ async def audit_open(request: Request):
             "category_scores": category_scores_list,
             "metrics": _present_metrics(res.get("metrics", {})),
             "top_issues": top_issues,
+            "charts": charts,  # NEW
         }
     })
 
 @app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
     normalized, res = _robust_audit(url)
-    cs_list = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
-    overall = compute_overall(res["category_scores"])
+    cs_list = [{"name": k, "score": int(v)} for k, v in _to_category_scores_dict(res["category_scores"]).items()]
+    overall = compute_overall(_to_category_scores_dict(res["category_scores"]))
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
-    exec_summary = summarize_200_words(normalized, res["category_scores"], top_issues)
+    exec_summary = summarize_200_words(normalized, _to_category_scores_dict(res["category_scores"]), top_issues)
     path = "/tmp/certified_audit_open.pdf"
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
@@ -346,7 +450,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
+    <p><aogin_link}{login_link}</a></p>
     <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
 
@@ -547,7 +651,7 @@ async def run_audit(website_id: int, request: Request, db: Session = Depends(get
     except Exception:
         return RedirectResponse("/auth/dashboard", status_code=303)
 
-    category_scores_dict = res["category_scores"]
+    category_scores_dict = _to_category_scores_dict(res["category_scores"])
     overall = compute_overall(category_scores_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
@@ -589,8 +693,11 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
         return RedirectResponse("/auth/dashboard", status_code=303)
 
     category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    category_scores_dict = _to_category_scores_dict(category_scores)
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
+
+    charts = _build_chart_data(category_scores_dict, metrics_raw, int(a.health_score), a.grade)
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
@@ -603,7 +710,8 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "health_score": a.health_score,
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
-            "metrics": metrics
+            "metrics": metrics,
+            "charts": charts,  # NEW
         }
     })
 
@@ -807,3 +915,42 @@ async def _daily_scheduler_loop():
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
+
+# ---------- Public JSON endpoints for charts (NEW) ----------
+@app.get("/api/audit/open/chart")
+async def api_audit_open_chart(url: str):
+    normalized, res = _robust_audit(url)
+    category_scores_dict = _to_category_scores_dict(res["category_scores"])
+    overall = compute_overall(category_scores_dict)
+    grade = grade_from_score(overall)
+    charts = _build_chart_data(category_scores_dict, res.get("metrics", {}), int(overall), grade)
+    return JSONResponse({
+        "url": normalized,
+        "health_score": int(overall),
+        "grade": grade,
+        "charts": charts,
+        "top_issues": res.get("top_issues", [])
+    })
+
+@app.get("/api/audit/{website_id}/chart")
+async def api_audit_chart(website_id: int, request: Request, db: Session = Depends(get_db)):
+    global current_user
+    if not current_user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return JSONResponse({"error": "not_found"}, status_code=404)
+
+    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    category_scores_dict = _to_category_scores_dict(category_scores)
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+
+    charts = _build_chart_data(category_scores_dict, metrics_raw, int(a.health_score), a.grade)
+    return JSONResponse({
+        "url": w.url,
+        "health_score": int(a.health_score),
+        "grade": a.grade,
+        "charts": charts
+    })
