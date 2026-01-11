@@ -17,14 +17,13 @@ def render_pdf(
     """
     Render a one or multi-page Certified Audit PDF.
 
-    - Writes title, URL, grade, health score
-    - Prints category scores
-    - Wraps and prints exec_summary safely (normalizes line breaks, wraps long lines)
+    - Title, URL, grade, health score
+    - Category scores
+    - Exec summary (normalized line breaks + wrapped to width)
     """
     c = canvas.Canvas(path, pagesize=A4)
     width, height = A4
 
-    # Margins & vertical cursor
     left = 20 * mm
     line_h = 6 * mm
     y = height - 30 * mm
@@ -43,8 +42,6 @@ def render_pdf(
     c.drawString(left, y, f"{brand} — Certified Audit")
     y -= 10 * mm
     c.setFont("Helvetica", 11)
-
-    # URL, grade, score
     c.drawString(left, y, f"URL: {url}")
     y -= line_h
     c.drawString(left, y, f"Grade: {grade}    Health: {health_score}/100")
@@ -55,7 +52,6 @@ def render_pdf(
     c.drawString(left, y, "Category Scores:")
     y -= line_h
     c.setFont("Helvetica", 11)
-
     for item in (category_scores_list or []):
         name = str(item.get("name", "Unknown"))
         score = str(item.get("score", "NA"))
@@ -63,7 +59,6 @@ def render_pdf(
         y -= line_h
         if y < 20 * mm:
             new_page()
-
     y -= line_h
 
     # Executive summary
@@ -72,33 +67,24 @@ def render_pdf(
     y -= line_h
     c.setFont("Helvetica", 11)
 
-    # Normalize line breaks and wrap text
+    # Normalize and wrap
     safe_summary = str(exec_summary or "")
     safe_summary = safe_summary.replace("\r\n", "\n").replace("\r", "\n")
-
-    # Break into paragraphs by newline first
     paragraphs = [p.strip() for p in safe_summary.split("\n")]
     paragraphs = [p for p in paragraphs if p] or ["No executive summary provided."]
-
-    # Wrap lines to a reasonable width (characters); adjust as needed
     max_chars = 95
 
     for para in paragraphs:
-        wrapped_lines = textwrap.wrap(para, width=max_chars, break_long_words=True, break_on_hyphens=True)
-        if not wrapped_lines:
-            wrapped_lines = [""]
-
+        wrapped_lines = textwrap.wrap(para, width=max_chars, break_long_words=True, break_on_hyphens=True) or [""]
         for line in wrapped_lines:
             c.drawString(left + 5 * mm, y, line)
             y -= line_h
             if y < 20 * mm:
                 new_page()
-
-        # Blank line between paragraphs
         y -= 2
         if y < 20 * mm:
             new_page()
 
-    # Finalize
     c.showPage()
     c.save()
+``
