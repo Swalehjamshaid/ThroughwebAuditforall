@@ -126,21 +126,14 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# ---------- Chart helpers (NEW) ----------
+# ---------- Chart helpers ----------
 def _to_category_scores_dict(cs_list_or_dict):
-    """
-    Accepts either a dict like {'SEO': 70, ...} or a list like
-    [{'name':'SEO','score':70}, ...] and returns a normalized dict of ints.
-    """
+    """Accept dict {'SEO': 70, ...} or list [{'name':'SEO','score':70}, ...] -> dict[str,int]."""
     if isinstance(cs_list_or_dict, dict):
         try:
             return {str(k): int(v) for k, v in cs_list_or_dict.items()}
         except Exception:
-            # best-effort coerce ints
-            return {
-                str(k): int(v) for k, v in cs_list_or_dict.items()
-                if isinstance(v, (int, float))
-            }
+            return {str(k): int(v) for k, v in cs_list_or_dict.items() if isinstance(v, (int, float))}
     out = {}
     for item in (cs_list_or_dict or []):
         try:
@@ -150,18 +143,12 @@ def _to_category_scores_dict(cs_list_or_dict):
     return out
 
 def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: int, grade: str) -> dict:
-    """
-    Return Chart.js-ready datasets for:
-    - Category Scores (bar)
-    - Boolean Summary (pie)
-    - Numeric Metrics (bar)
-    - Health Gauge (number for any gauge plugin)
-    """
-    # Category scores bar dataset
+    """Return Chart.js-ready datasets (bar/radar/pie/number)."""
+    # Category scores
     cat_labels = list(category_scores_dict.keys())
     cat_values = [int(category_scores_dict.get(k, 0)) for k in cat_labels]
 
-    # Boolean metrics summary (pass/fail)
+    # Boolean summary
     boolean_candidates = [
         "has_https", "robots_allowed", "sitemap_present",
         "canonical_present", "viewport_present", "html_lang_present",
@@ -175,12 +162,10 @@ def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: in
         if isinstance(val, bool):
             label = METRIC_LABELS.get(key, key.replace("_", " ").title())
             boolean_items.append({"label": label, "value": val})
-            if val:
-                passed += 1
-            else:
-                failed += 1
+            if val: passed += 1
+            else:   failed += 1
 
-    # Numeric metrics (counts and lengths)
+    # Numeric metrics
     numeric_candidates = [
         "image_count", "images_without_alt",
         "title_length", "meta_description_length",
@@ -212,7 +197,7 @@ def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: in
                 "data": [passed, failed],
                 "backgroundColor": ["#00c853", "#ff5252"]
             }],
-            "items": boolean_items  # optional per-item legend/list
+            "items": boolean_items
         },
         "numeric_metrics": {
             "labels": numeric_labels,
@@ -233,11 +218,9 @@ def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: in
 
 # ---------- Robust URL & audit helpers ----------
 def _normalize_url(raw: str) -> str:
-    if not raw:
-        return raw
+    if not raw: return raw
     s = raw.strip()
-    if not s:
-        return s
+    if not s: return s
     p = urlparse(s)
     if not p.scheme:
         s = "https://" + s
@@ -253,7 +236,6 @@ def _url_variants(u: str) -> list:
     host = p.netloc
     path = p.path or "/"
     scheme = p.scheme
-
     candidates = [f"{scheme}://{host}{path}"]
     if host.startswith("www."):
         candidates.append(f"{scheme}://{host[4:]}{path}")
@@ -367,7 +349,7 @@ async def audit_open(request: Request):
             "category_scores": category_scores_list,
             "metrics": _present_metrics(res.get("metrics", {})),
             "top_issues": top_issues,
-            "charts": charts,  # NEW
+            "charts": charts,
         }
     })
 
@@ -384,7 +366,7 @@ async def report_pdf_open(url: str):
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
-# ---------- Registration & Auth (ONLY /auth/*) ----------
+# ---------- Registration & Auth ----------
 @app.get("/auth/register")
 async def register_get(request: Request):
     return templates.TemplateResponse("register.html", {
@@ -443,16 +425,12 @@ async def login_get(request: Request):
 
 # ---------- Magic Login (Passwordless) ----------
 def _send_magic_login_email(to_email: str, token: str) -> bool:
-    """
-    Send the magic login link via email using the same SMTP settings.
-    Clicking this link will log the user in and redirect to the dashboard.
-    """
+    """Send magic login link via email; FIXED f-string and anchor."""
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
-    # FIXED: valid anchor + proper f-string braces
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
@@ -482,27 +460,16 @@ async def magic_request(
     email: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """
-    Request a passwordless magic login link.
-    - Requires that the user already exists and is verified.
-    - Sends a short-lived token to the user's email.
-    """
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
-        # Do not reveal whether account exists or verified (privacy)
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
-    # Short expiry for security (e.g., 15 minutes)
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
-
     return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
 @app.get("/auth/magic")
 async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
-    """
-    Consume the magic login link: decode token, set session cookie, redirect to dashboard.
-    """
     global current_user
     try:
         data = decode_token(token)
@@ -718,7 +685,8 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
             "metrics": metrics,
-            "charts": charts,  # NEW
+            "charts": charts,
+            "top_issues": json.loads(a.metrics_json).get("top_issues", []) if a.metrics_json else []
         }
     })
 
@@ -923,7 +891,7 @@ async def _daily_scheduler_loop():
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
 
-# ---------- Public JSON endpoints for charts (NEW) ----------
+# ---------- Public JSON endpoints for charts ----------
 @app.get("/api/audit/open/chart")
 async def api_audit_open_chart(url: str):
     normalized, res = _robust_audit(url)
