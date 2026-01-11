@@ -25,15 +25,14 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# >>> NEW: headless plotting
+# --- NEW: headless plotting and exports ---
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
-
-from pptx import Presentation  # >>> NEW
-from pptx.util import Inches   # >>> NEW
-
-import pandas as pd            # >>> NEW
+from matplotlib.patches import Rectangle
+from pptx import Presentation
+from pptx.util import Inches
+import pandas as pd
 
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
@@ -43,18 +42,18 @@ SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
-# >>> NEW: visual config
+# --- Visual config for dashboard ---
 TITLE_MIN, TITLE_MAX = 12, 70
 DESC_MIN, DESC_MAX   = 40, 170
 
 COLORS = {
-    "critical": "#D32F2F",
-    "high":     "#F4511E",
-    "medium":   "#FBC02D",
-    "low":      "#7CB342",
-    "accent":   "#3B82F6",
-    "bg":       "#0F172A",
-    "fg":       "#E5E7EB",
+    "critical": "#D32F2F",  # red
+    "high":     "#F4511E",  # orange
+    "medium":   "#FBC02D",  # yellow
+    "low":      "#7CB342",  # green
+    "accent":   "#3B82F6",  # blue
+    "bg":       "#0F172A",  # slate
+    "fg":       "#E5E7EB",  # light
     "ok":       "#2E7D32",
     "warn":     "#EF6C00"
 }
@@ -126,7 +125,7 @@ METRIC_LABELS = {
     "xfo": "X-Frame-Options",
     "csp": "Content-Security-Policy",
     "set_cookie": "Set-Cookie",
-    "title": "HTML &lt;title&gt;",
+    "title": "HTML <title>",
     "title_length": "Title Length",
     "meta_description_length": "Meta Description Length",
     "meta_robots": "Meta Robots",
@@ -137,7 +136,7 @@ METRIC_LABELS = {
     "images_without_alt": "Images Missing alt",
     "image_count": "Image Count",
     "viewport_present": "Viewport Meta Present",
-    "html_lang_present": "&lt;html lang&gt; Present",
+    "html_lang_present": "<html lang> Present",
     "h1_count": "H1 Count",
     "normalized_url": "Normalized URL",
     "error": "Fetch Error",
@@ -224,7 +223,7 @@ def _robust_audit(url: str) -> tuple[str, dict]:
             continue
     return base, _fallback_result(base)
 
-# ---------- Utility (NEW): safe conversions for visuals ----------
+# ---------- Utility (for visuals) ----------
 def _safe_int(v):
     try:
         return int(v)
@@ -327,7 +326,7 @@ async def report_pdf_open(url: str):
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
-# >>> NEW: Open dashboard PNG (non-auth)
+# --- NEW: Open dashboard PNG (no auth) ---
 @app.get("/report/png/open")
 async def report_png_open(url: str):
     normalized, res = _robust_audit(url)
@@ -405,7 +404,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
-    # >>> FIXED anchor (removed duplicated link)
+    # Fixed: proper anchor, no duplication
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
@@ -687,7 +686,7 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
-# >>> NEW: Report PNG (graphical dashboard)
+# --- NEW: Report PNG (graphical dashboard) ---
 @app.get("/auth/report/png/{website_id}")
 async def report_png(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -706,7 +705,7 @@ async def report_png(website_id: int, request: Request, db: Session = Depends(ge
     _render_dashboard_png(path, UI_BRAND_NAME, w.url, category_scores, metrics_raw)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Audit_Dashboard_{website_id}.png")
 
-# >>> NEW: Report PPTX
+# --- NEW: Report PPTX ---
 @app.get("/auth/report/ppt/{website_id}")
 async def report_ppt(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -729,7 +728,7 @@ async def report_ppt(website_id: int, request: Request, db: Session = Depends(ge
     _export_ppt(UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, metrics_raw, dashboard_png, out_pptx)
     return FileResponse(out_pptx, filename=f"{UI_BRAND_NAME}_Audit_Executive_{website_id}.pptx")
 
-# >>> NEW: Report XLSX
+# --- NEW: Report XLSX ---
 @app.get("/auth/report/xlsx/{website_id}")
 async def report_xlsx(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -907,7 +906,7 @@ async def _daily_scheduler_loop():
                         lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
                         continue
                     pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
-                    png_link = f"{BASE_URL}/auth/report/png/{w.id}"   # >>> NEW (optional include)
+                    png_link = f"{BASE_URL}/auth/report/png/{w.id}"
                     lines.append(
                         f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
                         f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Certified PDF</a> | "
@@ -934,8 +933,7 @@ async def _daily_scheduler_loop():
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
 
-# ---------- Visual rendering helpers (NEW) ----------
-
+# ---------- Visual rendering helpers ----------
 def _render_dashboard_png(out_path: str, brand: str, url: str, category_scores: list, metrics_raw: dict):
     """
     Create a 12x8 PNG dashboard with:
@@ -970,20 +968,19 @@ def _render_dashboard_png(out_path: str, brand: str, url: str, category_scores: 
     ax1.set_title("Category Scores (0–100)", color=COLORS["fg"], fontsize=12)
     ax1.tick_params(colors=COLORS["fg"])
     ax1.set_xticklabels(names, rotation=20, ha="right", color=COLORS["fg"])
-
     for i, v in enumerate(values):
-        ax1.text(i, v + 2, str(v), ha="center", color=COLORS["fg"], fontsize=9)
+        ax1.text(i, min(v + 2, 99), str(v), ha="center", color=COLORS["fg"], fontsize=9)
 
     # 2) Compliance block (title/meta)
     ax2 = plt.subplot2grid((2, 3), (0, 2))
     ax2.axis("off")
+    def _ok_range(v, lo, hi):
+        if v is None: return False
+        return lo <= v <= hi
     comp_lines = [
         f"Title length: {title_len if title_len is not None else 'NA'} (recommended {TITLE_MIN}–{TITLE_MAX})",
         f"Meta description: {desc_len if desc_len is not None else 'NA'} (recommended {DESC_MIN}–{DESC_MAX})",
     ]
-    def _ok_range(v, lo, hi):
-        if v is None: return False
-        return lo <= v <= hi
     comp_colors = [
         COLORS["ok"] if _ok_range(title_len, TITLE_MIN, TITLE_MAX) else COLORS["warn"],
         COLORS["ok"] if _ok_range(desc_len,  DESC_MIN,  DESC_MAX) else COLORS["warn"],
@@ -1009,7 +1006,7 @@ def _render_dashboard_png(out_path: str, brand: str, url: str, category_scores: 
     x0, y0 = 0.02, 0.80
     for label, ok in sec_items:
         box_color = COLORS["ok"] if ok else COLORS["critical"]
-        ax3.add_patch(plt.Rectangle((x0, y0), 0.04, 0.10, color=box_color))
+        ax3.add_patch(Rectangle((x0, y0), 0.04, 0.10, color=box_color, transform=ax3.transAxes))
         ax3.text(x0 + 0.06, y0 + 0.05, f"{label}: {'OK' if ok else 'Missing'}",
                  va="center", fontsize=10, color=COLORS["fg"], transform=ax3.transAxes)
         y0 -= 0.13
@@ -1039,16 +1036,15 @@ def _export_ppt(brand: str, url: str, grade: str, health_score: int,
     tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(4.5)).text_frame
     tf.word_wrap = True
 
-    # Category scores text
+    def line_bool(name, val):
+        return f"{name}: {'OK' if _truthy(val) else 'Missing'}"
+
     lines = ["Category Scores:"]
     for c in (category_scores or []):
         lines.append(f" - {c['name']}: {c['score']}")
     if not category_scores:
         lines.append(" - No category score data available.")
 
-    # Metrics highlights
-    def line_bool(name, val):
-        return f"{name}: {'OK' if _truthy(val) else 'Missing'}"
     lines.extend([
         "",
         "Security/Indexability:",
@@ -1071,7 +1067,11 @@ def _export_ppt(brand: str, url: str, grade: str, health_score: int,
 
 def _export_xlsx(brand: str, url: str, grade: str, health_score: int,
                  category_scores: list, metrics_raw: dict, out_xlsx: str):
-    # Build simple sheets with Pandas
+    """
+    Export a simple Excel workbook:
+    - Summary sheet (key metrics)
+    - CategoryScores sheet (name/score pairs)
+    """
     summary_rows = [
         {"Metric": "Brand", "Value": brand},
         {"Metric": "URL", "Value": url},
@@ -1087,10 +1087,8 @@ def _export_xlsx(brand: str, url: str, grade: str, health_score: int,
         {"Metric": "Robots allow indexing", "Value": "OK" if _truthy(metrics_raw.get("robots_allowed")) else "Blocked"},
     ]
     df_summary = pd.DataFrame(summary_rows)
-
     df_categories = pd.DataFrame(category_scores or [], columns=["name", "score"])
 
     with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
         df_summary.to_excel(writer, sheet_name="Summary", index=False)
         df_categories.to_excel(writer, sheet_name="CategoryScores", index=False)
-``
