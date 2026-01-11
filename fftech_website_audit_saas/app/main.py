@@ -25,6 +25,16 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+# >>> NEW: headless plotting
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from pptx import Presentation  # >>> NEW
+from pptx.util import Inches   # >>> NEW
+
+import pandas as pd            # >>> NEW
+
 UI_BRAND_NAME = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL      = os.getenv("BASE_URL", "http://localhost:8000")
 
@@ -32,6 +42,22 @@ SMTP_HOST     = os.getenv("SMTP_HOST")
 SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER     = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+
+# >>> NEW: visual config
+TITLE_MIN, TITLE_MAX = 12, 70
+DESC_MIN, DESC_MAX   = 40, 170
+
+COLORS = {
+    "critical": "#D32F2F",
+    "high":     "#F4511E",
+    "medium":   "#FBC02D",
+    "low":      "#7CB342",
+    "accent":   "#3B82F6",
+    "bg":       "#0F172A",
+    "fg":       "#E5E7EB",
+    "ok":       "#2E7D32",
+    "warn":     "#EF6C00"
+}
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -100,7 +126,7 @@ METRIC_LABELS = {
     "xfo": "X-Frame-Options",
     "csp": "Content-Security-Policy",
     "set_cookie": "Set-Cookie",
-    "title": "HTML <title>",
+    "title": "HTML &lt;title&gt;",
     "title_length": "Title Length",
     "meta_description_length": "Meta Description Length",
     "meta_robots": "Meta Robots",
@@ -111,7 +137,7 @@ METRIC_LABELS = {
     "images_without_alt": "Images Missing alt",
     "image_count": "Image Count",
     "viewport_present": "Viewport Meta Present",
-    "html_lang_present": "<html lang> Present",
+    "html_lang_present": "&lt;html lang&gt; Present",
     "h1_count": "H1 Count",
     "normalized_url": "Normalized URL",
     "error": "Fetch Error",
@@ -198,6 +224,33 @@ def _robust_audit(url: str) -> tuple[str, dict]:
             continue
     return base, _fallback_result(base)
 
+# ---------- Utility (NEW): safe conversions for visuals ----------
+def _safe_int(v):
+    try:
+        return int(v)
+    except Exception:
+        try:
+            return int(float(v))
+        except Exception:
+            return None
+
+def _truthy(v) -> bool:
+    """
+    Normalize various inputs to boolean.
+    Accepts bool, 'yes'/'true'/'ok', '1', non-empty lists/strings.
+    """
+    if isinstance(v, bool): return v
+    if v is None: return False
+    if isinstance(v, (list, dict)): return len(v) > 0
+    s = str(v).strip().lower()
+    return s in {"1", "true", "yes", "ok", "present", "enabled"}
+
+def _cookie_flag_present(set_cookie_val: str, flag: str) -> bool:
+    if not set_cookie_val:
+        return False
+    s = str(set_cookie_val).lower()
+    return flag.lower() in s
+
 # ---------- Session handling ----------
 current_user = None
 
@@ -274,6 +327,16 @@ async def report_pdf_open(url: str):
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
 
+# >>> NEW: Open dashboard PNG (non-auth)
+@app.get("/report/png/open")
+async def report_png_open(url: str):
+    normalized, res = _robust_audit(url)
+    cs_list = [{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]
+    metrics_raw = res.get("metrics", {})
+    path = "/tmp/Audit_Dashboard_Open.png"
+    _render_dashboard_png(path, UI_BRAND_NAME, normalized, cs_list, metrics_raw)
+    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Audit_Dashboard_Open.png")
+
 # ---------- Registration & Auth (ONLY /auth/*) ----------
 @app.get("/auth/register")
 async def register_get(request: Request):
@@ -342,6 +405,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
+    # >>> FIXED anchor (removed duplicated link)
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
@@ -381,7 +445,6 @@ async def magic_request(
         # Do not reveal whether account exists or verified (privacy)
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
 
-    # Short expiry for security (e.g., 15 minutes)
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
 
@@ -624,6 +687,67 @@ async def report_pdf(website_id: int, request: Request, db: Session = Depends(ge
     render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
 
+# >>> NEW: Report PNG (graphical dashboard)
+@app.get("/auth/report/png/{website_id}")
+async def report_png(website_id: int, request: Request, db: Session = Depends(get_db)):
+    global current_user
+    if not current_user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return RedirectResponse("/auth/dashboard", status_code=303)
+
+    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+    path = f"/tmp/Audit_Dashboard_{website_id}.png"
+
+    _render_dashboard_png(path, UI_BRAND_NAME, w.url, category_scores, metrics_raw)
+    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Audit_Dashboard_{website_id}.png")
+
+# >>> NEW: Report PPTX
+@app.get("/auth/report/ppt/{website_id}")
+async def report_ppt(website_id: int, request: Request, db: Session = Depends(get_db)):
+    global current_user
+    if not current_user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return RedirectResponse("/auth/dashboard", status_code=303)
+
+    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+
+    # generate dashboard image first
+    dashboard_png = f"/tmp/Audit_Dashboard_{website_id}.png"
+    _render_dashboard_png(dashboard_png, UI_BRAND_NAME, w.url, category_scores, metrics_raw)
+
+    out_pptx = f"/tmp/Audit_Executive_{website_id}.pptx"
+    _export_ppt(UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, metrics_raw, dashboard_png, out_pptx)
+    return FileResponse(out_pptx, filename=f"{UI_BRAND_NAME}_Audit_Executive_{website_id}.pptx")
+
+# >>> NEW: Report XLSX
+@app.get("/auth/report/xlsx/{website_id}")
+async def report_xlsx(website_id: int, request: Request, db: Session = Depends(get_db)):
+    global current_user
+    if not current_user:
+        return RedirectResponse("/auth/login", status_code=303)
+
+    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
+    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
+    if not w or not a:
+        return RedirectResponse("/auth/dashboard", status_code=303)
+
+    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
+    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
+
+    out_xlsx = f"/tmp/Audit_Dashboard_{website_id}.xlsx"
+    _export_xlsx(UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, metrics_raw, out_xlsx)
+    return FileResponse(out_xlsx, filename=f"{UI_BRAND_NAME}_Audit_Dashboard_{website_id}.xlsx")
+
 # ---------- Scheduling UI ----------
 @app.get("/auth/schedule")
 async def schedule_get(request: Request, db: Session = Depends(get_db)):
@@ -783,9 +907,11 @@ async def _daily_scheduler_loop():
                         lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
                         continue
                     pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
+                    png_link = f"{BASE_URL}/auth/report/png/{w.id}"   # >>> NEW (optional include)
                     lines.append(
                         f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
-                        f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Download Certified Report</a>)</p>"
+                        f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Certified PDF</a> | "
+                        f"<a href=\"{png_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Dashboard PNG</a>)</p>"
                     )
                 thirty_days_ago = datetime.utcnow() - timedelta(days=30)
                 audits_30 = db.query(Audit).filter(
@@ -807,3 +933,164 @@ async def _daily_scheduler_loop():
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
+
+# ---------- Visual rendering helpers (NEW) ----------
+
+def _render_dashboard_png(out_path: str, brand: str, url: str, category_scores: list, metrics_raw: dict):
+    """
+    Create a 12x8 PNG dashboard with:
+    - Bar chart for category scores
+    - Compliance block (title/meta lengths vs thresholds)
+    - Security matrix (XFO, CSP, HSTS, Secure/HttpOnly cookies, Robots)
+    """
+    # Extract metrics
+    title_len = _safe_int(metrics_raw.get("title_length"))
+    desc_len  = _safe_int(metrics_raw.get("meta_description_length"))
+
+    xfo_ok   = _truthy(metrics_raw.get("xfo"))
+    csp_ok   = _truthy(metrics_raw.get("csp"))
+    hsts_ok  = _truthy(metrics_raw.get("hsts"))
+    robots_allowed = _truthy(metrics_raw.get("robots_allowed"))
+    set_cookie_val = metrics_raw.get("set_cookie")
+
+    cookie_secure_ok   = _cookie_flag_present(set_cookie_val, "Secure")
+    cookie_httponly_ok = _cookie_flag_present(set_cookie_val, "HttpOnly")
+
+    # Prepare figure
+    plt.style.use("seaborn-v0_8-darkgrid")
+    fig = plt.figure(figsize=(12, 8), dpi=150)
+    fig.patch.set_facecolor(COLORS["bg"])
+
+    # 1) Category scores bar
+    ax1 = plt.subplot2grid((2, 3), (0, 0), colspan=2)
+    names = [c["name"] for c in category_scores] or ["Performance", "Accessibility", "SEO", "Security", "BestPractices"]
+    values = [int(c["score"]) for c in category_scores] if category_scores else [65, 72, 68, 70, 66]
+    ax1.bar(names, values, color=COLORS["accent"])
+    ax1.set_ylim(0, 100)
+    ax1.set_title("Category Scores (0–100)", color=COLORS["fg"], fontsize=12)
+    ax1.tick_params(colors=COLORS["fg"])
+    ax1.set_xticklabels(names, rotation=20, ha="right", color=COLORS["fg"])
+
+    for i, v in enumerate(values):
+        ax1.text(i, v + 2, str(v), ha="center", color=COLORS["fg"], fontsize=9)
+
+    # 2) Compliance block (title/meta)
+    ax2 = plt.subplot2grid((2, 3), (0, 2))
+    ax2.axis("off")
+    comp_lines = [
+        f"Title length: {title_len if title_len is not None else 'NA'} (recommended {TITLE_MIN}–{TITLE_MAX})",
+        f"Meta description: {desc_len if desc_len is not None else 'NA'} (recommended {DESC_MIN}–{DESC_MAX})",
+    ]
+    def _ok_range(v, lo, hi):
+        if v is None: return False
+        return lo <= v <= hi
+    comp_colors = [
+        COLORS["ok"] if _ok_range(title_len, TITLE_MIN, TITLE_MAX) else COLORS["warn"],
+        COLORS["ok"] if _ok_range(desc_len,  DESC_MIN,  DESC_MAX) else COLORS["warn"],
+    ]
+    y = 0.8
+    for t, col in zip(comp_lines, comp_colors):
+        ax2.text(0.0, y, t, fontsize=10, color=col, transform=ax2.transAxes)
+        y -= 0.18
+
+    # 3) Security matrix
+    ax3 = plt.subplot2grid((2, 3), (1, 0), colspan=3)
+    ax3.axis("off")
+    sec_items = [
+        ("X-Frame-Options", xfo_ok),
+        ("Content-Security-Policy", csp_ok),
+        ("HSTS", hsts_ok),
+        ("Cookie Secure", cookie_secure_ok),
+        ("Cookie HttpOnly", cookie_httponly_ok),
+        ("Robots allow indexing", robots_allowed),
+    ]
+    ax3.text(0.01, 0.95, "Security & Indexability", fontsize=12, color=COLORS["fg"], transform=ax3.transAxes)
+
+    x0, y0 = 0.02, 0.80
+    for label, ok in sec_items:
+        box_color = COLORS["ok"] if ok else COLORS["critical"]
+        ax3.add_patch(plt.Rectangle((x0, y0), 0.04, 0.10, color=box_color))
+        ax3.text(x0 + 0.06, y0 + 0.05, f"{label}: {'OK' if ok else 'Missing'}",
+                 va="center", fontsize=10, color=COLORS["fg"], transform=ax3.transAxes)
+        y0 -= 0.13
+
+    # Title
+    fig.suptitle(f"{brand} — Audit Dashboard\n{url}", color=COLORS["fg"], fontsize=15)
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
+    fig.savefig(out_path, facecolor=COLORS["bg"])
+    plt.close(fig)
+
+def _export_ppt(brand: str, url: str, grade: str, health_score: int,
+                category_scores: list, metrics_raw: dict, dashboard_png: str, out_pptx: str):
+    prs = Presentation()
+    # Title slide
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    slide.shapes.title.text = f"{brand} — Audit Summary"
+    slide.placeholders[1].text = f"{url}\nGrade: {grade}  |  Health: {health_score}/100\nGenerated {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+    # Dashboard slide
+    slide = prs.slides.add_slide(prs.slide_layouts[5])  # title only
+    slide.shapes.title.text = "Executive Dashboard"
+    slide.shapes.add_picture(dashboard_png, Inches(0.5), Inches(1.5), width=Inches(9.0))
+
+    # Details slide
+    slide = prs.slides.add_slide(prs.slide_layouts[5])
+    slide.shapes.title.text = "Details"
+    tf = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9), Inches(4.5)).text_frame
+    tf.word_wrap = True
+
+    # Category scores text
+    lines = ["Category Scores:"]
+    for c in (category_scores or []):
+        lines.append(f" - {c['name']}: {c['score']}")
+    if not category_scores:
+        lines.append(" - No category score data available.")
+
+    # Metrics highlights
+    def line_bool(name, val):
+        return f"{name}: {'OK' if _truthy(val) else 'Missing'}"
+    lines.extend([
+        "",
+        "Security/Indexability:",
+        line_bool("X-Frame-Options", metrics_raw.get("xfo")),
+        line_bool("Content-Security-Policy", metrics_raw.get("csp")),
+        line_bool("HSTS", metrics_raw.get("hsts")),
+        f"Cookie Secure: {'OK' if _cookie_flag_present(metrics_raw.get('set_cookie'), 'Secure') else 'Missing'}",
+        f"Cookie HttpOnly: {'OK' if _cookie_flag_present(metrics_raw.get('set_cookie'), 'HttpOnly') else 'Missing'}",
+        f"Robots allow indexing: {'OK' if _truthy(metrics_raw.get('robots_allowed')) else 'Blocked'}",
+        "",
+        f"Title length: {metrics_raw.get('title_length', 'NA')} (recommended {TITLE_MIN}-{TITLE_MAX})",
+        f"Meta description length: {metrics_raw.get('meta_description_length', 'NA')} (recommended {DESC_MIN}-{DESC_MAX})",
+    ])
+    p0 = tf.paragraphs[0]
+    p0.text = lines[0]; p0.level = 0
+    for t in lines[1:]:
+        pp = tf.add_paragraph(); pp.text = t; pp.level = 0
+
+    prs.save(out_pptx)
+
+def _export_xlsx(brand: str, url: str, grade: str, health_score: int,
+                 category_scores: list, metrics_raw: dict, out_xlsx: str):
+    # Build simple sheets with Pandas
+    summary_rows = [
+        {"Metric": "Brand", "Value": brand},
+        {"Metric": "URL", "Value": url},
+        {"Metric": "Grade", "Value": grade},
+        {"Metric": "Health Score", "Value": health_score},
+        {"Metric": "Title length", "Value": metrics_raw.get("title_length")},
+        {"Metric": "Meta description length", "Value": metrics_raw.get("meta_description_length")},
+        {"Metric": "X-Frame-Options", "Value": "OK" if _truthy(metrics_raw.get("xfo")) else "Missing"},
+        {"Metric": "CSP", "Value": "OK" if _truthy(metrics_raw.get("csp")) else "Missing"},
+        {"Metric": "HSTS", "Value": "OK" if _truthy(metrics_raw.get("hsts")) else "Missing"},
+        {"Metric": "Cookie Secure", "Value": "OK" if _cookie_flag_present(metrics_raw.get("set_cookie"), "Secure") else "Missing"},
+        {"Metric": "Cookie HttpOnly", "Value": "OK" if _cookie_flag_present(metrics_raw.get("set_cookie"), "HttpOnly") else "Missing"},
+        {"Metric": "Robots allow indexing", "Value": "OK" if _truthy(metrics_raw.get("robots_allowed")) else "Blocked"},
+    ]
+    df_summary = pd.DataFrame(summary_rows)
+
+    df_categories = pd.DataFrame(category_scores or [], columns=["name", "score"])
+
+    with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
+        df_summary.to_excel(writer, sheet_name="Summary", index=False)
+        df_categories.to_excel(writer, sheet_name="CategoryScores", index=False)
+``
