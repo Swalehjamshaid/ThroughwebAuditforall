@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Audits · Audit Portal{% endblock %}
+{% block content %}
+<h1>All Audits</h1>
+<table class="table">
+  <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Created By</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for a in audits %}
+    <tr>
+      <td>{{ a.title }}</td>
+      <td>{{ a.category }}</td>
+      <td>{{ a.date }}</td>
+      <td>{{ a.created_by }}</td>
+      <td>
+        <a class="btn" href="{{ url_for('audit_detail', audit_id=a.id) }}">Open</a>
+        <a class="btn" href="{{ url_for('audit_results', audit_id=a.id) }}">Results</a>
+        <a class="btn" href="{{ url_for('audit_report', audit_id=a.id) }}">PDF</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

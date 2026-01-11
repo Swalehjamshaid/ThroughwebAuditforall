@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Audit · {{ audit.title }}{% endblock %}
+{% block content %}
+<h1>{{ audit.title }}</h1>
+<p class="muted">Category: {{ audit.category }} · Date: {{ audit.date }} · By: {{ audit.created_by }}</p>
+
+<section class="actions">
+  <a class="btn" href="{{ url_for('audit_results', audit_id=audit.id) }}">View Results</a>
+  <a class="btn" href="{{ url_for('audit_report', audit_id=audit.id) }}">Download PDF</a>
+</section>
+
+<h2>Add Item</h2>
+<form method="post" class="form grid-2">
+  <label>Item<input name="item" required placeholder="e.g., PPE availability"></label>
+  <label>Weight<input name="weight" type="number" step="0.1" value="1"></label>
+  <label>Score<input name="score" type="number" step="0.1" value="0"></label>
+  <label>Status
+    <select name="status">
+      <option value="pending">pending</option>
+      <option value="in-progress">in-progress</option>
+      <option value="completed">completed</option>
+    </select>
+  </label>
+  <button class="btn primary" type="submit">Add</button>
+</form>
+
+<h2>Items</h2>
+<table class="table">
+  <thead><tr><th>Item</th><th>Score</th><th>Weight</th><th>Status</th><th>Created</th></tr></thead>
+  <tbody>
+    {% for it in items %}
+    <tr>
+      <td>{{ it.item }}</td>
+      <td>{{ it.score }}</td>
+      <td>{{ it.weight }}</td>
+      <td>{{ it.status }}</td>
+      <td>{{ it.created_at }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
