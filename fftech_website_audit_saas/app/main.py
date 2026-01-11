@@ -1,3 +1,5 @@
+
+# app/main.py
 import os
 import json
 import asyncio
@@ -59,7 +61,6 @@ def _ensure_schedule_columns():
     except Exception:
         pass
 
-
 def _ensure_user_columns():
     try:
         with engine.connect() as conn:
@@ -90,7 +91,7 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Metrics presenter ----------
+# ---------- Metrics presenter (human-friendly labels) ----------
 METRIC_LABELS = {
     "status_code": "Status Code",
     "content_length": "Content Length (bytes)",
@@ -118,7 +119,6 @@ METRIC_LABELS = {
     "error": "Fetch Error",
 }
 
-
 def _present_metrics(metrics: dict) -> dict:
     out = {}
     for k, v in (metrics or {}).items():
@@ -129,8 +129,6 @@ def _present_metrics(metrics: dict) -> dict:
     return out
 
 # ---------- Robust URL & audit helpers ----------
-from urllib.parse import urlparse
-
 def _normalize_url(raw: str) -> str:
     if not raw:
         return raw
@@ -146,7 +144,6 @@ def _normalize_url(raw: str) -> str:
         p = urlparse(s)
     path = p.path or "/"
     return f"{p.scheme}://{p.netloc}{path}"
-
 
 def _url_variants(u: str) -> list:
     p = urlparse(u)
@@ -172,7 +169,6 @@ def _url_variants(u: str) -> list:
             ordered.append(c); seen.add(c)
     return ordered
 
-
 def _fallback_result(url: str) -> dict:
     return {
         "category_scores": {
@@ -191,7 +187,6 @@ def _fallback_result(url: str) -> dict:
             "Verify URL is publicly accessible and not blocked by WAF/robots.",
         ],
     }
-
 
 def _robust_audit(url: str) -> tuple[str, dict]:
     base = _normalize_url(url)
@@ -347,23 +342,31 @@ async def login_get(request: Request):
         "user": current_user
     })
 
-# Magic login
+# ---------- Magic Login (Passwordless) ----------
 def _send_magic_login_email(to_email: str, token: str) -> bool:
+    """
+    Send the magic login link via email using the same SMTP settings.
+    Clicking this link will log the user in and redirect to the dashboard.
+    """
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
+
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
+
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
-    <p><a href="{login_link}" target="_blank" rel="noopener noreferrer">{login_link}</a></p>
-    <p>This link will expire shortly.</p>
+    <p><a href="{k}{login_link}</a></p>
+    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
     msg["From"] = SMTP_USER
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
+
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
@@ -382,6 +385,7 @@ async def magic_request(
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
     return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
@@ -394,9 +398,11 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
         uid = data.get("uid")
         if not uid or data.get("type") != "magic":
             return RedirectResponse("/auth/login?error=1", status_code=303)
+
         u = db.query(User).filter(User.id == uid).first()
         if not u or not getattr(u, "verified", False):
             return RedirectResponse("/auth/login?error=1", status_code=303)
+
         current_user = u
         session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
         resp = RedirectResponse("/auth/dashboard", status_code=303)
@@ -412,6 +418,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
 
+# ---------- Password login remains available ----------
 @app.post("/auth/login")
 async def login_post(
     request: Request,
@@ -423,8 +430,10 @@ async def login_post(
     u = db.query(User).filter(User.email == email).first()
     if not u or not verify_password(password, u.password_hash) or not u.verified:
         return RedirectResponse("/auth/login?error=1", status_code=303)
+
     current_user = u
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
+
     resp = RedirectResponse("/auth/dashboard", status_code=303)
     resp.set_cookie(
         key="session_token",
@@ -452,6 +461,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse("/auth/login", status_code=303)
 
     websites = db.query(Website).filter(Website.user_id == current_user.id).all()
+
     last_audits = (
         db.query(Audit)
         .filter(Audit.user_id == current_user.id)
@@ -597,6 +607,7 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
         }
     })
 
+# ---------- Report endpoints ----------
 @app.get("/auth/report/pdf/{website_id}")
 async def report_pdf(website_id: int, request: Request, db: Session = Depends(get_db)):
     global current_user
@@ -723,7 +734,6 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 # ---------- Daily Email Scheduler ----------
-
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
@@ -764,10 +774,12 @@ async def _daily_scheduler_loop():
                 if not user or not getattr(user, "verified", False):
                     continue
                 websites = db.query(Website).filter(Website.user_id == user.id).all()
+
+                # Build email HTML safely as a list of lines, then join
                 lines = [
                     f"<h3>Daily Website Audit Summary – {UI_BRAND_NAME}</h3>",
                     f"<p>Hello, {user.email}!</p>",
-                    "<p>Here is your daily summary. Download reports below.</p>"
+                    "<p>Here is your daily summary. Download certified reports via the links below.</p>",
                 ]
                 for w in websites:
                     last = (
@@ -779,12 +791,15 @@ async def _daily_scheduler_loop():
                     if not last:
                         lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
                         continue
-                    pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
-                    png_link = f"{BASE_URL}/auth/report/png/{w.id}"
+                    pdf_link = f"{BASE_URL.rstrip('/')}/auth/report/pdf/{w.id}"
+                    png_link = f"{BASE_URL.rstrip('/')}/auth/report/png/{w.id}"
                     lines.append(
-                        f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
-                        f"(<a href="{pdf_link}" target="_blank" rel="noopener noreferrer">PDF</a> | "
-                        f"<a href="{png_link}" target="_blank" rel="noopener noreferrer">Dashboard PNG</a>)</p>"
+                        (
+                            f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, "
+                            f"Health <b>{last.health_score}</b>/100 "
+                            f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Certified PDF</a> | "
+                            f"<a href=\"{png_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Dashboard PNG</a>)</p>"
+                        )
                     )
                 thirty_days_ago = datetime.utcnow() - timedelta(days=30)
                 audits_30 = db.query(Audit).filter(
@@ -796,11 +811,11 @@ async def _daily_scheduler_loop():
                     lines.append(f"<hr><p><b>30-day accumulated score:</b> {avg_score}/100</p>")
                 else:
                     lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
-                html = "
-".join(lines)
+                html = "\n".join(lines)
                 _send_report_email(user.email, f"{UI_BRAND_NAME} – Daily Website Audit Summary", html)
             db.close()
         except Exception:
+            # Never crash the scheduler loop
             pass
         await asyncio.sleep(60)
 
