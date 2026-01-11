@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Login</h2>
+<form action='/auth/login' method='post' class='col'>
+  <label>Email <input type='email' name='email' required/></label>
+  <label>Password <input type='password' name='password' required/></label>
+  <button type='submit'>Login</button>
+</form>
+{% if request.query_params.get('check_email') %}
+<p class='info'>Check your inbox and click the verification link to activate your account.</p>
+{% endif %}
+{% if request.query_params.get('verified') %}
+<p class='success'>Your email has been verified. You can now log in.</p>
+{% endif %}
+{% endblock %}
