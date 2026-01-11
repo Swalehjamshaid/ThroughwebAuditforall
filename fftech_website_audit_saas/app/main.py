@@ -136,7 +136,11 @@ def _to_category_scores_dict(cs_list_or_dict):
         try:
             return {str(k): int(v) for k, v in cs_list_or_dict.items()}
         except Exception:
-            return {str(k): int(v) for k, v in cs_list_or_dict.items() if isinstance(v, (int, float))}
+            # best-effort coerce ints
+            return {
+                str(k): int(v) for k, v in cs_list_or_dict.items()
+                if isinstance(v, (int, float))
+            }
     out = {}
     for item in (cs_list_or_dict or []):
         try:
@@ -293,7 +297,8 @@ def _robust_audit(url: str) -> tuple[str, dict]:
         try:
             res = run_basic_checks(candidate)
             cats = res.get("category_scores") or {}
-            if cats and sum(int(v) for v in _to_category_scores_dict(cats).values()) > 0:
+            cats_norm = _to_category_scores_dict(cats)
+            if cats_norm and sum(int(v) for v in cats_norm.values()) > 0:
                 return candidate, res
         except Exception:
             continue
@@ -369,11 +374,12 @@ async def audit_open(request: Request):
 @app.get("/report/pdf/open")
 async def report_pdf_open(url: str):
     normalized, res = _robust_audit(url)
-    cs_list = [{"name": k, "score": int(v)} for k, v in _to_category_scores_dict(res["category_scores"]).items()]
-    overall = compute_overall(_to_category_scores_dict(res["category_scores"]))
+    cs_dict = _to_category_scores_dict(res["category_scores"])
+    cs_list = [{"name": k, "score": int(v)} for k, v in cs_dict.items()]
+    overall = compute_overall(cs_dict)
     grade = grade_from_score(overall)
     top_issues = res.get("top_issues", [])
-    exec_summary = summarize_200_words(normalized, _to_category_scores_dict(res["category_scores"]), top_issues)
+    exec_summary = summarize_200_words(normalized, cs_dict, top_issues)
     path = "/tmp/certified_audit_open.pdf"
     render_pdf(path, UI_BRAND_NAME, normalized, grade, int(overall), cs_list, exec_summary)
     return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
@@ -446,11 +452,12 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
+    # FIXED: valid anchor + proper f-string braces
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
-    <p><aogin_link}{login_link}</a></p>
+    <p>{login_link}{login_link}</a></p>
     <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
 
