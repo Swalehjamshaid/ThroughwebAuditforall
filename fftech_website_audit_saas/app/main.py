@@ -154,16 +154,15 @@ def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: in
         "canonical_present", "viewport_present", "html_lang_present",
         "hsts", "xcto", "xfo", "csp"
     ]
-    passed = 0
-    failed = 0
+    passed = failed = 0
     boolean_items = []
     for key in boolean_candidates:
         val = metrics_raw.get(key, None)
         if isinstance(val, bool):
             label = METRIC_LABELS.get(key, key.replace("_", " ").title())
             boolean_items.append({"label": label, "value": val})
-            if val: passed += 1
-            else:   failed += 1
+            passed += (1 if val else 0)
+            failed += (0 if val else 1)
 
     # Numeric metrics
     numeric_candidates = [
@@ -171,8 +170,7 @@ def _build_chart_data(category_scores_dict: dict, metrics_raw: dict, overall: in
         "title_length", "meta_description_length",
         "h1_count", "content_length"
     ]
-    numeric_labels = []
-    numeric_values = []
+    numeric_labels, numeric_values = [], []
     for key in numeric_candidates:
         val = metrics_raw.get(key, None)
         if isinstance(val, (int, float)) and val is not None:
@@ -333,7 +331,6 @@ async def audit_open(request: Request):
     top_issues = res.get("top_issues", [])
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
-
     charts = _build_chart_data(category_scores_dict, res.get("metrics", {}), int(overall), grade)
 
     return templates.TemplateResponse("audit_detail_open.html", {
@@ -686,7 +683,6 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "category_scores": category_scores,
             "metrics": metrics,
             "charts": charts,
-            "top_issues": json.loads(a.metrics_json).get("top_issues", []) if a.metrics_json else []
         }
     })
 
