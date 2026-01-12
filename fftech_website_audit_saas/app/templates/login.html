@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-5">
+    <div class="card card-glass">
+      <div class="card-body">
+        <h4 class="mb-3">Login</h4>
+        {% if request.query_params.get('error') %}
+          <div class="alert alert-danger">Invalid credentials or account not verified.</div>
+        {% endif %}
+        {% if request.query_params.get('magic_sent') %}
+          <div class="alert alert-success">If the email exists and is verified, a magic link has been sent.</div>
+        {% endif %}
+        {% if request.query_params.get('check_email') %}
+          <div class="alert alert-info">Please check your email to verify your account.</div>
+        {% endif %}
+        <form method="post" action="/auth/login" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Email</label>
+            <input type="email" name="email" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Login</button>
+            <a class="btn btn-outline-secondary" href="/auth/register">Register</a>
+          </div>
+        </form>
+        <hr>
+        <h6 class="mb-2">Passwordless</h6>
+        <form method="post" action="/auth/magic/request" class="row g-2">
+          <div class="col-12">
+            <input type="email" name="email" class="form-control" placeholder="Enter your verified email">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-outline-primary" type="submit">Send Magic Link</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

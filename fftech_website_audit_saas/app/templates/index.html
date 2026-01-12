@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-xl-6">
+    <div class="card card-glass">
+      <div class="card-body">
+        <h4 class="mb-3">Audit any website — instant preview</h4>
+        <form method="post" action="/audit/open" class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Website URL</label>
+            <input type="url" name="url" class="form-control" placeholder="https://example.com" required>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-speedometer2 me-1"></i> Run Open Audit
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card card-glass">
+      <div class="card-body">
+        <h5 class="mb-3">Why {{ UI_BRAND_NAME }}?</h5>
+        <ul class="list-unstyled mb-0">
+          <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Performance, SEO, Accessibility, Security analysis</li>
+          <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Beautiful charts with dark/light theme toggle</li>
+          <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Certified PDF reports</li>
+          <li class="mb-2"><i class="bi bi-check2-circle text-success me-2"></i>Daily email scheduling</li>
+        </ul>
+        <hr>
+        {% if not user %}
+          <p class="mb-2">Want history, dashboards and scheduling?</p>
+          <a class="btn btn-outline-primary" href="/auth/register">Create account</a>
+        {% else %}
+          <p class="mb-0">Welcome back! Go to your <a href="/auth/dashboard">dashboard</a>.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

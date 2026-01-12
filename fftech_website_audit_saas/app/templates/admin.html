@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card card-glass">
+      <div class="card-body">
+        <h4 class="mb-3">Admin Dashboard</h4>
+        <div class="row g-4">
+          <div class="col-12 col-lg-4">
+            <h6 class="fw-bold">Users</h6>
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead><tr><th>Email</th><th>Verified</th><th>Created</th></tr></thead>
+                <tbody>
+                  {% for u in admin_users %}
+                  <tr>
+                    <td>{{ u.email }}</td>
+                    <td>{{ 'Yes' if u.verified else 'No' }}</td>
+                    <td>{{ u.created_at.strftime('%d %b %Y') if u.created_at else '-' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <h6 class="fw-bold">Websites</h6>
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead><tr><th>URL</th><th>Owner</th><th>Last Grade</th></tr></thead>
+                <tbody>
+                  {% for w in websites %}
+                  <tr>
+                    <td>{{ w.url }}</td>
+                    <td>{{ w.user_id }}</td>
+                    <td>{{ w.last_grade or '-' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <h6 class="fw-bold">Recent Audits</h6>
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead><tr><th>User</th><th>Website</th><th>Grade</th><th>Score</th><th>At</th></tr></thead>
+                <tbody>
+                  {% for a in admin_audits %}
+                  <tr>
+                    <td>{{ a.user_id }}</td>
+                    <td>{{ a.website_id }}</td>
+                    <td>{{ a.grade }}</td>
+                    <td>{{ a.health_score }}</td>
+                    <td>{{ a.created_at.strftime('%d %b %Y %H:%M') }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
