@@ -1,0 +1,18 @@
+
+{% extends 'base.html' %}
+{% block title %}Welcome · Audit SaaS{% endblock %}
+{% block content %}
+<section class="text-center py-5">
+  <h1 class="display-5 brand-gradient">Audit Intelligence, Beautifully Delivered</h1>
+  <p class="lead mt-3">Visualize risks, prioritize actions, and close findings faster with a delightful, modern UI.</p>
+  <div class="mt-4">
+    <a href="/dashboard" class="btn btn-brand btn-lg">Go to Dashboard</a>
+    <a href="/new_audit" class="btn btn-outline-primary btn-lg ms-2">Create New Audit</a>
+  </div>
+</section>
+<div class="row g-4">
+  <div class="col-md-4"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Total Audits</div><div class="value">{{ metrics.total_audits or 0 }}</div></div></div>
+  <div class="col-md-4"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Open Findings</div><div class="value">{{ metrics.open_findings or 0 }}</div></div></div>
+  <div class="col-md-4"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Avg. Risk Score</div><div class="value">{{ metrics.avg_risk or 0 }}</div></div></div>
+</div>
+{% endblock %}

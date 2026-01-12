@@ -1,0 +1,52 @@
+
+{% extends 'base.html' %}
+{% block title %}Dashboard · Audit SaaS{% endblock %}
+{% block content %}
+<h2 class="mb-3">Dashboard</h2>
+<div class="row g-4">
+  <div class="col-lg-3 col-md-6"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Audits This Month</div><div class="value">{{ kpis.audits_this_month or 0 }}</div></div></div>
+  <div class="col-lg-3 col-md-6"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Closed Findings</div><div class="value">{{ kpis.closed_findings or 0 }}</div></div></div>
+  <div class="col-lg-3 col-md-6"><div class="card glass p-4 rounded-4 card-stat"><div class="label">High Risk</div><div class="value">{{ kpis.high_risk or 0 }}</div></div></div>
+  <div class="col-lg-3 col-md-6"><div class="card glass p-4 rounded-4 card-stat"><div class="label">Mean Closure (days)</div><div class="value">{{ kpis.mean_closure_days or 0 }}</div></div></div>
+</div>
+<div class="row g-4 mt-1">
+  <div class="col-xl-6"><div class="glass p-3 rounded-4 chart-wrap"><canvas id="trendChart" height="160"></canvas></div></div>
+  <div class="col-xl-6"><div class="glass p-3 rounded-4 chart-wrap"><canvas id="severityChart" height="160"></canvas></div></div>
+</div>
+<div class="row g-4 mt-1">
+  <div class="col-xl-12"><div class="glass p-3 rounded-4 chart-wrap"><canvas id="topOwnersChart" height="140"></canvas></div></div>
+</div>
+<div class="glass p-4 rounded-4 mt-4">
+  <h5 class="mb-3">Recent Audits</h5>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Audit</th><th>Owner</th><th>Status</th><th>Risk</th><th>Updated</th></tr></thead>
+      <tbody>
+        {% for a in recent_audits %}
+        <tr>
+          <td><a href="/audit/{{ a.id }}">{{ a.title }}</a></td>
+          <td>{{ a.owner }}</td>
+          <td><span class="pill {% if a.status=='Open' %}status-open{% elif a.status=='Closed' %}status-closed{% else %}status-inprogress{% endif %}">{{ a.status }}</span></td>
+          <td>{{ a.risk }}</td>
+          <td>{{ a.updated }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const trendLabels = {{ charts.trend.labels | default(['Jan','Feb','Mar','Apr','May','Jun']) | tojson }};
+  const trendValues = {{ charts.trend['values'] | default([4,6,3,8,7,9]) | tojson }};
+  const sevLabels   = {{ charts.severity.labels | default(['Critical','High','Medium','Low']) | tojson }};
+  const sevValues   = {{ charts.severity['values'] | default([5,12,20,8]) | tojson }};
+  const ownersLabels= {{ charts.top_owners.labels | default(['Ops','IT','Finance','HR']) | tojson }};
+  const ownersVals  = {{ charts.top_owners['values'] | default([22,18,12,9]) | tojson }};
+  const gridColor = document.documentElement.getAttribute('data-theme')==='dark' ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)';
+  new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: trendLabels, datasets: [{ label: 'Findings Closed', data: trendValues, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,.25)', tension:.35, fill:true }]}, options: { scales: { y: { grid: { color: gridColor } }, x: { grid: { color: gridColor } } } } });
+  new Chart(document.getElementById('severityChart'), { type: 'doughnut', data: { labels: sevLabels, datasets: [{ data: sevValues, backgroundColor:['#ff4d6d','#ff9f1a','#feca57','#10ac84'] }]}, options: { plugins: { legend: { position: 'bottom' } } } });
+  new Chart(document.getElementById('topOwnersChart'), { type: 'bar', data: { labels: ownersLabels, datasets: [{ label:'Open Findings', data: ownersVals, backgroundColor:'#6c5ce7' }]}, options: { scales: { y: { grid: { color: gridColor } }, x: { grid: { color: gridColor } } } } });
+</script>
+{% endblock %}

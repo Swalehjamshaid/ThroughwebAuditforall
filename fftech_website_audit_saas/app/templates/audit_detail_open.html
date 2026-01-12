@@ -1,0 +1,15 @@
+
+{% extends 'base.html' %}
+{% block title %}Open Findings · {{ audit.title }}{% endblock %}
+{% block content %}
+<h2>Open Findings — {{ audit.title }}</h2>
+<div class="glass p-4 rounded-4"><div class="table-responsive"><table class="table align-middle"><thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Owner</th><th>Age (days)</th></tr></thead><tbody>{% for f in open_findings %}<tr><td>{{ f.id }}</td><td>{{ f.title }}</td><td>{{ f.severity }}</td><td>{{ f.owner }}</td><td>{{ f.age }}</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="glass p-3 rounded-4 chart-wrap mt-3"><canvas id="agingChart" height="150"></canvas></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const labels = {{ charts.aging.labels | default(['0-7','8-14','15-30','31+']) | tojson }};
+  const values = {{ charts.aging['values'] | default([5,7,12,9]) | tojson }};
+  new Chart(document.getElementById('agingChart'), { type:'bar', data:{ labels, datasets:[{ label:'Finding Count', data: values, backgroundColor:'#ff9f1a' }] }, options:{ plugins:{ legend:{ display:true } } } });
+</script>
+{% endblock %}
