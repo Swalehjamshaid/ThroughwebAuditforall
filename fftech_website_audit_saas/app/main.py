@@ -36,8 +36,8 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# --- FIXED: Context Processor logic using templates.context_processor ---
-@templates.context_processor
+# --- FIXED: Use @templates.context_processors (Plural) ---
+@templates.context_processors
 def inject_globals(request: Request):
     return {
         "datetime": datetime,
@@ -139,7 +139,7 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# --- ADDED: Competitor Comparison Logic (Metrics 151-167) ---
+# --- Competitor Comparison Logic ---
 def _get_competitor_comparison(target_scores: dict):
     baseline = {"Performance": 82, "Accessibility": 88, "SEO": 85, "Security": 90, "BestPractices": 84}
     comparison = []
@@ -376,7 +376,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
     <p><a href="{login_link}">{login_link}</a></p>
-    <p>This link will expire shortly.</ If you didn't request it, you can ignore this message.</p>
+    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
