@@ -1,8 +1,138 @@
+{% extends 'layout.html' %}
 
-{% extends 'base.html' %}
-{% block title %}Register{% endblock %}
+{% block title %}Join {{ UI_BRAND_NAME }} — Start Your Audit{% endblock %}
+
 {% block content %}
-<h1>Email-only Registration</h1>
-<p>Registration completes when you click the magic link sent to your email.</p>
-<a href="/auth/login">Go to Login</a>
+<div class="auth-container">
+    <div class="auth-card glass-effect">
+        <div class="auth-header">
+            <div class="icon-box">
+                <i class="fa-solid fa-paper-plane"></i>
+            </div>
+            <h1>Join the Platform</h1>
+            <p>Enter your email to receive your secure registration link.</p>
+        </div>
+
+        <form method="post" action="/auth/register" class="auth-form">
+            <div class="form-group">
+                <label for="email">Work Email Address</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-envelope"></i>
+                    <input type="email" name="email" id="email" placeholder="name@company.com" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn-primary-full">
+                Get Started Free <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </form>
+
+        <div class="process-steps">
+            <div class="step">
+                <span class="step-num">1</span>
+                <p>Submit Email</p>
+            </div>
+            <div class="step-line"></div>
+            <div class="step">
+                <span class="step-num">2</span>
+                <p>Verify Link</p>
+            </div>
+            <div class="step-line"></div>
+            <div class="step">
+                <span class="step-num">3</span>
+                <p>Audit Sites</p>
+            </div>
+        </div>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/auth/login">Sign in here</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-container { 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        padding: 4rem 0;
+        animation: fadeIn 0.8s ease;
+    }
+
+    .auth-card {
+        width: 100%;
+        max-width: 480px;
+        padding: 3rem;
+        border-radius: 24px;
+        background: white;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .icon-box {
+        width: 60px;
+        height: 60px;
+        background: var(--primary);
+        color: white;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin: 0 auto 1.5rem;
+    }
+
+    .auth-header h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.5rem; color: var(--dark); }
+    .auth-header p { color: #64748b; margin-bottom: 2rem; }
+
+    .form-group { text-align: left; margin-bottom: 1.5rem; }
+    .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; color: #475569; }
+
+    .input-wrapper { position: relative; }
+    .input-wrapper i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .input-wrapper input {
+        width: 100%;
+        padding: 0.8rem 1rem 0.8rem 2.5rem;
+        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        font-size: 1rem;
+        transition: 0.3s;
+    }
+    .input-wrapper input:focus { border-color: var(--primary); outline: none; }
+
+    .btn-primary-full {
+        width: 100%;
+        padding: 1rem;
+        background: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    .btn-primary-full:hover { background: var(--primary-dark); transform: translateY(-2px); }
+
+    /* Steps Styling */
+    .process-steps { display: flex; align-items: center; justify-content: space-between; margin: 3rem 0 2rem; }
+    .step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .step-num { 
+        width: 28px; height: 28px; background: #f1f5f9; border-radius: 50%; 
+        display: flex; align-items: center; justify-content: center; 
+        font-size: 0.8rem; font-weight: 800; color: #64748b;
+    }
+    .step p { font-size: 0.75rem; font-weight: 600; color: #94a3b8; margin: 0; }
+    .step-line { flex: 1; height: 2px; background: #f1f5f9; margin-bottom: 1.5rem; }
+
+    .auth-footer { margin-top: 2rem; border-top: 1px solid #f1f5f9; padding-top: 1.5rem; }
+    .auth-footer a { color: var(--primary); font-weight: 600; text-decoration: none; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+</style>
 {% endblock %}
