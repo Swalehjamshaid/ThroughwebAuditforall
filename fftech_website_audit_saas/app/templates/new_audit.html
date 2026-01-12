@@ -1,0 +1,11 @@
+
+{% extends 'base.html' %}
+{% block title %}New Audit{% endblock %}
+{% block content %}
+<h1>Create Secure Audit</h1>
+<p>Requires Authorization header with your API token.</p>
+<form method="post" action="/audits/secure">
+  <label>Website URL <input type="url" name="url" placeholder="https://example.com" required></label>
+  <button type="submit">Run Secure Audit</button>
+</form>
+{% endblock %}

@@ -1,0 +1,10 @@
+
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<h1>Passwordless Login</h1>
+<form method="post" action="/auth/request-link">
+  <label>Email <input type="email" name="email" required></label>
+  <button type="submit">Send Login Link</button>
+</form>
+{% endblock %}

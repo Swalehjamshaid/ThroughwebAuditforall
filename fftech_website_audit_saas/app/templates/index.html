@@ -1,0 +1,20 @@
+
+{% extends 'base.html' %}
+{% block title %}Home{% endblock %}
+{% block content %}
+<h1>FF Tech AI Website Audit</h1>
+<section>
+  <h2>Open Access Audit</h2>
+  <form method="post" action="/audits/open">
+    <label>Website URL <input type="url" name="url" placeholder="https://example.com" required></label>
+    <button type="submit">Run Open Audit</button>
+  </form>
+</section>
+<section>
+  <h2>Passwordless Login</h2>
+  <form method="post" action="/auth/request-link">
+    <label>Email <input type="email" name="email" required></label>
+    <button type="submit">Send Login Link</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+
+{% extends 'base.html' %}
+{% block title %}Audit Detail{% endblock %}
+{% block content %}
+<h1>Audit Detail</h1>
+{% if audit %}
+  <p><strong>URL:</strong> {{ audit.url }}</p>
+  <p><strong>Score:</strong> {{ audit.overall_score }}%</p>
+  <p><strong>Grade:</strong> {{ audit.grade }}</p>
+  <p><a href="/audits/{{ audit.id }}/open">Open Read-only View</a></p>
+{% else %}
+  <p>Audit not found.</p>
+{% endif %}
+{% endblock %}
