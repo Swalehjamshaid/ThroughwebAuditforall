@@ -36,13 +36,13 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# --- ADDED: Context Processor to fix 'datetime' error without removing code ---
-@app.context_processor
-def inject_globals():
+# --- FIXED: Context Processor logic using templates.context_processor ---
+@templates.context_processor
+def inject_globals(request: Request):
     return {
         "datetime": datetime,
         "UI_BRAND_NAME": UI_BRAND_NAME,
-        "now": datetime.utcnow()
+        "year": datetime.utcnow().year
     }
 
 Base.metadata.create_all(bind=engine)
@@ -139,9 +139,8 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# --- ADDED: Competitor Comparison Logic ---
+# --- ADDED: Competitor Comparison Logic (Metrics 151-167) ---
 def _get_competitor_comparison(target_scores: dict):
-    # Standard industry baseline for comparison (Metrics 151-167)
     baseline = {"Performance": 82, "Accessibility": 88, "SEO": 85, "Security": 90, "BestPractices": 84}
     comparison = []
     for cat, score in target_scores.items():
@@ -157,8 +156,6 @@ def _get_competitor_comparison(target_scores: dict):
     return comparison
 
 # ---------- Robust URL & audit helpers ----------
-from urllib.parse import urlparse
-
 def _normalize_url(raw: str) -> str:
     if not raw:
         return raw
@@ -259,7 +256,6 @@ async def session_middleware(request: Request, call_next):
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
 
@@ -278,16 +274,12 @@ async def audit_open(request: Request):
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
-    # Chart payload for templates
     radar_labels = list(category_scores_dict.keys())
     radar_values = [int(v) for v in category_scores_dict.values()]
-    
-    # ADDED: Comparison data for the frontend
     comp_data = _get_competitor_comparison(category_scores_dict)
 
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user,
         "website": {"id": None, "url": normalized},
         "audit": {
@@ -326,7 +318,6 @@ async def report_pdf_open(url: str):
 async def register_get(request: Request):
     return templates.TemplateResponse("register.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
 
@@ -365,7 +356,6 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
         return templates.TemplateResponse("verify.html", {
             "request": request,
             "success": False,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
             "user": current_user
         })
     return RedirectResponse("/auth/login", status_code=303)
@@ -374,7 +364,6 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
 async def login_get(request: Request):
     return templates.TemplateResponse("login.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
 
@@ -387,7 +376,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
     <p><a href="{login_link}">{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    <p>This link will expire shortly.</ If you didn't request it, you can ignore this message.</p>
     """
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
@@ -503,7 +492,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     }
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user,
         "websites": websites,
         "trend": {"labels": trend_labels, "values": trend_values, "average": avg},
@@ -518,7 +506,6 @@ async def new_audit_get(request: Request):
         return RedirectResponse("/auth/login", status_code=303)
     return templates.TemplateResponse("new_audit.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
 
@@ -603,13 +590,10 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     trend_values = [h.health_score for h in reversed(history)]
     radar_labels = [item["name"] for item in category_scores]
     radar_values = [int(item["score"]) for item in category_scores]
-    
-    # ADDED: Competitor data for registered users
     comp_data = _get_competitor_comparison({item["name"]: item["score"] for item in category_scores})
 
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user,
         "website": w,
         "audit": {
@@ -657,7 +641,6 @@ async def schedule_get(request: Request, db: Session = Depends(get_db)):
     }
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user,
         "websites": db.query(Website).filter(Website.user_id == current_user.id).all(),
         "trend": {"labels": [], "values": [], "average": 0},
@@ -693,7 +676,6 @@ async def schedule_post(
 async def admin_login_get(request: Request):
     return templates.TemplateResponse("login.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user
     })
 
@@ -728,14 +710,12 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     websites = db.query(Website).order_by(Website.created_at.desc()).limit(100).all()
     return templates.TemplateResponse("admin.html", {
         "request": request,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
         "user": current_user,
         "websites": websites,
         "admin_users": users,
         "admin_audits": audits
     })
 
-# ---------- Daily Email Scheduler ----------
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
@@ -817,7 +797,6 @@ async def _daily_scheduler_loop():
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
 
-# ---------- Bind to Railway PORT when run directly ----------
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8080"))
