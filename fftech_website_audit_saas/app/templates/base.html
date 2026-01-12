@@ -1,174 +1,45 @@
-<!doctype html>
-<html lang="en" data-theme="light">
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ UI_BRAND_NAME }} | {{ user.email if user else 'Guest' }}</title>
-
-  <!-- Bootstrap 5 -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <style>
-    :root {
-      --bg-body: #f5f7fb;
-      --bg-nav: #ffffff;
-      --card-bg: rgba(255, 255, 255, 0.85);
-      --text-muted: #6c757d;
-      --border: rgba(0,0,0,0.08);
-      --brand: #0d6efd;
-    }
-    html[data-theme="dark"] {
-      --bg-body: #0f1216;
-      --bg-nav: #0b0e12;
-      --card-bg: rgba(19, 23, 28, 0.88);
-      --text-muted: #9aa4af;
-      --border: rgba(255,255,255,0.06);
-      --brand: #4ea1ff;
-    }
-    body.bg-body { background: var(--bg-body); }
-    .bg-nav { background: var(--bg-nav); }
-    .card-glass {
-      background: var(--card-bg);
-      backdrop-filter: saturate(140%) blur(8px);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-    }
-    .grade-badge { font-size: .95rem; padding: .35rem .6rem; border-radius: 999px; }
-    .grade-a { background: #16a34a; color: #fff; }
-    .grade-b { background: #3b82f6; color: #fff; }
-    .grade-c { background: #f59e0b; color: #fff; }
-    .grade-d { background: #ef4444; color: #fff; }
-    .navbar-brand { color: var(--brand); }
-    .table-borderless tr td { border: 0 !important; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ UI_BRAND_NAME }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --primary-glow: #3b82f6; --glass-bg: rgba(15, 23, 42, 0.8); }
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .card-glass { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; }
+        .nav-glass { background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .text-accent-green { color: #10b981; }
+        .text-accent-red { color: #ef4444; }
+    </style>
 </head>
-<body class="bg-body">
+<body>
+    <nav class="navbar navbar-expand-lg nav-glass sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-primary" href="/">
+                <i class="bi bi-cpu-fill me-2"></i>{{ UI_BRAND_NAME }}
+            </a>
+            <div class="navbar-nav ms-auto">
+                {% if user %}
+                    <a class="nav-link" href="/auth/dashboard">Dashboard</a>
+                    <a class="nav-link btn btn-outline-danger btn-sm ms-lg-3" href="/auth/logout">Logout</a>
+                {% else %}
+                    <a class="nav-link" href="/auth/login">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
 
-<nav class="navbar navbar-expand-lg shadow-sm bg-nav">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="/">
-      <i class="bi bi-globe-asia-australia me-2"></i>{{ UI_BRAND_NAME }}
-    </a>
-    <div class="ms-auto d-flex gap-2 align-items-center">
-      {% if user %}
-        <span class="text-muted small me-2">{{ user.email }}</span>
-        <a class="btn btn-outline-primary btn-sm" href="/auth/logout">Logout</a>
-      {% else %}
-        <a class="btn btn-outline-primary btn-sm" href="/auth/login">Login</a>
-      {% endif %}
-      <button id="themeToggle" class="btn btn-outline-secondary btn-sm" type="button">
-        <i class="bi bi-brightness-high"></i>
-      </button>
-    </div>
-  </div>
-</nav>
+    <main class="container py-5">
+        {% block content %}{% endblock %}
+    </main>
 
-<main class="container py-4">
-  {% block content %}{% endblock %}
-</main>
-
-<footer class="border-top py-4 mt-auto">
-  <div class="container text-center text-muted small">
-    © {{ UI_BRAND_NAME }} — Beautiful Audit & Graphs · {{ datetime.utcnow().year }}
-  </div>
-</footer>
-
-<script>
-// Theme toggle with localStorage
-(function(){
-  const key = 'fftech_theme';
-  const saved = localStorage.getItem(key);
-  if (saved) document.documentElement.setAttribute('data-theme', saved);
-  document.getElementById('themeToggle')?.addEventListener('click', function(){
-    const html = document.documentElement;
-    const current = html.getAttribute('data-theme') || 'light';
-    const next = current === 'light' ? 'dark' : 'light';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem(key, next);
-  });
-})();
-
-// Chart helpers
-const FFCharts = {
-  healthGauge: function(id, value){
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const ctx = el.getContext('2d');
-    const grad = ctx.createLinearGradient(0,0,0,180);
-    grad.addColorStop(0, '#16a34a'); // green
-    grad.addColorStop(1, '#0d6efd'); // brand
-    const data = {
-      labels: ['Score','Remainder'],
-      datasets: [{
-        data: [value, Math.max(0, 100 - value)],
-        backgroundColor: [grad, 'rgba(108,117,125,0.15)'],
-        borderWidth: 0,
-        cutout: '75%'
-      }]
-    };
-    const plugin = {
-      id: 'centerText',
-      afterDraw: (chart) => {
-        const {ctx, chartArea} = chart;
-        ctx.save();
-        ctx.font = '600 28px system-ui';
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#0d6efd';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(value), (chartArea.left+chartArea.right)/2, (chartArea.top+chartArea.bottom)/2);
-        ctx.restore();
-      }
-    };
-    return new Chart(el, { type: 'doughnut', data, options: { plugins: { legend: { display: false } } }, plugins: [plugin] });
-  },
-  category: function(id, type, labels, values){
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const ds = {
-      labels,
-      datasets: [{
-        label: 'Category Score',
-        data: values,
-        borderColor: '#0d6efd',
-        backgroundColor: 'rgba(13,110,253,0.25)',
-        pointBackgroundColor: '#0d6efd',
-        tension: 0.3,
-      }]
-    };
-    const opts = {
-      scales: type==='bar' ? { y: { beginAtZero: true, max: 100 } } : {},
-      plugins: { legend: { display: false } }
-    };
-    return new Chart(el, { type, data: ds, options: opts });
-  },
-  trend: function(id, labels, values){
-    const el = document.getElementById(id);
-    if (!el) return null;
-    const ctx = el.getContext('2d');
-    const grad = ctx.createLinearGradient(0,0,0,150);
-    grad.addColorStop(0, 'rgba(13,110,253,0.35)');
-    grad.addColorStop(1, 'rgba(13,110,253,0.05)');
-    const data = {
-      labels,
-      datasets: [{
-        label: 'Health Score',
-        data: values,
-        borderColor: '#0d6efd',
-        backgroundColor: grad,
-        fill: true,
-        tension: 0.35,
-        pointRadius: 3,
-      }]
-    };
-    return new Chart(el, { type: 'line', data, options: { scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } } });
-  }
-};
-</script>
-
-{% block scripts %}{% endblock %}
+    <footer class="container py-4 text-center border-top border-secondary">
+        <p class="text-secondary small">
+            © {{ UI_BRAND_NAME }} — Certified Audit Intelligence · {{ year }}
+        </p>
+    </footer>
 </body>
 </html>
