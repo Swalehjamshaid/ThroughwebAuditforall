@@ -1,3 +1,7 @@
+
+# requirements.txt (append these if missing)
+itsdangerous>=2.1
+python-multipart>=0.0.9
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 sqlalchemy>=2.0.38
