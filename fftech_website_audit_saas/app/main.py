@@ -94,7 +94,7 @@ def get_db():
     finally:
         db.close()
 
-# ---------- Metrics presenter (human-friendly labels) ----------
+# ---------- Metrics presenter ----------
 METRIC_LABELS = {
     "status_code": "Status Code",
     "content_length": "Content Length (bytes)",
@@ -307,29 +307,21 @@ async def login_get(request: Request):
 
 # ---------- Magic Login (Passwordless) ----------
 def _send_magic_login_email(to_email: str, token: str) -> bool:
-    """
-    Send the magic login link via email using the same SMTP settings.
-    Clicking this link will log the user in and redirect to the dashboard.
-    """
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
         return False
-
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-
     html_body = f"""
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
     <p>{login_link}{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    <p>This link will expire shortly.</p>
     """
-
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
     msg["From"] = SMTP_USER
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
-
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
@@ -347,9 +339,7 @@ async def magic_request(
 ):
     u = db.query(User).filter(User.email == email).first()
     if not u or not getattr(u, "verified", False):
-        # Do not reveal account state (privacy)
         return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
-
     token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
     _send_magic_login_email(u.email, token)
     return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
@@ -362,11 +352,9 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
         uid = data.get("uid")
         if not uid or data.get("type") != "magic":
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         u = db.query(User).filter(User.id == uid).first()
         if not u or not getattr(u, "verified", False):
             return RedirectResponse("/auth/login?error=1", status_code=303)
-
         current_user = u
         session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60*24*30)
         resp = RedirectResponse("/auth/dashboard", status_code=303)
@@ -382,7 +370,7 @@ async def magic_login(request: Request, token: str, db: Session = Depends(get_db
     except Exception:
         return RedirectResponse("/auth/login?error=1", status_code=303)
 
-# ---------- Password login remains available ----------
+# ---------- Password login ----------
 @app.post("/auth/login")
 async def login_post(
     request: Request,
@@ -785,4 +773,3 @@ async def _daily_scheduler_loop():
 @app.on_event("startup")
 async def _start_scheduler():
     asyncio.create_task(_daily_scheduler_loop())
-``
