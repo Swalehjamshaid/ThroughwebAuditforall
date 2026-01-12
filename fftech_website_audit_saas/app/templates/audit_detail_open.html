@@ -9,13 +9,27 @@
           <h5 class="card-title mb-0">{{ website.url }}</h5>
           <span class="badge grade-badge grade-{{ audit.grade|lower }}">{{ audit.grade }}</span>
         </div>
-        <p class="text-muted small mb-2">Audited on {{ audit.created_at.strftime('%d %b %Y %H:%M') }}</p>
-
+        <p class="text-muted small mb-2">Instant Open Audit</p>
         <canvas id="healthGauge" height="220"></canvas>
         <div class="text-center mt-2">
-          <a class="btn btn-primary" href="/auth/report/pdf/{{ website.idile-earmark-pdf me-1"></i> Download Certified PDF
+          <a class="btn btn-outline-primary" href="/report/pdf/open?url={{ website.url|urlencodeark-pdf me-1"></i> Download PDF
           </a>
         </div>
+      </div>
+    </div>
+
+    <div class="card card-glass mt-4">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">Top Issues</h6>
+        {% if audit.top_issues %}
+          <ul class="list-group list-group-flush">
+            {% for issue in audit.top_issues %}
+              <li class="list-group-item bg-transparent">{{ issue }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted">No critical issues detected.</p>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -31,13 +45,6 @@
           </div>
         </div>
         <canvas id="categoryChart" height="160"></canvas>
-      </div>
-    </div>
-
-    <div class="card card-glass mb-4">
-      <div class="card-body">
-        <h6 class="fw-bold mb-3">Trend — Health Score over time</h6>
-        <canvas id="trendChart" height="120"></canvas>
       </div>
     </div>
 
@@ -75,18 +82,13 @@
 const chartData = {
   health: {{ chart.health|int }},
   radarLabels: {{ chart.radar_labels|tojson }},
-  radarValues: {{ chart.radar_values|tojson }},
-  trendLabels: {{ chart.trend_labels|tojson }},
-  trendValues: {{ chart.trend_values|tojson }},
+  radarValues: {{ chart.radar_values|tojson }}
 };
 
-// Build charts
 FFCharts.healthGauge("healthGauge", chartData.health);
 let currentType = "radar";
 let categoryChart = FFCharts.category("categoryChart", currentType, chartData.radarLabels, chartData.radarValues);
-FFCharts.trend("trendChart", chartData.trendLabels, chartData.trendValues);
 
-// Toggle chart type (radar ↔ bar)
 document.querySelectorAll('[data-chart]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('[data-chart]').forEach(b => b.classList.remove('active'));
