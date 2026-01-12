@@ -246,6 +246,10 @@ async def audit_open(request: Request):
     exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
     category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
 
+    # chart payloads
+    radar_labels = list(category_scores_dict.keys())
+    radar_values = [int(v) for v in category_scores_dict.values()]
+
     return templates.TemplateResponse("audit_detail_open.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -259,6 +263,13 @@ async def audit_open(request: Request):
             "category_scores": category_scores_list,
             "metrics": _present_metrics(res.get("metrics", {})),
             "top_issues": top_issues,
+        },
+        "chart": {
+            "radar_labels": radar_labels,
+            "radar_values": radar_values,
+            "health": int(overall),
+            "trend_labels": [],
+            "trend_values": []
         }
     })
 
@@ -346,8 +357,7 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    <p><a href="{login_link}" target="_blank" rel=" link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
 
     msg = MIMEMultipart("alternative")
@@ -592,6 +602,20 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
     metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
     metrics = _present_metrics(metrics_raw)
 
+    # Build trend arrays from last 12 audits for this website
+    history = (
+        db.query(Audit)
+        .filter(Audit.website_id == website_id)
+        .order_by(Audit.created_at.desc())
+        .limit(12)
+        .all()
+    )
+    trend_labels = [h.created_at.strftime('%d %b') for h in reversed(history)]
+    trend_values = [h.health_score for h in reversed(history)]
+
+    radar_labels = [item["name"] for item in category_scores]
+    radar_values = [int(item["score"]) for item in category_scores]
+
     return templates.TemplateResponse("audit_detail.html", {
         "request": request,
         "UI_BRAND_NAME": UI_BRAND_NAME,
@@ -604,6 +628,13 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
             "exec_summary": a.exec_summary,
             "category_scores": category_scores,
             "metrics": metrics
+        },
+        "chart": {
+            "radar_labels": radar_labels,
+            "radar_values": radar_values,
+            "health": a.health_score,
+            "trend_labels": trend_labels,
+            "trend_values": trend_values
         }
     })
 
