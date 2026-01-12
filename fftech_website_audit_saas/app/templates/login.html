@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container">
+  <h2>Login</h2>
+  <form method="post" action="/auth/login">
+    <input type="email" name="email" placeholder="you@example.com"><br>
+    <input type="password" name="password" placeholder="Password"><br>
+    <button class="btn" type="submit">Login</button>
+  </form>
+  <hr>
+  <h3>Magic link</h3>
+  <form method="post" action="/auth/magic/request">
+    <input type="email" name="email" placeholder="you@example.com">
+    <button class="btn" type="submit">Send magic link</button>
+  </form>
+</div>
+{% endblock %}
