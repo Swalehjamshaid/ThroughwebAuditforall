@@ -7,16 +7,13 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.staticfiles import StaticFiles
 
 from .db import engine, Base
 from .routers import health, auth, audits, pages
 
-# ------------------------------------------------------------------------------
-# App setup
-# ------------------------------------------------------------------------------
 app = FastAPI(title="FF Tech AI Website Audit SaaS", version="1.0.0")
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,21 +23,13 @@ STATIC_DIR = BASE_DIR / "static"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Use GMT+05:00 as per your environment
 TZ_OFFSET = timezone(timedelta(hours=5))
 
-# ------------------------------------------------------------------------------
-# Startup
-# ------------------------------------------------------------------------------
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
 
-# ------------------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------------------
 def common_context(request: Request, extra: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """Base context for all pages so templates always get required keys."""
     ctx: Dict[str, Any] = {
         "request": request,
         "year": datetime.now(TZ_OFFSET).year,
@@ -49,26 +38,36 @@ def common_context(request: Request, extra: Dict[str, Any] | None = None) -> Dic
         ctx.update(extra)
     return ctx
 
-def sample_index_metrics() -> Dict[str, Any]:
-    """Stubbed metrics for the index page (replace with DB or audit engine)."""
-    return {
-        "total_audits": 128,     # number of audits run on the platform
-        "open_findings": 57,     # current open findings across audits
-        "avg_risk": 72,          # average risk score in %
-    }
-
-# ------------------------------------------------------------------------------
-# Pages (HTML routes)
-# ------------------------------------------------------------------------------
+# --- Index (kept) ---
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    # FIX: provide `metrics` expected by templates/index.html
-    ctx = {"metrics": sample_index_metrics()}
+    ctx = {"metrics": {"total_audits": 128, "open_findings": 57, "avg_risk": 72}}
     return templates.TemplateResponse("index.html", common_context(request, ctx))
 
+# --- NEW AUDIT: register all common variants ---
+@app.get("/new_audit", response_class=HTMLResponse)
+async def new_audit_underscore(request: Request):
+    """Preferred route with underscore."""
+    return templates.TemplateResponse("new_audit.html", common_context(request))
+
+@app.get("/new_audit/", response_class=HTMLResponse)
+async def new_audit_underscore_slash():
+    """Normalize trailing slash to underscore route."""
+    return RedirectResponse(url="/new_audit", status_code=307)
+
+@app.get("/new-audit", response_class=HTMLResponse)
+async def new_audit_hyphen(request: Request):
+    """Support hyphen variant for convenience."""
+    return templates.TemplateResponse("new_audit.html", common_context(request))
+
+@app.get("/new-audit/", response_class=HTMLResponse)
+async def new_audit_hyphen_slash():
+    """Normalize trailing slash to hyphen route."""
+    return RedirectResponse(url="/new-audit", status_code=307)
+
+# --- Dashboard (optional, unchanged) ---
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    # Optional: keep dashboard working with charts/cards (if you have that page)
     ctx = {
         "kpis": {
             "audits_this_month": 12,
@@ -89,6 +88,7 @@ async def dashboard(request: Request):
     }
     return templates.TemplateResponse("dashboard.html", common_context(request, ctx))
 
+# --- Auth pages (unchanged) ---
 @app.get("/login", response_class=HTMLResponse)
 async def login(request: Request):
     return templates.TemplateResponse("login.html", common_context(request))
@@ -101,9 +101,7 @@ async def register(request: Request):
 async def verify(request: Request):
     return templates.TemplateResponse("verify.html", common_context(request))
 
-# ------------------------------------------------------------------------------
-# Existing routers
-# ------------------------------------------------------------------------------
+# --- Existing routers ---
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(audits.router)
