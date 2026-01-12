@@ -1,35 +1,100 @@
-{% extends 'base.html' %}
+
+{% extends "base.html" %}
 {% block content %}
-<div class="card">
-  <h2>Open Audit — {{ website.url }}</h2>
-  <p>Grade: <span class="pill">{{ audit.grade }}</span> · Health: <span class="pill">{{ audit.health_score }}/100</span></p>
-  <div class="grid-2">
-    <div>
-      <h3>Category Scores</h3>
-      {% set cat_names  = audit.category_scores | map(attribute='name')  | list %}
-      {% set cat_values = audit.category_scores | map(attribute='score') | list %}
-      <canvas id="catChart" height="200"></canvas>
-      <script>
-        const catNames  = {{ cat_names  | tojson }};
-        const catValues = {{ cat_values | tojson }};
-        window.renderBarChart('catChart', catNames, catValues);
-      </script>
-      {% if audit.top_issues %}
-      <h3>Top Issues</h3>
-      <ul class="list">
-        {% for i in audit.top_issues %}<li>{{ i }}</li>{% endfor %}
-      </ul>
-      {% endif %}
-      <p><a class="btn btn-primary" href="/report/pdf/open?url={{ website.url }}">Download Certified PDF</a></p>
+<div class="row g-4">
+  <div class="col-12 col-lg-4">
+    <div class="card card-glass">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">{{ website.url }}</h5>
+          <span class="badge grade-badge grade-{{ audit.grade|lower }}">{{ audit.grade }}</span>
+        </div>
+        <p class="text-muted small mb-2">Audited on {{ audit.created_at.strftime('%d %b %Y %H:%M') }}</p>
+
+        <canvas id="healthGauge" height="220"></canvas>
+        <div class="text-center mt-2">
+          <a class="btn btn-primary" href="/auth/report/pdf/{{ website.idile-earmark-pdf me-1"></i> Download Certified PDF
+          </a>
+        </div>
+      </div>
     </div>
-    <div>
-      <h3>Metrics</h3>
-      <div class="table">
-        {% for k, v in audit.metrics.items() %}
-          <div class="row"><div class="cell key">{{ k }}</div><div class="cell">{{ v }}</div></div>
-        {% endfor %}
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card card-glass mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="fw-bold mb-0">Category Scores</h6>
+          <div class="btn-group btn-group-sm" role="group" aria-label="chart type">
+            <button class="btn btn-outline-secondary active" data-chart="radar">Radar</button>
+            <button class="btn btn-outline-secondary" data-chart="bar">Bar</button>
+          </div>
+        </div>
+        <canvas id="categoryChart" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="card card-glass mb-4">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">Trend — Health Score over time</h6>
+        <canvas id="trendChart" height="120"></canvas>
+      </div>
+    </div>
+
+    <div class="card card-glass">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3">Key Metrics</h6>
+        <div class="table-responsive">
+          <table class="table table-borderless align-middle">
+            <tbody>
+              {% for k,v in audit.metrics.items() %}
+              <tr>
+                <td class="text-muted">{{ k }}</td>
+                <td class="text-end">
+                  {% if v in ['Yes','No'] %}
+                    <span class="badge bg-{{ 'success' if v=='Yes' else 'danger' }}">{{ v }}</span>
+                  {% else %}
+                    {{ v }}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <hr>
+        <p class="mb-0">{{ audit.exec_summary }}</p>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {
+  health: {{ chart.health|int }},
+  radarLabels: {{ chart.radar_labels|tojson }},
+  radarValues: {{ chart.radar_values|tojson }},
+  trendLabels: {{ chart.trend_labels|tojson }},
+  trendValues: {{ chart.trend_values|tojson }},
+};
+
+// Build charts
+FFCharts.healthGauge("healthGauge", chartData.health);
+let currentType = "radar";
+let categoryChart = FFCharts.category("categoryChart", currentType, chartData.radarLabels, chartData.radarValues);
+FFCharts.trend("trendChart", chartData.trendLabels, chartData.trendValues);
+
+// Toggle chart type (radar ↔ bar)
+document.querySelectorAll('[data-chart]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-chart]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentType = btn.getAttribute('data-chart');
+    if (categoryChart) categoryChart.destroy();
+    categoryChart = FFCharts.category("categoryChart", currentType, chartData.radarLabels, chartData.radarValues);
+  });
+});
+</script>
 {% endblock %}
