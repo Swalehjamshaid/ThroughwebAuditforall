@@ -37,8 +37,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
-# ---------- FIXED: Global Context Processor ----------
-# This resolves the 'datetime is undefined' error in HTML and the 'TypeError' in FastAPI
+# ---------- Global Context Processor ----------
 def inject_globals(request: Request):
     return {
         "datetime": datetime,
@@ -47,7 +46,6 @@ def inject_globals(request: Request):
         "now": datetime.utcnow()
     }
 
-# FastAPI/Starlette requires appending the function to the list
 templates.context_processors.append(inject_globals)
 
 # ---------- Database Initialization & Patching ----------
@@ -144,9 +142,8 @@ def _present_metrics(metrics: dict) -> dict:
         out[label] = v
     return out
 
-# ---------- ADDED: Competitor Comparison Logic ----------
+# ---------- Competitor Logic ----------
 def _get_competitor_comparison(target_scores: dict):
-    # Industry standard benchmarks for gap analysis
     baseline = {"Performance": 82, "Accessibility": 88, "SEO": 85, "Security": 90, "BestPractices": 84}
     comparison = []
     for cat, score in target_scores.items():
@@ -188,7 +185,7 @@ def _fallback_result(url: str) -> dict:
     return {
         "category_scores": {"Performance": 65, "Accessibility": 72, "SEO": 68, "Security": 70, "BestPractices": 66},
         "metrics": {"error": "Fetch failed", "normalized_url": url},
-        "top_issues": ["Fetch failed; using baseline heuristic.", "Verify URL accessibility."],
+        "top_issues": ["Fetch failed; using heuristic baseline.", "Verify URL is publicly accessible."],
     }
 
 def _robust_audit(url: str) -> tuple[str, dict]:
@@ -203,7 +200,7 @@ def _robust_audit(url: str) -> tuple[str, dict]:
             continue
     return base, _fallback_result(base)
 
-# ---------- Middleware & Authentication ----------
+# ---------- Session Handling ----------
 current_user = None
 
 @app.middleware("http")
@@ -302,6 +299,49 @@ async def verify(request: Request, token: str, db: Session = Depends(get_db)):
 async def login_get(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "user": current_user})
 
+# --- Magic Request Handles Trailing Slash ---
+@app.post("/auth/magic/request")
+@app.post("/auth/magic/request/")
+async def magic_request(request: Request, email: str = Form(...), db: Session = Depends(get_db)):
+    u = db.query(User).filter(User.email == email).first()
+    if u and getattr(u, "verified", False):
+        token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
+        
+        login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
+        html_body = f"<h3>Magic Login</h3><p>Click below to log in:</p><p><a href='{login_link}'>{login_link}</a></p>"
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"{UI_BRAND_NAME} Magic Link"
+        msg["From"] = SMTP_USER
+        msg["To"] = u.email
+        msg.attach(MIMEText(html_body, "html"))
+        
+        try:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, [u.email], msg.as_string())
+        except Exception:
+            pass
+
+    return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+
+@app.get("/auth/magic")
+async def magic_login(request: Request, token: str, db: Session = Depends(get_db)):
+    global current_user
+    try:
+        data = decode_token(token)
+        uid = data.get("uid")
+        if uid and data.get("type") == "magic":
+            u = db.query(User).filter(User.id == uid).first()
+            if u and getattr(u, "verified", False):
+                current_user = u
+                resp = RedirectResponse("/auth/dashboard", status_code=303)
+                resp.set_cookie(key="session_token", value=create_token({"uid": u.id, "email": u.email}, expires_minutes=43200), httponly=True)
+                return resp
+    except Exception: pass
+    return RedirectResponse("/auth/login?error=1", status_code=303)
+
 @app.post("/auth/login")
 async def login_post(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     global current_user
@@ -320,7 +360,7 @@ async def logout(request: Request):
     resp = RedirectResponse("/", status_code=303); resp.delete_cookie("session_token")
     return resp
 
-# ---------- Routes: Dashboard & Audits ----------
+# ---------- Dashboard & Admin ----------
 @app.get("/auth/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     if not current_user: return RedirectResponse("/auth/login", status_code=303)
@@ -336,25 +376,6 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "schedule": {"daily_time": getattr(sub, "daily_time", "09:00"), "timezone": getattr(sub, "timezone", "UTC"), "enabled": getattr(sub, "email_schedule_enabled", False)}
     })
 
-@app.post("/auth/audit/new")
-async def new_audit_post(request: Request, url: str = Form(...), db: Session = Depends(get_db)):
-    if not current_user: return RedirectResponse("/auth/login", status_code=303)
-    w = Website(user_id=current_user.id, url=url); db.add(w); db.commit(); db.refresh(w)
-    return RedirectResponse(f"/auth/audit/run/{w.id}", status_code=303)
-
-@app.get("/auth/audit/run/{website_id}")
-async def run_audit(website_id: int, db: Session = Depends(get_db)):
-    if not current_user: return RedirectResponse("/auth/login", status_code=303)
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == current_user.id).first()
-    norm, res = _robust_audit(w.url)
-    ovr = compute_overall(res["category_scores"])
-    a = Audit(user_id=current_user.id, website_id=w.id, health_score=int(ovr), grade=grade_from_score(ovr),
-              exec_summary=summarize_200_words(norm, res["category_scores"], res.get("top_issues", [])),
-              category_scores_json=json.dumps([{"name": k, "score": int(v)} for k, v in res["category_scores"].items()]),
-              metrics_json=json.dumps(res.get("metrics", {})))
-    db.add(a); w.last_audit_at = a.created_at; w.last_grade = a.grade; db.commit()
-    return RedirectResponse(f"/auth/audit/{w.id}", status_code=303)
-
 @app.get("/auth/audit/{website_id}")
 async def audit_detail(website_id: int, request: Request, db: Session = Depends(get_db)):
     if not current_user: return RedirectResponse("/auth/login", status_code=303)
@@ -368,13 +389,12 @@ async def audit_detail(website_id: int, request: Request, db: Session = Depends(
         "chart": {"radar_labels": [s["name"] for s in scores], "radar_values": [s["score"] for s in scores], "health": a.health_score}
     })
 
-# ---------- Scheduler Loop ----------
+# ---------- Scheduler & Main ----------
 async def _daily_scheduler_loop():
     while True:
         try:
             db = SessionLocal()
             for sub in db.query(Subscription).filter(Subscription.email_schedule_enabled == True).all():
-                # Loop through and send reports
                 pass
             db.close()
         except Exception: pass
