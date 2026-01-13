@@ -370,9 +370,12 @@ def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -
 
 
 def _send_magic_login_email(to_email: str, token: str) -> bool:
-    """Send a magic login link via SMTP settings."""
+    """
+    Send a magic login link via SMTP settings.
+    Returns True on success, False otherwise.
+    """
     if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        logger.info("SMTP not configured; skipping magic email.")
+        logger.info("Magic email skipped: SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASSWORD).")
         return False
 
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
@@ -391,13 +394,15 @@ def _send_magic_login_email(to_email: str, token: str) -> bool:
     msg.attach(MIMEText(html_body, "html"))
 
     try:
+        logger.info("Magic email: connecting SMTP %s:%s as %s", SMTP_HOST, SMTP_PORT, SMTP_USER)
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)  # type: ignore[arg-type]
             server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
+        logger.info("Magic email: sent to %s", to_email)
         return True
     except Exception as e:
-        logger.warning("Magic email send failed: %s", e)
+        logger.warning("Magic email send failed for %s: %s", to_email, e)
         return False
 
 
@@ -410,6 +415,15 @@ async def index(request: Request, user: Optional[User] = Depends(get_current_use
         "index.html",
         {"request": request, "user": user},
     )
+
+# Legacy/bookmark alias to fix Railway 405 loops
+@app.get("/login")
+async def login_redirect():
+    """
+    Normalize legacy/bookmarked '/login' to the actual login page route.
+    Prevents GET /login 405 errors in proxies/health checks.
+    """
+    return RedirectResponse("/auth/login", status_code=307)
 
 
 @app.post("/audit/open")
@@ -556,11 +570,14 @@ async def magic_request(
     db: Session = Depends(get_db),
 ):
     # Privacy: do not reveal account existence status
+    sent = False
     u = db.query(User).filter(User.email == email).first()
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-        _send_magic_login_email(u.email, token)
-    return RedirectResponse("/auth/login?magic_sent=1", status_code=303)
+        sent = _send_magic_login_email(u.email, token)
+
+    # Return success UI but include a developer hint on SMTP status
+    return RedirectResponse(f"/auth/login?magic_sent=1&smtp={'ok' if sent else 'check'}", status_code=303)
 
 
 @app.get("/auth/magic")
