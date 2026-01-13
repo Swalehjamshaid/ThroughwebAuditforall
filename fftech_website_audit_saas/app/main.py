@@ -573,7 +573,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends; FastAPI injects this automatically
+    background_tasks: BackgroundTasks,  # <-- no Depends; FastAPI injects this automatically
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -588,11 +588,7 @@ async def register_post(
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
     # Send verification email in background to avoid blocking
-    if background_tasks is not None:
-        background_tasks.add_task(_send_verification_email_bg, u.email, token)
-    else:
-        # Fallback if background_tasks isn't provided (edge cases)
-        _send_verification_email_bg(u.email, token)
+    background_tasks.add_task(_send_verification_email_bg, u.email, token)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -633,7 +629,7 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends; FastAPI injects this automatically
+    background_tasks: BackgroundTasks,  # <-- no Depends; FastAPI injects this automatically
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
@@ -641,10 +637,7 @@ async def magic_request(
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
         # Queue in background; no request-time blocking
-        if background_tasks is not None:
-            background_tasks.add_task(_send_magic_login_email, u.email, token)
-        else:
-            _send_magic_login_email(u.email, token)
+        background_tasks.add_task(_send_magic_login_email, u.email, token)
         smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
 
     # Return success UI but include a developer hint on SMTP status
