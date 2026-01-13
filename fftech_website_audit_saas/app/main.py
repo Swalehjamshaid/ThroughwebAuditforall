@@ -7,6 +7,7 @@ import json
 import asyncio
 import logging
 import smtplib
+import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, Generator, Iterable, Optional, Tuple
@@ -361,34 +362,13 @@ def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------------------
-# Utilities
+# SMTP helpers with timeout + retries
 # ------------------------------------------------------------------------------
-def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
-    """Set a secure, HTTP-only session cookie."""
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * max_age_days,
-    )
-
-# Circuit breaker flag: if outbound SMTP is not reachable once, stop further attempts
-_SMTP_CIRCUIT_OPEN: bool = False
-
 def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     """
     Low-level SMTP send with connection timeout and bounded retries.
-    Stops permanently for this process if 'Network is unreachable' is detected.
     Returns True on success, False otherwise.
     """
-    global _SMTP_CIRCUIT_OPEN
-
-    if _SMTP_CIRCUIT_OPEN:
-        logger.warning("SMTP circuit open; skipping send to %s", to_email)
-        return False
-
     if not MAGIC_EMAIL_ENABLED:
         logger.warning("SMTP disabled by config (MAGIC_EMAIL_ENABLED=false); skipping send to %s", to_email)
         return False
@@ -413,30 +393,13 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
                 server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
             logger.info("SMTP: sent email to %s", to_email)
             return True
-
-        except OSError as e:
-            # Detect container-level network block to SMTP and open circuit
-            if getattr(e, "errno", None) == 101:  # Network is unreachable
-                logger.warning("SMTP unreachable (errno=101). Opening circuit breaker; future sends will be skipped.")
-                _SMTP_CIRCUIT_OPEN = True
-                return False
+        except (smtplib.SMTPException, OSError) as e:
             logger.warning("SMTP send failed to %s: %s", to_email, e)
             if attempt < attempts:
-                import time
                 time.sleep(delay)
                 delay *= 2
                 continue
             return False
-
-        except smtplib.SMTPException as e:
-            logger.warning("SMTP exception sending to %s: %s", to_email, e)
-            if attempt < attempts:
-                import time
-                time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-
         except Exception as e:
             logger.warning("Unexpected SMTP error to %s: %s", to_email, e)
             return False
@@ -445,7 +408,7 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
 def _send_magic_login_email(to_email: str, token: str) -> None:
     """
     Background task: build & send magic login email via SMTP.
-    Non-blocking for the request path; logs redacted link if sending fails.
+    Non-blocking for the request path; logs link if sending is disabled or fails.
     """
     login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
     html_body = f"""
@@ -464,9 +427,7 @@ def _send_magic_login_email(to_email: str, token: str) -> None:
 
     ok = _smtp_send_with_retries(msg, to_email)
     if not ok:
-        # Redact token in logs: only reveal tail for correlation
-        tail = token[-8:]
-        logger.warning("Magic email delivery failed/disabled for %s; token_tail=%s", to_email, tail)
+        logger.warning("Magic email delivery failed or disabled; link for %s: %s", to_email, login_link)
 
 
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
@@ -479,6 +440,31 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
     return _smtp_send_with_retries(msg, to_email)
+
+
+def _send_verification_email_bg(to_email: str, token: str) -> None:
+    """
+    Wrapper to send verification email in background and log fallback link if it fails.
+    """
+    ok = send_verification_email(to_email, token)
+    if not ok:
+        verify_link = f"{BASE_URL.rstrip('/')}/auth/verify?token={token}"
+        logger.warning("Verification email failed or disabled; link for %s: %s", to_email, verify_link)
+
+
+# ------------------------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------------------------
+def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
+    """Set a secure, HTTP-only session cookie."""
+    resp.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=BASE_URL.startswith("https://"),
+        samesite="Lax",
+        max_age=60 * 60 * 24 * max_age_days,
+    )
 
 
 # ------------------------------------------------------------------------------
@@ -587,7 +573,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends()
+    background_tasks: BackgroundTasks = None,  # <-- no Depends; FastAPI injects this automatically
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -603,13 +589,10 @@ async def register_post(
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
     # Send verification email in background to avoid blocking
     if background_tasks is not None:
-        background_tasks.add_task(send_verification_email, u.email, token)
+        background_tasks.add_task(_send_verification_email_bg, u.email, token)
     else:
-        # Fallback: run immediately if BackgroundTasks not provided (e.g., internal call)
-        try:
-            send_verification_email(u.email, token)
-        except Exception as e:
-            logger.warning("Verification email failed: %s", e)
+        # Fallback if background_tasks isn't provided (edge cases)
+        _send_verification_email_bg(u.email, token)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -650,7 +633,7 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends()
+    background_tasks: BackgroundTasks = None,  # <-- no Depends; FastAPI injects this automatically
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
@@ -660,11 +643,9 @@ async def magic_request(
         # Queue in background; no request-time blocking
         if background_tasks is not None:
             background_tasks.add_task(_send_magic_login_email, u.email, token)
-            smtp_status = "queued" if MAGIC_EMAIL_ENABLED and not _SMTP_CIRCUIT_OPEN else "disabled"
         else:
-            # Fallback immediate send
             _send_magic_login_email(u.email, token)
-            smtp_status = "sent" if not _SMTP_CIRCUIT_OPEN else "disabled"
+        smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
 
     # Return success UI but include a developer hint on SMTP status
     return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
@@ -1068,8 +1049,8 @@ async def _daily_scheduler_loop() -> None:
     """Runs once per minute, sending daily emails at the configured local time."""
     while True:
         try:
-            # Skip if email disabled or circuit is open
-            if not MAGIC_EMAIL_ENABLED or _SMTP_CIRCUIT_OPEN:
+            if not MAGIC_EMAIL_ENABLED:
+                # Avoid hitting blocked networks entirely
                 await asyncio.sleep(60)
                 continue
 
