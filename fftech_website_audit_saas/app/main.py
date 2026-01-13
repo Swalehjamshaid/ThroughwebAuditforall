@@ -483,7 +483,6 @@ async def register_post(
     if background_tasks is not None:
         background_tasks.add_task(send_verification_email, u.email, token)
     else:
-        # Fallback (shouldn't happen under FastAPI), send inline
         send_verification_email(u.email, token)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
@@ -955,15 +954,18 @@ async def _daily_scheduler_loop() -> None:
                 hhmm_now = local_now.strftime("%H:%M")
                 if hhmm_now != daily_time:
                     continue
+
                 user = db.query(User).filter(User.id == sub.user_id).first()
                 if not user or not getattr(user, "verified", False):
                     continue
+
                 websites = db.query(Website).filter(Website.user_id == user.id).all()
                 lines = [
                     f"<h3>Daily Website Audit Summary – {UI_BRAND_NAME}</h3>",
                     f"<p>Hello, {user.email}!</p>",
                     "<p>Here is your daily summary. Download certified PDFs via links below.</p>",
                 ]
+
                 for w in websites:
                     last = (
                         db.query(Audit)
@@ -976,9 +978,10 @@ async def _daily_scheduler_loop() -> None:
                         continue
                     pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
                     lines.append(
-                        f"<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 "
-                        f"(<a href=\"{pdf_link}\" target=\"_blank\" rel=\"noopener noreferrer\">Download Certified Report</a>)</p>"
+                        f'<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 '
+                        f'({pdf_link}Download Certified Report</a>)</p>'
                     )
+
                 thirty_days_ago = datetime.utcnow() - timedelta(days=30)
                 audits_30 = db.query(Audit).filter(
                     Audit.user_id == user.id, Audit.created_at >= thirty_days_ago
@@ -988,6 +991,11 @@ async def _daily_scheduler_loop() -> None:
                     lines.append(f"<hr><p><b>30-day accumulated score:</b> {avg_score}/100</p>")
                 else:
                     lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
+
+                lines.append(
+                    f'<p style="margin-top:10px;">{BASE_URL}/auth/scheduleManage schedule or unsubscribe</a></p>'
+                )
+
                 html = "\n".join(lines)
                 # Use centralized email helper (respects MAGIC_EMAIL_ENABLED and timeouts)
                 send_daily_report_email(user.email, html)
