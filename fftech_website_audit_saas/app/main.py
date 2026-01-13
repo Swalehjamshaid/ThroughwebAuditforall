@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, Generator, Iterable, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -42,8 +42,9 @@ SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER: Optional[str] = os.getenv("SMTP_USER")
 SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
 
-# Email behavior toggles & timeouts
+# Email behavior toggles & timeouts (new)
 MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
+MAGIC_LINK_DEV_SHOW: bool = os.getenv("MAGIC_LINK_DEV_SHOW", "false").lower() == "true"
 SMTP_TIMEOUT_SEC: float = float(os.getenv("SMTP_TIMEOUT_SEC", "6.0"))
 SMTP_MAX_RETRIES: int = int(os.getenv("SMTP_MAX_RETRIES", "2"))  # total attempts = 1 + retries
 SMTP_BACKOFF_BASE_SEC: float = float(os.getenv("SMTP_BACKOFF_BASE_SEC", "1.0"))
@@ -362,8 +363,20 @@ def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------------------
-# SMTP helpers with timeout + retries
+# Utilities
 # ------------------------------------------------------------------------------
+def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
+    """Set a secure, HTTP-only session cookie."""
+    resp.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=BASE_URL.startswith("https://"),
+        samesite="Lax",
+        max_age=60 * 60 * 24 * max_age_days,
+    )
+
+
 def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     """
     Low-level SMTP send with connection timeout and bounded retries.
@@ -381,10 +394,8 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     attempts = SMTP_MAX_RETRIES + 1  # initial + retries
     for attempt in range(1, attempts + 1):
         try:
-            logger.info(
-                "SMTP: connecting %s:%s as %s (attempt %d/%d)",
-                SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts
-            )
+            logger.info("SMTP: connecting %s:%s as %s (attempt %d/%d)",
+                        SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts)
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
                 server.ehlo()
                 server.starttls()
@@ -394,6 +405,7 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
             logger.info("SMTP: sent email to %s", to_email)
             return True
         except (smtplib.SMTPException, OSError) as e:
+            # Covers 'Network is unreachable', DNS resolution issues, auth failures, etc.
             logger.warning("SMTP send failed to %s: %s", to_email, e)
             if attempt < attempts:
                 time.sleep(delay)
@@ -427,6 +439,7 @@ def _send_magic_login_email(to_email: str, token: str) -> None:
 
     ok = _smtp_send_with_retries(msg, to_email)
     if not ok:
+        # Graceful fallback: log the link so admins/devs can assist users
         logger.warning("Magic email delivery failed or disabled; link for %s: %s", to_email, login_link)
 
 
@@ -440,31 +453,6 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
     return _smtp_send_with_retries(msg, to_email)
-
-
-def _send_verification_email_bg(to_email: str, token: str) -> None:
-    """
-    Wrapper to send verification email in background and log fallback link if it fails.
-    """
-    ok = send_verification_email(to_email, token)
-    if not ok:
-        verify_link = f"{BASE_URL.rstrip('/')}/auth/verify?token={token}"
-        logger.warning("Verification email failed or disabled; link for %s: %s", to_email, verify_link)
-
-
-# ------------------------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------------------------
-def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
-    """Set a secure, HTTP-only session cookie."""
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * max_age_days,
-    )
 
 
 # ------------------------------------------------------------------------------
@@ -573,7 +561,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks,  # <-- no Depends; FastAPI injects this automatically
+    background_tasks: BackgroundTasks = None,  # <-- NO Depends; FastAPI supports direct injection
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -588,7 +576,14 @@ async def register_post(
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
     # Send verification email in background to avoid blocking
-    background_tasks.add_task(_send_verification_email_bg, u.email, token)
+    if background_tasks:
+        background_tasks.add_task(send_verification_email, u.email, token)
+    else:
+        # Fallback: run sync if BG not provided (e.g., tests)
+        try:
+            send_verification_email(u.email, token)
+        except Exception as e:
+            logger.warning("Verification email send failed: %s", e)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -629,19 +624,33 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks,  # <-- no Depends; FastAPI injects this automatically
+    background_tasks: BackgroundTasks = None,  # <-- NO Depends
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
+    dev_link_qs = ""
     u = db.query(User).filter(User.email == email).first()
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-        # Queue in background; no request-time blocking
-        background_tasks.add_task(_send_magic_login_email, u.email, token)
-        smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
+        login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
 
-    # Return success UI but include a developer hint on SMTP status
-    return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
+        # Queue in background; no request-time blocking
+        if background_tasks and MAGIC_EMAIL_ENABLED:
+            background_tasks.add_task(_send_magic_login_email, u.email, token)
+            smtp_status = "queued"
+        elif MAGIC_EMAIL_ENABLED:
+            # BG not available, attempt sync send
+            _send_magic_login_email(u.email, token)
+            smtp_status = "queued"
+        else:
+            smtp_status = "disabled"
+
+        # Optional dev helper: surface the magic link in the redirect (for blocked SMTP)
+        if (not MAGIC_EMAIL_ENABLED) or MAGIC_LINK_DEV_SHOW:
+            dev_link_qs = "&dev_link=" + quote(login_link, safe="")
+
+    # Return success UI but include a developer hint on SMTP status (and dev_link if enabled)
+    return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}{dev_link_qs}", status_code=303)
 
 
 @app.get("/auth/magic")
