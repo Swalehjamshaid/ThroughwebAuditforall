@@ -6,14 +6,10 @@ import os
 import json
 import asyncio
 import logging
-import smtplib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, Generator, Iterable, Optional, Tuple
 from urllib.parse import urlparse
-
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from fastapi import FastAPI, Request, Form, Depends, Response, BackgroundTasks
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
@@ -25,59 +21,31 @@ from sqlalchemy.orm import Session
 from .db import Base, engine, SessionLocal
 from .models import User, Website, Audit, Subscription
 from .auth import hash_password, verify_password, create_token, decode_token
-from .email_utils import send_verification_email
+from .email_utils import (
+    send_verification_email,
+    send_magic_login_email,
+    send_daily_report_email,
+)
 from .audit.engine import run_basic_checks
 from .audit.grader import compute_overall, grade_from_score, summarize_200_words
 from .audit.report import render_pdf
 
 # ------------------------------------------------------------------------------
-# Configuration helpers
-# ------------------------------------------------------------------------------
-def _env(*keys: str) -> Optional[str]:
-    """Return the first non-empty env var among given keys."""
-    for k in keys:
-        v = os.getenv(k)
-        if v is not None and v.strip() != "":
-            return v.strip()
-    return None
-
-def _looks_placeholder(value: Optional[str]) -> bool:
-    """Heuristics to detect placeholder values (treated as missing)."""
-    if not value:
-        return True
-    v = value.strip().lower()
-    return v in {"changeme", "password", "example", "placeholder"} or "real_16_char_app_password" in v
-
-# ------------------------------------------------------------------------------
-# Configuration
+# Configuration (aligned with provided env block)
 # ------------------------------------------------------------------------------
 UI_BRAND_NAME: str = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
-SMTP_HOST: Optional[str] = _env("SMTP_HOST", "MAIL_HOST")
-SMTP_PORT: int = int(_env("SMTP_PORT", "MAIL_PORT") or "587")
-# Accept common aliases to avoid “missing” warnings in different envs
-SMTP_USER: Optional[str] = _env("SMTP_USER", "SMTP_USERNAME", "EMAIL_USER")
-SMTP_PASSWORD: Optional[str] = _env("SMTP_PASSWORD", "SMTP_PASS", "SMTP_API_KEY")
-
-# Email behavior toggles & timeouts
+# email feature flag & logging level (used for scheduler hints and startup logs)
 MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
-SMTP_TIMEOUT_SEC: float = float(os.getenv("SMTP_TIMEOUT_SEC", "6.0"))
-SMTP_MAX_RETRIES: int = int(os.getenv("SMTP_MAX_RETRIES", "2"))  # total attempts = 1 + retries
-SMTP_BACKOFF_BASE_SEC: float = float(os.getenv("SMTP_BACKOFF_BASE_SEC", "1.0"))
-
-ADMIN_EMAIL: Optional[str] = os.getenv("ADMIN_EMAIL")  # optional auto-verify admin
-COMPETITOR_BASELINE_JSON: Optional[str] = os.getenv(
-    "COMPETITOR_BASELINE_JSON",
-    '{"Performance": 82, "Accessibility": 88, "SEO": 85, "Security": 90, "BestPractices": 84}',
-)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # ------------------------------------------------------------------------------
 # Logging
 # ------------------------------------------------------------------------------
 logger = logging.getLogger("fftech.app")
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
+    level=LOG_LEVEL,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
@@ -147,16 +115,17 @@ def _ensure_user_columns() -> None:
 
 def _auto_verify_admin() -> None:
     """Optionally auto-verify a specific admin email from env (for bootstrap)."""
-    if not ADMIN_EMAIL:
+    admin_email = os.getenv("ADMIN_EMAIL")
+    if not admin_email:
         return
     try:
         with engine.connect() as conn:
             conn.execute(
                 text("UPDATE users SET verified = True, is_admin = True WHERE email = :email"),
-                {"email": ADMIN_EMAIL},
+                {"email": admin_email},
             )
             conn.commit()
-            logger.info("Auto-verified admin account: %s", ADMIN_EMAIL)
+            logger.info("Auto-verified admin account: %s", admin_email)
     except Exception as e:
         logger.warning("Auto verify admin failed: %s", e)
 
@@ -205,7 +174,6 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> O
 async def security_headers(request: Request, call_next):
     """
     Adds a minimal set of security headers to every response.
-    (Fine-tune for your domain & CSP if you need stricter policies.)
     """
     response: Response = await call_next(request)
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
@@ -282,7 +250,7 @@ def _present_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
 def _get_competitor_comparison(target_scores: Dict[str, int]) -> Iterable[Dict[str, Any]]:
     """Compare target scores to a configurable competitor baseline."""
     try:
-        baseline: Dict[str, int] = json.loads(COMPETITOR_BASELINE_JSON or "{}")
+        baseline: Dict[str, int] = json.loads(os.getenv("COMPETITOR_BASELINE_JSON", "{}") or "{}")
     except Exception:
         baseline = {"Performance": 80, "Accessibility": 80, "SEO": 80, "Security": 80, "BestPractices": 80}
 
@@ -393,90 +361,6 @@ def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -
         max_age=60 * 60 * 24 * max_age_days,
     )
 
-def _smtp_config_ok() -> bool:
-    """True if SMTP looks properly configured (non-placeholder)."""
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        return False
-    if _looks_placeholder(SMTP_PASSWORD):
-        return False
-    return True
-
-def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
-    """
-    Low-level SMTP send with connection timeout and bounded retries.
-    Returns True on success, False otherwise.
-    """
-    if not MAGIC_EMAIL_ENABLED:
-        logger.warning("SMTP disabled by config (MAGIC_EMAIL_ENABLED=false); skipping send to %s", to_email)
-        return False
-
-    if not _smtp_config_ok():
-        logger.info("SMTP not fully configured; skip send to %s", to_email)
-        return False
-
-    delay = SMTP_BACKOFF_BASE_SEC
-    attempts = SMTP_MAX_RETRIES + 1  # initial + retries
-    for attempt in range(1, attempts + 1):
-        try:
-            logger.info(
-                "SMTP: connecting %s:%s as %s (attempt %d/%d)",
-                SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts
-            )
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(SMTP_USER, SMTP_PASSWORD)  # type: ignore[arg-type]
-                server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
-            logger.info("SMTP: sent email to %s", to_email)
-            return True
-        except (smtplib.SMTPException, OSError) as e:
-            logger.warning("SMTP send failed to %s: %s", to_email, e)
-            if attempt < attempts:
-                import time
-                time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-        except Exception as e:
-            logger.warning("Unexpected SMTP error to %s: %s", to_email, e)
-            return False
-
-
-def _send_magic_login_email(to_email: str, token: str) -> None:
-    """
-    Background task: build & send magic login email via SMTP.
-    Non-blocking for the request path; logs link if sending is disabled or fails.
-    """
-    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-    html_body = f"""
-    <h3>{UI_BRAND_NAME} — Magic Login</h3>
-    <p>Hello!</p>
-    <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
-    """
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
-    msg["From"] = SMTP_USER or ""
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-
-    ok = _smtp_send_with_retries(msg, to_email)
-    if not ok:
-        logger.warning("Magic email delivery failed or disabled; link for %s: %s", to_email, login_link)
-
-
-def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
-    """Daily report email with the same timeout/retry protections."""
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_USER or ""
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-    return _smtp_send_with_retries(msg, to_email)
-
 
 # ------------------------------------------------------------------------------
 # Routes — public
@@ -491,7 +375,7 @@ async def index(request: Request, user: Optional[User] = Depends(get_current_use
 # Legacy/bookmark alias to fix Railway 405 loops
 @app.get("/login")
 async def login_redirect():
-    """Normalize legacy/bookmarked '/login' to the actual login page route."""
+    """Normalize legacy '/login' to the actual login page."""
     return RedirectResponse("/auth/login", status_code=307)
 
 
@@ -581,7 +465,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends()
+    background_tasks: BackgroundTasks = None,  # NOTE: plain parameter, NOT Depends()
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -595,12 +479,12 @@ async def register_post(
     db.refresh(u)
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
-    # Send verification email in background to avoid blocking
+    # Send verification email in background to avoid request-time blocking
     if background_tasks is not None:
         background_tasks.add_task(send_verification_email, u.email, token)
     else:
-        # Fallback if not provided (rare)
-        asyncio.create_task(asyncio.to_thread(send_verification_email, u.email, token))
+        # Fallback (shouldn't happen under FastAPI), send inline
+        send_verification_email(u.email, token)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -641,18 +525,17 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- no Depends()
+    background_tasks: BackgroundTasks = None,  # NOTE: plain parameter, NOT Depends()
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
     u = db.query(User).filter(User.email == email).first()
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-        # Queue in background; no request-time blocking
         if background_tasks is not None:
-            background_tasks.add_task(_send_magic_login_email, u.email, token)
+            background_tasks.add_task(send_magic_login_email, u.email, token)
         else:
-            asyncio.create_task(asyncio.to_thread(_send_magic_login_email, u.email, token))
+            send_magic_login_email(u.email, token)
         smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
 
     return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
@@ -897,7 +780,7 @@ async def audit_detail(
                 "exec_summary": a.exec_summary,
                 "category_scores": category_scores,
                 "metrics": metrics,
-                "competitor_comparison": list(_get_competitor_comparison({s["name"]: int(s["score"]) for s in category_scores})),
+                "competitor_comparison": list(_get_competitor_comparison({s['name']: int(s['score']) for s in category_scores})),
             },
             "chart": {
                 "radar_labels": radar_labels,
@@ -1056,11 +939,6 @@ async def _daily_scheduler_loop() -> None:
     """Runs once per minute, sending daily emails at the configured local time."""
     while True:
         try:
-            if not MAGIC_EMAIL_ENABLED or not _smtp_config_ok():
-                # Avoid hitting blocked networks entirely
-                await asyncio.sleep(60)
-                continue
-
             db = SessionLocal()
             subs = db.query(Subscription).filter(Subscription.active == True).all()
             now_utc = datetime.utcnow()
@@ -1111,7 +989,8 @@ async def _daily_scheduler_loop() -> None:
                 else:
                     lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
                 html = "\n".join(lines)
-                _send_report_email(user.email, f"{UI_BRAND_NAME} – Daily Website Audit Summary", html)
+                # Use centralized email helper (respects MAGIC_EMAIL_ENABLED and timeouts)
+                send_daily_report_email(user.email, html)
             db.close()
         except Exception as e:
             logger.warning("Scheduler loop error: %s", e)
@@ -1122,15 +1001,10 @@ async def _daily_scheduler_loop() -> None:
 async def _start_scheduler():
     if not MAGIC_EMAIL_ENABLED:
         logger.warning("Startup: MAGIC_EMAIL_ENABLED=false (emails will NOT be sent).")
-    elif not _smtp_config_ok():
-        logger.warning("Startup: SMTP credentials missing/placeholder; emails will NOT be sent.")
     else:
-        logger.info(
-            f"Startup: SMTP configured for {SMTP_USER} via {SMTP_HOST}:{SMTP_PORT}, timeout={SMTP_TIMEOUT_SEC}s"
-        )
-    # Only start the scheduler if emails are enabled and configured
-    if MAGIC_EMAIL_ENABLED and _smtp_config_ok():
-        asyncio.create_task(_daily_scheduler_loop())
+        logger.info("Startup: Email sending enabled.")
+    asyncio.create_task(_daily_scheduler_loop())
+
 
 # ------------------------------------------------------------------------------
 # Run locally binding to environment PORT (Railway sets PORT automatically)
