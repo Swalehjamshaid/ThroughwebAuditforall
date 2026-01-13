@@ -15,11 +15,10 @@ from urllib.parse import urlparse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from fastapi import FastAPI, Request, Form, Depends, Response
+from fastapi import FastAPI, Request, Form, Depends, Response, BackgroundTasks
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.background import BackgroundTasks
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -362,98 +361,6 @@ def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------------------
-# SMTP helpers (timeouts, retries, background-safe)
-# ------------------------------------------------------------------------------
-def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
-    """
-    Low-level SMTP send with connection timeout and bounded retries.
-    Returns True on success, False otherwise.
-    """
-    if not MAGIC_EMAIL_ENABLED:
-        logger.warning("SMTP disabled by config (MAGIC_EMAIL_ENABLED=false); skipping send to %s", to_email)
-        return False
-
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        logger.info("SMTP not fully configured; skip send to %s", to_email)
-        return False
-
-    delay = SMTP_BACKOFF_BASE_SEC
-    attempts = SMTP_MAX_RETRIES + 1  # initial + retries
-    for attempt in range(1, attempts + 1):
-        try:
-            logger.info("SMTP: connecting %s:%s as %s (attempt %d/%d)",
-                        SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts)
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(SMTP_USER, SMTP_PASSWORD)  # type: ignore[arg-type]
-                server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
-            logger.info("SMTP: sent email to %s", to_email)
-            return True
-        except (smtplib.SMTPException, OSError) as e:
-            # Covers 'Network is unreachable', DNS issues, auth failures, etc.
-            logger.warning("SMTP send failed to %s: %s", to_email, e)
-            if attempt < attempts:
-                # Exponential backoff (works in sync or async contexts)
-                try:
-                    loop = asyncio.get_running_loop()
-                    # schedule sleep within running loop
-                    async def _sleep():
-                        await asyncio.sleep(delay)
-                    # Run a nested task to sleep without blocking unrelated tasks
-                    loop.run_until_complete(_sleep())  # type: ignore[attr-defined]
-                except RuntimeError:
-                    # No running loop -> do a blocking sleep
-                    import time
-                    time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-        except Exception as e:
-            logger.warning("Unexpected SMTP error to %s: %s", to_email, e)
-            return False
-
-
-def _send_magic_login_email(to_email: str, token: str) -> None:
-    """
-    Background task: build & send magic login email via SMTP.
-    Non-blocking for the request path; logs link if sending is disabled or fails.
-    """
-    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-    html_body = f"""
-    <h3>{UI_BRAND_NAME} — Magic Login</h3>
-    <p>Hello!</p>
-    <p>Click the secure link below to log in:</p>
-    <p><a href="{login_link}" target="_
-    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
-    """
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
-    msg["From"] = SMTP_USER or ""
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-
-    ok = _smtp_send_with_retries(msg, to_email)
-    if not ok:
-        # Graceful fallback: log the link so admins/devs can assist users
-        logger.warning("Magic email delivery failed or disabled; link for %s: %s", to_email, login_link)
-
-
-def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
-    """
-    Daily report email with the same timeout/retry protections.
-    """
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_USER or ""
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
-    return _smtp_send_with_retries(msg, to_email)
-
-
-# ------------------------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------------------------
 def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
@@ -466,6 +373,112 @@ def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -
         samesite="Lax",
         max_age=60 * 60 * 24 * max_age_days,
     )
+
+# Circuit breaker flag: if outbound SMTP is not reachable once, stop further attempts
+_SMTP_CIRCUIT_OPEN: bool = False
+
+def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
+    """
+    Low-level SMTP send with connection timeout and bounded retries.
+    Stops permanently for this process if 'Network is unreachable' is detected.
+    Returns True on success, False otherwise.
+    """
+    global _SMTP_CIRCUIT_OPEN
+
+    if _SMTP_CIRCUIT_OPEN:
+        logger.warning("SMTP circuit open; skipping send to %s", to_email)
+        return False
+
+    if not MAGIC_EMAIL_ENABLED:
+        logger.warning("SMTP disabled by config (MAGIC_EMAIL_ENABLED=false); skipping send to %s", to_email)
+        return False
+
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        logger.info("SMTP not fully configured; skip send to %s", to_email)
+        return False
+
+    delay = SMTP_BACKOFF_BASE_SEC
+    attempts = SMTP_MAX_RETRIES + 1  # initial + retries
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.info(
+                "SMTP: connecting %s:%s as %s (attempt %d/%d)",
+                SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts
+            )
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(SMTP_USER, SMTP_PASSWORD)  # type: ignore[arg-type]
+                server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
+            logger.info("SMTP: sent email to %s", to_email)
+            return True
+
+        except OSError as e:
+            # Detect container-level network block to SMTP and open circuit
+            if getattr(e, "errno", None) == 101:  # Network is unreachable
+                logger.warning("SMTP unreachable (errno=101). Opening circuit breaker; future sends will be skipped.")
+                _SMTP_CIRCUIT_OPEN = True
+                return False
+            logger.warning("SMTP send failed to %s: %s", to_email, e)
+            if attempt < attempts:
+                import time
+                time.sleep(delay)
+                delay *= 2
+                continue
+            return False
+
+        except smtplib.SMTPException as e:
+            logger.warning("SMTP exception sending to %s: %s", to_email, e)
+            if attempt < attempts:
+                import time
+                time.sleep(delay)
+                delay *= 2
+                continue
+            return False
+
+        except Exception as e:
+            logger.warning("Unexpected SMTP error to %s: %s", to_email, e)
+            return False
+
+
+def _send_magic_login_email(to_email: str, token: str) -> None:
+    """
+    Background task: build & send magic login email via SMTP.
+    Non-blocking for the request path; logs redacted link if sending fails.
+    """
+    login_link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
+    html_body = f"""
+    <h3>{UI_BRAND_NAME} — Magic Login</h3>
+    <p>Hello!</p>
+    <p>Click the secure link below to log in:</p>
+    <p>{login_link}{login_link}</a></p>
+    <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{UI_BRAND_NAME} — Magic Login Link"
+    msg["From"] = SMTP_USER or ""
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_body, "html"))
+
+    ok = _smtp_send_with_retries(msg, to_email)
+    if not ok:
+        # Redact token in logs: only reveal tail for correlation
+        tail = token[-8:]
+        logger.warning("Magic email delivery failed/disabled for %s; token_tail=%s", to_email, tail)
+
+
+def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
+    """
+    Daily report email with the same timeout/retry protections.
+    """
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_USER or ""
+    msg["To"] = to_email
+    msg.attach(MIMEText(html_body, "html"))
+    return _smtp_send_with_retries(msg, to_email)
 
 
 # ------------------------------------------------------------------------------
@@ -574,7 +587,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- NO Depends(); FastAPI injects this automatically
+    background_tasks: BackgroundTasks = None,  # <-- no Depends()
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -588,16 +601,15 @@ async def register_post(
     db.refresh(u)
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
-
     # Send verification email in background to avoid blocking
-    if isinstance(background_tasks, BackgroundTasks):
+    if background_tasks is not None:
         background_tasks.add_task(send_verification_email, u.email, token)
     else:
-        # Fallback: run synchronously if for some reason BackgroundTasks not provided
+        # Fallback: run immediately if BackgroundTasks not provided (e.g., internal call)
         try:
             send_verification_email(u.email, token)
         except Exception as e:
-            logger.warning("Failed to send verification email to %s: %s", u.email, e)
+            logger.warning("Verification email failed: %s", e)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -638,7 +650,7 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- NO Depends(); FastAPI injects this automatically
+    background_tasks: BackgroundTasks = None,  # <-- no Depends()
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
@@ -646,13 +658,13 @@ async def magic_request(
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
         # Queue in background; no request-time blocking
-        if isinstance(background_tasks, BackgroundTasks):
+        if background_tasks is not None:
             background_tasks.add_task(_send_magic_login_email, u.email, token)
-            smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
+            smtp_status = "queued" if MAGIC_EMAIL_ENABLED and not _SMTP_CIRCUIT_OPEN else "disabled"
         else:
-            # Fallback: try sync send
+            # Fallback immediate send
             _send_magic_login_email(u.email, token)
-            smtp_status = "attempted"
+            smtp_status = "sent" if not _SMTP_CIRCUIT_OPEN else "disabled"
 
     # Return success UI but include a developer hint on SMTP status
     return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
@@ -1056,8 +1068,8 @@ async def _daily_scheduler_loop() -> None:
     """Runs once per minute, sending daily emails at the configured local time."""
     while True:
         try:
-            if not MAGIC_EMAIL_ENABLED:
-                # Avoid hitting blocked networks entirely
+            # Skip if email disabled or circuit is open
+            if not MAGIC_EMAIL_ENABLED or _SMTP_CIRCUIT_OPEN:
                 await asyncio.sleep(60)
                 continue
 
