@@ -15,10 +15,11 @@ from urllib.parse import urlparse
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from fastapi import FastAPI, Request, Form, Depends, Response, BackgroundTasks
+from fastapi import FastAPI, Request, Form, Depends, Response
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.background import BackgroundTasks
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -41,7 +42,7 @@ SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER: Optional[str] = os.getenv("SMTP_USER")
 SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
 
-# Email behavior toggles & timeouts (new)
+# Email behavior toggles & timeouts
 MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
 SMTP_TIMEOUT_SEC: float = float(os.getenv("SMTP_TIMEOUT_SEC", "6.0"))
 SMTP_MAX_RETRIES: int = int(os.getenv("SMTP_MAX_RETRIES", "2"))  # total attempts = 1 + retries
@@ -361,20 +362,8 @@ def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------------------
-# Utilities
+# SMTP helpers (timeouts, retries, background-safe)
 # ------------------------------------------------------------------------------
-def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
-    """Set a secure, HTTP-only session cookie."""
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * max_age_days,
-    )
-
-
 def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     """
     Low-level SMTP send with connection timeout and bounded retries.
@@ -403,23 +392,19 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
             logger.info("SMTP: sent email to %s", to_email)
             return True
         except (smtplib.SMTPException, OSError) as e:
-            # Covers 'Network is unreachable', DNS resolution issues, auth failures, etc.
+            # Covers 'Network is unreachable', DNS issues, auth failures, etc.
             logger.warning("SMTP send failed to %s: %s", to_email, e)
             if attempt < attempts:
-                # Exponential backoff
+                # Exponential backoff (works in sync or async contexts)
                 try:
-                    asyncio.get_event_loop()
-                    # If in async context, non-blocking sleep
-                    # (BackgroundTasks will run sync, but we guard both cases)
+                    loop = asyncio.get_running_loop()
+                    # schedule sleep within running loop
                     async def _sleep():
                         await asyncio.sleep(delay)
-                    try:
-                        asyncio.run(_sleep())
-                    except RuntimeError:
-                        # If loop already running, do a blocking sleep
-                        import time
-                        time.sleep(delay)
-                except Exception:
+                    # Run a nested task to sleep without blocking unrelated tasks
+                    loop.run_until_complete(_sleep())  # type: ignore[attr-defined]
+                except RuntimeError:
+                    # No running loop -> do a blocking sleep
                     import time
                     time.sleep(delay)
                 delay *= 2
@@ -440,7 +425,7 @@ def _send_magic_login_email(to_email: str, token: str) -> None:
     <h3>{UI_BRAND_NAME} — Magic Login</h3>
     <p>Hello!</p>
     <p>Click the secure link below to log in:</p>
-    <p>{login_link}{login_link}</a></p>
+    <p><a href="{login_link}" target="_
     <p>This link will expire shortly. If you didn't request it, you can ignore this message.</p>
     """
 
@@ -466,6 +451,21 @@ def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
     return _smtp_send_with_retries(msg, to_email)
+
+
+# ------------------------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------------------------
+def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
+    """Set a secure, HTTP-only session cookie."""
+    resp.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=BASE_URL.startswith("https://"),
+        samesite="Lax",
+        max_age=60 * 60 * 24 * max_age_days,
+    )
 
 
 # ------------------------------------------------------------------------------
@@ -574,7 +574,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = Depends(),
+    background_tasks: BackgroundTasks = None,  # <-- NO Depends(); FastAPI injects this automatically
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -588,8 +588,16 @@ async def register_post(
     db.refresh(u)
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
+
     # Send verification email in background to avoid blocking
-    background_tasks.add_task(send_verification_email, u.email, token)
+    if isinstance(background_tasks, BackgroundTasks):
+        background_tasks.add_task(send_verification_email, u.email, token)
+    else:
+        # Fallback: run synchronously if for some reason BackgroundTasks not provided
+        try:
+            send_verification_email(u.email, token)
+        except Exception as e:
+            logger.warning("Failed to send verification email to %s: %s", u.email, e)
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -630,7 +638,7 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = Depends(),
+    background_tasks: BackgroundTasks = None,  # <-- NO Depends(); FastAPI injects this automatically
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
@@ -638,8 +646,13 @@ async def magic_request(
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
         # Queue in background; no request-time blocking
-        background_tasks.add_task(_send_magic_login_email, u.email, token)
-        smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
+        if isinstance(background_tasks, BackgroundTasks):
+            background_tasks.add_task(_send_magic_login_email, u.email, token)
+            smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
+        else:
+            # Fallback: try sync send
+            _send_magic_login_email(u.email, token)
+            smtp_status = "attempted"
 
     # Return success UI but include a developer hint on SMTP status
     return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
