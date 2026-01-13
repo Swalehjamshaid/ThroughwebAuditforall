@@ -7,7 +7,6 @@ import json
 import asyncio
 import logging
 import smtplib
-import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, Generator, Iterable, Optional, Tuple
@@ -32,15 +31,34 @@ from .audit.grader import compute_overall, grade_from_score, summarize_200_words
 from .audit.report import render_pdf
 
 # ------------------------------------------------------------------------------
+# Configuration helpers
+# ------------------------------------------------------------------------------
+def _env(*keys: str) -> Optional[str]:
+    """Return the first non-empty env var among given keys."""
+    for k in keys:
+        v = os.getenv(k)
+        if v is not None and v.strip() != "":
+            return v.strip()
+    return None
+
+def _looks_placeholder(value: Optional[str]) -> bool:
+    """Heuristics to detect placeholder values (treated as missing)."""
+    if not value:
+        return True
+    v = value.strip().lower()
+    return v in {"changeme", "password", "example", "placeholder"} or "real_16_char_app_password" in v
+
+# ------------------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------------------
 UI_BRAND_NAME: str = os.getenv("UI_BRAND_NAME", "FF Tech")
 BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
-SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST")
-SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER: Optional[str] = os.getenv("SMTP_USER")
-SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
+SMTP_HOST: Optional[str] = _env("SMTP_HOST", "MAIL_HOST")
+SMTP_PORT: int = int(_env("SMTP_PORT", "MAIL_PORT") or "587")
+# Accept common aliases to avoid “missing” warnings in different envs
+SMTP_USER: Optional[str] = _env("SMTP_USER", "SMTP_USERNAME", "EMAIL_USER")
+SMTP_PASSWORD: Optional[str] = _env("SMTP_PASSWORD", "SMTP_PASS", "SMTP_API_KEY")
 
 # Email behavior toggles & timeouts
 MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
@@ -362,8 +380,27 @@ def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
 
 
 # ------------------------------------------------------------------------------
-# SMTP utilities
+# Utilities
 # ------------------------------------------------------------------------------
+def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
+    """Set a secure, HTTP-only session cookie."""
+    resp.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=BASE_URL.startswith("https://"),
+        samesite="Lax",
+        max_age=60 * 60 * 24 * max_age_days,
+    )
+
+def _smtp_config_ok() -> bool:
+    """True if SMTP looks properly configured (non-placeholder)."""
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+        return False
+    if _looks_placeholder(SMTP_PASSWORD):
+        return False
+    return True
+
 def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     """
     Low-level SMTP send with connection timeout and bounded retries.
@@ -373,7 +410,7 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
         logger.warning("SMTP disabled by config (MAGIC_EMAIL_ENABLED=false); skipping send to %s", to_email)
         return False
 
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
+    if not _smtp_config_ok():
         logger.info("SMTP not fully configured; skip send to %s", to_email)
         return False
 
@@ -381,8 +418,10 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
     attempts = SMTP_MAX_RETRIES + 1  # initial + retries
     for attempt in range(1, attempts + 1):
         try:
-            logger.info("SMTP: connecting %s:%s as %s (attempt %d/%d)",
-                        SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts)
+            logger.info(
+                "SMTP: connecting %s:%s as %s (attempt %d/%d)",
+                SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts
+            )
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
                 server.ehlo()
                 server.starttls()
@@ -394,6 +433,7 @@ def _smtp_send_with_retries(msg: MIMEMultipart, to_email: str) -> bool:
         except (smtplib.SMTPException, OSError) as e:
             logger.warning("SMTP send failed to %s: %s", to_email, e)
             if attempt < attempts:
+                import time
                 time.sleep(delay)
                 delay *= 2
                 continue
@@ -429,28 +469,13 @@ def _send_magic_login_email(to_email: str, token: str) -> None:
 
 
 def _send_report_email(to_email: str, subject: str, html_body: str) -> bool:
-    """Daily report email using the same timeout/retry protections."""
+    """Daily report email with the same timeout/retry protections."""
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = SMTP_USER or ""
     msg["To"] = to_email
     msg.attach(MIMEText(html_body, "html"))
     return _smtp_send_with_retries(msg, to_email)
-
-
-# ------------------------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------------------------
-def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
-    """Set a secure, HTTP-only session cookie."""
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * max_age_days,
-    )
 
 
 # ------------------------------------------------------------------------------
@@ -466,10 +491,7 @@ async def index(request: Request, user: Optional[User] = Depends(get_current_use
 # Legacy/bookmark alias to fix Railway 405 loops
 @app.get("/login")
 async def login_redirect():
-    """
-    Normalize legacy/bookmarked '/login' to the actual login page route.
-    Prevents GET /login 405 errors in proxies/health checks.
-    """
+    """Normalize legacy/bookmarked '/login' to the actual login page route."""
     return RedirectResponse("/auth/login", status_code=307)
 
 
@@ -559,7 +581,7 @@ async def register_post(
     password: str = Form(...),
     confirm_password: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- IMPORTANT: no Depends()
+    background_tasks: BackgroundTasks = None,  # <-- no Depends()
 ):
     if password != confirm_password:
         return RedirectResponse("/auth/register?mismatch=1", status_code=303)
@@ -574,14 +596,11 @@ async def register_post(
 
     token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
     # Send verification email in background to avoid blocking
-    if background_tasks:
+    if background_tasks is not None:
         background_tasks.add_task(send_verification_email, u.email, token)
     else:
-        # Fallback if BackgroundTasks not provided (e.g., unit tests)
-        try:
-            send_verification_email(u.email, token)
-        except Exception as e:
-            logger.warning("Failed to send verification email to %s: %s", u.email, e)
+        # Fallback if not provided (rare)
+        asyncio.create_task(asyncio.to_thread(send_verification_email, u.email, token))
 
     return RedirectResponse("/auth/login?check_email=1", status_code=303)
 
@@ -622,7 +641,7 @@ async def magic_request(
     request: Request,
     email: str = Form(...),
     db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # <-- IMPORTANT: no Depends()
+    background_tasks: BackgroundTasks = None,  # <-- no Depends()
 ):
     # Privacy: do not reveal account existence status
     smtp_status = "skip"
@@ -630,14 +649,12 @@ async def magic_request(
     if u and getattr(u, "verified", False):
         token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
         # Queue in background; no request-time blocking
-        if background_tasks:
+        if background_tasks is not None:
             background_tasks.add_task(_send_magic_login_email, u.email, token)
         else:
-            # Fallback execution
-            _send_magic_login_email(u.email, token)
+            asyncio.create_task(asyncio.to_thread(_send_magic_login_email, u.email, token))
         smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
 
-    # Return success UI but include a developer hint on SMTP status
     return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
 
 
@@ -1039,7 +1056,7 @@ async def _daily_scheduler_loop() -> None:
     """Runs once per minute, sending daily emails at the configured local time."""
     while True:
         try:
-            if not MAGIC_EMAIL_ENABLED:
+            if not MAGIC_EMAIL_ENABLED or not _smtp_config_ok():
                 # Avoid hitting blocked networks entirely
                 await asyncio.sleep(60)
                 continue
@@ -1105,13 +1122,15 @@ async def _daily_scheduler_loop() -> None:
 async def _start_scheduler():
     if not MAGIC_EMAIL_ENABLED:
         logger.warning("Startup: MAGIC_EMAIL_ENABLED=false (emails will NOT be sent).")
+    elif not _smtp_config_ok():
+        logger.warning("Startup: SMTP credentials missing/placeholder; emails will NOT be sent.")
     else:
-        if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-            logger.warning("Startup: SMTP credentials missing; emails will NOT be sent.")
-        else:
-            logger.info(f"Startup: SMTP configured for {SMTP_USER} via {SMTP_HOST}:{SMTP_PORT}, timeout={SMTP_TIMEOUT_SEC}s")
-    asyncio.create_task(_daily_scheduler_loop())
-
+        logger.info(
+            f"Startup: SMTP configured for {SMTP_USER} via {SMTP_HOST}:{SMTP_PORT}, timeout={SMTP_TIMEOUT_SEC}s"
+        )
+    # Only start the scheduler if emails are enabled and configured
+    if MAGIC_EMAIL_ENABLED and _smtp_config_ok():
+        asyncio.create_task(_daily_scheduler_loop())
 
 # ------------------------------------------------------------------------------
 # Run locally binding to environment PORT (Railway sets PORT automatically)
