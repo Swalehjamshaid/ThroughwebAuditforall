@@ -1,52 +1,37 @@
-let myChart; // Global variable to hold the chart instance
-
 async function startAudit() {
-    const url = document.getElementById('auditUrl').value;
-    if(!url) return alert("Please enter a URL");
+    const urlInput = document.getElementById('auditUrl') || document.querySelector('input[type="url"]');
+    const urlValue = urlInput.value;
+    
+    if(!urlValue) return alert("Please enter a valid URL");
 
-    // Show loading state in the Grade box
     document.getElementById('gradeValue').innerText = "...";
 
-    const response = await fetch(`/audit/run?url=${encodeURIComponent(url)}`, { method: 'POST' });
-    const data = await response.json();
+    try {
+        const response = await fetch('/audit/run', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', // Tell the server we are sending JSON
+            },
+            body: JSON.stringify({ url: urlValue }) // Send the URL in a JSON object
+        });
 
-    if (data.id) {
-        // 1. Update the Big Grade
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Server Error:", errorData);
+            throw new Error("Audit failed");
+        }
+
+        const data = await response.json();
+
+        // Update the Dashboard UI
         document.getElementById('gradeValue').innerText = data.grade;
+        window.currentAuditId = data.id; // Save ID for the PDF download
         
-        // 2. Update the Graphical Chart
+        // Update the Graphical Presentation
         updateChart(data.categories);
         
-        // 3. Store ID for PDF download
-        window.currentAuditId = data.id;
+    } catch (error) {
+        document.getElementById('gradeValue').innerText = "Err";
+        alert("Connection Error. Check console for 422 details.");
     }
-}
-
-function updateChart(categoryData) {
-    const ctx = document.getElementById('auditChart').getContext('2d');
-    
-    if (myChart) { myChart.destroy(); } // Clear old data
-
-    myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(categoryData),
-            datasets: [{
-                label: 'Audit Score %',
-                data: Object.values(categoryData),
-                backgroundColor: '#0AD1A3', // Your brand color
-                borderColor: '#0AD1A3',
-                borderWidth: 1,
-                borderRadius: 5
-            }]
-        },
-        options: {
-            scales: { y: { beginAtZero: true, max: 100 } }
-        }
-    });
-}
-
-function downloadReport() {
-    if (!window.currentAuditId) return alert("Run an audit first!");
-    window.location.href = `/audit/${window.currentAuditId}/pdf`;
 }
