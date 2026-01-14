@@ -1,7 +1,7 @@
-
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel # Added for JSON validation
 import io, tempfile, zipfile
 
 from ..db import db_session
@@ -13,6 +13,14 @@ from ..audit.record import save_png_summary, save_xlsx, save_pptx
 
 router = APIRouter(prefix='/audit', tags=['audit'])
 
+# --- NEW: Pydantic models to fix the 422 error ---
+class AuditRequest(BaseModel):
+    url: str
+
+class RegisteredAuditRequest(BaseModel):
+    url: str
+    user_email: str
+
 @router.get('/open', response_class=HTMLResponse)
 def open_form(request: Request):
     from fastapi.templating import Jinja2Templates
@@ -20,17 +28,24 @@ def open_form(request: Request):
     return templates.TemplateResponse('index.html', {'request': request})
 
 @router.post('/run')
-def run_audit(url: str, request: Request, db: Session = Depends(db_session)):
+def run_audit(payload_in: AuditRequest, request: Request, db: Session = Depends(db_session)):
+    # Use payload_in.url instead of a raw url string to parse JSON
+    url = payload_in.url
     payload = analyze(url)
     overall, cat_scores = compute_category_scores(payload['results'])
     grade = grade_from_score(overall)
     return {'url': url, 'score': overall, 'grade': grade, 'categories': cat_scores, 'details': payload}
 
 @router.post('/run-registered')
-def run_audit_registered(url: str, user_email: str, request: Request, db: Session = Depends(db_session)):
+def run_audit_registered(payload_in: RegisteredAuditRequest, request: Request, db: Session = Depends(db_session)):
+    # Use the Pydantic model to extract data from the JSON body
+    user_email = payload_in.user_email
+    url = payload_in.url
+    
     user = db.query(User).filter(User.email==user_email).first()
     if not user:
         raise HTTPException(status_code=401, detail='User not found. Please sign in.')
+    
     payload = analyze(url)
     overall, cat_scores = compute_category_scores(payload['results'])
     grade = grade_from_score(overall)
