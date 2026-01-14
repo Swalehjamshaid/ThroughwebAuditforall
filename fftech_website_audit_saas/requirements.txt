@@ -1,4 +1,7 @@
-# Core API
+
+SQLAlchemy==2.0.36
+
+psycopg[binary]==3.2.4# Core API
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 
