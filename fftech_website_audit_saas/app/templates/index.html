@@ -1,63 +1,63 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <div class="card p-4 shadow-sm">
-        <form id="auditForm">
+<div class="container py-5">
+    <div class="card p-5 shadow-lg border-0 bg-dark text-white mb-4 text-center">
+        <h1 class="fw-bold">FF Tech AI Audit SaaS</h1>
+        <form id="auditForm" class="mt-4">
             <div class="input-group">
-                <input type="url" id="url" class="form-control" placeholder="https://example.com" required>
-                <button class="btn btn-primary" type="submit" id="btn">
-                    <span id="spin" class="spinner-border spinner-border-sm d-none"></span> Run Audit
-                </button>
+                <input type="url" id="url" class="form-control" placeholder="Enter Website" required>
+                <button class="btn btn-success px-4" type="submit" id="btn">Run AI Audit</button>
             </div>
         </form>
     </div>
 
-    <div id="results" class="mt-4 d-none">
-        <div class="card p-4">
-            <div class="d-flex justify-content-between">
-                <h3>Score: <span id="score"></span> (<span id="grade"></span>)</h3>
-                <button id="pdfBtn" class="btn btn-danger">Download PDF</button>
+    <div id="results" class="d-none animate__animated animate__fadeIn">
+        <div class="row g-4">
+            <div class="col-md-4 text-center">
+                <div class="card p-4 border-success">
+                    <h5 class="text-muted">Grade</h5>
+                    <h1 id="grade" class="display-1 text-success fw-bold"></h1>
+                    <button id="pdfBtn" class="btn btn-danger w-100 mt-3">Download PDF</button>
+                </div>
             </div>
-            <canvas id="chart"></canvas>
+            <div class="col-md-8">
+                <div class="card p-4">
+                    <p id="summary" class="lead fw-bold text-muted"></p>
+                    <canvas id="chart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let chart;
-let lastId;
+let lastId; let chart;
 document.getElementById('auditForm').onsubmit = async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('btn');
-    const spin = document.getElementById('spin');
-    btn.disabled = true; spin.classList.remove('d-none');
-
     const res = await fetch('/audit/run', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({url: document.getElementById('url').value})
+        body: JSON.stringify({ 
+            url: document.getElementById('url').value, 
+            user_email: localStorage.getItem('user_email') 
+        })
     });
-    
     const data = await res.json();
     lastId = data.id;
-    btn.disabled = false; spin.classList.add('d-none');
     document.getElementById('results').classList.remove('d-none');
-    document.getElementById('score').innerText = data.score + '%';
     document.getElementById('grade').innerText = data.grade;
+    document.getElementById('summary').innerText = data.summary;
 
     if(chart) chart.destroy();
     chart = new Chart(document.getElementById('chart'), {
         type: 'bar',
         data: {
             labels: Object.keys(data.categories),
-            datasets: [{label: 'Scores', data: Object.values(data.categories), backgroundColor: '#0AD1A3'}]
+            datasets: [{ label: 'Performance Score %', data: Object.values(data.categories), backgroundColor: '#198754' }]
         }
     });
 };
-
-document.getElementById('pdfBtn').onclick = () => {
-    window.open(`/audit/${lastId}/pdf`, '_blank');
-};
+document.getElementById('pdfBtn').onclick = () => window.open(`/audit/${lastId}/pdf`, '_blank');
 </script>
 {% endblock %}
