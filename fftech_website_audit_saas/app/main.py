@@ -1,1024 +1,402 @@
-
-# app/main.py
-from __future__ import annotations
+# Main.py
+# M365 Copilot — Orchestration entrypoint
+# Loads config, runs grader/report/record pipelines, and sends outputs via EmailClient.
 
 import os
+import sys
 import json
-import asyncio
+import argparse
 import logging
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
-from typing import Any, Dict, Generator, Iterable, Optional, Tuple
-from urllib.parse import urlparse
+import datetime
+from typing import Dict, Any, List, Optional
 
-from fastapi import FastAPI, Request, Form, Depends, Response, BackgroundTasks
-from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+# Import your provided Email.py
+from Email import EmailClient, build_html_template
 
-from .db import Base, engine, SessionLocal
-from .models import User, Website, Audit, Subscription
-from .auth import hash_password, verify_password, create_token, decode_token
-from .email_utils import (
-    send_verification_email,
-    send_magic_login_email,
-    send_daily_report_email,
-)
-from .audit.engine import run_basic_checks
-from .audit.grader import compute_overall, grade_from_score, summarize_200_words
-from .audit.report import render_pdf
+# Optional project modules — handle if missing gracefully
+try:
+    import grader
+except ImportError:
+    grader = None
 
-# ------------------------------------------------------------------------------
-# Configuration (aligned with provided env block)
-# ------------------------------------------------------------------------------
-UI_BRAND_NAME: str = os.getenv("UI_BRAND_NAME", "FF Tech")
-BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+try:
+    import report
+except ImportError:
+    report = None
 
-# email feature flag & logging level (used for scheduler hints and startup logs)
-MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+try:
+    import record
+except ImportError:
+    record = None
 
-# ------------------------------------------------------------------------------
-# Logging
-# ------------------------------------------------------------------------------
-logger = logging.getLogger("fftech.app")
+# Logger setup
+logger = logging.getLogger("Main")
 logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-# ------------------------------------------------------------------------------
-# FastAPI app, static & templates
-# ------------------------------------------------------------------------------
-app = FastAPI(title=f"{UI_BRAND_NAME} — Website Audit SaaS")
+# ----------------------------
+# Config helpers
+# ----------------------------
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-templates = Jinja2Templates(directory="app/templates")
-templates.env.globals.update(
-    {
-        "datetime": datetime,
-        "UI_BRAND_NAME": UI_BRAND_NAME,
-        "year": datetime.utcnow().year,
-        "now": datetime.utcnow(),
-    }
-)
-
-# ------------------------------------------------------------------------------
-# DB schema initialization & patches
-# ------------------------------------------------------------------------------
-Base.metadata.create_all(bind=engine)
-
-
-def _ensure_schedule_columns() -> None:
-    """Ensure new schedule columns are present for subscriptions."""
-    try:
-        with engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE subscriptions "
-                "ADD COLUMN IF NOT EXISTS daily_time VARCHAR(8) DEFAULT '09:00';"
-            ))
-            conn.execute(text(
-                "ALTER TABLE subscriptions "
-                "ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) DEFAULT 'UTC';"
-            ))
-            conn.execute(text(
-                "ALTER TABLE subscriptions "
-                "ADD COLUMN IF NOT EXISTS email_schedule_enabled BOOLEAN DEFAULT FALSE;"
-            ))
-            conn.commit()
-    except Exception as e:
-        logger.warning("Schedule columns patch failed: %s", e)
-
-
-def _ensure_user_columns() -> None:
-    """Ensure additional columns for users are present."""
-    try:
-        with engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;"
-            ))
-            conn.execute(text(
-                "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;"
-            ))
-            conn.execute(text(
-                "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();"
-            ))
-            conn.commit()
-    except Exception as e:
-        logger.warning("User columns patch failed: %s", e)
-
-
-def _auto_verify_admin() -> None:
-    """Optionally auto-verify a specific admin email from env (for bootstrap)."""
-    admin_email = os.getenv("ADMIN_EMAIL")
-    if not admin_email:
-        return
-    try:
-        with engine.connect() as conn:
-            conn.execute(
-                text("UPDATE users SET verified = True, is_admin = True WHERE email = :email"),
-                {"email": admin_email},
-            )
-            conn.commit()
-            logger.info("Auto-verified admin account: %s", admin_email)
-    except Exception as e:
-        logger.warning("Auto verify admin failed: %s", e)
-
-
-_ensure_schedule_columns()
-_ensure_user_columns()
-_auto_verify_admin()
-
-# ------------------------------------------------------------------------------
-# DB dependency & per-request user dependency
-# ------------------------------------------------------------------------------
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-async def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
-    """
-    Resolve the current user per-request from the session cookie.
-    Returns None if there is no valid/verified user.
-    """
-    try:
-        token = request.cookies.get("session_token")
-        if not token:
-            return None
-        data = decode_token(token)
-        uid = data.get("uid")
-        if not uid:
-            return None
-        user = db.query(User).filter(User.id == uid).first()
-        if user and getattr(user, "verified", False):
-            return user
-        return None
-    except Exception as e:
-        logger.debug("get_current_user error: %s", e)
-        return None
-
-
-# ------------------------------------------------------------------------------
-# Security headers middleware
-# ------------------------------------------------------------------------------
-@app.middleware("http")
-async def security_headers(request: Request, call_next):
-    """
-    Adds a minimal set of security headers to every response.
-    """
-    response: Response = await call_next(request)
-    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-    response.headers.setdefault("X-Content-Type-Options", "nosniff")
-    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-    return response
-
-
-# ------------------------------------------------------------------------------
-# Health & readiness
-# ------------------------------------------------------------------------------
-@app.get("/health")
-def health() -> JSONResponse:
-    return JSONResponse({"status": "ok"})
-
-
-@app.get("/ready")
-def ready() -> JSONResponse:
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return JSONResponse({"status": "ready"})
-    except Exception as e:
-        logger.error("Readiness DB check failed: %s", e)
-        return JSONResponse({"status": "not-ready"}, status_code=503)
-
-
-# ------------------------------------------------------------------------------
-# Metric labels & presenters
-# ------------------------------------------------------------------------------
-METRIC_LABELS: Dict[str, str] = {
-    "status_code": "Status Code",
-    "content_length": "Content Length (bytes)",
-    "content_encoding": "Compression (Content-Encoding)",
-    "cache_control": "Caching (Cache-Control)",
-    "hsts": "HSTS (Strict-Transport-Security)",
-    "xcto": "X-Content-Type-Options",
-    "xfo": "X-Frame-Options",
-    "csp": "Content-Security-Policy",
-    "set_cookie": "Set-Cookie",
-    "title": "HTML <title>",
-    "title_length": "Title Length",
-    "meta_description_length": "Meta Description Length",
-    "meta_robots": "Meta Robots",
-    "canonical_present": "Canonical Link Present",
-    "has_https": "Uses HTTPS",
-    "robots_allowed": "Robots Allowed",
-    "sitemap_present": "Sitemap Present",
-    "images_without_alt": "Images Missing alt",
-    "image_count": "Image Count",
-    "viewport_present": "Viewport Meta Present",
-    "html_lang_present": "<html lang> Present",
-    "h1_count": "H1 Count",
-    "normalized_url": "Normalized URL",
-    "error": "Fetch Error",
-}
-
-
-def _present_metrics(metrics: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert raw metric keys/values to human-friendly labels and formats for UI."""
-    out: Dict[str, Any] = {}
-    for k, v in (metrics or {}).items():
-        label = METRIC_LABELS.get(k, k.replace("_", " ").title())
-        if isinstance(v, bool):
-            v = "Yes" if v else "No"
-        out[label] = v
-    return out
-
-
-# ------------------------------------------------------------------------------
-# Competitor baseline comparison (UI helper)
-# ------------------------------------------------------------------------------
-def _get_competitor_comparison(target_scores: Dict[str, int]) -> Iterable[Dict[str, Any]]:
-    """Compare target scores to a configurable competitor baseline."""
-    try:
-        baseline: Dict[str, int] = json.loads(os.getenv("COMPETITOR_BASELINE_JSON", "{}") or "{}")
-    except Exception:
-        baseline = {"Performance": 80, "Accessibility": 80, "SEO": 80, "Security": 80, "BestPractices": 80}
-
-    comparison = []
-    for cat, score in target_scores.items():
-        comp_val = int(baseline.get(cat, 80))
-        diff = int(score) - comp_val
-        comparison.append(
-            {
-                "category": cat,
-                "target": int(score),
-                "competitor": comp_val,
-                "gap": diff,
-                "status": "Lead" if diff >= 0 else "Lag",
-            }
-        )
-    return comparison
-
-
-# ------------------------------------------------------------------------------
-# URL normalization & resilient audit
-# ------------------------------------------------------------------------------
-def _normalize_url(raw: str) -> str:
-    if not raw:
-        return raw
-    s = raw.strip()
-    p = urlparse(s)
-    if not p.scheme:
-        s = "https://" + s
-        p = urlparse(s)
-    if not p.netloc and p.path:
-        s = f"{p.scheme}://{p.path}"
-        p = urlparse(s)
-    path = p.path or "/"
-    return f"{p.scheme}://{p.netloc}{path}"
-
-
-def _url_variants(u: str) -> Iterable[str]:
-    p = urlparse(u)
-    host = p.netloc
-    path = p.path or "/"
-    scheme = p.scheme
-
-    candidates = [f"{scheme}://{host}{path}"]
-    if host.startswith("www."):
-        candidates.append(f"{scheme}://{host[4:]}{path}")
-    else:
-        candidates.append(f"{scheme}://www.{host}{path}")
-    candidates.append(f"http://{host}{path}")
-    if host.startswith("www."):
-        candidates.append(f"http://{host[4:]}{path}")
-    else:
-        candidates.append(f"http://www.{host}{path}")
-    if not path.endswith("/"):
-        candidates.append(f"{scheme}://{host}{path}/")
-
-    seen, ordered = set(), []
-    for c in candidates:
-        if c not in seen:
-            ordered.append(c)
-            seen.add(c)
-    return ordered
-
-
-def _fallback_result(url: str) -> Dict[str, Any]:
-    return {
-        "category_scores": {
-            "Performance": 65,
-            "Accessibility": 72,
-            "SEO": 68,
-            "Security": 70,
-            "BestPractices": 66,
-        },
-        "metrics": {"error": "Fetch failed or blocked", "normalized_url": url},
-        "top_issues": [
-            "Fetch failed; using heuristic baseline.",
-            "Verify URL is publicly accessible and not blocked by WAF/robots.",
-        ],
-    }
-
-
-def _robust_audit(url: str) -> Tuple[str, Dict[str, Any]]:
-    """Attempt multiple URL variants; return first successful result or fallback."""
-    base = _normalize_url(url)
-    for candidate in _url_variants(base):
+def load_json_config(path: Optional[str]) -> Dict[str, Any]:
+    """Load a JSON config file if present."""
+    cfg: Dict[str, Any] = {}
+    if path and os.path.exists(path):
         try:
-            res = run_basic_checks(candidate)
-            cats = res.get("category_scores") or {}
-            if cats and sum(int(v) for v in cats.values()) > 0:
-                return candidate, res
+            with open(path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            logger.info("Loaded config.json: %s", path)
         except Exception as e:
-            logger.debug("Variant failed (%s): %s", candidate, e)
+            logger.error("Failed to load config file %s: %s", path, e)
+    return cfg
+
+
+def load_env_into_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Overlay environment variables onto config dictionary."""
+    env_map = {
+        # Profile / org
+        "COMPANY_NAME": "COMPANY_NAME",
+        "JOB_TITLE": "JOB_TITLE",
+        "MANAGER": "MANAGER",
+        "SKIP_MANAGER": "SKIP_MANAGER",
+        "OFFICE_LOCATION": "OFFICE_LOCATION",
+        "USER_NAME": "USER_NAME",
+        # UI
+        "UI_THEME": "UI_THEME",
+        "UI_PREF": "UI_PREF",
+        "TEMPLATES_DIR": "TEMPLATES_DIR",
+        # Outputs
+        "OUTPUT_DIR": "OUTPUT_DIR",
+        "INCLUDE_PNG": "INCLUDE_PNG",
+        "INCLUDE_PPTX": "INCLUDE_PPTX",
+        "INCLUDE_XLSX": "INCLUDE_XLSX",
+        # Email / SMTP
+        "SMTP_HOST": "SMTP_HOST",
+        "SMTP_PORT": "SMTP_PORT",
+        "SMTP_USER": "SMTP_USER",
+        "SMTP_PASS": "SMTP_PASS",
+        "SMTP_SSL": "SMTP_SSL",
+        "FROM_EMAIL": "FROM_EMAIL",
+        "FROM_NAME": "FROM_NAME",
+        "REPLY_TO": "REPLY_TO",
+        "DEFAULT_RECIPIENTS": "DEFAULT_RECIPIENTS",
+        "CC_LIST": "CC_LIST",
+        "BCC_LIST": "BCC_LIST",
+        # Project metadata
+        "PROJECT_NAME": "PROJECT_NAME",
+        "RUN_TAG": "RUN_TAG",
+    }
+    for k, env_k in env_map.items():
+        v = os.getenv(env_k)
+        if v is None:
             continue
-    return base, _fallback_result(base)
-
-
-# ------------------------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------------------------
-def _set_session_cookie(resp: Response, token: str, *, max_age_days: int = 30) -> None:
-    """Set a secure, HTTP-only session cookie."""
-    resp.set_cookie(
-        key="session_token",
-        value=token,
-        httponly=True,
-        secure=BASE_URL.startswith("https://"),
-        samesite="Lax",
-        max_age=60 * 60 * 24 * max_age_days,
-    )
-
-
-# ------------------------------------------------------------------------------
-# Routes — public
-# ------------------------------------------------------------------------------
-@app.get("/")
-async def index(request: Request, user: Optional[User] = Depends(get_current_user)):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "user": user},
-    )
-
-# Legacy/bookmark alias to fix Railway 405 loops
-@app.get("/login")
-async def login_redirect():
-    """Normalize legacy '/login' to the actual login page."""
-    return RedirectResponse("/auth/login", status_code=307)
-
-
-@app.post("/audit/open")
-async def audit_open(request: Request, user: Optional[User] = Depends(get_current_user)):
-    form = await request.form()
-    url = form.get("url")
-    if not url:
-        return RedirectResponse("/", status_code=303)
-
-    normalized, res = _robust_audit(url)
-    category_scores_dict: Dict[str, int] = {k: int(v) for k, v in (res["category_scores"] or {}).items()}
-    overall = compute_overall(category_scores_dict)
-    grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
-    exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
-
-    radar_labels = list(category_scores_dict.keys())
-    radar_values = [int(v) for v in category_scores_dict.values()]
-
-    return templates.TemplateResponse(
-        "audit_detail_open.html",
-        {
-            "request": request,
-            "user": user,
-            "website": {"id": None, "url": normalized},
-            "audit": {
-                "created_at": datetime.utcnow(),
-                "grade": grade,
-                "health_score": int(overall),
-                "exec_summary": exec_summary,
-                "category_scores": category_scores_list,
-                "metrics": _present_metrics(res.get("metrics", {})),
-                "top_issues": top_issues,
-                "competitor_comparison": list(_get_competitor_comparison(category_scores_dict)),
-            },
-            "chart": {
-                "radar_labels": radar_labels,
-                "radar_values": radar_values,
-                "health": int(overall),
-                "trend_labels": [],
-                "trend_values": [],
-            },
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-        },
-    )
-
-
-@app.get("/report/pdf/open")
-async def report_pdf_open(url: str):
-    normalized, res = _robust_audit(url)
-    category_scores_dict: Dict[str, int] = {k: int(v) for k, v in (res["category_scores"] or {}).items()}
-    overall = compute_overall(category_scores_dict)
-    grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
-    exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
-
-    path = "/tmp/certified_audit_open.pdf"
-    render_pdf(
-        path,
-        UI_BRAND_NAME,
-        normalized,
-        grade,
-        int(overall),
-        [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()],
-        exec_summary,
-    )
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_Open.pdf")
-
-
-# ------------------------------------------------------------------------------
-# Registration & Auth
-# ------------------------------------------------------------------------------
-@app.get("/auth/register")
-async def register_get(request: Request, user: Optional[User] = Depends(get_current_user)):
-    return templates.TemplateResponse(
-        "register.html",
-        {"request": request, "user": user, "UI_BRAND_NAME": UI_BRAND_NAME},
-    )
-
-
-@app.post("/auth/register")
-async def register_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...),
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # NOTE: plain parameter, NOT Depends()
-):
-    if password != confirm_password:
-        return RedirectResponse("/auth/register?mismatch=1", status_code=303)
-
-    if db.query(User).filter(User.email == email).first():
-        return RedirectResponse("/auth/login?exists=1", status_code=303)
-
-    u = User(email=email, password_hash=hash_password(password), verified=False, is_admin=False)
-    db.add(u)
-    db.commit()
-    db.refresh(u)
-
-    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 3)
-    # Send verification email in background to avoid request-time blocking
-    if background_tasks is not None:
-        background_tasks.add_task(send_verification_email, u.email, token)
-    else:
-        send_verification_email(u.email, token)
-
-    return RedirectResponse("/auth/login?check_email=1", status_code=303)
-
-
-@app.get("/auth/verify")
-async def verify(
-    request: Request,
-    token: str,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    try:
-        data = decode_token(token)
-        u = db.query(User).filter(User.id == data["uid"]).first()
-        if u:
-            u.verified = True
-            db.commit()
-            return RedirectResponse("/auth/login?verified=1", status_code=303)
-    except Exception as e:
-        logger.warning("Verification failed: %s", e)
-        return templates.TemplateResponse(
-            "verify.html",
-            {"request": request, "success": False, "user": user, "UI_BRAND_NAME": UI_BRAND_NAME},
-        )
-    return RedirectResponse("/auth/login", status_code=303)
-
-
-@app.get("/auth/login")
-async def login_get(request: Request, user: Optional[User] = Depends(get_current_user)):
-    return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "user": user, "UI_BRAND_NAME": UI_BRAND_NAME},
-    )
-
-
-@app.post("/auth/magic/request")
-async def magic_request(
-    request: Request,
-    email: str = Form(...),
-    db: Session = Depends(get_db),
-    background_tasks: BackgroundTasks = None,  # NOTE: plain parameter, NOT Depends()
-):
-    # Privacy: do not reveal account existence status
-    smtp_status = "skip"
-    u = db.query(User).filter(User.email == email).first()
-    if u and getattr(u, "verified", False):
-        token = create_token({"uid": u.id, "email": u.email, "type": "magic"}, expires_minutes=15)
-        if background_tasks is not None:
-            background_tasks.add_task(send_magic_login_email, u.email, token)
+        if k in {"INCLUDE_PNG", "INCLUDE_PPTX", "INCLUDE_XLSX", "SMTP_SSL"}:
+            config[k] = str(v).strip().lower() in {"1", "true", "yes", "on"}
+        elif k in {"SMTP_PORT"}:
+            try:
+                config[k] = int(v)
+            except ValueError:
+                logger.warning("Invalid SMTP_PORT env value: %s", v)
+        elif k in {"DEFAULT_RECIPIENTS", "CC_LIST", "BCC_LIST"}:
+            config[k] = [s.strip() for s in v.split(",") if s.strip()]
         else:
-            send_magic_login_email(u.email, token)
-        smtp_status = "queued" if MAGIC_EMAIL_ENABLED else "disabled"
-
-    return RedirectResponse(f"/auth/login?magic_sent=1&smtp={smtp_status}", status_code=303)
+            config[k] = v
+    return config
 
 
-@app.get("/auth/magic")
-async def magic_login(
-    request: Request,
-    token: str,
-    db: Session = Depends(get_db),
-):
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run operational pipeline (grade/report/record) and email outputs."
+    )
+    parser.add_argument("--config", type=str, default="config.json", help="Path to JSON config")
+    parser.add_argument("--output-dir", type=str, help="Override OUTPUT_DIR")
+    parser.add_argument("--include-png", action="store_true", help="Attach PNG outputs")
+    parser.add_argument("--include-pptx", action="store_true", help="Attach PPTX outputs")
+    parser.add_argument("--include-xlsx", action="store_true", help="Attach XLSX outputs")
+    parser.add_argument("--theme", type=str, choices=["light", "dark"], help="UI theme")
+    parser.add_argument("--recipients", type=str, help="Comma separated recipient emails")
+    parser.add_argument("--cc", type=str, help="Comma separated CC emails")
+    parser.add_argument("--bcc", type=str, help="Comma separated BCC emails")
+    parser.add_argument("--run-tag", type=str, help="Run tag (e.g., Daily, Weekly, Audit-Q1)")
+    parser.add_argument("--project-name", type=str, help="Project name appearing in email header")
+    parser.add_argument("--templates-dir", type=str, help="Templates directory for UI/HTML")
+    return parser.parse_args()
+
+
+def build_config() -> Dict[str, Any]:
+    args = parse_args()
+    config = load_json_config(args.config)
+    config = load_env_into_config(config)
+
+    # Overlay CLI args
+    if args.output_dir:
+        config["OUTPUT_DIR"] = args.output_dir
+    if args.include_png:
+        config["INCLUDE_PNG"] = True
+    if args.include_pptx:
+        config["INCLUDE_PPTX"] = True
+    if args.include_xlsx:
+        config["INCLUDE_XLSX"] = True
+    if args.theme:
+        config["UI_THEME"] = args.theme
+    if args.recipients:
+        config["DEFAULT_RECIPIENTS"] = [s.strip() for s in args.recipients.split(",") if s.strip()]
+    if args.cc:
+        config["CC_LIST"] = [s.strip() for s in args.cc.split(",") if s.strip()]
+    if args.bcc:
+        config["BCC_LIST"] = [s.strip() for s in args.bcc.split(",") if s.strip()]
+    if args.run_tag:
+        config["RUN_TAG"] = args.run_tag
+    if args.project_name:
+        config["PROJECT_NAME"] = args.project_name
+    if args.templates_dir:
+        config["TEMPLATES_DIR"] = args.templates_dir
+
+    # Defaults
+    config.setdefault("COMPANY_NAME", "Comp_HPK")
+    config.setdefault("JOB_TITLE", "Operational Manager")
+    config.setdefault("MANAGER", "Tanveer Hussain (Comp_HPK)")
+    config.setdefault("SKIP_MANAGER", "Liu Changwei 刘长伟 (690)")
+    config.setdefault("OFFICE_LOCATION", "")
+    config.setdefault("USER_NAME", "Khan Roy Jamshaid (Comp_HPK)")
+
+    config.setdefault("UI_THEME", "dark")
+    config.setdefault("UI_PREF", "stunning")
+    config.setdefault("TEMPLATES_DIR", "./templates")
+
+    config.setdefault("OUTPUT_DIR", "./outputs")
+    config.setdefault("INCLUDE_PNG", True)
+    config.setdefault("INCLUDE_PPTX", True)
+    config.setdefault("INCLUDE_XLSX", True)
+
+    # SMTP defaults (Office365 typical: host 587 STARTTLS)
+    config.setdefault("SMTP_HOST", os.getenv("SMTP_HOST", "smtp.office365.com"))
+    config.setdefault("SMTP_PORT", int(os.getenv("SMTP_PORT", "587")))
+    config.setdefault("SMTP_USER", os.getenv("SMTP_USER"))
+    config.setdefault("SMTP_PASS", os.getenv("SMTP_PASS"))
+    config.setdefault("SMTP_SSL", False)  # STARTTLS by default
+
+    config.setdefault("FROM_EMAIL", config.get("SMTP_USER"))
+    config.setdefault("FROM_NAME", config.get("USER_NAME"))
+    config.setdefault("REPLY_TO", config.get("FROM_EMAIL"))
+
+    config.setdefault("DEFAULT_RECIPIENTS", [])
+    config.setdefault("CC_LIST", [])
+    config.setdefault("BCC_LIST", [])
+
+    config.setdefault("PROJECT_NAME", "Operational Audit")
+    config.setdefault("RUN_TAG", "Daily")
+
+    # Ensure output directory exists
+    os.makedirs(config["OUTPUT_DIR"], exist_ok=True)
+    return config
+
+# ----------------------------
+# Pipeline execution
+# ----------------------------
+
+def run_grader(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Run grader stage and return summary dict."""
+    if grader is None:
+        logger.warning("grader module not found; skipping.")
+        return {"score": None, "notes": "grader module not available"}
     try:
-        data = decode_token(token)
-        uid = data.get("uid")
-        if not uid or data.get("type") != "magic":
-            return RedirectResponse("/auth/login?error=1", status_code=303)
-
-        u = db.query(User).filter(User.id == uid).first()
-        if not u or not getattr(u, "verified", False):
-            return RedirectResponse("/auth/login?error=1", status_code=303)
-
-        session_token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 30)
-        resp = RedirectResponse("/auth/dashboard", status_code=303)
-        _set_session_cookie(resp, session_token)
-        return resp
+        # Expected API: grader.run(output_dir=...) -> dict
+        summary = grader.run(output_dir=config["OUTPUT_DIR"])
+        logger.info("Grader completed.")
+        return summary or {}
     except Exception as e:
-        logger.warning("Magic login failed: %s", e)
-        return RedirectResponse("/auth/login?error=1", status_code=303)
+        logger.error("Grader failed: %s", e)
+        return {"error": str(e)}
 
 
-@app.post("/auth/login")
-async def login_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    u = db.query(User).filter(User.email == email).first()
-    if not u or not verify_password(password, u.password_hash) or not u.verified:
-        return RedirectResponse("/auth/login?error=1", status_code=303)
+def run_report(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Run report stage; return dict incl. list of attachments."""
+    if report is None:
+        logger.warning("report module not found; skipping.")
+        return {"attachments": []}
 
-    token = create_token({"uid": u.id, "email": u.email}, expires_minutes=60 * 24 * 30)
-    resp = RedirectResponse("/auth/dashboard", status_code=303)
-    _set_session_cookie(resp, token)
-    return resp
-
-
-@app.get("/auth/logout")
-async def logout(request: Request):
-    resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie("session_token")
-    return resp
-
-
-# ------------------------------------------------------------------------------
-# Dashboard & audits (registered flows)
-# ------------------------------------------------------------------------------
-@app.get("/auth/dashboard")
-async def dashboard(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    websites = db.query(Website).filter(Website.user_id == user.id).all()
-
-    last_audits = (
-        db.query(Audit)
-        .filter(Audit.user_id == user.id)
-        .order_by(Audit.created_at.desc())
-        .limit(10)
-        .all()
-    )
-
-    avg = round(sum(a.health_score for a in last_audits) / len(last_audits), 1) if last_audits else 0
-    trend_labels = [a.created_at.strftime("%d %b") for a in reversed(last_audits)]
-    trend_values = [a.health_score for a in reversed(last_audits)]
-
-    summary = {
-        "grade": (last_audits[0].grade if last_audits else "A"),
-        "health_score": (last_audits[0].health_score if last_audits else 88),
-    }
-
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    schedule = {
-        "daily_time": getattr(sub, "daily_time", "09:00"),
-        "timezone": getattr(sub, "timezone", "UTC"),
-        "enabled": getattr(sub, "email_schedule_enabled", False),
-    }
-
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-            "user": user,
-            "websites": websites,
-            "trend": {"labels": trend_labels, "values": trend_values, "average": avg},
-            "summary": summary,
-            "schedule": schedule,
-        },
-    )
-
-
-@app.get("/auth/audit/new")
-async def new_audit_get(request: Request, user: Optional[User] = Depends(get_current_user)):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
-    return templates.TemplateResponse(
-        "new_audit.html",
-        {"request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": user},
-    )
-
-
-@app.post("/auth/audit/new")
-async def new_audit_post(
-    request: Request,
-    url: str = Form(...),
-    enable_schedule: str = Form(None),
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    if not sub:
-        sub = Subscription(user_id=user.id, plan="free", active=True, audits_used=0)
-        db.add(sub)
-        db.commit()
-        db.refresh(sub)
-
-    if enable_schedule and hasattr(sub, "email_schedule_enabled"):
-        sub.email_schedule_enabled = True
-        db.commit()
-
-    w = Website(user_id=user.id, url=url)
-    db.add(w)
-    db.commit()
-    db.refresh(w)
-
-    return RedirectResponse(f"/auth/audit/run/{w.id}", status_code=303)
-
-
-@app.get("/auth/audit/run/{website_id}")
-async def run_audit(
-    website_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
-    if not w:
-        return RedirectResponse("/auth/dashboard", status_code=303)
+    attachments: List[str] = []
+    results: Dict[str, Any] = {}
 
     try:
-        normalized, res = _robust_audit(w.url)
+        # PNGs
+        if config.get("INCLUDE_PNG", True) and hasattr(report, "generate_pngs"):
+            pngs = report.generate_pngs(
+                output_dir=config["OUTPUT_DIR"],
+                theme=config["UI_THEME"],
+                templates_dir=config["TEMPLATES_DIR"]
+            )
+            if pngs:
+                attachments.extend(pngs)
+            results["pngs"] = pngs
+
+        # PPTX
+        if config.get("INCLUDE_PPTX", True) and hasattr(report, "build_pptx"):
+            pptx_path = report.build_pptx(
+                output_dir=config["OUTPUT_DIR"],
+                theme=config["UI_THEME"]
+            )
+            if pptx_path:
+                attachments.append(pptx_path)
+            results["pptx"] = pptx_path
+
+        # XLSX
+        if config.get("INCLUDE_XLSX", True) and hasattr(report, "export_xlsx"):
+            xlsx_path = report.export_xlsx(output_dir=config["OUTPUT_DIR"])
+            if xlsx_path:
+                attachments.append(xlsx_path)
+            results["xlsx"] = xlsx_path
+
+        logger.info("Report generation completed with %d attachments.", len(attachments))
     except Exception as e:
-        logger.warning("Audit engine failed: %s", e)
-        return RedirectResponse("/auth/dashboard", status_code=303)
+        logger.error("Report generation failed: %s", e)
+        results["error"] = str(e)
 
-    category_scores_dict: Dict[str, int] = {k: int(v) for k, v in (res["category_scores"] or {}).items()}
-    overall = compute_overall(category_scores_dict)
-    grade = grade_from_score(overall)
-    top_issues = res.get("top_issues", [])
-    exec_summary = summarize_200_words(normalized, category_scores_dict, top_issues)
-    category_scores_list = [{"name": k, "score": int(v)} for k, v in category_scores_dict.items()]
-
-    audit = Audit(
-        user_id=user.id,
-        website_id=w.id,
-        health_score=int(overall),
-        grade=grade,
-        exec_summary=exec_summary,
-        category_scores_json=json.dumps(category_scores_list),
-        metrics_json=json.dumps(res.get("metrics", {})),
-    )
-    db.add(audit)
-    db.commit()
-    db.refresh(audit)
-
-    w.last_audit_at = audit.created_at
-    w.last_grade = grade
-    db.commit()
-
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    if sub:
-        sub.audits_used = (sub.audits_used or 0) + 1
-        db.commit()
-
-    return RedirectResponse(f"/auth/audit/{w.id}", status_code=303)
+    results["attachments"] = attachments
+    return results
 
 
-@app.get("/auth/audit/{website_id}")
-async def audit_detail(
-    website_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
+def run_record(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Run record stage; return dict with KPIs/cards."""
+    if record is None:
+        logger.warning("record module not found; skipping.")
+        return {"kpis": []}
+    try:
+        # Expected API: record.collect_kpis(output_dir=...) -> list of {'title','value'}
+        kpis = record.collect_kpis(output_dir=config["OUTPUT_DIR"])
+        return {"kpis": kpis or []}
+    except Exception as e:
+        logger.error("Record (KPIs) failed: %s", e)
+        return {"error": str(e), "kpis": []}
 
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
-    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
-    if not w or not a:
-        return RedirectResponse("/auth/dashboard", status_code=303)
+# ----------------------------
+# Email orchestration
+# ----------------------------
 
-    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
-    metrics_raw = json.loads(a.metrics_json) if a.metrics_json else {}
-    metrics = _present_metrics(metrics_raw)
+def build_email_context(config: Dict[str, Any],
+                        grader_summary: Dict[str, Any],
+                        report_results: Dict[str, Any],
+                        record_results: Dict[str, Any]) -> Dict[str, Any]:
+    """Build context dict for build_html_template in Email.py."""
+    date_str = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
+    score = grader_summary.get("score")
+    notes = grader_summary.get("notes")
+    error_msgs: List[str] = []
 
-    history = (
-        db.query(Audit)
-        .filter(Audit.website_id == website_id)
-        .order_by(Audit.created_at.desc())
-        .limit(12)
-        .all()
-    )
-    trend_labels = [h.created_at.strftime("%d %b") for h in reversed(history)]
-    trend_values = [h.health_score for h in reversed(history)]
+    if grader_summary.get("error"):
+        error_msgs.append(f"Grader Error: {grader_summary['error']}")
+    if report_results.get("error"):
+        error_msgs.append(f"Report Error: {report_results['error']}")
+    if record_results.get("error"):
+        error_msgs.append(f"Record Error: {record_results['error']}")
 
-    radar_labels = [item["name"] for item in category_scores]
-    radar_values = [int(item["score"]) for item in category_scores]
+    summary_parts: List[str] = []
+    if score is not None:
+        summary_parts.append(f"Overall grade: <strong>{score}</strong>.")
+    if notes:
+        summary_parts.append(f"Notes: {notes}")
+    if error_msgs:
+        summary_parts.append("<br/>".join(error_msgs))
 
-    return templates.TemplateResponse(
-        "audit_detail.html",
-        {
-            "request": request,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-            "user": user,
-            "website": w,
-            "audit": {
-                "created_at": a.created_at,
-                "grade": a.grade,
-                "health_score": a.health_score,
-                "exec_summary": a.exec_summary,
-                "category_scores": category_scores,
-                "metrics": metrics,
-                "competitor_comparison": list(_get_competitor_comparison({s['name']: int(s['score']) for s in category_scores})),
-            },
-            "chart": {
-                "radar_labels": radar_labels,
-                "radar_values": radar_values,
-                "health": a.health_score,
-                "trend_labels": trend_labels,
-                "trend_values": trend_values,
-            },
-        },
-    )
+    summary_text = " ".join(summary_parts) if summary_parts else "Run completed successfully."
 
+    cards = record_results.get("kpis") or []
+    if not cards:
+        cards = [
+            {"title": "Theme", "value": config.get("UI_THEME", "dark").title()},
+            {"title": "Outputs", "value": f"PNG:{config.get('INCLUDE_PNG')} PPTX:{config.get('INCLUDE_PPTX')} XLSX:{config.get('INCLUDE_XLSX')}"}
+        ]
 
-@app.get("/auth/report/pdf/{website_id}")
-async def report_pdf(
-    website_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
+    links = [
+        {"text": "Open Outputs Folder", "href": f"file://{os.path.abspath(config['OUTPUT_DIR'])}"},
+    ]
 
-    w = db.query(Website).filter(Website.id == website_id, Website.user_id == user.id).first()
-    a = db.query(Audit).filter(Audit.website_id == website_id).order_by(Audit.created_at.desc()).first()
-    if not w or not a:
-        return RedirectResponse("/auth/dashboard", status_code=303)
-
-    category_scores = json.loads(a.category_scores_json) if a.category_scores_json else []
-    path = f"/tmp/certified_audit_{website_id}.pdf"
-
-    render_pdf(path, UI_BRAND_NAME, w.url, a.grade, a.health_score, category_scores, a.exec_summary)
-    return FileResponse(path, filename=f"{UI_BRAND_NAME}_Certified_Audit_{website_id}.pdf")
-
-
-# ------------------------------------------------------------------------------
-# Scheduling UI & updates
-# ------------------------------------------------------------------------------
-@app.get("/auth/schedule")
-async def schedule_get(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
-
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    schedule = {
-        "daily_time": getattr(sub, "daily_time", "09:00"),
-        "timezone": getattr(sub, "timezone", "UTC"),
-        "enabled": getattr(sub, "email_schedule_enabled", False),
+    context = {
+        "PROJECT_NAME": config.get("PROJECT_NAME", "Operational Audit"),
+        "RUN_TAG": config.get("RUN_TAG", "Daily"),
+        "UI_THEME": config.get("UI_THEME", "dark"),
+        "COMPANY_NAME": config.get("COMPANY_NAME", ""),
+        "USER_NAME": config.get("USER_NAME", ""),
+        "JOB_TITLE": config.get("JOB_TITLE", ""),
+        "MANAGER": config.get("MANAGER", ""),
+        "SKIP_MANAGER": config.get("SKIP_MANAGER", ""),
+        "OFFICE_LOCATION": config.get("OFFICE_LOCATION", ""),
+        "SUMMARY": summary_text,
+        "CARDS": cards,
+        "LINKS": links,
+        "DATE_STR": date_str,
     }
+    return context
 
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-            "user": user,
-            "websites": db.query(Website).filter(Website.user_id == user.id).all(),
-            "trend": {"labels": [], "values": [], "average": 0},
-            "summary": {"grade": "A", "health_score": 88},
-            "schedule": schedule,
-        },
+
+def send_pipeline_email(config: Dict[str, Any],
+                        context: Dict[str, Any],
+                        attachments: List[str]) -> None:
+    """Compose and send email using EmailClient."""
+    email_client = EmailClient(
+        smtp_host=config["SMTP_HOST"],
+        smtp_port=config["SMTP_PORT"],
+        smtp_user=config.get("SMTP_USER"),
+        smtp_pass=config.get("SMTP_PASS"),
+        use_ssl=config.get("SMTP_SSL", False),
+        from_email=config.get("FROM_EMAIL"),
+        from_name=config.get("FROM_NAME"),
+        default_cc=config.get("CC_LIST", []),
+        default_bcc=config.get("BCC_LIST", []),
+        reply_to=config.get("REPLY_TO")
     )
 
+    subject = f"{config.get('PROJECT_NAME','Operational Audit')} • {config.get('RUN_TAG','Daily')} • {datetime.datetime.now().strftime('%Y-%m-%d')}"
+    html_body = build_html_template(context)
+    text_body = f"{context.get('SUMMARY','Run completed.')}\n\nOutputs: {os.path.abspath(config.get('OUTPUT_DIR','./outputs'))}"
 
-@app.post("/auth/schedule")
-async def schedule_post(
-    request: Request,
-    daily_time: str = Form(...),
-    timezone: str = Form(...),
-    enabled: str = Form(None),
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user:
-        return RedirectResponse("/auth/login", status_code=303)
+    recipients = config.get("DEFAULT_RECIPIENTS", [])
+    if not recipients:
+        logger.warning("No recipients configured. Email will not be sent.")
+        return
 
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    if not sub:
-        sub = Subscription(user_id=user.id, plan="free", active=True, audits_used=0)
-        db.add(sub)
-        db.commit()
-        db.refresh(sub)
-
-    if hasattr(sub, "daily_time"):
-        sub.daily_time = daily_time
-    if hasattr(sub, "timezone"):
-        sub.timezone = timezone
-    if hasattr(sub, "email_schedule_enabled"):
-        sub.email_schedule_enabled = bool(enabled)
-
-    db.commit()
-    return RedirectResponse("/auth/dashboard", status_code=303)
-
-
-# ------------------------------------------------------------------------------
-# Admin
-# ------------------------------------------------------------------------------
-@app.get("/auth/admin/login")
-async def admin_login_get(request: Request, user: Optional[User] = Depends(get_current_user)):
-    return templates.TemplateResponse(
-        "login.html",
-        {"request": request, "UI_BRAND_NAME": UI_BRAND_NAME, "user": user},
+    email_client.send_report(
+        to=recipients,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        cc=config.get("CC_LIST", []),
+        bcc=config.get("BCC_LIST", []),
+        attachments=attachments,
+        inline_images={},  # Map cid -> path if needed, e.g., {"hero": "./outputs/hero.png"}
+        headers={"X-Run-Tag": config.get("RUN_TAG", "Daily")}
     )
 
+# ----------------------------
+# Main entrypoint
+# ----------------------------
 
-@app.post("/auth/admin/login")
-async def admin_login_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    u = db.query(User).filter(User.email == email).first()
-    if not u or not verify_password(password, u.password_hash) or not u.is_admin:
-        return RedirectResponse("/auth/admin/login?error=1", status_code=303)
+def main():
+    config = build_config()
+    logger.info("Config ready. Output dir: %s", config["OUTPUT_DIR"])
 
-    token = create_token({"uid": u.id, "email": u.email, "admin": True}, expires_minutes=60 * 24 * 30)
-    resp = RedirectResponse("/auth/admin", status_code=303)
-    _set_session_cookie(resp, token)
-    return resp
+    # Execute pipeline stages
+    grader_summary = run_grader(config)
+    report_results = run_report(config)
+    record_results = run_record(config)
 
+    # Build email context
+    context = build_email_context(config, grader_summary, report_results, record_results)
 
-@app.get("/auth/admin")
-async def admin_dashboard(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: Optional[User] = Depends(get_current_user),
-):
-    if not user or not user.is_admin:
-        return RedirectResponse("/auth/admin/login", status_code=303)
+    # Send email with attachments
+    attachments = report_results.get("attachments", [])
+    send_pipeline_email(config, context, attachments)
 
-    users = db.query(User).order_by(User.created_at.desc()).limit(100).all()
-    audits = db.query(Audit).order_by(Audit.created_at.desc()).limit(100).all()
-    websites = db.query(Website).order_by(Website.created_at.desc()).limit(100).all()
-
-    return templates.TemplateResponse(
-        "admin.html",
-        {
-            "request": request,
-            "UI_BRAND_NAME": UI_BRAND_NAME,
-            "user": user,
-            "websites": websites,
-            "admin_users": users,
-            "admin_audits": audits,
-        },
-    )
+    logger.info("Pipeline completed.")
 
 
-# ------------------------------------------------------------------------------
-# Daily Email Scheduler
-# ------------------------------------------------------------------------------
-async def _daily_scheduler_loop() -> None:
-    """Runs once per minute, sending daily emails at the configured local time."""
-    while True:
-        try:
-            db = SessionLocal()
-            subs = db.query(Subscription).filter(Subscription.active == True).all()
-            now_utc = datetime.utcnow()
-            for sub in subs:
-                if not getattr(sub, "email_schedule_enabled", False):
-                    continue
-                tz_name = getattr(sub, "timezone", "UTC") or "UTC"
-                daily_time = getattr(sub, "daily_time", "09:00") or "09:00"
-                try:
-                    tz = ZoneInfo(tz_name)
-                except Exception:
-                    tz = ZoneInfo("UTC")
-                local_now = now_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
-                hhmm_now = local_now.strftime("%H:%M")
-                if hhmm_now != daily_time:
-                    continue
-
-                user = db.query(User).filter(User.id == sub.user_id).first()
-                if not user or not getattr(user, "verified", False):
-                    continue
-
-                websites = db.query(Website).filter(Website.user_id == user.id).all()
-                lines = [
-                    f"<h3>Daily Website Audit Summary – {UI_BRAND_NAME}</h3>",
-                    f"<p>Hello, {user.email}!</p>",
-                    "<p>Here is your daily summary. Download certified PDFs via links below.</p>",
-                ]
-
-                for w in websites:
-                    last = (
-                        db.query(Audit)
-                        .filter(Audit.website_id == w.id)
-                        .order_by(Audit.created_at.desc())
-                        .first()
-                    )
-                    if not last:
-                        lines.append(f"<p><b>{w.url}</b>: No audits yet.</p>")
-                        continue
-                    pdf_link = f"{BASE_URL}/auth/report/pdf/{w.id}"
-                    lines.append(
-                        f'<p><b>{w.url}</b>: Grade <b>{last.grade}</b>, Health <b>{last.health_score}</b>/100 '
-                        f'({pdf_link}Download Certified Report</a>)</p>'
-                    )
-
-                thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-                audits_30 = db.query(Audit).filter(
-                    Audit.user_id == user.id, Audit.created_at >= thirty_days_ago
-                ).all()
-                if audits_30:
-                    avg_score = round(sum(a.health_score for a in audits_30) / len(audits_30), 1)
-                    lines.append(f"<hr><p><b>30-day accumulated score:</b> {avg_score}/100</p>")
-                else:
-                    lines.append("<hr><p><b>30-day accumulated score:</b> Not enough data yet.</p>")
-
-                lines.append(
-                    f'<p style="margin-top:10px;">{BASE_URL}/auth/scheduleManage schedule or unsubscribe</a></p>'
-                )
-
-                html = "\n".join(lines)
-                # Use centralized email helper (respects MAGIC_EMAIL_ENABLED and timeouts)
-                send_daily_report_email(user.email, html)
-            db.close()
-        except Exception as e:
-            logger.warning("Scheduler loop error: %s", e)
-        await asyncio.sleep(60)
-
-
-@app.on_event("startup")
-async def _start_scheduler():
-    if not MAGIC_EMAIL_ENABLED:
-        logger.warning("Startup: MAGIC_EMAIL_ENABLED=false (emails will NOT be sent).")
-    else:
-        logger.info("Startup: Email sending enabled.")
-    asyncio.create_task(_daily_scheduler_loop())
-
-
-# ------------------------------------------------------------------------------
-# Run locally binding to environment PORT (Railway sets PORT automatically)
-# ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("PORT", "8080"))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, workers=1)
+    try:
+        main()
+    except Exception as e:
+        logger.exception("Fatal error: %s", e)
+        sys.exit(1)
