@@ -1,63 +1,49 @@
-
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-import jwt
-
-from .config import settings
-from .db import db_session
-from .models import MagicToken, User
-from .email_utils import send_email
+from datetime import datetime, timedelta, timezone
+import jwt, resend
+from ..config import settings
+from ..db import db_session
+from ..models import MagicToken, User
 
 router = APIRouter(prefix='/auth', tags=['auth'])
+resend.api_key = settings.RESEND_API_KEY # Key from image_18abc1.png
 
-class LoginRequest(BaseModel):
+class MagicLinkRequest(BaseModel):
     email: EmailStr
 
 @router.post('/login-link')
-def send_login_link(payload: LoginRequest, request: Request, db: Session = Depends(db_session)):
-    if not settings.MAGIC_EMAIL_ENABLED:
-        raise HTTPException(status_code=403, detail='Magic email disabled')
-    exp = datetime.utcnow() + timedelta(minutes=30)
-    token = jwt.encode({'email': payload.email, 'exp': exp}, settings.JWT_SECRET, algorithm='HS256')
-
-    mt = MagicToken(email=payload.email, token=token, valid_until=exp)
-    db.add(mt)
+def send_link(payload: MagicLinkRequest, db: Session = Depends(db_session)):
+    exp = datetime.now(timezone.utc) + timedelta(minutes=30)
+    token = jwt.encode({'email': payload.email, 'exp': exp.timestamp()}, settings.JWT_SECRET)
+    
+    db.add(MagicToken(email=payload.email, token=token, valid_until=exp))
     db.commit()
 
     link = f"{settings.BASE_URL}/auth/callback?token={token}"
-    html = f"<p>Login to <b>{settings.UI_BRAND_NAME} Audit</b></p><p><a href='{link}'>Click here to sign in</a> (valid 30 minutes)</p>"
-
-    try:
-        send_email(to=payload.email, subject='Your secure login link', html=html)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Email send failed: {e}')
-
-    return {'ok': True, 'message': 'Login link sent'}
+    
+    resend.Emails.send({
+        "from": settings.RESEND_FROM_EMAIL,
+        "to": payload.email,
+        "subject": f"Login to {settings.UI_BRAND_NAME}",
+        "html": f"<strong>FF Tech AI Audit</strong><br><br><a href='{link}'>Click here to sign in</a>"
+    })
+    return {"message": "Magic link sent"}
 
 @router.get('/callback')
-def magic_callback(token: str, db: Session = Depends(db_session)):
+def callback(token: str, db: Session = Depends(db_session)):
     try:
         data = jwt.decode(token, settings.JWT_SECRET, algorithms=['HS256'])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=400, detail='Token expired')
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=400, detail='Invalid token')
+        email = data['email']
+    except:
+        raise HTTPException(status_code=400, detail="Expired or invalid link")
 
-    mt = db.query(MagicToken).filter(MagicToken.token==token, MagicToken.used==False).first()
-    if not mt or mt.valid_until < datetime.utcnow():
-        raise HTTPException(status_code=400, detail='Token not valid')
-
-    user = db.query(User).filter(User.email==data['email']).first()
+    user = db.query(User).filter(User.email == email).first()
     if not user:
-        user = User(email=data['email'])
+        user = User(email=email)
         db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    mt.used = True
     db.commit()
-
-    session_token = jwt.encode({'uid': user.id, 'email': user.email, 'iat': datetime.utcnow()}, settings.JWT_SECRET, algorithm='HS256')
-    return {'ok': True, 'token': session_token, 'user': {'id': user.id, 'email': user.email, 'subscriber': user.is_subscriber}}
+    
+    session = jwt.encode({'uid': user.id, 'email': user.email}, settings.JWT_SECRET)
+    return {"token": session, "email": email}
