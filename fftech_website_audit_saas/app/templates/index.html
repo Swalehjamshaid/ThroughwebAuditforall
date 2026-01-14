@@ -1,39 +1,122 @@
 <!DOCTYPE html>
-<html class="dark">
+<html lang="en" class="dark">
 <head>
-    <title>FF Tech AI | Best-in-Breed Audit</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tech AI | World-Class Web Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #020617; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+        .gradient-text { background: linear-gradient(90deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen font-sans">
-    <div class="max-w-7xl mx-auto px-6 py-12">
-        <header class="flex justify-between items-center mb-16 border-b border-slate-800 pb-6">
-            <h1 class="text-3xl font-black text-emerald-400">FF TECH <span class="text-white">AI</span></h1>
-            <div id="userInfo" class="text-right text-sm text-slate-400"></div>
-        </header>
+<body class="text-slate-200 min-h-screen">
 
-        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-3 bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl">
-                <form id="auditForm" class="flex gap-4">
-                    <input id="url" type="url" placeholder="Enter URL for 200-metric Deep Audit..." class="flex-1 bg-slate-800 border-none rounded-xl p-4 focus:ring-2 focus:ring-emerald-500">
-                    <button type="submit" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-xl font-bold transition-all transform hover:scale-105">ANALYZE NOW</button>
-                </form>
+    <nav class="border-b border-slate-800 px-8 py-4 flex justify-between items-center glass sticky top-0 z-50">
+        <h1 class="text-2xl font-black tracking-tighter gradient-text">FF TECH AI</h1>
+        <div class="flex items-center gap-6">
+            <span id="userBadge" class="hidden text-sm text-slate-400"></span>
+            <button onclick="document.getElementById('authModal').showModal()" class="bg-slate-800 hover:bg-slate-700 px-5 py-2 rounded-full text-sm font-bold transition">Sign In</button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-6 py-12">
+        <section class="text-center mb-16">
+            <h2 class="text-5xl font-extrabold mb-6 tracking-tight">Enterprise-Grade <span class="text-emerald-400">Web Audits</span></h2>
+            <p class="text-slate-400 max-w-2xl mx-auto mb-10">Analyze 200 checkpoints across performance, SEO, and security with our AI engine.</p>
+            
+            <div class="max-w-3xl mx-auto flex gap-3 p-2 rounded-2xl glass shadow-2xl">
+                <input type="url" id="auditUrl" placeholder="https://yourwebsite.com" class="flex-1 bg-transparent border-none px-4 py-3 focus:ring-0 text-white text-lg">
+                <button onclick="startAudit()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-3 rounded-xl font-bold transition-all transform hover:scale-105">Run Deep Audit</button>
+            </div>
+        </section>
+
+        <div id="dashboard" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+            <div class="glass p-8 rounded-3xl text-center flex flex-col justify-center border-emerald-500/20">
+                <p class="text-slate-500 uppercase text-xs font-bold tracking-widest mb-4">Overall Health</p>
+                <div id="gradeValue" class="text-9xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">A+</div>
+                <button onclick="downloadReport()" class="mt-8 bg-slate-800 py-3 rounded-xl border border-slate-700 hover:bg-slate-700 transition">Download 5-Page PDF</button>
             </div>
 
-            <div id="resultCard" class="hidden bg-slate-900 p-8 rounded-3xl border border-emerald-500/30 text-center">
-                <p class="text-slate-500 uppercase text-xs font-bold tracking-widest mb-2">Grade</p>
-                <h2 id="gradeDisplay" class="text-9xl font-black text-emerald-400">A+</h2>
-                <button onclick="downloadPdf()" class="mt-8 w-full bg-slate-800 border border-slate-700 py-3 rounded-xl hover:bg-slate-700 transition">Get 5-Page PDF</button>
+            <div class="lg:col-span-2 glass p-8 rounded-3xl">
+                <h3 class="text-xl font-bold mb-6">Category Presentation</h3>
+                <canvas id="auditChart" height="150"></canvas>
             </div>
+        </div>
 
-            <div id="chartCard" class="hidden lg:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800">
-                <canvas id="auditChart"></canvas>
+        <section id="schedulingPanel" class="hidden glass p-10 rounded-3xl border-blue-500/20">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-8">
+                <div>
+                    <h3 class="text-2xl font-bold mb-2">Automated Reporting</h3>
+                    <p class="text-slate-400">Schedule this audit to reach your inbox at your desired time.</p>
+                </div>
+                <div class="flex gap-4">
+                    <select id="scheduleDay" class="bg-slate-800 border-slate-700 rounded-xl px-4 py-3">
+                        <option value="mon">Every Monday</option>
+                        <option value="fri">Every Friday</option>
+                    </select>
+                    <input type="number" id="scheduleHour" placeholder="Hour (0-23)" class="bg-slate-800 border-slate-700 rounded-xl px-4 py-3 w-32">
+                    <button onclick="saveSchedule()" class="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold transition">Set Schedule</button>
+                </div>
             </div>
-        </main>
-    </div>
+        </section>
+    </main>
 
     <script>
-        // Chart and API Logic here...
+        let myChart;
+        async function startAudit() {
+            const url = document.getElementById('auditUrl').value;
+            if(!url) return alert("Enter a valid URL");
+            
+            // UI Loading state
+            document.getElementById('dashboard').classList.remove('hidden');
+            const ctx = document.getElementById('auditChart').getContext('2d');
+            
+            // Mock call to /audit/run
+            const response = await fetch('/audit/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ url: url, user_email: localStorage.getItem('email') })
+            });
+            const data = await response.json();
+
+            // Update Graphical Presentation
+            if(myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.categories),
+                    datasets: [{
+                        label: 'Score %',
+                        data: Object.values(data.categories),
+                        backgroundColor: '#10b981',
+                        borderRadius: 8
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+            
+            document.getElementById('gradeValue').innerText = data.grade;
+            if(localStorage.getItem('email')) document.getElementById('schedulingPanel').classList.remove('hidden');
+        }
+
+        async function saveSchedule() {
+            const payload = {
+                email: localStorage.getItem('email'),
+                url: document.getElementById('auditUrl').value,
+                day_of_week: document.getElementById('scheduleDay').value,
+                hour: parseInt(document.getElementById('scheduleHour').value)
+            };
+            const res = await fetch('/audit/schedule', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if(res.ok) alert("Schedule Saved Successfully!");
+        }
     </script>
 </body>
 </html>
