@@ -1,129 +1,63 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="row g-4">
-  <div class="col-lg-8">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h1 class="h4">Open Access Audit</h1>
-        <p class="text-secondary">Enter a website URL to run a quick audit (no sign-up required).</p>
-        <form id="openAuditForm" class="row g-2">
-          <div class="col-9">
-            <input type="url" class="form-control form-control-lg" id="url" placeholder="https://example.com" required />
-          </div>
-          <div class="col-3 d-grid">
-            <button class="btn btn-primary btn-lg" type="submit" id="submitBtn">
-              <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-              <span id="btnText">Run Audit</span>
-            </button>
-          </div>
+<div class="container mt-5">
+    <div class="card p-4 shadow-sm">
+        <form id="auditForm">
+            <div class="input-group">
+                <input type="url" id="url" class="form-control" placeholder="https://example.com" required>
+                <button class="btn btn-primary" type="submit" id="btn">
+                    <span id="spin" class="spinner-border spinner-border-sm d-none"></span> Run Audit
+                </button>
+            </div>
         </form>
-      </div>
     </div>
 
     <div id="results" class="mt-4 d-none">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <h2 class="h5 mb-0">Results</h2>
-            <span class="badge bg-success" id="grade"></span>
-          </div>
-          <div class="my-3">
-            <div class="progress" role="progressbar" aria-label="Overall score">
-              <div class="progress-bar bg-success" id="scoreBar" style="width: 0%">0%</div>
+        <div class="card p-4">
+            <div class="d-flex justify-content-between">
+                <h3>Score: <span id="score"></span> (<span id="grade"></span>)</h3>
+                <button id="pdfBtn" class="btn btn-danger">Download PDF</button>
             </div>
-          </div>
-          <canvas id="catChart" height="120"></canvas>
+            <canvas id="chart"></canvas>
         </div>
-      </div>
     </div>
-  </div>
-  
-  <div class="col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h2 class="h5">Registered Access</h2>
-        <p class="text-secondary">Use the magic link to sign in and unlock history and exports.</p>
-        <form id="magicForm" class="d-flex">
-          <input type="email" class="form-control me-2" id="email" placeholder="you@example.com" required />
-          <button class="btn btn-outline-primary">Send Magic Link</button>
-        </form>
-        <div id="magicStatus" class="mt-2"></div>
-      </div>
-    </div>
-  </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const form = document.getElementById('openAuditForm');
-  const submitBtn = document.getElementById('submitBtn');
-  const btnSpinner = document.getElementById('btnSpinner');
-  const btnText = document.getElementById('btnText');
-  const results = document.getElementById('results');
-  const scoreBar = document.getElementById('scoreBar');
-  const gradeEl = document.getElementById('grade');
-  let catChart;
-
-  form.addEventListener('submit', async (e)=>{
+let chart;
+let lastId;
+document.getElementById('auditForm').onsubmit = async (e) => {
     e.preventDefault();
-    const url = document.getElementById('url').value;
-    
-    // UI Loading State
-    submitBtn.disabled = true;
-    btnSpinner.classList.remove('d-none');
-    btnText.textContent = 'Auditing...';
-    results.classList.add('d-none');
+    const btn = document.getElementById('btn');
+    const spin = document.getElementById('spin');
+    btn.disabled = true; spin.classList.remove('d-none');
 
-    try {
-        const res = await fetch('/audit/run', {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ url: url })
-        });
-
-        if(!res.ok) {
-            const err = await res.json();
-            throw new Error(err.detail || 'Audit Failed');
-        }
-
-        const data = await res.json();
-        results.classList.remove('d-none');
-        scoreBar.style.width = data.score + '%';
-        scoreBar.textContent = Math.round(data.score) + '%';
-        gradeEl.textContent = data.grade;
-
-        const labels = Object.keys(data.categories);
-        const values = labels.map(k => data.categories[k]);
-        if (catChart) catChart.destroy();
-        catChart = new Chart(document.getElementById('catChart'), {
-          type: 'bar',
-          data: { labels, datasets: [{ label: 'Category Scores', data: values, backgroundColor: '#0AD1A3' }]},
-          options: { scales: { y: { beginAtZero: true, max: 100 }}}
-        });
-    } catch (err) {
-        alert("Error: " + err.message);
-    } finally {
-        submitBtn.disabled = false;
-        btnSpinner.classList.add('d-none');
-        btnText.textContent = 'Run Audit';
-    }
-  });
-
-  const magicForm = document.getElementById('magicForm');
-  magicForm.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const res = await fetch('/auth/login-link', {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({email})
+    const res = await fetch('/audit/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url: document.getElementById('url').value})
     });
-    const statusEl = document.getElementById('magicStatus');
-    if(!res.ok){
-      const err = await res.json();
-      statusEl.innerHTML = `<div class="alert alert-danger">${err.detail || 'Failed'}</div>`;
-      return;
-    }
-    statusEl.innerHTML = `<div class="alert alert-success">Magic link sent. Check your inbox.</div>`;
-  });
+    
+    const data = await res.json();
+    lastId = data.id;
+    btn.disabled = false; spin.classList.add('d-none');
+    document.getElementById('results').classList.remove('d-none');
+    document.getElementById('score').innerText = data.score + '%';
+    document.getElementById('grade').innerText = data.grade;
+
+    if(chart) chart.destroy();
+    chart = new Chart(document.getElementById('chart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data.categories),
+            datasets: [{label: 'Scores', data: Object.values(data.categories), backgroundColor: '#0AD1A3'}]
+        }
+    });
+};
+
+document.getElementById('pdfBtn').onclick = () => {
+    window.open(`/audit/${lastId}/pdf`, '_blank');
+};
 </script>
 {% endblock %}
