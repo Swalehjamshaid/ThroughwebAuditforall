@@ -1,4 +1,3 @@
-
 # Email.py
 # M365 Copilot — Email helper with HTML templating and attachments
 # Works with SMTP (LOGIN) with SSL/TLS; designed for sending pipeline outputs (PNG, PPTX, XLSX)
@@ -50,7 +49,7 @@ class EmailClient:
                     smtp_host, smtp_port, use_ssl)
 
     @staticmethod
-    def _guess_mime_type(path: str) -> Tuple[str, str]:
+    def _guess_mime_type(path: str) -&gt; Tuple[str, str]:
         ctype, _ = mimetypes.guess_type(path)
         if ctype is None:
             ctype = "application/octet-stream"
@@ -66,7 +65,7 @@ class EmailClient:
                  bcc: Optional[List[str]] = None,
                  attachments: Optional[List[str]] = None,
                  inline_images: Optional[Dict[str, str]] = None,
-                 headers: Optional[Dict[str, str]] = None) -> EmailMessage:
+                 headers: Optional[Dict[str, str]] = None) -&gt; EmailMessage:
         msg = EmailMessage()
 
         # From
@@ -111,7 +110,7 @@ class EmailClient:
         # Add HTML alternative
         msg.add_alternative(html_body, subtype="html")
 
-        # Inline images (cid mapping: cid_name -> file path)
+        # Inline images (cid mapping: cid_name -&gt; file path)
         if inline_images:
             for cid_name, path in inline_images.items():
                 try:
@@ -121,7 +120,7 @@ class EmailClient:
                             f.read(),
                             maintype=maintype,
                             subtype=subtype,
-                            cid=f"<{cid_name}>"
+                            cid=f"&lt;{cid_name}&gt;"
                         )
                         logger.info("Inline image attached: %s (cid=%s)", path, cid_name)
                 except Exception as e:
@@ -147,7 +146,7 @@ class EmailClient:
         msg._bcc = bcc_list
         return msg
 
-    def send(self, message: EmailMessage) -> None:
+    def send(self, message: EmailMessage) -&gt; None:
         """
         Sends the EmailMessage using SMTP. BCC recipients are included in RCPTs but not headers.
         """
@@ -184,7 +183,7 @@ class EmailClient:
                     bcc: Optional[List[str]] = None,
                     attachments: Optional[List[str]] = None,
                     inline_images: Optional[Dict[str, str]] = None,
-                    headers: Optional[Dict[str, str]] = None) -> None:
+                    headers: Optional[Dict[str, str]] = None) -&gt; None:
         msg = self._compose(
             subject=subject,
             to=to,
@@ -198,7 +197,8 @@ class EmailClient:
         self.send(msg)
 
 
-def build_html_template(context: Dict[str, Any]) -> str:
+
+def build_html_template(context: Dict[str, Any]) -&gt; str:
     """
     Returns a visually pleasing HTML email body reflecting Khan's preferences.
     Uses only inline CSS for maximum client compatibility.
@@ -217,44 +217,44 @@ def build_html_template(context: Dict[str, Any]) -> str:
     cards_html = ""
     for card in context.get("CARDS", []):
         cards_html += f"""
-        <div style="flex:1; min-width:200px; background:{card_bg}; border-radius:12px; padding:16px; margin:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
-            <div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;">{card.get('title','')}</div>
-            <div style="font-size:24px; font-weight:700; color:{text}; margin-top:6px;">{card.get('value','')}</div>
-        </div>
+        &lt;div style="flex:1; min-width:200px; background:{card_bg}; border-radius:12px; padding:16px; margin:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08);"&gt;
+            &lt;div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;"&gt;{card.get('title','')}&lt;/div&gt;
+            &lt;div style="font-size:24px; font-weight:700; color:{text}; margin-top:6px;"&gt;{card.get('value','')}&lt;/div&gt;
+        &lt;/div&gt;
         """
 
     links_html = ""
     for link in context.get("LINKS", []):
-        links_html += f"""<a href="{linkk.get('text','Open')}</a>"""
+        links_html += f"""&lt;a href="{linkk.get('text','Open')}&lt;/a&gt;"""
 
     html = f"""
-    <div style="background:{bg}; padding:24px; font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:{text};">
-        <div style="max-width:960px; margin:0 auto;">
-            <header style="margin-bottom:24px;">
-                <div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;">
+    &lt;div style="background:{bg}; padding:24px; font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:{text};"&gt;
+        &lt;div style="max-width:960px; margin:0 auto;"&gt;
+            &lt;header style="margin-bottom:24px;"&gt;
+                &lt;div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;"&gt;
                     {context.get('COMPANY_NAME','')} — {context.get('PROJECT_NAME','Operational Report')}
-                </div>
-                <h1 style="margin:8px 0 0; font-size:28px; color:{text};">
+                &lt;/div&gt;
+                &lt;h1 style="margin:8px 0 0; font-size:28px; color:{text};"&gt;
                     {context.get('RUN_TAG','Daily Run')} • {context.get('DATE_STR','')}
-                </h1>
-                <div style="font-size:13px; opacity:0.8;">
+                &lt;/h1&gt;
+                &lt;div style="font-size:13px; opacity:0.8;"&gt;
                     {context.get('USER_NAME','')} ({context.get('JOB_TITLE','')}) • Manager: {context.get('MANAGER','')} • Skip: {context.get('SKIP_MANAGER','')}
-                </div>
-                <div style="font-size:12px; opacity:0.7;">Office: {context.get('OFFICE_LOCATION','')}</div>
-            </header>
+                &lt;/div&gt;
+                &lt;div style="font-size:12px; opacity:0.7;"&gt;Office: {context.get('OFFICE_LOCATION','')}&lt;/div&gt;
+            &lt;/header&gt;
 
-            <section style="background:{card_bg}; border-radius:12px; padding:16px; margin-bottom:16px;">
-                <p style="margin:0; line-height:1.6;">{context.get('SUMMARY','')}</p>
-            </section>
+            &lt;section style="background:{card_bg}; border-radius:12px; padding:16px; margin-bottom:16px;"&gt;
+                &lt;p style="margin:0; line-height:1.6;"&gt;{context.get('SUMMARY','')}&lt;/p&gt;
+            &lt;/section&gt;
 
-            <section style="display:flex; flex-wrap:wrap; align-items:stretch; margin-bottom:8px;">
+            &lt;section style="display:flex; flex-wrap:wrap; align-items:stretch; margin-bottom:8px;"&gt;
                 {cards_html}
-            </section>
+            &lt;/section&gt;
 
-            <footer style="margin-top:16px; font-size:12px;">
+            &lt;footer style="margin-top:16px; font-size:12px;"&gt;
                 {links_html}
-            </footer>
-        </div>
-    </div>
+            &lt;/footer&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
     """
     return html
