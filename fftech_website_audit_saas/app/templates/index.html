@@ -1,71 +1,31 @@
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-let myChartInstance = null; // Store the chart to prevent duplicates
-
 async function startAudit() {
-    const urlInput = document.getElementById('auditUrl') || document.querySelector('input[type="url"]');
+    const urlInput = document.getElementById('auditUrl');
     const urlValue = urlInput.value.trim();
     
-    if(!urlValue) return alert("Please enter a valid URL");
-
-    // Loading State
-    document.getElementById('gradeValue').innerText = "...";
+    if(!urlValue) return alert("Enter a URL");
 
     try {
         const response = await fetch('/audit/run', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json' // Matches the Pydantic model requirement
+                'Content-Type': 'application/json' // Matches Pydantic requirement
             },
-            body: JSON.stringify({ url: urlValue }) // Send the URL inside a JSON object
+            body: JSON.stringify({ url: urlValue }) // Send as JSON object
         });
 
         if (!response.ok) {
-            const errorBody = await response.json();
-            console.error("FastAPI Validation Error:", errorBody);
-            throw new Error("422 Validation Error");
+            const error = await response.json();
+            console.error("422 Details:", error);
+            throw new Error("Validation Error");
         }
-
+        
         const data = await response.json();
-
-        // 1. Update the dashboard grade
-        document.getElementById('gradeValue').innerText = data.grade;
-        window.currentAuditId = data.id; 
         
-        // 2. Trigger the Graphical Presentation
+        // This triggers the visual graph
         updateChart(data.categories);
-        
+        document.getElementById('gradeValue').innerText = data.grade;
+
     } catch (error) {
-        document.getElementById('gradeValue').innerText = "Err";
-        alert("Failed to connect to backend. Check console.");
+        console.error("Audit failed:", error);
     }
 }
-
-function updateChart(categories) {
-    const ctx = document.getElementById('auditChart').getContext('2d');
-    
-    // Clear old chart instance before drawing a new one
-    if (myChartInstance) { myChartInstance.destroy(); }
-    
-    myChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(categories),
-            datasets: [{
-                label: 'Metric Health %',
-                data: Object.values(categories),
-                backgroundColor: '#0AD1A3', // Brand color from your CSS
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { beginAtZero: true, max: 100 }
-            }
-        }
-    });
-}
-</script>
