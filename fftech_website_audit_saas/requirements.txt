@@ -7,15 +7,13 @@ uvloop==0.21.0
 SQLAlchemy==2.0.36
 psycopg[binary]==3.2.4
 
-# Auth & Config
+# Auth, Config & Validation
 PyJWT==2.10.1
 python-dotenv==1.0.1
 itsdangerous==2.2.0
-
-# Email Validation (Fixes the current error)
 email-validator==2.2.0
 
-# Templates & HTML Parsing
+# HTML Parsing (For Audit Logic)
 Jinja2==3.1.4
 beautifulsoup4==4.12.3
 lxml==5.3.0
@@ -28,9 +26,13 @@ python-multipart==0.0.9
 pydantic==2.10.4
 pydantic-core==2.27.2
 
-# Reporting / Emails
+# Reporting, Emails & Data Export (Fixes the Pandas error)
+pandas==2.2.3
+openpyxl==3.1.5
+python-pptx==1.0.2
 reportlab==4.2.5
 resend==2.2.0
 
-# Optional: Plotting
+# Visuals & Charts
 matplotlib==3.9.2
+numpy==2.1.3
