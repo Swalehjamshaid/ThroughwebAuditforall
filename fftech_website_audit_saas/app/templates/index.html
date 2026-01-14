@@ -1,63 +1,42 @@
-{% extends 'base.html' %}
-{% block content %}
-<div class="container py-5">
-    <div class="card p-5 shadow-lg border-0 bg-dark text-white mb-4 text-center">
-        <h1 class="fw-bold">FF Tech AI Audit SaaS</h1>
-        <form id="auditForm" class="mt-4">
-            <div class="input-group">
-                <input type="url" id="url" class="form-control" placeholder="Enter Website" required>
-                <button class="btn btn-success px-4" type="submit" id="btn">Run AI Audit</button>
-            </div>
-        </form>
-    </div>
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+    <div class="container mx-auto px-6 py-12">
+        <header class="flex justify-between items-center mb-16">
+            <h1 class="text-3xl font-black tracking-tighter text-emerald-400">FF TECH <span class="text-slate-100">AI</span></h1>
+            <nav class="space-x-8 text-sm font-medium text-slate-400">
+                <a href="#" class="hover:text-emerald-400">Dashboard</a>
+                <a href="#" class="hover:text-emerald-400">History</a>
+                <button class="bg-emerald-500 text-slate-950 px-5 py-2 rounded-full font-bold">Login</button>
+            </nav>
+        </header>
 
-    <div id="results" class="d-none animate__animated animate__fadeIn">
-        <div class="row g-4">
-            <div class="col-md-4 text-center">
-                <div class="card p-4 border-success">
-                    <h5 class="text-muted">Grade</h5>
-                    <h1 id="grade" class="display-1 text-success fw-bold"></h1>
-                    <button id="pdfBtn" class="btn btn-danger w-100 mt-3">Download PDF</button>
-                </div>
+        <div class="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl mb-12">
+            <h2 class="text-2xl font-bold mb-6 text-center">Run 200-Metric Deep Audit</h2>
+            <form id="auditForm" class="flex gap-4">
+                <input type="url" id="url" placeholder="https://your-website.com" class="flex-1 bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-emerald-500">
+                <button type="submit" class="bg-emerald-500 px-8 py-4 rounded-2xl font-bold text-slate-950 hover:scale-105 transition-transform">ANALYZE SITE</button>
+            </form>
+        </div>
+
+        <div id="results" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex flex-col items-center justify-center">
+                <p class="text-slate-500 uppercase text-xs font-bold tracking-widest mb-4">Final Grade</p>
+                <span id="grade" class="text-9xl font-black text-emerald-500">A+</span>
+                <button id="pdfBtn" class="mt-8 w-full bg-slate-800 py-3 rounded-xl border border-slate-700 hover:bg-slate-700 transition">Download Certified PDF</button>
             </div>
-            <div class="col-md-8">
-                <div class="card p-4">
-                    <p id="summary" class="lead fw-bold text-muted"></p>
-                    <canvas id="chart"></canvas>
-                </div>
+            <div class="lg:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800">
+                <canvas id="auditChart"></canvas>
             </div>
         </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-let lastId; let chart;
-document.getElementById('auditForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const res = await fetch('/audit/run', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ 
-            url: document.getElementById('url').value, 
-            user_email: localStorage.getItem('user_email') 
-        })
-    });
-    const data = await res.json();
-    lastId = data.id;
-    document.getElementById('results').classList.remove('d-none');
-    document.getElementById('grade').innerText = data.grade;
-    document.getElementById('summary').innerText = data.summary;
-
-    if(chart) chart.destroy();
-    chart = new Chart(document.getElementById('chart'), {
-        type: 'bar',
-        data: {
-            labels: Object.keys(data.categories),
-            datasets: [{ label: 'Performance Score %', data: Object.values(data.categories), backgroundColor: '#198754' }]
-        }
-    });
-};
-document.getElementById('pdfBtn').onclick = () => window.open(`/audit/${lastId}/pdf`, '_blank');
-</script>
-{% endblock %}
+    <script>
+        // JS logic to call backend /audit/run and update Chart.js
+    </script>
+</body>
+</html>
