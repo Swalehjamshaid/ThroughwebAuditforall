@@ -2,14 +2,18 @@ from fastapi import FastAPI
 from app.database import engine, Base
 from app.routers.audit_routes import router as audit_router
 from app.routers.auth import router as auth_router
-from app.scheduler import scheduler  # Ensure scheduler starts with the app
+from app.scheduler import scheduler 
 
-# Build database tables according to models
+# 1. Initialize DB Tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FF Tech AI Website Audit SaaS")
 
-# Mount Routers using absolute paths to avoid top-level package errors
+# 2. Start Background Scheduler
+if not scheduler.running:
+    scheduler.start()
+
+# 3. Include Routers
 app.include_router(auth_router)
 app.include_router(audit_router)
 
