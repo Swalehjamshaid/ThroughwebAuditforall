@@ -1,20 +1,24 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from .config import settings 
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.config import settings
 
-# Get the URL from your settings
-db_url = settings.DATABASE_URL 
+# Access the attribute from config
+DATABASE_URL = settings.DATABASE_URL
 
-# Force SQLAlchemy to use the 'psycopg' (v3) driver
-if db_url:
-    if db_url.startswith("postgresql://"):
-        db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
-    elif db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql+psycopg://", 1)
+# Fix for Railway/Heroku 'postgres://' prefix
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Create the engine with the updated URL
-engine = create_engine(db_url, pool_pre_ping=True)
-
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+
+class Base(DeclarativeBase):
+    pass
+
+def db_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
