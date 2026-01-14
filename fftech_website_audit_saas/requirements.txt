@@ -5,13 +5,15 @@ uvloop==0.21.0
 
 # Data & DB
 SQLAlchemy==2.0.36
-# Version 3.2.4 provides the necessary binaries for Python 3.13
 psycopg[binary]==3.2.4
 
 # Auth & Config
 PyJWT==2.10.1
 python-dotenv==1.0.1
 itsdangerous==2.2.0
+
+# Email Validation (Fixes the current error)
+email-validator==2.2.0
 
 # Templates & HTML Parsing
 Jinja2==3.1.4
@@ -23,7 +25,6 @@ requests==2.32.3
 python-multipart==0.0.9
 
 # Validation
-# Pydantic 2.10.4 is strictly paired with pydantic-core 2.27.2
 pydantic==2.10.4
 pydantic-core==2.27.2
 
