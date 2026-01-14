@@ -1,42 +1,39 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html class="dark">
 <head>
+    <title>FF Tech AI | Best-in-Breed Audit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen">
-    <div class="container mx-auto px-6 py-12">
-        <header class="flex justify-between items-center mb-16">
-            <h1 class="text-3xl font-black tracking-tighter text-emerald-400">FF TECH <span class="text-slate-100">AI</span></h1>
-            <nav class="space-x-8 text-sm font-medium text-slate-400">
-                <a href="#" class="hover:text-emerald-400">Dashboard</a>
-                <a href="#" class="hover:text-emerald-400">History</a>
-                <button class="bg-emerald-500 text-slate-950 px-5 py-2 rounded-full font-bold">Login</button>
-            </nav>
+<body class="bg-slate-950 text-white min-h-screen font-sans">
+    <div class="max-w-7xl mx-auto px-6 py-12">
+        <header class="flex justify-between items-center mb-16 border-b border-slate-800 pb-6">
+            <h1 class="text-3xl font-black text-emerald-400">FF TECH <span class="text-white">AI</span></h1>
+            <div id="userInfo" class="text-right text-sm text-slate-400"></div>
         </header>
 
-        <div class="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-2xl mb-12">
-            <h2 class="text-2xl font-bold mb-6 text-center">Run 200-Metric Deep Audit</h2>
-            <form id="auditForm" class="flex gap-4">
-                <input type="url" id="url" placeholder="https://your-website.com" class="flex-1 bg-slate-800 border-none rounded-2xl p-4 text-white focus:ring-2 focus:ring-emerald-500">
-                <button type="submit" class="bg-emerald-500 px-8 py-4 rounded-2xl font-bold text-slate-950 hover:scale-105 transition-transform">ANALYZE SITE</button>
-            </form>
-        </div>
-
-        <div id="results" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex flex-col items-center justify-center">
-                <p class="text-slate-500 uppercase text-xs font-bold tracking-widest mb-4">Final Grade</p>
-                <span id="grade" class="text-9xl font-black text-emerald-500">A+</span>
-                <button id="pdfBtn" class="mt-8 w-full bg-slate-800 py-3 rounded-xl border border-slate-700 hover:bg-slate-700 transition">Download Certified PDF</button>
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-3 bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl">
+                <form id="auditForm" class="flex gap-4">
+                    <input id="url" type="url" placeholder="Enter URL for 200-metric Deep Audit..." class="flex-1 bg-slate-800 border-none rounded-xl p-4 focus:ring-2 focus:ring-emerald-500">
+                    <button type="submit" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-8 py-4 rounded-xl font-bold transition-all transform hover:scale-105">ANALYZE NOW</button>
+                </form>
             </div>
-            <div class="lg:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800">
+
+            <div id="resultCard" class="hidden bg-slate-900 p-8 rounded-3xl border border-emerald-500/30 text-center">
+                <p class="text-slate-500 uppercase text-xs font-bold tracking-widest mb-2">Grade</p>
+                <h2 id="gradeDisplay" class="text-9xl font-black text-emerald-400">A+</h2>
+                <button onclick="downloadPdf()" class="mt-8 w-full bg-slate-800 border border-slate-700 py-3 rounded-xl hover:bg-slate-700 transition">Get 5-Page PDF</button>
+            </div>
+
+            <div id="chartCard" class="hidden lg:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800">
                 <canvas id="auditChart"></canvas>
             </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        // JS logic to call backend /audit/run and update Chart.js
+        // Chart and API Logic here...
     </script>
 </body>
 </html>
