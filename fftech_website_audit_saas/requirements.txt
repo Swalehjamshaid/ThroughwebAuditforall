@@ -1,15 +1,10 @@
-
 # Core API
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 
 # Data & DB
 SQLAlchemy==2.0.36
-# Prefer psycopg (v3) for new projects; use psycopg2 only if you depend on extensions needing v2
 psycopg[binary]==3.1.18
-# If you must stick with psycopg2, use one of these instead of psycopg:
-# psycopg2==2.9.9   # (compiled; better for prod than psycopg2-binary)
-# psycopg2-binary==2.9.9  # (dev only; not recommended for prod)
 
 # Auth & config
 PyJWT==2.10.1
@@ -25,12 +20,13 @@ requests==2.32.3
 python-multipart==0.0.9
 
 # Validation
+# FIX: pydantic 2.10.4 requires pydantic-core 2.27.2
 pydantic==2.10.4
-pydantic-core==2.23.4  # pin to match pydantic for reproducibility
+pydantic-core==2.27.2
 
-# Reporting / emails (heavy libs — consider a separate image if needed)
+# Reporting / emails
 reportlab==4.2.5
-resend==2.2.0  # if you’re on the newer resend client; otherwise keep your tested version
+resend==2.2.0
 
-# Optional: plotting (avoid in web image if possible)
+# Optional: plotting
 matplotlib==3.9.2
