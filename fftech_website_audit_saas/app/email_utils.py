@@ -1,214 +1,260 @@
 
-# app/email_utils.py
-from __future__ import annotations
+# Email.py
+# M365 Copilot — Email helper with HTML templating and attachments
+# Works with SMTP (LOGIN) with SSL/TLS; designed for sending pipeline outputs (PNG, PPTX, XLSX)
+# No third-party dependencies required.
 
 import os
-import logging
-import smtplib
-import time
-import json
-from typing import Optional
-
-import socket
 import ssl
-import http.client
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import mimetypes
+import logging
+from typing import List, Optional, Dict, Any, Tuple
+from email.message import EmailMessage
+from email.utils import formataddr, make_msgid
+import smtplib
+import datetime
 
-# ------------------------------------------------------------------------------
-# Environment-driven configuration
-# ------------------------------------------------------------------------------
-UI_BRAND_NAME: str = os.getenv("UI_BRAND_NAME", "FF Tech")
-BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+logger = logging.getLogger("EmailClient")
+logger.setLevel(logging.INFO)
 
-# --- SendGrid HTTP API (primary) ---
-SENDGRID_API_KEY: Optional[str] = os.getenv("SENDGRID_API_KEY", None)
-SENDGRID_FROM_EMAIL: Optional[str] = os.getenv("SENDGRID_FROM_EMAIL", None)
-
-# --- SMTP (fallback) ---
-SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST", None)
-SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER: Optional[str] = os.getenv("SMTP_USER", None)
-SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD", None)
-
-MAGIC_EMAIL_ENABLED: bool = os.getenv("MAGIC_EMAIL_ENABLED", "true").lower() == "true"
-
-SMTP_TIMEOUT_SEC: float = float(os.getenv("SMTP_TIMEOUT_SEC", "6.0"))
-SMTP_MAX_RETRIES: int = int(os.getenv("SMTP_MAX_RETRIES", "2"))  # total attempts = 1 + retries
-SMTP_BACKOFF_BASE_SEC: float = float(os.getenv("SMTP_BACKOFF_BASE_SEC", "1.0"))
-
-logger = logging.getLogger("fftech.app.email")
-
-# ------------------------------------------------------------------------------
-# SendGrid sender (HTTP API)
-# ------------------------------------------------------------------------------
-def _send_via_sendgrid(to_email: str, subject: str, html_body: str) -> bool:
+class EmailClient:
     """
-    Send an HTML email using SendGrid HTTP API (primary path).
-    Returns True on success, False otherwise.
+    SMTP Email client supporting:
+    - HTML body with inline images (cid)
+    - Attachments (PNG, PPTX, XLSX, PDF, etc.)
+    - CC, BCC, Reply-To, custom From display name
     """
-    if not MAGIC_EMAIL_ENABLED:
-        logger.warning("Email disabled (MAGIC_EMAIL_ENABLED=false); skipping SendGrid send to %s", to_email)
-        return False
+    def __init__(self,
+                 smtp_host: str,
+                 smtp_port: int,
+                 smtp_user: Optional[str] = None,
+                 smtp_pass: Optional[str] = None,
+                 use_ssl: bool = True,
+                 from_email: Optional[str] = None,
+                 from_name: Optional[str] = None,
+                 default_cc: Optional[List[str]] = None,
+                 default_bcc: Optional[List[str]] = None,
+                 reply_to: Optional[str] = None):
+        self.smtp_host = smtp_host
+        self.smtp_port = smtp_port
+        self.smtp_user = smtp_user
+        self.smtp_pass = smtp_pass
+        self.use_ssl = use_ssl
+        self.from_email = from_email or smtp_user
+        self.from_name = from_name
+        self.default_cc = default_cc or []
+        self.default_bcc = default_bcc or []
+        self.reply_to = reply_to
 
-    if not (SENDGRID_API_KEY and SENDGRID_FROM_EMAIL):
-        logger.debug("SendGrid not configured; missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL.")
-        return False
+        logger.info("EmailClient initialized (host=%s, port=%s, ssl=%s)",
+                    smtp_host, smtp_port, use_ssl)
 
-    payload = {
-        "personalizations": [{"to": [{"email": to_email}]}],
-        "from": {"email": SENDGRID_FROM_EMAIL},
-        "subject": subject,
-        "content": [{"type": "text/html", "value": html_body}],
-    }
-    body = json.dumps(payload)
+    @staticmethod
+    def _guess_mime_type(path: str) -> Tuple[str, str]:
+        ctype, _ = mimetypes.guess_type(path)
+        if ctype is None:
+            ctype = "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+        return maintype, subtype
 
-    delay = SMTP_BACKOFF_BASE_SEC
-    attempts = SMTP_MAX_RETRIES + 1
-    for attempt in range(1, attempts + 1):
-        try:
-            logger.info("SendGrid: POST /v3/mail/send (attempt %d/%d)", attempt, attempts)
-            # Build HTTPS connection with timeout
-            context = ssl.create_default_context()
-            conn = http.client.HTTPSConnection("api.sendgrid.com", timeout=SMTP_TIMEOUT_SEC, context=context)
-            headers = {
-                "Authorization": f"Bearer {SENDGRID_API_KEY}",
-                "Content-Type": "application/json",
-            }
-            conn.request("POST", "/v3/mail/send", body=body, headers=headers)
-            resp = conn.getresponse()
-            status = resp.status
-            resp.read()  # drain
-            conn.close()
+    def _compose(self,
+                 subject: str,
+                 to: List[str],
+                 html_body: str,
+                 text_body: Optional[str] = None,
+                 cc: Optional[List[str]] = None,
+                 bcc: Optional[List[str]] = None,
+                 attachments: Optional[List[str]] = None,
+                 inline_images: Optional[Dict[str, str]] = None,
+                 headers: Optional[Dict[str, str]] = None) -> EmailMessage:
+        msg = EmailMessage()
 
-            # SendGrid returns 202 for success
-            if 200 <= status < 300:
-                logger.info("SendGrid: sent email to %s (status=%d)", to_email, status)
-                return True
+        # From
+        if self.from_name and self.from_email:
+            msg["From"] = formataddr((self.from_name, self.from_email))
+        elif self.from_email:
+            msg["From"] = self.from_email
+        else:
+            raise ValueError("From email is required")
 
-            logger.warning("SendGrid send failure to %s: HTTP %d", to_email, status)
-            if attempt < attempts:
-                time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-        except (socket.timeout, ConnectionError, ssl.SSLError, OSError, http.client.HTTPException) as e:
-            logger.warning("SendGrid network error to %s: %s", to_email, e)
-            if attempt < attempts:
-                time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-        except Exception as e:
-            logger.warning("SendGrid unexpected error to %s: %s", to_email, e)
-            return False
+        # To / CC / BCC
+        if not to:
+            raise ValueError("At least one recipient required")
+        msg["To"] = ", ".join(to)
+
+        cc_list = (cc or []) + self.default_cc
+        bcc_list = (bcc or []) + self.default_bcc
+        if cc_list:
+            msg["Cc"] = ", ".join(cc_list)
+        # Note: BCC is not set in headers; we include it in the send() call.
+
+        # Reply-To
+        if self.reply_to:
+            msg["Reply-To"] = self.reply_to
+
+        # Subject
+        msg["Subject"] = subject
+
+        # Additional headers
+        if headers:
+            for k, v in headers.items():
+                msg[k] = v
+
+        # Text + HTML bodies
+        if text_body:
+            msg.set_content(text_body)
+
+        # Ensure unique message-ID
+        msg_id = make_msgid()
+        msg["Message-ID"] = msg_id
+
+        # Add HTML alternative
+        msg.add_alternative(html_body, subtype="html")
+
+        # Inline images (cid mapping: cid_name -> file path)
+        if inline_images:
+            for cid_name, path in inline_images.items():
+                try:
+                    with open(path, "rb") as f:
+                        maintype, subtype = self._guess_mime_type(path)
+                        msg.get_payload()[1].add_related(
+                            f.read(),
+                            maintype=maintype,
+                            subtype=subtype,
+                            cid=f"<{cid_name}>"
+                        )
+                        logger.info("Inline image attached: %s (cid=%s)", path, cid_name)
+                except Exception as e:
+                    logger.error("Failed to attach inline image %s: %s", path, e)
+
+        # File attachments
+        if attachments:
+            for path in attachments:
+                try:
+                    with open(path, "rb") as f:
+                        maintype, subtype = self._guess_mime_type(path)
+                        msg.add_attachment(
+                            f.read(),
+                            maintype=maintype,
+                            subtype=subtype,
+                            filename=os.path.basename(path)
+                        )
+                        logger.info("Attachment added: %s", path)
+                except Exception as e:
+                    logger.error("Failed to attach file %s: %s", path, e)
+
+        # Store BCC in a private attribute to pass to send
+        msg._bcc = bcc_list
+        return msg
+
+    def send(self, message: EmailMessage) -> None:
+        """
+        Sends the EmailMessage using SMTP. BCC recipients are included in RCPTs but not headers.
+        """
+        recipients = []
+        if "To" in message:
+            recipients += [r.strip() for r in message["To"].split(",") if r.strip()]
+        if "Cc" in message:
+            recipients += [r.strip() for r in message["Cc"].split(",") if r.strip()]
+        recipients += getattr(message, "_bcc", [])
+
+        logger.info("Sending email to: %s", recipients)
+        context = ssl.create_default_context()
+
+        if self.use_ssl:
+            with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, context=context) as server:
+                if self.smtp_user and self.smtp_pass:
+                    server.login(self.smtp_user, self.smtp_pass)
+                server.send_message(message, to_addrs=recipients)
+        else:
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls(context=context)
+                if self.smtp_user and self.smtp_pass:
+                    server.login(self.smtp_user, self.smtp_pass)
+                server.send_message(message, to_addrs=recipients)
+
+        logger.info("Email sent successfully at %s", datetime.datetime.now().isoformat())
+
+    def send_report(self,
+                    to: List[str],
+                    subject: str,
+                    html_body: str,
+                    text_body: Optional[str] = None,
+                    cc: Optional[List[str]] = None,
+                    bcc: Optional[List[str]] = None,
+                    attachments: Optional[List[str]] = None,
+                    inline_images: Optional[Dict[str, str]] = None,
+                    headers: Optional[Dict[str, str]] = None) -> None:
+        msg = self._compose(
+            subject=subject,
+            to=to,
+            html_body=html_body,
+            text_body=text_body,
+            cc=cc, bcc=bcc,
+            attachments=attachments,
+            inline_images=inline_images,
+            headers=headers
+        )
+        self.send(msg)
 
 
-# ------------------------------------------------------------------------------
-# SMTP sender (fallback)
-# ------------------------------------------------------------------------------
-def _smtp_send_html(to_email: str, subject: str, html_body: str) -> bool:
+def build_html_template(context: Dict[str, Any]) -> str:
     """
-    Send an HTML email via SMTP with timeouts and bounded retries.
-    Returns True on success, False otherwise.
+    Returns a visually pleasing HTML email body reflecting Khan's preferences.
+    Uses only inline CSS for maximum client compatibility.
+    Context keys expected:
+      - PROJECT_NAME, RUN_TAG, UI_THEME, COMPANY_NAME
+      - USER_NAME, JOB_TITLE, MANAGER, SKIP_MANAGER, OFFICE_LOCATION
+      - SUMMARY (str), CARDS (list of dicts with title/value), LINKS (list of {text,href})
+      - DATE_STR
     """
-    if not MAGIC_EMAIL_ENABLED:
-        logger.warning("Email disabled (MAGIC_EMAIL_ENABLED=false); skipping SMTP send to %s", to_email)
-        return False
+    theme = (context.get("UI_THEME") or "light").lower()
+    bg = "#0f172a" if theme == "dark" else "#f8fafc"
+    card_bg = "#1f2937" if theme == "dark" else "#ffffff"
+    text = "#e5e7eb" if theme == "dark" else "#0f172a"
+    accent = "#3b82f6"
 
-    if not (SMTP_HOST and SMTP_USER and SMTP_PASSWORD):
-        logger.debug("SMTP not configured; missing SMTP_HOST/SMTP_USER/SMTP_PASSWORD.")
-        return False
+    cards_html = ""
+    for card in context.get("CARDS", []):
+        cards_html += f"""
+        <div style="flex:1; min-width:200px; background:{card_bg}; border-radius:12px; padding:16px; margin:8px; box-shadow:0 4px 12px rgba(0,0,0,0.08);">
+            <div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;">{card.get('title','')}</div>
+            <div style="font-size:24px; font-weight:700; color:{text}; margin-top:6px;">{card.get('value','')}</div>
+        </div>
+        """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = SMTP_USER or ""
-    msg["To"] = to_email
-    msg.attach(MIMEText(html_body, "html"))
+    links_html = ""
+    for link in context.get("LINKS", []):
+        links_html += f"""<a href="{linkk.get('text','Open')}</a>"""
 
-    delay = SMTP_BACKOFF_BASE_SEC
-    attempts = SMTP_MAX_RETRIES + 1  # initial attempt + retries
-    for attempt in range(1, attempts + 1):
-        try:
-            logger.info(
-                "SMTP: connecting %s:%s as %s (attempt %d/%d, timeout=%.1fs)",
-                SMTP_HOST, SMTP_PORT, SMTP_USER, attempt, attempts, SMTP_TIMEOUT_SEC
-            )
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SEC) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(SMTP_USER, SMTP_PASSWORD)  # type: ignore[arg-type]
-                server.sendmail(SMTP_USER, [to_email], msg.as_string())  # type: ignore[arg-type]
-            logger.info("SMTP: sent email to %s", to_email)
-            return True
-        except (smtplib.SMTPException, OSError, socket.timeout) as e:
-            logger.warning("SMTP send failure to %s: %s", to_email, e)
-            if attempt < attempts:
-                time.sleep(delay)
-                delay *= 2
-                continue
-            return False
-        except Exception as e:
-            logger.warning("Unexpected SMTP error to %s: %s", to_email, e)
-            return False
+    html = f"""
+    <div style="background:{bg}; padding:24px; font-family:Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:{text};">
+        <div style="max-width:960px; margin:0 auto;">
+            <header style="margin-bottom:24px;">
+                <div style="font-size:12px; color:{accent}; letter-spacing:0.08em; text-transform:uppercase;">
+                    {context.get('COMPANY_NAME','')} — {context.get('PROJECT_NAME','Operational Report')}
+                </div>
+                <h1 style="margin:8px 0 0; font-size:28px; color:{text};">
+                    {context.get('RUN_TAG','Daily Run')} • {context.get('DATE_STR','')}
+                </h1>
+                <div style="font-size:13px; opacity:0.8;">
+                    {context.get('USER_NAME','')} ({context.get('JOB_TITLE','')}) • Manager: {context.get('MANAGER','')} • Skip: {context.get('SKIP_MANAGER','')}
+                </div>
+                <div style="font-size:12px; opacity:0.7;">Office: {context.get('OFFICE_LOCATION','')}</div>
+            </header>
 
+            <section style="background:{card_bg}; border-radius:12px; padding:16px; margin-bottom:16px;">
+                <p style="margin:0; line-height:1.6;">{context.get('SUMMARY','')}</p>
+            </section>
 
-# ------------------------------------------------------------------------------
-# Unified public helper (SendGrid primary, SMTP fallback)
-# ------------------------------------------------------------------------------
-def _send_email_html(to_email: str, subject: str, html_body: str) -> bool:
+            <section style="display:flex; flex-wrap:wrap; align-items:stretch; margin-bottom:8px;">
+                {cards_html}
+            </section>
+
+            <footer style="margin-top:16px; font-size:12px;">
+                {links_html}
+            </footer>
+        </div>
+    </div>
     """
-    Try SendGrid first (if configured), then SMTP fallback.
-    """
-    # Primary: SendGrid
-    if SENDGRID_API_KEY and SENDGRID_FROM_EMAIL:
-        if _send_via_sendgrid(to_email, subject, html_body):
-            return True
-
-    # Fallback: SMTP
-    if SMTP_HOST and SMTP_USER and SMTP_PASSWORD:
-        return _smtp_send_html(to_email, subject, html_body)
-
-    logger.warning("No email transport available; email to %s dropped.", to_email)
-    return False
-
-
-# ------------------------------------------------------------------------------
-# Public helpers used by main.py
-# ------------------------------------------------------------------------------
-def send_verification_email(to_email: str, token: str) -> bool:
-    """
-    Sends the account verification link.
-    """
-    link = f"{BASE_URL.rstrip('/')}/auth/verify?token={token}"
-    html_body = f"""
-    <h3>{UI_BRAND_NAME} — Verify your email</h3>
-    <p>Hello!</p>
-    <p>Click the link below to verify your account:</p>
-    <p>{link}{link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can safely ignore this message.</p>
-    """
-    return _send_email_html(to_email, f"{UI_BRAND_NAME} — Verify your email", html_body)
-
-
-def send_magic_login_email(to_email: str, token: str) -> bool:
-    """
-    Sends a magic login link for passwordless sign-in.
-    """
-    link = f"{BASE_URL.rstrip('/')}/auth/magic?token={token}"
-    html_body = f"""
-    <h3>{UI_BRAND_NAME} — Magic Login</h3>
-    <p>Hello!</p>
-    <p>Click the secure link below to log in:</p>
-    <p>{link}{link}</a></p>
-    <p>This link will expire shortly. If you didn't request it, you can safely ignore this message.</p>
-    """
-    return _send_email_html(to_email, f"{UI_BRAND_NAME} — Magic Login Link", html_body)
-
-
-def send_daily_report_email(to_email: str, html_body: str) -> bool:
-    """
-    Sends the daily report email (HTML body prepared by caller).
-    """
-    return _send_email_html(to_email, f"{UI_BRAND_NAME} – Daily Website Audit Summary", html_body)
+    return html
