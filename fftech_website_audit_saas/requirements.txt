@@ -4,7 +4,9 @@ uvicorn[standard]==0.32.1
 
 # Data & DB
 SQLAlchemy==2.0.36
-psycopg[binary]==3.1.18
+# UPDATED: Version 3.1.18 does not support Python 3.13 binaries. 
+# 3.2.4 is a stable version that supports Python 3.13.
+psycopg[binary]==3.2.4
 
 # Auth & config
 PyJWT==2.10.1
@@ -20,7 +22,6 @@ requests==2.32.3
 python-multipart==0.0.9
 
 # Validation
-# FIX: pydantic 2.10.4 requires pydantic-core 2.27.2
 pydantic==2.10.4
 pydantic-core==2.27.2
 
