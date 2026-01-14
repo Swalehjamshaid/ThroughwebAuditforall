@@ -1,37 +1,21 @@
 async function startAudit() {
-    const urlInput = document.getElementById('auditUrl') || document.querySelector('input[type="url"]');
-    const urlValue = urlInput.value;
-    
-    if(!urlValue) return alert("Please enter a valid URL");
-
-    document.getElementById('gradeValue').innerText = "...";
+    const urlValue = document.getElementById('auditUrl').value;
+    if(!urlValue) return alert("Enter a URL");
 
     try {
         const response = await fetch('/audit/run', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json', // Tell the server we are sending JSON
+                'Content-Type': 'application/json' // Critical: matches Pydantic requirement
             },
-            body: JSON.stringify({ url: urlValue }) // Send the URL in a JSON object
+            body: JSON.stringify({ url: urlValue }) // Send as a JSON object
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error("Server Error:", errorData);
-            throw new Error("Audit failed");
-        }
-
+        if (!response.ok) throw new Error("Audit failed");
+        
         const data = await response.json();
-
-        // Update the Dashboard UI
-        document.getElementById('gradeValue').innerText = data.grade;
-        window.currentAuditId = data.id; // Save ID for the PDF download
-        
-        // Update the Graphical Presentation
-        updateChart(data.categories);
-        
+        // Update your graphical presentation with 'data.categories'
     } catch (error) {
-        document.getElementById('gradeValue').innerText = "Err";
-        alert("Connection Error. Check console for 422 details.");
+        console.error("422 Error Debug:", error);
     }
 }
