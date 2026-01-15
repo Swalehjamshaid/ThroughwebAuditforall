@@ -1,5 +1,0 @@
-
-:root { --brand: #0AD1A3; }
-.progress-bar { transition: width .6s ease; }
-.navbar-brand img { filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); }
-.card { border-radius: .8rem; }
