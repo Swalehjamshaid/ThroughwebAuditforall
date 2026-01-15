@@ -1,6 +1,0 @@
-{% extends 'base.html' %}{% block content %}
-<div class="container"><h1 class="h5">Audit Detail #{{audit.id}}</h1>
-  <p><strong>URL:</strong> {{audit.url}} | <strong>Score:</strong> {{audit.overall_score}}% | <strong>Grade:</strong> {{audit.grade}}</p>
-  <a class="btn btn-outline-primary" href="/api/reports/pdf/{{audit.id}}">Download PDF</a>
-</div>
-{% endblock %}
