@@ -1,62 +1,56 @@
-# ── Core API and Server ──────────────────────────────────────────────────────────
+# Core API and Server
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 uvloop==0.21.0
 python-multipart==0.0.9
 
-# ── Configuration and Validation ─────────────────────────────────────────────────
+# Configuration and Validation
 pydantic==2.10.4
 pydantic-core==2.27.2
 pydantic-settings==2.7.1
 python-dotenv==1.0.1
 email-validator==2.2.0
 
-# ── Database & Migrations ────────────────────────────────────────────────────────
+# Database & Migrations
 SQLAlchemy==2.0.36
 psycopg[binary]==3.2.4
-alembic==1.13.3               # Database migrations (highly recommended)
+alembic==1.13.3
 
-# ── Authentication and Security ──────────────────────────────────────────────────
+# Authentication and Security
 PyJWT==2.10.1
 itsdangerous==2.2.0
 bcrypt==4.2.1
-passlib[bcrypt]==1.7.4        # Better password hashing utilities
+passlib[bcrypt]==1.7.4
 
-# ── Web Scraping, HTTP Clients & Advanced Crawling ───────────────────────────────
+# Web Scraping & Crawling
 httpx==0.28.1
 requests==2.32.3
 beautifulsoup4==4.12.3
 lxml==5.3.0
-playwright==1.50.0            # JavaScript rendering + mobile emulation (mobile metrics)
-scrapy==2.12.0                # Powerful deep crawler for 200+ metrics
+playwright==1.50.0
+scrapy==2.12.0
 
-# ── Automated Scheduling & Background Tasks ──────────────────────────────────────
+# Scheduling & Background Tasks
 apscheduler==3.11.0
-celery==5.4.0                 # Robust background tasks (scheduled audits & emails)
-redis==5.2.0                  # Celery broker/backend (Railway supports Redis)
+celery==5.4.0
+redis==5.2.0
 
-# ── Data Analysis and Visualization ──────────────────────────────────────────────
+# Data & Visualization
 numpy==2.1.3
 pandas==2.2.3
 matplotlib==3.9.2
-seaborn==0.13.2               # Better charts for PDF reports & UI
+seaborn==0.13.2
 
-# ── Reporting and Exports (PDF, CSV, PPTX) ───────────────────────────────────────
-reportlab==4.2.5              # Alternative PDF if WeasyPrint has issues
+# Reporting & Exports
+reportlab==4.2.5
 openpyxl==3.1.5
 python-pptx==1.0.2
 Jinja2==3.1.4
-weasyprint==62.3              # Modern HTML → PDF (best for 5-page branded reports)
-pypdf==5.1.0                  # PDF manipulation (merge, split, etc.)
+weasyprint==62.3
+pypdf==5.1.0
 
-# ── Email Delivery ───────────────────────────────────────────────────────────────
+# Email
 resend==2.2.0
 
-# ── Rate Limiting & Production Tools ─────────────────────────────────────────────
-slowapi==0.1.9                # Rate limiting (prevent abuse on open audits)
-
-# ── Optional / Future-proof (commented – add when needed) ────────────────────────
-# stripe==10.8.0              # Subscriptions & payments (unlock unlimited audits)
-# python-dotenv[cli]==1.0.1   # CLI env management
-# pillow==10.4.0              # Image processing (for screenshots or optimization)
-# python-docx==1.1.2          # DOCX export if needed
+# Rate Limiting
+slowapi==0.1.9
