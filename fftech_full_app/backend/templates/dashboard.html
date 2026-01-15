@@ -1,0 +1,12 @@
+
+{% extends 'base_register.html' %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Dashboard</h1>
+    <a class="btn btn-primary" href="/new-audit"><i class="ti ti-plus"></i> New Audit</a>
+  </div>
+  <div id="auditList" class="row g-3"></div>
+  <p class="text-secondary small mt-3">Free plan: up to 10 stored audits. Scheduling and long-term history require subscription.</p>
+</div>
+{% endblock %}
