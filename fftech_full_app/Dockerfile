@@ -3,37 +3,13 @@ FROM python:3.13-slim
 
 # Install all required native libraries for WeasyPrint and Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcairo2 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf-2.0-0 \
-    libglib2.0-0 \
-    gobject-introspection \
-    fontconfig \
-    libfreetype6 \
-    libharfbuzz0b \
-    libjpeg62-turbo \
-    libpng16-16 \
-    zlib1g \
-    libxml2 \
-    libxslt1.1 \
-    shared-mime-info \
-    libffi-dev \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
+    libglib2.0-0 gobject-introspection fontconfig libfreetype6 libharfbuzz0b \
+    libjpeg62-turbo libpng16-16 zlib1g libxml2 libxslt1.1 shared-mime-info \
+    libffi-dev libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxext6 libxfixes3 \
+    libxrandr2 libgbm1 libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -41,13 +17,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
+# Install Playwright browsers (if needed for analysis)
 RUN playwright install --with-deps chromium
 
 # Copy the rest of the application
 COPY . .
 
-# --- THE FIX IS HERE ---
-# Use Shell form (NO BRACKETS) so $PORT is evaluated by the system.
-# This replaces the text '$PORT' with the actual number (e.g., 8080).
+# --- CRITICAL FIX ---
+# Use Shell form (NO BRACKETS) so the system evaluates $PORT
 CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
