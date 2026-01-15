@@ -18,6 +18,7 @@ psycopg[binary]==3.2.4
 # Authentication and Security
 PyJWT==2.10.1
 itsdangerous==2.2.0
+bcrypt==4.2.1                # ← ADDED: required for password hashing
 
 # Web Scraping and HTTP Clients
 httpx==0.28.1
