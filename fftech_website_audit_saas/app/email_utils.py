@@ -1,2 +1,0 @@
-
-from .services.email_service import send_email, EmailError
