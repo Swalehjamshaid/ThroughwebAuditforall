@@ -1,7 +1,7 @@
-# Use official Python 3.13 slim base (Debian Trixie/Bookworm compatible)
+# Use official Python 3.13 slim base
 FROM python:3.13-slim
 
-# Install all required native libraries for WeasyPrint (correct package names)
+# Install all required native libraries for WeasyPrint and Playwright
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core rendering libraries
     libcairo2 \
@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     libfreetype6 \
     libharfbuzz0b \
-    # Image support (JPEG, PNG)
+    # Image support
     libjpeg62-turbo \
     libpng16-16 \
     zlib1g \
@@ -24,6 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1.1 \
     shared-mime-info \
     libffi-dev \
+    # Requirements for Playwright/Browsers
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Set working directory
@@ -35,11 +50,12 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install Playwright browsers (if using Playwright for the audit)
+RUN playwright install --with-deps chromium
+
 # Copy the rest of the application
 COPY . .
 
-# Expose the port (Railway uses $PORT env var)
-EXPOSE $PORT
-
-# Run uvicorn without --port → it auto-reads $PORT from environment
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
+# IMPORTANT: Use Shell form (no brackets) to ensure $PORT is evaluated
+# This fixes the "Invalid value for --port: $PORT" error
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
