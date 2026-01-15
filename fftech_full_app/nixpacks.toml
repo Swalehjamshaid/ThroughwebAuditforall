@@ -1,3 +1,7 @@
+# nixpacks.toml - Custom start command for Railway to expand $PORT
+
+[phases.build]
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
+
 [start]
-# The 'sh -c' tells Linux to translate $PORT into the actual port number (e.g., 8080)
-cmd = "sh -c 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'"
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
