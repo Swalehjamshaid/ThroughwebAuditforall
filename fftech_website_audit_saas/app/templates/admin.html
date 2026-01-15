@@ -1,0 +1,31 @@
+
+{% extends 'layout.html' %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h4 mb-3">Admin Dashboard</h1>
+  <div class="card p-3 mb-3">
+    <h6 class="mb-2">Password Login</h6>
+    <form id="adminLogin" class="row g-2">
+      <div class="col-auto"><input type="email" id="adminEmail" class="form-control" placeholder="email" value="{{ email or '' }}"></div>
+      <div class="col-auto"><input type="password" id="adminPassword" class="form-control" placeholder="password"></div>
+      <div class="col-auto"><button class="btn btn-primary">Login</button></div>
+    </form>
+  </div>
+  <div class="row" id="statsRow" style="display:none;">
+    <div class="col-md-6">
+      <div class="p-3 bg-body-tertiary rounded-3">
+        <div class="d-flex justify-content-between">
+          <span>Users</span><strong id="usersCount">0</strong>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="p-3 bg-body-tertiary rounded-3">
+        <div class="d-flex justify-content-between">
+          <span>Audits</span><strong id="auditsCount">0</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
