@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% block content %}
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4">Dashboard</h1>
+    <div><a class="btn btn-success" href="/new_audit">New Audit</a> <a class="btn btn-outline-secondary" href="/upgrade">Upgrade</a></div>
+  </div>
+  <table class="table table-striped">
+    <thead><tr><th>ID</th><th>URL</th><th>Score</th><th>Grade</th><th>Created</th></tr></thead>
+    <tbody>
+      {% for a in audits %}
+        <tr><td>{{a.id}}</td><td><a href="/audit_detail/{{a.id}}">{{a.url}}</a></td><td>{{a.overall_score}}%</td><td>{{a.grade}}</td><td>{{a.created_at}}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
