@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 
-# Install WeasyPrint dependencies
+# Install WeasyPrint system libraries (correct & complete)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
@@ -27,8 +27,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Expose port (Railway sets $PORT)
+# Expose port (Railway sets $PORT env var)
 EXPOSE $PORT
 
-# Run uvicorn without explicit --port (uses $PORT from env)
+# Run uvicorn without --port (auto-uses $PORT from env)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
