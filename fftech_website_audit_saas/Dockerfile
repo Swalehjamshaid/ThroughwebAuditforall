@@ -1,24 +1,22 @@
-# Use official Python 3.13 slim base (matches your env)
+# Use official Python 3.13 slim (Debian base)
 FROM python:3.13-slim
 
-# Install ALL required system libraries for WeasyPrint (this fixes gobject-2.0-0 error)
+# Install ALL required system libraries for WeasyPrint (correct names)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Core WeasyPrint libs
+    # Core rendering
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-2.0-0 \          # Correct name (was 2.0-0, not 2.0-0-0)
     libffi-dev \
-    # GObject & GLib (fixes the exact error)
+    # GLib & GObject (fixes libgobject-2.0-0 error)
     libglib2.0-0 \
-    libgobject2.0-0 \
     gobject-introspection \
-    # Fonts & text rendering
+    # Fonts & text
     fontconfig \
-    freetype2-demos \
-    libfontconfig1 \
+    libfreetype6 \
     libharfbuzz0b \
-    # Images & PNG/JPEG
+    # Images (JPEG/PNG)
     libjpeg62-turbo \
     libpng16-16 \
     zlib1g \
