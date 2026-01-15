@@ -1,0 +1,24 @@
+# nixpacks.toml - Custom Railway build config for WeasyPrint dependencies
+
+# Install required system packages (Debian/Ubuntu base)
+[phases.setup]
+nixPkgs = [
+  'cairo',
+  'pango',
+  'gdk-pixbuf',
+  'libffi',
+  'shared-mime-info',
+  'fontconfig',
+  'freetype',
+  'harfbuzz'
+]
+
+# After pip install, ensure everything is ready
+[phases.build]
+cmds = [
+  "pip install --no-cache-dir -r requirements.txt"
+]
+
+# Start command (Railway uses $PORT)
+[start]
+cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
