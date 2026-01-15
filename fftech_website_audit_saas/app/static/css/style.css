@@ -1,0 +1,5 @@
+
+:root{ --brand:#0ea5e9; }
+.navbar .brand{color:var(--brand)}
+.progress-bar{ background-color: var(--brand);} 
+body{ background: var(--bs-body-bg);} 
