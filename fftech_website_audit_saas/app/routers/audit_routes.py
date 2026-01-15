@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel  # Added for data validation
 import io, tempfile, zipfile
 
 from ..db import db_session
@@ -13,15 +13,13 @@ from ..audit.record import save_png_summary, save_xlsx, save_pptx
 
 router = APIRouter(prefix='/audit', tags=['audit'])
 
-# --- Pydantic Models for JSON Validation ---
+# --- Added Pydantic Models to fix the 422 Error ---
 class AuditRequest(BaseModel):
     url: str
 
 class RegisteredAuditRequest(BaseModel):
     url: str
     user_email: str
-
-# --- Routes ---
 
 @router.get('/open', response_class=HTMLResponse)
 def open_form(request: Request):
@@ -31,7 +29,7 @@ def open_form(request: Request):
 
 @router.post('/run')
 def run_audit(data: AuditRequest, request: Request, db: Session = Depends(db_session)):
-    # Use data.url to get the value from the JSON body
+    # Extract url from the validated data object
     url = data.url
     payload = analyze(url)
     overall, cat_scores = compute_category_scores(payload['results'])
@@ -43,10 +41,10 @@ def run_audit_registered(data: RegisteredAuditRequest, request: Request, db: Ses
     url = data.url
     user_email = data.user_email
     
-    user = db.query(User).filter(User.email==user_email).first()
+    user = db.query(User).filter(User.email == user_email).first()
     if not user:
         raise HTTPException(status_code=401, detail='User not found. Please sign in.')
-        
+    
     payload = analyze(url)
     overall, cat_scores = compute_category_scores(payload['results'])
     grade = grade_from_score(overall)
@@ -64,7 +62,7 @@ def run_audit_registered(data: RegisteredAuditRequest, request: Request, db: Ses
 
 @router.get('/{audit_id}/pdf')
 def audit_pdf(audit_id: int, db: Session = Depends(db_session)):
-    audit = db.query(Audit).filter(Audit.id==audit_id).first()
+    audit = db.query(Audit).filter(Audit.id == audit_id).first()
     if not audit:
         raise HTTPException(status_code=404, detail='Audit not found')
     payload = audit.result['details']
@@ -79,7 +77,7 @@ def audit_pdf(audit_id: int, db: Session = Depends(db_session)):
 
 @router.get('/{audit_id}/exports')
 def audit_exports(audit_id: int, db: Session = Depends(db_session)):
-    audit = db.query(Audit).filter(Audit.id==audit_id).first()
+    audit = db.query(Audit).filter(Audit.id == audit_id).first()
     if not audit:
         raise HTTPException(status_code=404, detail='Audit not found')
 
