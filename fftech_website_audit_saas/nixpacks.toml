@@ -1,33 +1,20 @@
-# nixpacks.toml - Full WeasyPrint dependencies for Railway
+# nixpacks.toml - Fixed for WeasyPrint on Railway
 
 [phases.setup]
-nixPkgs = [
-  # Core rendering libraries
-  'cairo',
-  'pango',
-  'gdk-pixbuf',
-  # GObject (this is the missing one causing the error)
-  'glib',
-  'gobject-introspection',
-  # Font & image support
-  'fontconfig',
-  'freetype',
-  'harfbuzz',
-  'libjpeg62-turbo',
-  'libpng16-16',
-  # XML & extra
-  'libxml2',
-  'libxslt',
-  # Utilities
-  'shared-mime-info',
-  'libffi',
-  'zlib'
+# These are the standard Debian libraries that WeasyPrint looks for
+aptPkgs = [
+  "libpango-1.0-0",
+  "libharfbuzz0b",
+  "libpangoft2-1.0-0",
+  "libpangocairo-1.0-0",
+  "libgdk-pixbuf2.0-0",
+  "libffi-dev",
+  "shared-mime-info"
 ]
 
 [phases.build]
-cmds = [
-  "pip install --no-cache-dir -r requirements.txt"
-]
+# Standard build command
+cmds = ["pip install --no-cache-dir -r requirements.txt"]
 
 [start]
 cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
