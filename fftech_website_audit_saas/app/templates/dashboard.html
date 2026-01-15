@@ -1,0 +1,9 @@
+{% extends 'base_open.html' %}
+{% block open_content %}
+<h1 class="h4 mb-3">Dashboard</h1>
+<p>Your recent audits (sample):</p>
+<div id="audits" class="row g-3"></div>
+<script>
+(async ()=>{ document.getElementById('audits').innerHTML = '<div class="col-12">Connect auth & list saved audits here.</div>'; })();
+</script>
+{% endblock %}
