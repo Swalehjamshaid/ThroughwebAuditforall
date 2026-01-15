@@ -1,0 +1,7 @@
+
+{% extends 'base_open.html' %}
+{% block open_content %}
+<h1 class="h4">Verify</h1>
+<p>If you arrived here from your email link, your token is: <code>{{ token }}</code></p>
+<p>Use the token with <code>/api/auth/verify-token?token=...</code> to complete API verification, or continue to <a href="/new-audit">New Audit</a>.</p>
+{% endblock %}

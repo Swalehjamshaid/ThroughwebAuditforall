@@ -1,0 +1,23 @@
+
+{% extends 'base_open.html' %}
+{% block open_content %}
+<div class="card"><div class="card-body">
+  <h1 class="h4 mb-3">AI Website Audit (Open)</h1>
+  <form id="auditForm">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-9"><label class="form-label">Website URL</label><input id="url" type="url" class="form-control" placeholder="https://example.com" required></div>
+      <div class="col-md-3"><button class="btn btn-primary w-100">Run Audit</button></div>
+    </div>
+  </form>
+  <div id="result" class="d-none mt-4">
+    <div class="row g-3">
+      <div class="col-sm-6"><div class="p-3 bg-body-tertiary rounded"><div class="d-flex justify-content-between"><span>Overall Score</span><strong id="overallScore" class="fs-4"></strong></div><div class="progress mt-2"><div class="progress-bar" id="overallBar" style="width:0%"></div></div></div></div>
+      <div class="col-sm-6"><div class="p-3 bg-body-tertiary rounded"><div class="d-flex justify-content-between"><span>Grade</span><strong id="grade" class="fs-4"></strong></div></div></div>
+    </div>
+    <canvas id="categoriesChart" class="mt-4"></canvas>
+  </div>
+</div></div>
+<script>
+// simple chart render after fetch in main.js; here we only mount Chart if data exists
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+
+{% extends 'base_register.html' %}
+{% block reg_content %}
+<h1 class="h4">Audit Detail #{{ audit_id }}</h1>
+<p>Download: <a class="btn btn-sm btn-outline-primary" href="/api/reports/pdf/{{ audit_id }}">PDF Report</a></p>
+{% endblock %}
