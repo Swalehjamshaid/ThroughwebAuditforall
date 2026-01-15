@@ -1,22 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-import jwt
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 from .config import settings
-from .database import db_session           # ← FIXED: use db_session (this is the correct name)
-from .models import MagicToken, User
-from .email_utils import send_email
 
-router = APIRouter(prefix='/auth', tags=['auth'])
+# Create SQLAlchemy engine
+engine = create_engine(settings.DATABASE_URL)
 
-class LoginRequest(BaseModel):
-    email: EmailStr
+# Session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@router.post('/login-link')
-def send_login_link(payload: LoginRequest, request: Request, db: Session = Depends(db_session)):
-    # ... (rest of the function remains unchanged)
+# Base class for models
+Base = declarative_base()
 
-@router.get('/callback')
-def magic_callback(token: str, db: Session = Depends(db_session)):
-    # ... (rest of the function remains unchanged)
+# Dependency to get DB session
+def db_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
