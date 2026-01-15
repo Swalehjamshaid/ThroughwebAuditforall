@@ -1,20 +1,30 @@
-# nixpacks.toml - Fixed for WeasyPrint on Railway
-
 [phases.setup]
-# These are the standard Debian libraries that WeasyPrint looks for
+# aptPkgs installs the Linux libraries required by WeasyPrint and Playwright
 aptPkgs = [
+  # WeasyPrint Dependencies
   "libpango-1.0-0",
   "libharfbuzz0b",
   "libpangoft2-1.0-0",
   "libpangocairo-1.0-0",
   "libgdk-pixbuf2.0-0",
   "libffi-dev",
-  "shared-mime-info"
+  "shared-mime-info",
+  # Playwright Dependencies (Browsers)
+  "libevent-2.1-7",
+  "libvpx7",
+  "libxtst6",
+  "libxss1",
+  "libnss3",
+  "libasound2",
+  "libatk-bridge2.0-0",
+  "libgtk-3-0"
 ]
 
 [phases.build]
-# Standard build command
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
+cmds = [
+  "pip install --no-cache-dir -r requirements.txt",
+  "playwright install --with-deps chromium" 
+]
 
 [start]
 cmd = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
