@@ -1,9 +1,7 @@
-{
-  "build": {
-    "builder": "Docker"
-  },
-  "deploy": {
-    "restartPolicyType": "ON_FAILURE",
-    "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
-  }
-}
+[build]
+builder = "docker"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+# This override ensures Railway tells Uvicorn exactly which port to use
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
