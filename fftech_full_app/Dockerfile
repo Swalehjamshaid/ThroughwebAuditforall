@@ -17,12 +17,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers (if needed for analysis)
+# Install Playwright browsers
 RUN playwright install --with-deps chromium
 
-# Copy the rest of the application
+# Copy application
 COPY . .
 
-# --- CRITICAL FIX ---
-# Use Shell form (NO BRACKETS) so the system evaluates $PORT
-CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# ✅ CORRECT START COMMAND (NO $PORT, NO UVICORN CLI)
+CMD ["python", "-m", "app.main"]
