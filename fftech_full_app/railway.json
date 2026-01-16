@@ -1,6 +1,9 @@
-[build]
-builder = "Docker"
-
-[deploy]
-restartPolicyType = "ON_FAILURE"
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+{
+  "build": {
+    "builder": "Docker"
+  },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "startCommand": "uvicorn main:app --host 0.0.0.0 --port $PORT"
+  }
+}
