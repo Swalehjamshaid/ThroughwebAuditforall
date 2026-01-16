@@ -1,0 +1,11 @@
+
+{% extends 'base_open.html' %}
+{% block content %}
+<div class="container py-4">
+  <h1 class="h5">Open Audit Result</h1>
+  <div class="row g-3">
+    <div class="col-md-4"><div class="tile p-3"><div class="d-flex justify-content-between"><span>Overall</span><strong id="oaScore" class="fs-4"></strong></div><div class="progress mt-2"><div class="progress-bar" id="oaBar" style="width:0%"></div></div><div class="mt-2">Grade: <strong id="oaGrade"></strong></div></div></div>
+    <div class="col-md-8"><div class="tile p-3"><canvas id="oaCatChart"></canvas></div></div>
+  </div>
+</div>
+{% endblock %}
