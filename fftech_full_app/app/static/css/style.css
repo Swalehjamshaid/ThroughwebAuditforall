@@ -1,0 +1,7 @@
+:root{--brand:#0ea5e9}
+body{background:var(--bs-body-bg)}
+.gradient-hero{background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%);color:#fff}
+.glass{backdrop-filter:saturate(140%) blur(6px);background:rgba(255,255,255,.18);border-radius:16px}
+.tile{background:var(--bs-body-bg);border:1px solid rgba(0,0,0,.05);border-radius:12px}
+.navbar .btn-icon{width:42px}
+.progress-bar{background-color:var(--brand)}
