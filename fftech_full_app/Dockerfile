@@ -1,7 +1,7 @@
-# Official Python 3.13 slim base image
+# Official Python 3.13 slim base (Debian-based, perfect for Railway)
 FROM python:3.13-slim
 
-# Install system dependencies for WeasyPrint (critical for PDF generation)
+# Install all required system libraries for WeasyPrint (fixes gobject, cairo, pango errors)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     libpango-1.0-0 \
@@ -21,20 +21,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Set working directory
+# Set working directory (standard for Railway)
 WORKDIR /app
 
-# Copy requirements first (better caching)
+# Copy requirements first for caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire application
+# Copy the entire project
 COPY . .
 
-# Expose the port Railway will assign via $PORT
+# Expose the port (Railway assigns $PORT automatically)
 EXPOSE $PORT
 
-# Run uvicorn without explicit --port (automatically uses $PORT from env)
+# Run uvicorn WITHOUT --port flag → it auto-reads $PORT from environment
+# This fixes the "Invalid value for '--port': '$PORT'" error
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0"]
