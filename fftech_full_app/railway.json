@@ -1,6 +1,2 @@
-[build]
-builder = "docker"
-
-[deploy]
-# This command points to your nested backend module
-startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+# Final line only - Remove the [" "]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT
