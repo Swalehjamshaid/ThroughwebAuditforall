@@ -1,0 +1,1 @@
+:root { --brand:#2e86de; } body{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; } .card{ border-radius: 14px; } .navbar{ backdrop-filter: blur(6px); }
