@@ -1,12 +1,15 @@
-import os
-from pydantic import BaseModel
+from pydantic import BaseSettings
 
-class Settings(BaseModel):
-    ENV: str = os.getenv('ENV', 'development')
-    SECRET_KEY: str = os.getenv('SECRET_KEY', 'change-me')
-    BASE_URL: str = os.getenv('BASE_URL', 'http://localhost:8000')
-    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///./fftech.db')
-    BRAND_NAME: str = os.getenv('BRAND_NAME', 'FF Tech')
-    BRAND_LOGO_PATH: str = os.getenv('BRAND_LOGO_PATH', 'backend/static/img/logo.png')
+class Settings(BaseSettings):
+    ENV: str = "development"
+    SECRET_KEY: str = "change-me"
+    BASE_URL: str = "http://localhost:8000"
+    DATABASE_URL: str = "sqlite:///./fftech.db"
+    BRAND_NAME: str = "FF Tech"
+    BRAND_LOGO_PATH: str = "backend/static/img/logo.png"
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
 settings = Settings()
