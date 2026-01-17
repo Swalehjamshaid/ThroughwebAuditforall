@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card p-4 shadow-sm">
+      <h3 class="mb-3">Open Audit</h3>
+      <form id="auditForm">
+        <label class="form-label">Website URL</label>
+        <input class="form-control" name="url" placeholder="https://example.com" required>
+        <button class="btn btn-primary mt-3">Run Audit</button>
+      </form>
+      <div class="alert alert-info mt-3">No login needed. Results are not stored.</div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card p-4 shadow-sm">
+      <h3 class="mb-3">Results</h3>
+      <div id="scores"></div>
+      <canvas id="scoreChart" height="200"></canvas>
+    </div>
+  </div>
+</div>
+<hr>
+<div class="card p-4 mt-3">
+  <h5>Competitor Quick Compare</h5>
+  <form id="compForm">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control" name="main_url" placeholder="Your site (https://...)" required></div>
+      <div class="col-md-4"><input class="form-control" name="c1" placeholder="Competitor 1"></div>
+      <div class="col-md-4"><input class="form-control" name="c2" placeholder="Competitor 2"></div>
+    </div>
+    <button class="btn btn-outline-primary mt-2">Compare</button>
+  </form>
+  <pre id="compOut" class="mt-3" style="white-space:pre-wrap"></pre>
+</div>
+<script>
+const form = document.getElementById('auditForm');
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const url = new FormData(form).get('url');
+  const res = await fetch('/api/audit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url})});
+  const data = await res.json();
+  renderScores(data.scores);
+});
+const compForm = document.getElementById('compForm');
+compForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd=new FormData(compForm);
+  const body={main_url:fd.get('main_url'), competitors:[fd.get('c1'), fd.get('c2')].filter(Boolean)};
+  const res = await fetch('/api/competitor', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const data = await res.json();
+  document.getElementById('compOut').textContent = JSON.stringify({overall:{
+    main:data.main.scores.overall, c1:data.competitors[0]?.scores.overall, c2:data.competitors[1]?.scores.overall
+  }}, null, 2);
+});
+</script>
+{% endblock %}
