@@ -1,2 +1,5 @@
-# Final line only - Remove the [" "]
-CMD uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+{
+  "rootDirectory": "/",
+  "buildCommand": "pip install -r requirements.txt",
+  "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+}
