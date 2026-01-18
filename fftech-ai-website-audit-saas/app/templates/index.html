@@ -1,0 +1,55 @@
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="row g-4 align-items-center">
+  <div class="col-lg-7">
+    <h1 class="display-5 fw-bold">AI Website Audit</h1>
+    <p class="lead">Enter a website URL to run a professional, standards-based audit. No signup required for a quick check.</p>
+    <form id="auditForm" class="row g-2">
+      <div class="col-9"><input type="url" class="form-control form-control-lg" id="url" placeholder="https://example.com" required></div>
+      <div class="col-3 d-grid"><button class="btn btn-primary btn-lg">Run Audit</button></div>
+    </form>
+    <div id="result" class="mt-4"></div>
+  </div>
+  <div class="col-lg-5">
+    <canvas id="heroChart" height="240"></canvas>
+  </div>
+</div>
+<script>
+  const ctx = document.getElementById('heroChart');
+  new Chart(ctx, {type:'radar', data:{labels:['Health','Crawl','On-Page','Perf','Mobile/Sec','ROI'], datasets:[{label:'Sample', data:[60,55,70,50,65,58], backgroundColor:'rgba(13,110,253,.2)', borderColor:'#0d6efd'}]}});
+
+  document.getElementById('auditForm').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const url = document.getElementById('url').value;
+    const resEl = document.getElementById('result');
+    resEl.innerHTML = '<div class="alert alert-info">Running audit…</div>';
+    const res = await fetch('/api/audit', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+    const data = await res.json();
+    if (res.ok){
+      resEl.innerHTML = `<div class='card'><div class='card-body'>
+        <h5>${data.url}</h5>
+        <div class='d-flex align-items-center gap-3'>
+          <div class='display-6'>${data.score}</div>
+          <div class='badge bg-success fs-6'>${data.grade}</div>
+          <div class='text-muted'>Coverage: ${data.coverage}%</div>
+        </div>
+        <p class='mt-3'>${data.summary}</p>
+        <button class='btn btn-outline-primary' id='pdfBtn'>Download PDF</button>
+      </div></div>`;
+    } else {
+      resEl.innerHTML = `<div class='alert alert-danger'>${data.detail || 'Failed'}</div>`;
+    }
+  });
+
+      document.getElementById('pdfBtn').addEventListener('click', async ()=>{
+        const pdfRes = await fetch('/api/report/pdf-open', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+        const blob = await pdfRes.blob();
+        const urlBlob = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = urlBlob; a.download = 'fftech_audit.pdf'; a.click();
+        URL.revokeObjectURL(urlBlob);
+      });
+
+</script>
+{% endblock %}
