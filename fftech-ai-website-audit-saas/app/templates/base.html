@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ UI_BRAND_NAME }} — Website Audit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+      :root{--bg:#0b1021;--card:rgba(255,255,255,0.06);--border:rgba(255,255,255,0.12);--text:#eaf0ff;--muted:#9aa6ce;--primary:#6ea8fe;--accent:#a16dff;--pill:#1f2a44;--shadow:0 24px 64px rgba(0,0,0,.45)}
+      html[data-theme="light"]{--bg:#f7f8fc;--card:#ffffff;--border:#e2e6f0;--text:#1d2442;--muted:#5c678a;--pill:#e9edfb;--shadow:0 18px 48px rgba(0,0,0,.12)}
+      *{box-sizing:border-box}
+      body{margin:0;background:radial-gradient(1600px 600px at 10% -20%, #1b2142 0%, transparent 60%),linear-gradient(180deg,#0b1021,#0b1021);color:var(--text);font-family:'Inter',system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+      .wrap{max-width:1180px;margin:0 auto;padding:24px}
+      .site-header{position:sticky;top:0;z-index:100;background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,0));backdrop-filter:saturate(160%) blur(10px)}
+      .header-bar{display:flex;align-items:center;justify-content:space-between}
+      .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
+      .brand-mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 12px 24px rgba(110,168,254,.35)}
+      .brand-name{font-weight:800;letter-spacing:.2px}
+      .nav a{color:var(--text);text-decoration:none;margin-left:18px}
+      .btn{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:12px;padding:.6rem 1rem;cursor:pointer;transition:.2s}
+      .btn:hover{transform:translateY(-1px)}
+      .btn-primary{background:linear-gradient(135deg,var(--primary),var(--accent));border:none;color:#fff;box-shadow:0 10px 24px rgba(110,168,254,.35)}
+      .btn-ghost{background:transparent;color:var(--text)}
+      .hero{padding:36px;border-radius:22px;background:linear-gradient(120deg, rgba(110,168,254,.18), rgba(161,109,255,.18));box-shadow:var(--shadow)}
+      .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+      .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+      .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+      h1{margin:0 0 12px;font-size:2.2rem}
+      h2{margin:0 0 10px;font-size:1.6rem}
+      h3{margin:12px 0;font-size:1.25rem}
+      .lead{color:var(--muted);margin-bottom:16px}
+      .form-grid{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:14px}
+      input{width:100%;padding:.8rem;border:1px solid var(--border);border-radius:12px;background:transparent;color:var(--text)}
+      .pill{display:inline-block;background:var(--pill);border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+      .list{list-style:none;padding:0;margin:0}
+      .list li{padding:10px 0;border-bottom:1px dashed var(--border)}
+      .table{display:grid;grid-template-columns:1fr 2fr;border:1px solid var(--border);border-radius:12px}
+      .row{display:contents}
+      .cell{padding:10px;border-bottom:1px solid var(--border)}
+      .key{background:rgba(255,255,255,0.06)}
+      .muted{color:var(--muted)}
+      .site-footer{margin-top:40px;border-top:1px solid var(--border)}
+      .alert{background:#ffebea;border:1px solid #ffa9a0;color:#9c2c1c;border-radius:12px;padding:.6rem;margin:.6rem 0}
+      @media(max-width:980px){.grid-2{grid-template-columns:1fr}.grid-3{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+    </style>
+    <script>
+      // Theme toggle + ultra-light chart helpers (no external JS)
+      document.addEventListener('DOMContentLoaded',()=>{
+        const btn=document.getElementById('themeToggle');
+        if(btn){btn.addEventListener('click',()=>{
+          const html=document.documentElement;
+          html.setAttribute('data-theme', html.getAttribute('data-theme')==='light'?'dark':'light');
+        });}
+      });
+      function _ctx(id){const c=document.getElementById(id);return c?c.getContext('2d'):null}
+      function _clear(ctx){const c=ctx.canvas;c.width=c.offsetWidth||c.width;ctx.clearRect(0,0,c.width,c.height)}
+      window.renderLineChart=function(id,labels,values){const ctx=_ctx(id); if(!ctx) return; _clear(ctx); const W=ctx.canvas.width,H=ctx.canvas.height||160; ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(40,10); ctx.lineTo(40,H-22); ctx.lineTo(W-10,H-22); ctx.stroke(); const maxV=Math.max(100,...values,0),minV=Math.min(...values,0); const step=(W-60)/Math.max(1,values.length-1); const y=v=>(H-22)-((v-minV)/(maxV-minV||1))*(H-42); ctx.strokeStyle='#6ea8fe'; ctx.lineWidth=2; ctx.beginPath(); values.forEach((v,i)=>{const x=40+i*step,yy=y(v); if(i===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy)}); ctx.stroke(); ctx.fillStyle='#a16dff'; values.forEach((v,i)=>{const x=40+i*step,yy=y(v); ctx.beginPath(); ctx.arc(x,yy,3,0,Math.PI*2); ctx.fill()}); }
+      window.renderBarChart=function(id,labels,values){const ctx=_ctx(id); if(!ctx) return; _clear(ctx); const W=ctx.canvas.width,H=ctx.canvas.height||180; const n=values.length, bw=Math.max(26,(W-60)/Math.max(1,n)); const maxV=Math.max(100,...values,0); ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(40,10); ctx.lineTo(40,H-22); ctx.lineTo(W-10,H-22); ctx.stroke(); for(let i=0;i<n;i++){const v=values[i]; const h=((v)/(maxV||1))*(H-40); const x=40+i*bw; const grd=ctx.createLinearGradient(x,0,x+bw-8,H); grd.addColorStop(0,'#6ea8fe'); grd.addColorStop(1,'#a16dff'); ctx.fillStyle=grd; ctx.fillRect(x,H-22-h,bw-8,h);} }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-bar">
+        <a class="brand" href="/" aria-label="Home">
+          <span class="brand-mark"></span>
+          <span class="brand-name">{{ UI_BRAND_NAME }}</span>
+        </a>
+        <nav class="nav" aria-label="primary">
+          {% if user %}
+            <a href="/auth/dashboard">Dashboard</a>
+            <a href="/auth/audit/new">New Audit</a>
+            <a href="/auth/logout">Logout</a>
+          {% else %}
+            <a href="/auth/login">Login</a>
+            <a href="/auth/register" class="btn btn-primary">Register</a>
+          {% endif %}
+          <button id="themeToggle" class="btn btn-ghost" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+      <div class="wrap" style="display:flex;align-items:center;justify-content:space-between">
+        <p>© {{ UI_BRAND_NAME }} • Certified Website Audit</p>
+        <div class="muted">Made with Inter · Glass UI · Charts</div>
+      </div>
+    </footer>
+  </body>
+</html>
